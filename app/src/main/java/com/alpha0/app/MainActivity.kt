@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.alpha0.app.security.DeviceIdentity
 
 class MainActivity : Activity() {
 
@@ -26,21 +27,6 @@ class MainActivity : Activity() {
         }
 
         val status = TextView(this).apply {
-            text = """
-                BUILD-001A
-
-                Android client initialized.
-
-                Status:
-                Prototype
-
-                Next:
-                Device Identity
-                Ed25519 Authentication
-                Session
-                Revocation
-            """.trimIndent()
-
             textSize = 18f
             gravity = Gravity.CENTER
             setPadding(0, 32, 0, 0)
@@ -50,5 +36,43 @@ class MainActivity : Activity() {
         root.addView(status)
 
         setContentView(root)
+
+        try {
+            val identity = DeviceIdentity()
+                .getIdentityInfo()
+
+            status.text = """
+                BUILD-002A
+
+                Device Identity initialized.
+
+                Algorithm:
+                ${identity.algorithm}
+
+                Fingerprint:
+                ${identity.fingerprint}
+
+                Hardware backed:
+                ${identity.hardwareBacked}
+
+                Private key:
+                Non-exportable Keystore key
+
+                Status:
+                READY
+            """.trimIndent()
+
+        } catch (error: Exception) {
+            status.text = """
+                BUILD-002A
+
+                Device Identity:
+                FAILED
+
+                ${error.javaClass.simpleName}
+
+                ${error.message ?: "Unknown error"}
+            """.trimIndent()
+        }
     }
 }

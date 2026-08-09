@@ -52,9 +52,6 @@ class MainActivity : Activity() {
                 Fingerprint:
                 ${identity.fingerprint}
 
-                Hardware backed:
-                ${identity.hardwareBacked}
-
                 Private key:
                 Non-exportable Keystore key
 

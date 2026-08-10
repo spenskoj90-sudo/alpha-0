@@ -40,7 +40,6 @@ of a device key, while Sentinel Core remains the authoritative authorization bou
 - Gradle build/test/lint CI
 - APK SHA-256 checksum artifact
 - CodeQL static analysis
-- Dependency vulnerability review
 - Dependabot for Gradle and GitHub Actions updates
 - Durable Sentinel state and traceability documentation
 
@@ -98,7 +97,7 @@ The Android CI workflow validates:
 5. APK SHA-256 checksum generation
 6. Debug APK artifact publication
 
-Additional security workflows perform CodeQL analysis and dependency vulnerability review.
+CodeQL runs separately when repository security scanning is available. Dependabot tracks Gradle and GitHub Actions updates. Dependency Review is intentionally not configured because the current private-repository security configuration does not support that action; it must be enabled at the repository security-settings level before it can become a required check.
 
 A successful CI run is evidence for the configured checks only; it does not by itself establish production security, device-runtime acceptance, server deployment readiness, or Minimal Alpha RC readiness.
 

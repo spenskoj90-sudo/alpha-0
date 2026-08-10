@@ -48,6 +48,15 @@ Minimal Alpha Release Candidate
 - bounded roles, permissions, scope rules and context attributes
 - explicit `ALLOW` / typed `DENY` decisions
 
+### Device enrollment / binding
+
+- explicit `PENDING` / `ACTIVE` / `REVOKED` device state model
+- registration does not grant authorization
+- activation is a separate state transition
+- revoked devices cannot be reactivated through the normal activation path
+- store failures fail closed
+- active binding is checked before cryptographic proof acceptance
+
 ### Device challenge security
 
 - server-side P-256 challenge/signature verification boundary
@@ -63,17 +72,24 @@ Minimal Alpha Release Candidate
 - challenge-store failures fail closed
 - mandatory audit acknowledgement for successful verification
 - audit failure denies
-- regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized, non-P256 and storage-failure paths
+- active binding required before proof acceptance
+- regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized, non-P256, revoked-device and storage-failure paths
 
 ### PostgreSQL persistence slice
 
 - PostgreSQL JDBC 42.7.13
 - `JdbcChallengeStore`
+- `JdbcSessionStore`
 - server-side persisted challenge state
+- server-side persisted session state
 - atomic replay protection using conditional `UPDATE`
-- persisted nonce/fingerprint integrity validation
-- Flyway-style `V1__device_challenges.sql` migration
-- active-expiry and consumed-state indexes
+- persisted nonce/fingerprint/token-hash integrity validation
+- session token hash uniqueness
+- V1 challenge and V2 session migrations
+- canonical schema includes challenges and sessions
+- active-expiry and state indexes
+- environment-driven PostgreSQL configuration with TLS and channel binding required
+- bounded connection and socket timeouts
 
 ### Session security foundation
 
@@ -84,6 +100,7 @@ Minimal Alpha Release Candidate
 - expiry and revocation checks
 - malformed-token rejection
 - session-store failures fail closed
+- PostgreSQL persistence implementation
 - revocation API foundation
 - unit regression coverage for issue/authenticate/expiry/revocation/malformed/store-failure paths
 
@@ -101,8 +118,10 @@ Minimal Alpha Release Candidate
 
 - HTTP/API transport
 - production device registration and binding approval workflow
-- production session persistence/rotation and token operational policy
+- challenge issuance API
+- production session rotation and token operational policy
 - production revocation enforcement across all protected operations
+- transactional coupling of challenge consumption and mandatory audit persistence
 - recovery/key rotation
 - production database operational configuration and integration execution evidence
 - Android instrumentation on real/emulated devices
@@ -117,8 +136,8 @@ Interfaces and domain code do not count as production acceptance until execution
 ## Evidence status
 
 - Source inspection: current modernization branch
-- Latest Android CI: running/queued after current head changes
-- Latest CodeQL: running/queued after current head changes
+- Latest Android CI: pending/queued after current head changes
+- Latest CodeQL: queued after current head changes
 - Runtime Android identity verification: not yet performed
 - PostgreSQL integration execution: not yet performed
 - End-to-end authentication: not yet performed
@@ -150,7 +169,7 @@ Interfaces and domain code do not count as production acceptance until execution
 
 ## Next vertical slice
 
-Device Registration → Binding Approval → Session/Token Lifecycle → Revocation → Recovery/Key Rotation → HTTP/API enforcement → PostgreSQL integration tests → Client/Server E2E → performance → chaos → release verification.
+Device Registration API → Binding Approval → Server-issued Challenge → Proof Verification → Session Issuance → Revocation → Recovery/Key Rotation → HTTP/API enforcement → PostgreSQL integration tests → Client/Server E2E → performance → chaos → release verification.
 
 ## Continuity rule
 

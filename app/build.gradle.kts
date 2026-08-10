@@ -44,9 +44,16 @@ android {
         }
 
         release {
+            // Release signing is intentionally secret-backed. A release build without
+            // all required CI secrets must fail instead of silently producing a release artifact.
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("ciRelease")
         }
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
     }
 }
 

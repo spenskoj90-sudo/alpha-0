@@ -17,18 +17,22 @@ This map records the current implementation-to-contract boundary. `Implemented` 
 | Entitlement status/time window | `Authorization.kt` | Implemented | Core CI execution pending |
 | Policy evaluation | `Authorization.kt` | Implemented | Core CI execution pending |
 | Context validation | `Authorization.kt` | Implemented | Core CI execution pending |
+| Authorization resource limits | `Authorization.kt` | Implemented | Core CI execution pending |
 | Default Deny decision paths | `Authorization.kt` | Implemented in domain engine | Server enforcement pending |
 | Least Privilege | Core authorization contract | Foundation implemented | Server enforcement pending |
-| Server-side challenge verification | `core/.../DeviceChallengeVerifier.kt` | Implemented domain boundary | Integration/persistence pending |
-| Trusted challenge state | `ChallengeStore` | Interface contract | Persistent implementation pending |
-| Challenge replay protection | `ChallengeStore.consume()` | Interface contract | Atomic persistent implementation pending |
+| Server-side challenge verification | `DeviceChallengeVerifier.kt` | Implemented domain boundary | Integration/persistence pending |
+| Trusted challenge state | `ChallengeStore` + `JdbcChallengeStore` | Implemented | PostgreSQL runtime verification pending |
+| Challenge expiry | `DeviceChallengeVerifier` + DB schema | Implemented | PostgreSQL/runtime verification pending |
+| Challenge replay protection | atomic `UPDATE ... consumed_at` | Implemented | PostgreSQL integration test pending |
 | Device fingerprint binding | server-issued challenge state | Implemented domain boundary | Integration/persistence pending |
+| Constant-time fingerprint comparison | `MessageDigest.isEqual` | Implemented | Core CI execution pending |
+| Bounded cryptographic inputs | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Mandatory auditability | `AuditSink` | Interface contract | Durable persistence pending |
 | Audit failure → deny | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Centralized authorization truth | Sentinel Core | Foundation implemented | API/service enforcement pending |
 | Device registration | Backend | Not implemented | Not accepted |
 | Device binding approval | Backend | Not implemented | Not accepted |
-| PostgreSQL persistence | Sentinel Core | Not implemented | Not accepted |
+| PostgreSQL persistence | Challenge persistence slice | Partially implemented | Integration/deployment pending |
 | Session/token lifecycle | Backend | Not implemented | Not accepted |
 | Device revocation | Backend | Not implemented | Not accepted |
 | Recovery | Backend/client | Not implemented | Not accepted |

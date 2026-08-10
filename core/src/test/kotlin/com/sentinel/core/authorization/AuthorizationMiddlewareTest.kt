@@ -1,5 +1,7 @@
 package com.sentinel.core.authorization
 
+import com.sentinel.core.audit.AuditEvent
+import com.sentinel.core.audit.AuditSink
 import com.sentinel.core.session.SessionManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,6 +46,37 @@ class AuthorizationMiddlewareTest {
         )
         val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }) { now }
         assertEquals(ProtectedAuthorizationResult.Deny(403, "missing_role"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
+    }
+
+    @Test
+    fun auditFailureFailsClosed() {
+        val sessions = SessionManager(MemorySessionStore(), now = { now })
+        val credential = sessions.issue("device-1", Duration.ofMinutes(10))!!
+        val profile = AuthorizationProfile(
+            roles = setOf("operator"), requiredRole = "operator", permissions = setOf("report:read"),
+            scope = ScopeRuleset(1, listOf(ScopeRule("report", null, setOf("read")))),
+            entitlement = Entitlement("license", EntitlementStatus.ACTIVE, now.minusSeconds(1), null), policy = Policy { true }
+        )
+        val sink = AuditSink { false }
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, { now }, sink)
+        assertEquals(ProtectedAuthorizationResult.Deny(503, "audit_unavailable"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
+    }
+
+    @Test
+    fun denyDecisionIsAudited() {
+        val sessions = SessionManager(MemorySessionStore(), now = { now })
+        val credential = sessions.issue("device-1", Duration.ofMinutes(10))!!
+        val profile = AuthorizationProfile(
+            roles = setOf("viewer"), requiredRole = "operator", permissions = emptySet(),
+            scope = ScopeRuleset(1, listOf(ScopeRule("report", null, setOf("read")))),
+            entitlement = Entitlement("license", EntitlementStatus.ACTIVE, now.minusSeconds(1), null), policy = Policy { true }
+        )
+        val events = mutableListOf<AuditEvent>()
+        val sink = AuditSink { event -> events += event; true }
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, { now }, sink)
+        assertEquals(ProtectedAuthorizationResult.Deny(403, "missing_role"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
+        assertEquals("DENY", events.single().outcome)
+        assertTrue(events.single().reason!!.contains("missing_role"))
     }
 
     private class MemorySessionStore : com.sentinel.core.session.SessionStore {

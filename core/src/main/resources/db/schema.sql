@@ -12,7 +12,7 @@ CREATE INDEX IF NOT EXISTS idx_sentinel_devices_state ON sentinel_devices (state
 CREATE INDEX IF NOT EXISTS idx_sentinel_devices_updated ON sentinel_devices (updated_at);
 
 CREATE TABLE IF NOT EXISTS sentinel_device_recovery_codes (
-    device_fingerprint CHAR(64) NOT NULL REFERENCES sentinel_devices(fingerprint) ON DELETE CASCADE,
+    device_fingerprint CHAR(64) NOT NULL REFERENCES sentinel_devices(fingerprint) ON UPDATE CASCADE ON DELETE CASCADE,
     code_hash BYTEA NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     consumed_at TIMESTAMPTZ,

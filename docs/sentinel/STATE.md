@@ -30,6 +30,7 @@ Minimal Alpha Release Candidate
 - ECDSA `SHA256withECDSA` signing and local verification
 - deterministic hexadecimal encoding
 - runtime cryptographic self-test
+- explicit non-exportability self-test for the Keystore private key
 - cleartext traffic disabled
 - backup/device-transfer extraction disabled
 - JVM fingerprint/hex tests
@@ -54,7 +55,7 @@ Minimal Alpha Release Candidate
 - trusted server-issued nonce, expiry and expected fingerprint
 - 32–64 byte challenge nonce bound
 - bounded challenge ID, public-key and signature inputs
-- P-256 enforcement
+- exact `secp256r1` parameter enforcement, not only field-size checks
 - challenge expiry before expensive cryptography
 - expiry re-check immediately before atomic consumption
 - atomic challenge-consume contract for replay prevention
@@ -62,7 +63,7 @@ Minimal Alpha Release Candidate
 - challenge-store failures fail closed
 - mandatory audit acknowledgement for successful verification
 - audit failure denies
-- regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized and storage-failure paths
+- regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized, non-P256 and storage-failure paths
 
 ### PostgreSQL persistence slice
 
@@ -73,6 +74,18 @@ Minimal Alpha Release Candidate
 - persisted nonce/fingerprint integrity validation
 - Flyway-style `V1__device_challenges.sql` migration
 - active-expiry and consumed-state indexes
+
+### Session security foundation
+
+- opaque 256-bit bearer session credentials
+- raw token returned only at issuance
+- SHA-256 token digest persisted instead of the raw token
+- bounded session lifetime (maximum 30 days)
+- expiry and revocation checks
+- malformed-token rejection
+- session-store failures fail closed
+- revocation API foundation
+- unit regression coverage for issue/authenticate/expiry/revocation/malformed/store-failure paths
 
 ### Engineering / supply chain
 
@@ -88,8 +101,8 @@ Minimal Alpha Release Candidate
 
 - HTTP/API transport
 - production device registration and binding approval workflow
-- session/token lifecycle
-- revocation
+- production session persistence/rotation and token operational policy
+- production revocation enforcement across all protected operations
 - recovery/key rotation
 - production database operational configuration and integration execution evidence
 - Android instrumentation on real/emulated devices
@@ -121,6 +134,7 @@ Interfaces and domain code do not count as production acceptance until execution
 - expired challenge → DENY
 - replayed challenge → DENY
 - device/key mismatch → DENY
+- non-P256 key → DENY
 - challenge-store failure → DENY
 - malformed authorization request → DENY
 - oversized authorization input → DENY
@@ -131,6 +145,7 @@ Interfaces and domain code do not count as production acceptance until execution
 - policy denial/exception → DENY
 - invalid context → DENY
 - audit persistence failure → DENY
+- expired/revoked session → DENY
 - valid bound device + valid authorization context → ALLOW
 
 ## Next vertical slice

@@ -188,7 +188,7 @@ class DeviceChallengeVerifierTest {
         var consumed: Boolean = false
     ) : ChallengeStore {
         override fun find(challengeId: String): IssuedDeviceChallenge? =
-            challenge?.takeIf { it.id == challengeId }?.takeUnless { consumed }
+            challenge?.takeIf { it.id == challengeId }
 
         override fun consume(challengeId: String): Boolean {
             if (consumed || challenge?.id != challengeId) return false

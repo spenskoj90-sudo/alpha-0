@@ -11,30 +11,30 @@ import java.security.spec.X509EncodedKeySpec
 /**
  * Server-side cryptographic verification boundary.
  *
- * The proof contains only cryptographic material and a server-issued challenge.
- * No caller-supplied device/account identifier is trusted as identity. For an
- * already-bound device, the challenge may carry an expected fingerprint; the
- * verifier compares it to the fingerprint derived from the submitted public key.
+ * The client submits only a challenge ID, public key and signature. The nonce and
+ * any expected fingerprint are loaded from trusted server-side challenge state and
+ * are therefore not attacker-controlled proof parameters.
  *
  * This verifier proves possession of a P-256 private key. It deliberately does NOT
  * bind a new key to an account or grant authorization. Those remain separate,
  * explicitly authorized server-side decisions.
  */
 
-data class DeviceChallenge(
+data class IssuedDeviceChallenge(
     val id: String,
     val nonce: ByteArray,
     val expectedFingerprint: String? = null
 )
 
-data class DeviceProof(
+data class PresentedDeviceProof(
+    val challengeId: String,
     val publicKeyEncoded: ByteArray,
-    val signature: ByteArray,
-    val challenge: DeviceChallenge
+    val signature: ByteArray
 )
 
 enum class DeviceVerificationFailure {
     MALFORMED_REQUEST,
+    CHALLENGE_NOT_FOUND,
     UNSUPPORTED_KEY,
     INVALID_SIGNATURE,
     DEVICE_MISMATCH,
@@ -47,22 +47,33 @@ sealed interface DeviceVerificationResult {
     data class Rejected(val reason: DeviceVerificationFailure) : DeviceVerificationResult
 }
 
-fun interface ChallengeReplayGuard {
-    /** Atomically consumes a challenge. False means it was already consumed or unknown. */
+interface ChallengeStore {
+    fun find(challengeId: String): IssuedDeviceChallenge?
+
+    /** Atomically consumes the challenge. False means it was already consumed. */
     fun consume(challengeId: String): Boolean
 }
 
 class DeviceChallengeVerifier(
-    private val replayGuard: ChallengeReplayGuard,
+    private val challengeStore: ChallengeStore,
     private val auditSink: AuditSink
 ) {
-    fun verify(proof: DeviceProof): DeviceVerificationResult {
+    fun verify(proof: PresentedDeviceProof): DeviceVerificationResult {
         if (
-            proof.challenge.id.isBlank() ||
-            proof.challenge.nonce.size < MIN_CHALLENGE_BYTES ||
+            proof.challengeId.isBlank() ||
             proof.publicKeyEncoded.isEmpty() ||
-            proof.signature.isEmpty() ||
-            proof.challenge.expectedFingerprint?.let(::isValidFingerprint) == false
+            proof.signature.isEmpty()
+        ) {
+            return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
+        }
+
+        val challenge = challengeStore.find(proof.challengeId)
+            ?: return reject("unknown", DeviceVerificationFailure.CHALLENGE_NOT_FOUND)
+
+        if (
+            challenge.id != proof.challengeId ||
+            challenge.nonce.size < MIN_CHALLENGE_BYTES ||
+            challenge.expectedFingerprint?.let(::isValidFingerprint) == false
         ) {
             return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
         }
@@ -83,8 +94,8 @@ class DeviceChallengeVerifier(
         val fingerprint = fingerprint(proof.publicKeyEncoded)
 
         if (
-            proof.challenge.expectedFingerprint != null &&
-            proof.challenge.expectedFingerprint != fingerprint
+            challenge.expectedFingerprint != null &&
+            challenge.expectedFingerprint != fingerprint
         ) {
             return reject(fingerprint, DeviceVerificationFailure.DEVICE_MISMATCH)
         }
@@ -92,7 +103,7 @@ class DeviceChallengeVerifier(
         val validSignature = try {
             Signature.getInstance(SIGNATURE_ALGORITHM).apply {
                 initVerify(publicKey)
-                update(proof.challenge.nonce)
+                update(challenge.nonce)
             }.verify(proof.signature)
         } catch (_: Exception) {
             false
@@ -102,7 +113,7 @@ class DeviceChallengeVerifier(
             return reject(fingerprint, DeviceVerificationFailure.INVALID_SIGNATURE)
         }
 
-        if (!replayGuard.consume(proof.challenge.id)) {
+        if (!challengeStore.consume(proof.challengeId)) {
             return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }
 

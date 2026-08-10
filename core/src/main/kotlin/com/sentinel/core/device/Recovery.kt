@@ -6,14 +6,10 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 
-interface RecoveryCodeStore {
-    fun save(deviceFingerprint: String, codeHash: ByteArray, expiresAt: Instant): Boolean
-    fun consume(deviceFingerprint: String, codeHash: ByteArray, at: Instant): Boolean
-}
-
-interface DeviceKeyRotationStore : DeviceRegistryStore {
-    /** Atomically replaces the active key and keeps the device ACTIVE. */
-    fun rotateActiveKey(oldFingerprint: String, newFingerprint: String, newPublicKey: ByteArray, at: Instant): Boolean
+/** Persistence boundary for recovery. Recover must consume the one-time code and rotate the key atomically. */
+interface DeviceRecoveryStore : DeviceRegistryStore {
+    fun saveRecoveryCode(deviceFingerprint: String, codeHash: ByteArray, expiresAt: Instant): Boolean
+    fun recover(deviceFingerprint: String, codeHash: ByteArray, newFingerprint: String, newPublicKey: ByteArray, at: Instant): Boolean
 }
 
 sealed interface RecoveryResult {
@@ -23,8 +19,7 @@ sealed interface RecoveryResult {
 }
 
 class DeviceRecoveryService(
-    private val recoveryStore: RecoveryCodeStore,
-    private val deviceStore: DeviceKeyRotationStore,
+    private val store: DeviceRecoveryStore,
     private val random: SecureRandom = SecureRandom(),
     private val now: () -> Instant = Instant::now
 ) {
@@ -36,7 +31,7 @@ class DeviceRecoveryService(
         val code = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
         val expiresAt = now().plus(lifetime)
         return try {
-            if (recoveryStore.save(fingerprint, sha256(raw), expiresAt)) RecoveryResult.Issued(code, expiresAt)
+            if (store.saveRecoveryCode(fingerprint, sha256(raw), expiresAt)) RecoveryResult.Issued(code, expiresAt)
             else RecoveryResult.Rejected("store_unavailable")
         } catch (_: Exception) {
             RecoveryResult.Rejected("store_unavailable")
@@ -53,13 +48,10 @@ class DeviceRecoveryService(
         if (rawCode.size != CODE_BYTES) return RecoveryResult.Rejected("malformed_request")
         val newFingerprint = sha256(newPublicKey).toHex()
         return try {
-            val current = deviceStore.find(oldFingerprint)
-                ?: return RecoveryResult.Rejected("not_found")
-            if (current.state != DeviceState.ACTIVE) return RecoveryResult.Rejected("device_not_active")
-            if (!recoveryStore.consume(oldFingerprint, sha256(rawCode), now())) return RecoveryResult.Rejected("invalid_or_expired_code")
-            if (!deviceStore.rotateActiveKey(oldFingerprint, newFingerprint, newPublicKey.copyOf(), now())) {
-                RecoveryResult.Rejected("store_unavailable")
-            } else RecoveryResult.Recovered
+            if (store.find(oldFingerprint)?.state != DeviceState.ACTIVE) return RecoveryResult.Rejected("device_not_active")
+            if (store.recover(oldFingerprint, sha256(rawCode), newFingerprint, newPublicKey.copyOf(), now())) {
+                RecoveryResult.Recovered
+            } else RecoveryResult.Rejected("invalid_or_expired_code")
         } catch (_: Exception) {
             RecoveryResult.Rejected("store_unavailable")
         }

@@ -20,6 +20,7 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Identity substitution | PASS at domain level | fingerprint derived from submitted public key; expected fingerprint comes from trusted challenge state |
 | Fingerprint comparison | PASS | constant-time byte comparison |
 | Challenge tampering | PASS at domain level | client cannot replace server-issued nonce or identity context |
+| Curve enforcement | PASS at domain level | full `secp256r1` parameter set is compared, not only key size |
 | Input resource bounds | PASS at domain boundary | bounded IDs, keys, signatures, roles, permissions, scope rules and context |
 | Default Deny | PASS at domain level | explicit typed deny decisions |
 | Role enforcement | PASS at domain level | required role must be present |
@@ -31,6 +32,9 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Challenge-store failure | PASS | storage exceptions become typed DENY rather than escaping the security boundary |
 | Audit requirement | PASS at domain boundary | successful verification requires audit acknowledgement |
 | Audit failure | PASS | audit unavailable becomes DENY |
+| Session token confidentiality | PASS at domain level | opaque 256-bit token; SHA-256 digest is the persisted representation |
+| Session expiry | PASS at domain level | maximum 30-day issuance and expiry enforcement |
+| Session revocation | Foundation implemented | store contract exists; protected-operation integration pending |
 | Cleartext network | PASS | Android manifest + network security config |
 | Backup/data transfer | PASS | disabled in manifest and extraction rules |
 | CI build/test/lint | Automated | GitHub Actions; current head validation pending |
@@ -38,14 +42,21 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Static analysis | Configured | CodeQL workflow; current head validation pending |
 | Secrets in source | Guarded | `.gitignore`, CI secret-backed release signing |
 
+## Known design limitations
+
+1. Challenge consumption and audit acknowledgement are separate injected operations. Production deployment should use a transactional persistence/audit boundary so a successful proof cannot be consumed and then lose its audit record without a recovery mechanism.
+2. Session rotation is not yet implemented. Production rotation must atomically revoke the old credential and issue the new one.
+3. Session persistence is a domain foundation only; production database implementation is pending.
+4. Revocation is not yet wired into every protected operation.
+
 ## Release blockers
 
 The following remain blockers for claiming a production-ready Minimal Alpha RC:
 
 1. production API/transport implementation;
 2. explicit device registration and binding approval;
-3. session/token lifecycle;
-4. server-side revocation;
+3. production session persistence and rotation;
+4. server-side revocation enforcement;
 5. recovery and key-rotation flows;
 6. production PostgreSQL operational configuration and integration execution evidence;
 7. end-to-end client/server authentication tests;
@@ -55,8 +66,18 @@ The following remain blockers for claiming a production-ready Minimal Alpha RC:
 11. production release signing and artifact verification;
 12. repository-level GitHub Advanced Security configuration if CodeQL is expected to be enforced as a required check.
 
+## Current evidence
+
+- Android CI: in progress on current head
+- CodeQL: in progress on current head
+- Runtime Android verification: pending
+- PostgreSQL integration execution: pending
+- End-to-end authentication: pending
+- Performance benchmark: not performed
+- Chaos testing: not performed
+
 ## Acceptance rule
 
-No source-only claim is promoted to PASS. Final acceptance remains:
+No source-only claim is promoted to runtime PASS. Final acceptance remains:
 
 `FAIL → root cause → FIX → regression → PASS → ACCEPTED`

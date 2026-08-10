@@ -21,7 +21,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6.1.0
         with:
           gradle-version: "8.9"
-      - name: Start PostgreSQL
+      - name: Start PostgreSQL with TLS and SCRAM
         run: |
           set -euo pipefail
           docker run --name sentinel-postgres -e POSTGRES_DB=sentinel -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=sentinel-password -p 5432:5432 -d postgres:17
@@ -38,7 +38,7 @@ jobs:
           SENTINEL_DB_USER: sentinel
           SENTINEL_DB_PASSWORD: sentinel-password
           SENTINEL_ENROLLMENT_TOKEN: e2e-enrollment-token
-          SENTINEL_OPERATOR_SUBJECTS: "e2e-placeholder"
+          SENTINEL_OPERATOR_SUBJECTS: "*"
         run: |
           set -euo pipefail
           nohup server/build/install/server/bin/server > /tmp/sentinel-server.log 2>&1 &

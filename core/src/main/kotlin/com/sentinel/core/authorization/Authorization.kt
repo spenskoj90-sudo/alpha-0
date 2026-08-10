@@ -5,16 +5,11 @@ import java.time.Instant
 /**
  * Deterministic authorization domain for Sentinel Core.
  *
- * This module intentionally contains no transport, persistence, billing, or UI code.
- * The server/API adapter must invoke this engine before protected operations are executed.
- *
  * Security invariant: malformed input and evaluation failures fail closed.
+ * Resource limits are enforced at this boundary to reduce memory/CPU abuse.
  */
 
-data class Resource(
-    val type: String,
-    val id: String
-)
+data class Resource(val type: String, val id: String)
 
 data class ScopeRule(
     val resourceType: String,
@@ -22,34 +17,23 @@ data class ScopeRule(
     val actions: Set<String>
 ) {
     fun permits(action: String, resource: Resource): Boolean =
-        action in actions &&
-            resourceType == resource.type &&
+        action in actions && resourceType == resource.type &&
             (resourceId == null || resourceId == resource.id)
 
     fun isValid(): Boolean =
-        resourceType.isNotBlank() &&
-            (resourceId == null || resourceId.isNotBlank()) &&
-            actions.isNotEmpty() &&
-            actions.none { it.isBlank() }
+        resourceType.isNotBlank() && resourceType.length <= MAX_TEXT_LENGTH &&
+            (resourceId == null || (resourceId.isNotBlank() && resourceId.length <= MAX_TEXT_LENGTH)) &&
+            actions.isNotEmpty() && actions.size <= MAX_SET_SIZE &&
+            actions.all { it.isNotBlank() && it.length <= MAX_TEXT_LENGTH }
 }
 
-data class ScopeRuleset(
-    val version: Int,
-    val rules: List<ScopeRule>
-) {
-    fun permits(action: String, resource: Resource): Boolean =
-        rules.any { it.permits(action, resource) }
-
-    fun isValid(): Boolean =
-        version > 0 && rules.isNotEmpty() && rules.all(ScopeRule::isValid)
+data class ScopeRuleset(val version: Int, val rules: List<ScopeRule>) {
+    fun permits(action: String, resource: Resource): Boolean = rules.any { it.permits(action, resource) }
+    fun isValid(): Boolean = version > 0 && rules.isNotEmpty() &&
+        rules.size <= MAX_SCOPE_RULES && rules.all(ScopeRule::isValid)
 }
 
-enum class EntitlementStatus {
-    ACTIVE,
-    EXPIRED,
-    REVOKED,
-    SUSPENDED
-}
+enum class EntitlementStatus { ACTIVE, EXPIRED, REVOKED, SUSPENDED }
 
 data class Entitlement(
     val source: String,
@@ -58,27 +42,21 @@ data class Entitlement(
     val expiresAt: Instant?
 ) {
     fun isActiveAt(now: Instant): Boolean =
-        source.isNotBlank() &&
-            status == EntitlementStatus.ACTIVE &&
-            !now.isBefore(startsAt) &&
-            (expiresAt == null || now.isBefore(expiresAt))
+        source.isNotBlank() && status == EntitlementStatus.ACTIVE &&
+            !now.isBefore(startsAt) && (expiresAt == null || now.isBefore(expiresAt))
 
-    fun isValid(): Boolean =
-        source.isNotBlank() &&
-            (expiresAt == null || !expiresAt.isBefore(startsAt))
+    fun isValid(): Boolean = source.isNotBlank() && source.length <= MAX_TEXT_LENGTH &&
+        (expiresAt == null || !expiresAt.isBefore(startsAt))
 }
 
-data class AuthorizationContext(
-    val attributes: Map<String, String> = emptyMap()
-) {
-    fun isValid(): Boolean =
-        attributes.keys.none { it.isBlank() } &&
-            attributes.values.none { it.isBlank() }
+data class AuthorizationContext(val attributes: Map<String, String> = emptyMap()) {
+    fun isValid(): Boolean = attributes.size <= MAX_CONTEXT_ATTRIBUTES && attributes.all { (key, value) ->
+        key.isNotBlank() && key.length <= MAX_TEXT_LENGTH &&
+            value.isNotBlank() && value.length <= MAX_TEXT_LENGTH
+    }
 }
 
-fun interface Policy {
-    fun permits(request: AuthorizationRequest): Boolean
-}
+fun interface Policy { fun permits(request: AuthorizationRequest): Boolean }
 
 data class AuthorizationRequest(
     val identityId: String,
@@ -95,14 +73,8 @@ data class AuthorizationRequest(
 )
 
 enum class DenyReason {
-    MALFORMED_REQUEST,
-    INVALID_IDENTITY,
-    MISSING_ROLE,
-    MISSING_PERMISSION,
-    SCOPE_DENIED,
-    ENTITLEMENT_DENIED,
-    POLICY_DENIED,
-    CONTEXT_DENIED
+    MALFORMED_REQUEST, INVALID_IDENTITY, MISSING_ROLE, MISSING_PERMISSION,
+    SCOPE_DENIED, ENTITLEMENT_DENIED, POLICY_DENIED, CONTEXT_DENIED
 }
 
 sealed interface AuthorizationDecision {
@@ -112,54 +84,40 @@ sealed interface AuthorizationDecision {
 
 object AuthorizationEngine {
     fun decide(request: AuthorizationRequest): AuthorizationDecision {
-        if (!isRequestWellFormed(request)) {
-            return AuthorizationDecision.Deny(DenyReason.MALFORMED_REQUEST)
+        if (!isRequestWellFormed(request)) return deny(DenyReason.MALFORMED_REQUEST)
+        if (request.identityId.isBlank() || request.identityId.length > MAX_TEXT_LENGTH) {
+            return deny(DenyReason.INVALID_IDENTITY)
         }
-
-        if (request.identityId.isBlank()) {
-            return AuthorizationDecision.Deny(DenyReason.INVALID_IDENTITY)
-        }
-
-        if (request.requiredRole.isBlank() || request.roles.isEmpty() || request.requiredRole !in request.roles) {
-            return AuthorizationDecision.Deny(DenyReason.MISSING_ROLE)
-        }
+        if (request.requiredRole !in request.roles) return deny(DenyReason.MISSING_ROLE)
 
         val requiredPermission = "${request.resource.type}:${request.action}"
-        if (requiredPermission !in request.permissions) {
-            return AuthorizationDecision.Deny(DenyReason.MISSING_PERMISSION)
-        }
+        if (requiredPermission !in request.permissions) return deny(DenyReason.MISSING_PERMISSION)
+        if (!request.scope.permits(request.action, request.resource)) return deny(DenyReason.SCOPE_DENIED)
+        if (!request.entitlement.isActiveAt(request.now)) return deny(DenyReason.ENTITLEMENT_DENIED)
+        if (!request.context.isValid()) return deny(DenyReason.CONTEXT_DENIED)
 
-        if (!request.scope.permits(request.action, request.resource)) {
-            return AuthorizationDecision.Deny(DenyReason.SCOPE_DENIED)
-        }
-
-        if (!request.entitlement.isActiveAt(request.now)) {
-            return AuthorizationDecision.Deny(DenyReason.ENTITLEMENT_DENIED)
-        }
-
-        if (!request.context.isValid()) {
-            return AuthorizationDecision.Deny(DenyReason.CONTEXT_DENIED)
-        }
-
-        val policyPermits = try {
-            request.policy.permits(request)
-        } catch (_: Exception) {
-            false
-        }
-
-        if (!policyPermits) {
-            return AuthorizationDecision.Deny(DenyReason.POLICY_DENIED)
-        }
-
-        return AuthorizationDecision.Allow(scopeVersion = request.scope.version)
+        val policyPermits = try { request.policy.permits(request) } catch (_: Exception) { false }
+        if (!policyPermits) return deny(DenyReason.POLICY_DENIED)
+        return AuthorizationDecision.Allow(request.scope.version)
     }
 
+    private fun deny(reason: DenyReason) = AuthorizationDecision.Deny(reason)
+
     private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
-        request.roles.none { it.isBlank() } &&
-            request.permissions.none { it.isBlank() } &&
-            request.action.isNotBlank() &&
-            request.resource.type.isNotBlank() &&
-            request.resource.id.isNotBlank() &&
-            request.scope.isValid() &&
-            request.entitlement.isValid()
+        request.identityId.isNotBlank() && request.identityId.length <= MAX_TEXT_LENGTH &&
+            request.roles.isNotEmpty() && request.roles.size <= MAX_SET_SIZE &&
+            request.roles.all { it.isNotBlank() && it.length <= MAX_TEXT_LENGTH } &&
+            request.permissions.isNotEmpty() && request.permissions.size <= MAX_SET_SIZE &&
+            request.permissions.all { it.isNotBlank() && it.length <= MAX_PERMISSION_LENGTH } &&
+            request.requiredRole.isNotBlank() && request.requiredRole.length <= MAX_TEXT_LENGTH &&
+            request.action.isNotBlank() && request.action.length <= MAX_TEXT_LENGTH &&
+            request.resource.type.isNotBlank() && request.resource.type.length <= MAX_TEXT_LENGTH &&
+            request.resource.id.isNotBlank() && request.resource.id.length <= MAX_TEXT_LENGTH &&
+            request.scope.isValid() && request.entitlement.isValid()
+
+    private const val MAX_TEXT_LENGTH = 256
+    private const val MAX_PERMISSION_LENGTH = 513
+    private const val MAX_SET_SIZE = 128
+    private const val MAX_SCOPE_RULES = 512
+    private const val MAX_CONTEXT_ATTRIBUTES = 64
 }

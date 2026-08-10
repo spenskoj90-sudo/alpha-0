@@ -25,17 +25,22 @@ This map records the current implementation-to-contract boundary. `Implemented` 
 | Challenge expiry | `DeviceChallengeVerifier` + DB schema | Implemented | PostgreSQL/runtime verification pending |
 | Challenge replay protection | atomic `UPDATE ... consumed_at` | Implemented | PostgreSQL integration test pending |
 | Device fingerprint binding | server-issued challenge state | Implemented domain boundary | Integration/persistence pending |
+| Exact secp256r1 parameter enforcement | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Constant-time fingerprint comparison | `MessageDigest.isEqual` | Implemented | Core CI execution pending |
 | Bounded cryptographic inputs | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Mandatory auditability | `AuditSink` | Interface contract | Durable persistence pending |
 | Audit failure → deny | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Centralized authorization truth | Sentinel Core | Foundation implemented | API/service enforcement pending |
+| Session credentials | `SessionManager` | Implemented foundation | Core CI execution pending |
+| Session token storage | SHA-256 digest of opaque token | Implemented foundation | Persistent integration pending |
+| Session expiry | `SessionManager` | Implemented | Core CI execution pending |
+| Session revocation | `SessionManager` + `SessionStore` | Implemented foundation | Protected-operation integration pending |
 | Device registration | Backend | Not implemented | Not accepted |
 | Device binding approval | Backend | Not implemented | Not accepted |
 | PostgreSQL persistence | Challenge persistence slice | Partially implemented | Integration/deployment pending |
-| Session/token lifecycle | Backend | Not implemented | Not accepted |
+| Session rotation | Backend | Not implemented | Not accepted |
 | Device revocation | Backend | Not implemented | Not accepted |
-| Recovery | Backend/client | Not implemented | Not accepted |
+| Recovery / key rotation | Backend/client | Not implemented | Not accepted |
 | Network/VPN resilience | Client/backend | Not implemented | Not accepted |
 | End-to-end authentication | Client ↔ server | Not implemented | Not accepted |
 | Performance | Test infrastructure | Not implemented | Not accepted |

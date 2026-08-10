@@ -1,5 +1,11 @@
 package com.sentinel.core.device
 
+import java.security.AlgorithmParameters
+import java.security.KeyFactory
+import java.security.interfaces.ECPublicKey
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
 
 /**
@@ -42,7 +48,7 @@ class DeviceRegistry(
     private val now: () -> Instant = Instant::now
 ) {
     fun registerPending(fingerprint: String, publicKeyEncoded: ByteArray): DeviceRegistryResult {
-        if (!isValidFingerprint(fingerprint) || publicKeyEncoded.isEmpty() || publicKeyEncoded.size > MAX_PUBLIC_KEY_BYTES) {
+        if (!isValidFingerprint(fingerprint) || !isP256PublicKey(publicKeyEncoded)) {
             return DeviceRegistryResult.Rejected(DeviceRegistryFailure.MALFORMED_REQUEST)
         }
         return try {
@@ -90,8 +96,23 @@ class DeviceRegistry(
     private fun isValidFingerprint(value: String): Boolean =
         value.length == FINGERPRINT_LENGTH && value.all { it in '0'..'9' || it in 'a'..'f' }
 
+    private fun isP256PublicKey(encoded: ByteArray): Boolean = runCatching {
+        if (encoded.isEmpty() || encoded.size > MAX_PUBLIC_KEY_BYTES) return false
+        val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(encoded)) as? ECPublicKey ?: return false
+        val expected = P256_PARAMS
+        key.params.curve == expected.curve &&
+            key.params.generator == expected.generator &&
+            key.params.order == expected.order &&
+            key.params.cofactor == expected.cofactor
+    }.getOrDefault(false)
+
     private companion object {
         const val FINGERPRINT_LENGTH = 64
         const val MAX_PUBLIC_KEY_BYTES = 512
+        val P256_PARAMS: ECParameterSpec by lazy {
+            AlgorithmParameters.getInstance("EC").apply {
+                init(ECGenParameterSpec("secp256r1"))
+            }.getParameterSpec(ECParameterSpec::class.java)
+        }
     }
 }

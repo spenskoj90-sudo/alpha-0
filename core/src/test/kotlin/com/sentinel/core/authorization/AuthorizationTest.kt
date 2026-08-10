@@ -28,6 +28,7 @@ class AuthorizationTest {
     private fun request(
         identityId: String = "device-1",
         roles: Set<String> = setOf("member"),
+        requiredRole: String = "member",
         permissions: Set<String> = setOf("profile:read"),
         requestScope: ScopeRuleset = scope,
         requestEntitlement: Entitlement = entitlement,
@@ -36,6 +37,7 @@ class AuthorizationTest {
     ) = AuthorizationRequest(
         identityId = identityId,
         roles = roles,
+        requiredRole = requiredRole,
         permissions = permissions,
         scope = requestScope,
         entitlement = requestEntitlement,
@@ -63,10 +65,10 @@ class AuthorizationTest {
     }
 
     @Test
-    fun missingRoleIsDenied() {
+    fun missingRequiredRoleIsDenied() {
         assertEquals(
             AuthorizationDecision.Deny(DenyReason.MISSING_ROLE),
-            AuthorizationEngine.decide(request(roles = emptySet()))
+            AuthorizationEngine.decide(request(roles = setOf("viewer")))
         )
     }
 

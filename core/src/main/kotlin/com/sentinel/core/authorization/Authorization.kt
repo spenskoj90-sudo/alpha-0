@@ -2,6 +2,12 @@ package com.sentinel.core.authorization
 
 import java.time.Instant
 
+private const val MAX_TEXT_LENGTH = 256
+private const val MAX_PERMISSION_LENGTH = 513
+private const val MAX_SET_SIZE = 128
+private const val MAX_SCOPE_RULES = 512
+private const val MAX_CONTEXT_ATTRIBUTES = 64
+
 /**
  * Deterministic authorization domain for Sentinel Core.
  *
@@ -113,10 +119,4 @@ object AuthorizationEngine {
             request.resource.type.isNotBlank() && request.resource.type.length <= MAX_TEXT_LENGTH &&
             request.resource.id.isNotBlank() && request.resource.id.length <= MAX_TEXT_LENGTH &&
             request.scope.isValid() && request.entitlement.isValid()
-
-    private const val MAX_TEXT_LENGTH = 256
-    private const val MAX_PERMISSION_LENGTH = 513
-    private const val MAX_SET_SIZE = 128
-    private const val MAX_SCOPE_RULES = 512
-    private const val MAX_CONTEXT_ATTRIBUTES = 64
 }

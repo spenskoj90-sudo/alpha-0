@@ -29,27 +29,7 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Prepare signing keystore
-        env:
-          ALPHA0_KEYSTORE_BASE64: ${{ secrets.ALPHA0_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-
-          test -n "$ALPHA0_KEYSTORE_BASE64"
-
-          mkdir -p "$RUNNER_TEMP/alpha0"
-
-          echo "$ALPHA0_KEYSTORE_BASE64" | base64 --decode \
-            > "$RUNNER_TEMP/alpha0/alpha0-release.keystore"
-
-          test -s "$RUNNER_TEMP/alpha0/alpha0-release.keystore"
-
       - name: Build Debug APK
-        env:
-          ALPHA0_KEYSTORE_PATH: ${{ runner.temp }}/alpha0/alpha0-release.keystore
-          ALPHA0_KEYSTORE_PASSWORD: ${{ secrets.ALPHA0_KEYSTORE_PASSWORD }}
-          ALPHA0_KEY_ALIAS: ${{ secrets.ALPHA0_KEY_ALIAS }}
-          ALPHA0_KEY_PASSWORD: ${{ secrets.ALPHA0_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           gradle --no-daemon --stacktrace assembleDebug
@@ -70,8 +50,3 @@ jobs:
           name: alpha-0-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
-      - name: Cleanup signing material
-        if: always()
-        run: |
-          rm -rf "$RUNNER_TEMP/alpha0"

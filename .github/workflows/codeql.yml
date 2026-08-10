@@ -1,0 +1,32 @@
+name: SENTINEL CodeQL
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: CodeQL analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4.37.3
+        with:
+          languages: java-kotlin
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4.37.3
+        with:
+          category: "/language:java-kotlin"

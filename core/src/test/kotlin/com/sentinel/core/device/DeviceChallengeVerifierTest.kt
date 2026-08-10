@@ -105,6 +105,17 @@ class DeviceChallengeVerifierTest {
     }
 
     @Test
+    fun nonP256KeyIsRejectedBeforeSignatureVerification() {
+        val keyPair = KeyPairGenerator.getInstance("EC").apply { initialize(384) }.generateKeyPair()
+        val nonce = ByteArray(32) { 5 }
+        val store = TestChallengeStore(challenge(nonce = nonce))
+        val verifier = DeviceChallengeVerifier(store, RecordingAuditSink()) { testNow }
+        val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce)))
+        assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.UNSUPPORTED_KEY), result)
+        assertTrue(!store.consumed)
+    }
+
+    @Test
     fun replayIsRejectedAfterValidSignature() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 3 }

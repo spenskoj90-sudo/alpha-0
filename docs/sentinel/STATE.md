@@ -2,7 +2,7 @@
 
 ## Current stage
 
-Alpha-0
+Alpha-0 hardening / reliability vertical slice
 
 ## Target
 
@@ -35,9 +35,8 @@ Minimal Alpha Release Candidate
 - JVM fingerprint/hex tests
 - Android build, lint and artifact CI
 
-### Sentinel Core foundation
+### Sentinel Core authorization
 
-- Kotlin/JVM `core` module
 - centralized Default Deny authorization engine
 - explicit required-role membership
 - permission check independent from role
@@ -45,16 +44,35 @@ Minimal Alpha Release Candidate
 - entitlement status/time-window evaluation
 - policy evaluation with fail-closed exceptions
 - context validation
+- bounded roles, permissions, scope rules and context attributes
 - explicit `ALLOW` / typed `DENY` decisions
-- bounded authorization inputs to reduce memory/CPU abuse
+
+### Device challenge security
+
 - server-side P-256 challenge/signature verification boundary
-- trusted server-issued challenge-state lookup
-- challenge expiry enforcement
-- bounded challenge/public-key/signature inputs
+- client submits only challenge ID, public key and signature
+- trusted server-issued nonce, expiry and expected fingerprint
+- 32–64 byte challenge nonce bound
+- bounded challenge ID, public-key and signature inputs
+- P-256 enforcement
+- challenge expiry before expensive cryptography
+- expiry re-check immediately before atomic consumption
 - atomic challenge-consume contract for replay prevention
-- server-issued expected-fingerprint binding with constant-time comparison
-- mandatory audit-sink contract for security-success acknowledgement
-- regression tests for positive, negative, boundary, replay, substitution, challenge-tampering, expiry, resource-limit and audit-failure paths
+- constant-time fingerprint comparison
+- challenge-store failures fail closed
+- mandatory audit acknowledgement for successful verification
+- audit failure denies
+- regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized and storage-failure paths
+
+### PostgreSQL persistence slice
+
+- PostgreSQL JDBC 42.7.13
+- `JdbcChallengeStore`
+- server-side persisted challenge state
+- atomic replay protection using conditional `UPDATE`
+- persisted nonce/fingerprint integrity validation
+- Flyway-style `V1__device_challenges.sql` migration
+- active-expiry and consumed-state indexes
 
 ### Engineering / supply chain
 
@@ -69,26 +87,28 @@ Minimal Alpha Release Candidate
 ## Intentionally not accepted as complete
 
 - HTTP/API transport
-- PostgreSQL persistence
-- production challenge store / atomic replay implementation
-- explicit device enrollment and binding approval workflow
+- production device registration and binding approval workflow
 - session/token lifecycle
 - revocation
-- recovery
-- network/VPN resilience
-- production release signing and artifact verification
+- recovery/key rotation
+- production database operational configuration and migration execution evidence
 - Android instrumentation on real/emulated devices
 - client ↔ server end-to-end authentication tests
-- performance and chaos benchmarks
+- performance benchmarks
+- chaos/failure-injection tests
+- production release signing and artifact verification
+- repository-level GitHub Advanced Security enforcement if CodeQL is expected to be a required check
 
-Interfaces and domain code do not count as production implementation until execution evidence exists.
+Interfaces and domain code do not count as production acceptance until execution evidence exists.
 
 ## Evidence status
 
-- Source inspection: verified on modernization branch
-- CI: must be checked against the latest head after changes
+- Source inspection: current modernization branch
+- Latest Android CI: in progress for current head
+- Latest CodeQL: queued for current head
 - Runtime Android identity verification: not yet performed
-- Server integration verification: not yet performed
+- PostgreSQL integration execution: not yet performed
+- End-to-end authentication: not yet performed
 - Performance benchmark: not performed
 - Chaos testing: not performed
 
@@ -101,6 +121,7 @@ Interfaces and domain code do not count as production implementation until execu
 - expired challenge → DENY
 - replayed challenge → DENY
 - device/key mismatch → DENY
+- challenge-store failure → DENY
 - malformed authorization request → DENY
 - oversized authorization input → DENY
 - missing role → DENY
@@ -114,7 +135,7 @@ Interfaces and domain code do not count as production implementation until execu
 
 ## Next vertical slice
 
-Device Registration → Server Challenge Store → Server Challenge Verification → Device Binding Approval → PostgreSQL Persistence → Audit → protected operation through Core Authorization.
+Device Registration → Binding Approval → Session/Token Lifecycle → Revocation → Recovery/Key Rotation → HTTP/API enforcement → PostgreSQL integration tests → Client/Server E2E → performance → chaos → release verification.
 
 ## Continuity rule
 

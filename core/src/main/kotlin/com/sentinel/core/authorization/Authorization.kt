@@ -8,13 +8,6 @@ private const val MAX_SET_SIZE = 128
 private const val MAX_SCOPE_RULES = 512
 private const val MAX_CONTEXT_ATTRIBUTES = 64
 
-/**
- * Deterministic authorization domain for Sentinel Core.
- *
- * Security invariant: malformed input and evaluation failures fail closed.
- * Resource limits are enforced at this boundary to reduce memory/CPU abuse.
- */
-
 data class Resource(val type: String, val id: String)
 
 data class ScopeRule(
@@ -110,9 +103,9 @@ object AuthorizationEngine {
     private fun deny(reason: DenyReason) = AuthorizationDecision.Deny(reason)
 
     private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
-        request.roles.isNotEmpty() && request.roles.size <= MAX_SET_SIZE &&
+        request.roles.size <= MAX_SET_SIZE &&
             request.roles.all { it.isNotBlank() && it.length <= MAX_TEXT_LENGTH } &&
-            request.permissions.isNotEmpty() && request.permissions.size <= MAX_SET_SIZE &&
+            request.permissions.size <= MAX_SET_SIZE &&
             request.permissions.all { it.isNotBlank() && it.length <= MAX_PERMISSION_LENGTH } &&
             request.requiredRole.isNotBlank() && request.requiredRole.length <= MAX_TEXT_LENGTH &&
             request.action.isNotBlank() && request.action.length <= MAX_TEXT_LENGTH &&

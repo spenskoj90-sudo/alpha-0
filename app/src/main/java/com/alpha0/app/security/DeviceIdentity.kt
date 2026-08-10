@@ -19,6 +19,7 @@ class DeviceIdentity {
         private const val CURVE = "secp256r1"
         private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
         private const val HASH_ALGORITHM = "SHA-256"
+        private val KEY_CREATION_LOCK = Any()
     }
 
     data class IdentityInfo(
@@ -33,27 +34,29 @@ class DeviceIdentity {
     }
 
     private fun ensureKeyExists() {
-        val keyStore = loadKeyStore()
+        synchronized(KEY_CREATION_LOCK) {
+            val keyStore = loadKeyStore()
 
-        if (keyStore.containsAlias(KEY_ALIAS)) {
-            return
+            if (keyStore.containsAlias(KEY_ALIAS)) {
+                return
+            }
+
+            val generator = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_EC,
+                KEYSTORE_PROVIDER
+            )
+
+            val spec = KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            )
+                .setAlgorithmParameterSpec(ECGenParameterSpec(CURVE))
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .build()
+
+            generator.initialize(spec)
+            generator.generateKeyPair()
         }
-
-        val generator = KeyPairGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_EC,
-            KEYSTORE_PROVIDER
-        )
-
-        val spec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
-            KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-        )
-            .setAlgorithmParameterSpec(ECGenParameterSpec(CURVE))
-            .setDigests(KeyProperties.DIGEST_SHA256)
-            .build()
-
-        generator.initialize(spec)
-        generator.generateKeyPair()
     }
 
     private fun getPrivateKey(): PrivateKey {

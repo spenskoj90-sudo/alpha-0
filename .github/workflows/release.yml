@@ -47,12 +47,15 @@ jobs:
           apksigner verify --verbose --min-sdk-version 29 "$apk"
           sha256sum "$apk" | tee "$apk.sha256"
       - name: Publish release assets
-        uses: softprops/action-gh-release@v2.4.2
-        with:
-          files: |
-            app/build/outputs/apk/release/app-release.apk
-            app/build/outputs/apk/release/app-release.apk.sha256
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" \
+            app/build/outputs/apk/release/app-release.apk \
+            app/build/outputs/apk/release/app-release.apk.sha256 \
+            --generate-notes
       - name: Remove signing material
         if: always()
         run: rm -rf "$RUNNER_TEMP/sentinel"

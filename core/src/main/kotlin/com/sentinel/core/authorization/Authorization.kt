@@ -120,7 +120,7 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.INVALID_IDENTITY)
         }
 
-        if (request.roles.isEmpty() || request.roles.none { it == request.requiredRole }) {
+        if (request.requiredRole.isBlank() || request.roles.isEmpty() || request.requiredRole !in request.roles) {
             return AuthorizationDecision.Deny(DenyReason.MISSING_ROLE)
         }
 
@@ -137,10 +137,6 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.ENTITLEMENT_DENIED)
         }
 
-        if (!request.context.isValid()) {
-            return AuthorizationDecision.Deny(DenyReason.CONTEXT_DENIED)
-        }
-
         val policyPermits = try {
             request.policy.permits(request)
         } catch (_: Exception) {
@@ -155,9 +151,7 @@ object AuthorizationEngine {
     }
 
     private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
-        request.requiredRole.isNotBlank() &&
-            request.roles.none { it.isBlank() } &&
-            request.permissions.isNotEmpty() &&
+        request.roles.none { it.isBlank() } &&
             request.permissions.none { it.isBlank() } &&
             request.action.isNotBlank() &&
             request.resource.type.isNotBlank() &&

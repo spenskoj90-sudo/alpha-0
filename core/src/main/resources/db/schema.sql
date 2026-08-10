@@ -8,12 +8,19 @@ CREATE TABLE IF NOT EXISTS sentinel_devices (
     CONSTRAINT sentinel_device_public_key_size CHECK (octet_length(public_key) BETWEEN 1 AND 512),
     CONSTRAINT sentinel_device_state CHECK (state IN ('PENDING', 'ACTIVE', 'REVOKED'))
 );
+CREATE INDEX IF NOT EXISTS idx_sentinel_devices_state ON sentinel_devices (state);
+CREATE INDEX IF NOT EXISTS idx_sentinel_devices_updated ON sentinel_devices (updated_at);
 
-CREATE INDEX IF NOT EXISTS idx_sentinel_devices_state
-    ON sentinel_devices (state);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_devices_updated
-    ON sentinel_devices (updated_at);
+CREATE TABLE IF NOT EXISTS sentinel_device_recovery_codes (
+    device_fingerprint CHAR(64) NOT NULL REFERENCES sentinel_devices(fingerprint) ON DELETE CASCADE,
+    code_hash BYTEA NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    PRIMARY KEY (device_fingerprint, code_hash),
+    CONSTRAINT sentinel_recovery_hash_size CHECK (octet_length(code_hash) = 32),
+    CONSTRAINT sentinel_recovery_expiry CHECK (expires_at IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_sentinel_recovery_expiry ON sentinel_device_recovery_codes (expires_at);
 
 CREATE TABLE IF NOT EXISTS sentinel_device_challenges (
     challenge_id VARCHAR(256) PRIMARY KEY,
@@ -22,18 +29,11 @@ CREATE TABLE IF NOT EXISTS sentinel_device_challenges (
     expected_fingerprint CHAR(64),
     consumed_at TIMESTAMPTZ,
     CONSTRAINT sentinel_challenge_nonce_size CHECK (octet_length(nonce) BETWEEN 32 AND 64),
-    CONSTRAINT sentinel_challenge_fingerprint_format CHECK (
-        expected_fingerprint IS NULL OR expected_fingerprint ~ '^[0-9a-f]{64}$'
-    ),
+    CONSTRAINT sentinel_challenge_fingerprint_format CHECK (expected_fingerprint IS NULL OR expected_fingerprint ~ '^[0-9a-f]{64}$'),
     CONSTRAINT sentinel_challenge_expiry CHECK (expires_at IS NOT NULL)
 );
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_expiry
-    ON sentinel_device_challenges (expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_active
-    ON sentinel_device_challenges (challenge_id)
-    WHERE consumed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_expiry ON sentinel_device_challenges (expires_at);
+CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_active ON sentinel_device_challenges (challenge_id) WHERE consumed_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS sentinel_sessions (
     session_id VARCHAR(128) PRIMARY KEY,
@@ -45,16 +45,9 @@ CREATE TABLE IF NOT EXISTS sentinel_sessions (
     CONSTRAINT sentinel_session_subject_nonempty CHECK (length(subject_id) BETWEEN 1 AND 256),
     CONSTRAINT sentinel_session_expiry_present CHECK (expires_at IS NOT NULL)
 );
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_expiry
-    ON sentinel_sessions (expires_at);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_subject
-    ON sentinel_sessions (subject_id);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_active
-    ON sentinel_sessions (session_id)
-    WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_expiry ON sentinel_sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_subject ON sentinel_sessions (subject_id);
+CREATE INDEX IF NOT EXISTS idx_sentinel_sessions_active ON sentinel_sessions (session_id) WHERE revoked_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS sentinel_audit_events (
     id BIGSERIAL PRIMARY KEY,
@@ -65,13 +58,7 @@ CREATE TABLE IF NOT EXISTS sentinel_audit_events (
     reason VARCHAR(256),
     fingerprint CHAR(64),
     CONSTRAINT sentinel_audit_outcome CHECK (outcome IN ('ALLOW', 'DENY')),
-    CONSTRAINT sentinel_audit_fingerprint_format CHECK (
-        fingerprint IS NULL OR fingerprint ~ '^[0-9a-f]{64}$'
-    )
+    CONSTRAINT sentinel_audit_fingerprint_format CHECK (fingerprint IS NULL OR fingerprint ~ '^[0-9a-f]{64}$')
 );
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_audit_subject_time
-    ON sentinel_audit_events (subject_id, event_time DESC);
-
-CREATE INDEX IF NOT EXISTS idx_sentinel_audit_action_time
-    ON sentinel_audit_events (action, event_time DESC);
+CREATE INDEX IF NOT EXISTS idx_sentinel_audit_subject_time ON sentinel_audit_events (subject_id, event_time DESC);
+CREATE INDEX IF NOT EXISTS idx_sentinel_audit_action_time ON sentinel_audit_events (action, event_time DESC);

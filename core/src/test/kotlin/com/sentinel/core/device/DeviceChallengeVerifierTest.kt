@@ -27,12 +27,9 @@ class DeviceChallengeVerifierTest {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { it.toByte() }
         val store = TestChallengeStore(challenge(nonce = nonce))
-        val signature = sign(keyPair, nonce)
         val audit = RecordingAuditSink()
         val verifier = DeviceChallengeVerifier(store, audit) { testNow }
-
-        val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, signature))
-
+        val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce)))
         assertTrue(result is DeviceVerificationResult.Verified)
         assertEquals(1, audit.events.size)
         assertEquals("ALLOW", audit.events.single().outcome)
@@ -44,12 +41,9 @@ class DeviceChallengeVerifierTest {
         val keyPair = generateP256KeyPair()
         val otherKeyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 9 }
-        val expected = fingerprint(otherKeyPair.public.encoded)
-        val store = TestChallengeStore(challenge(nonce = nonce, expectedFingerprint = expected))
+        val store = TestChallengeStore(challenge(nonce = nonce, expectedFingerprint = fingerprint(otherKeyPair.public.encoded)))
         val verifier = DeviceChallengeVerifier(store, RecordingAuditSink()) { testNow }
-
         val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce)))
-
         assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.DEVICE_MISMATCH), result)
         assertTrue(!store.consumed)
     }
@@ -61,9 +55,7 @@ class DeviceChallengeVerifierTest {
         val attackerNonce = ByteArray(32) { 2 }
         val store = TestChallengeStore(challenge(nonce = serverNonce))
         val verifier = DeviceChallengeVerifier(store, RecordingAuditSink()) { testNow }
-
         val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, attackerNonce)))
-
         assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.INVALID_SIGNATURE), result)
         assertTrue(!store.consumed)
     }
@@ -74,9 +66,7 @@ class DeviceChallengeVerifierTest {
         val nonce = ByteArray(32) { 8 }
         val store = TestChallengeStore(challenge(nonce = nonce, expiresAt = testNow.minusSeconds(1)))
         val verifier = DeviceChallengeVerifier(store, RecordingAuditSink()) { testNow }
-
         val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce)))
-
         assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_EXPIRED), result)
         assertTrue(!store.consumed)
     }
@@ -90,6 +80,18 @@ class DeviceChallengeVerifierTest {
     }
 
     @Test
+    fun challengeStoreFailureFailsClosed() {
+        val keyPair = generateP256KeyPair()
+        val store = object : ChallengeStore {
+            override fun find(challengeId: String): IssuedDeviceChallenge? = error("database unavailable")
+            override fun consume(challengeId: String): Boolean = error("database unavailable")
+        }
+        val verifier = DeviceChallengeVerifier(store, RecordingAuditSink()) { testNow }
+        val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, byteArrayOf(1)))
+        assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_STORE_UNAVAILABLE), result)
+    }
+
+    @Test
     fun invalidSignatureIsRejectedAndChallengeIsNotConsumed() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 7 }
@@ -97,7 +99,6 @@ class DeviceChallengeVerifierTest {
         val audit = RecordingAuditSink()
         val verifier = DeviceChallengeVerifier(store, audit) { testNow }
         val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, byteArrayOf(1, 2, 3)))
-
         assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.INVALID_SIGNATURE), result)
         assertTrue(!store.consumed)
         assertEquals("DENY", audit.events.single().outcome)
@@ -137,30 +138,25 @@ class DeviceChallengeVerifierTest {
         val store = TestChallengeStore(challenge(nonce = nonce))
         val verifier = DeviceChallengeVerifier(store, AuditSink { false }) { testNow }
         val result = verifier.verify(PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce)))
-
         assertEquals(DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE), result)
         assertTrue(store.consumed)
     }
 
-    private fun generateP256KeyPair(): KeyPair =
-        KeyPairGenerator.getInstance("EC").apply { initialize(256) }.generateKeyPair()
+    private fun generateP256KeyPair(): KeyPair = KeyPairGenerator.getInstance("EC").apply { initialize(256) }.generateKeyPair()
 
-    private fun sign(keyPair: KeyPair, nonce: ByteArray): ByteArray =
-        Signature.getInstance("SHA256withECDSA").apply {
-            initSign(keyPair.private)
-            update(nonce)
-        }.sign()
+    private fun sign(keyPair: KeyPair, nonce: ByteArray): ByteArray = Signature.getInstance("SHA256withECDSA").apply {
+        initSign(keyPair.private)
+        update(nonce)
+    }.sign()
 
-    private fun fingerprint(encodedPublicKey: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(encodedPublicKey)
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    private fun fingerprint(encodedPublicKey: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(encodedPublicKey)
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private class TestChallengeStore(
         private val challenge: IssuedDeviceChallenge?,
         var consumed: Boolean = false
     ) : ChallengeStore {
         override fun find(challengeId: String): IssuedDeviceChallenge? = challenge?.takeIf { it.id == challengeId }
-
         override fun consume(challengeId: String): Boolean {
             if (consumed || challenge?.id != challengeId) return false
             consumed = true

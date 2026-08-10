@@ -9,21 +9,25 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Area | Result | Evidence / boundary |
 |---|---|---|
 | Private-key storage | PASS at source level | Android Keystore-backed EC key |
-| Private-key export | Runtime check implemented | `DeviceIdentity.isPrivateKeyExported()` |
+| Private-key export | Runtime check implemented | Android crypto self-test |
 | Signature algorithm | PASS at source level | P-256 / `SHA256withECDSA` |
 | Fingerprint encoding | PASS at source + unit coverage | SHA-256 + deterministic lowercase hex |
-| Challenge minimum size | PASS | 32-byte minimum in server verifier |
-| Trusted challenge state | PASS at domain boundary | nonce and expected fingerprint come only from `ChallengeStore` |
+| Challenge minimum size | PASS | 32-byte minimum |
+| Challenge maximum size | PASS | 64-byte upper bound before crypto work |
+| Trusted challenge state | PASS at domain boundary | nonce, expiry and expected fingerprint come only from `ChallengeStore` |
+| Challenge expiry | PASS at domain boundary | verifier rejects expired challenges before signature work |
 | Challenge replay | Contract present | `ChallengeStore.consume()` must be atomic/persistent in production |
 | Identity substitution | PASS at domain level | fingerprint derived from submitted public key; expected fingerprint comes from trusted challenge state |
+| Fingerprint comparison | PASS | constant-time byte comparison |
 | Challenge tampering | PASS at domain level | client cannot replace server-issued nonce or identity context |
+| Input resource bounds | PASS at domain boundary | bounded IDs, keys, signatures, roles, permissions, scope rules and context |
 | Default Deny | PASS at domain level | explicit typed deny decisions |
 | Role enforcement | PASS at domain level | required role must be present |
 | Permission enforcement | PASS at domain level | resource/action permission required independently |
 | Scope enforcement | PASS at domain level | versioned ruleset with structural validation |
 | Entitlement | PASS at domain level | status + time-window validation |
 | Policy exceptions | PASS | policy exceptions become DENY |
-| Context validation | PASS | blank keys/values denied |
+| Context validation | PASS | blank/oversized keys and values denied |
 | Audit requirement | PASS at domain boundary | successful verification requires audit acknowledgement |
 | Audit failure | PASS | audit unavailable becomes DENY |
 | Cleartext network | PASS | Android manifest + network security config |

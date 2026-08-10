@@ -91,7 +91,7 @@ Minimal Alpha Release Candidate
 - session/token lifecycle
 - revocation
 - recovery/key rotation
-- production database operational configuration and migration execution evidence
+- production database operational configuration and integration execution evidence
 - Android instrumentation on real/emulated devices
 - client ↔ server end-to-end authentication tests
 - performance benchmarks
@@ -104,8 +104,8 @@ Interfaces and domain code do not count as production acceptance until execution
 ## Evidence status
 
 - Source inspection: current modernization branch
-- Latest Android CI: in progress for current head
-- Latest CodeQL: queued for current head
+- Latest Android CI: running/queued after current head changes
+- Latest CodeQL: running/queued after current head changes
 - Runtime Android identity verification: not yet performed
 - PostgreSQL integration execution: not yet performed
 - End-to-end authentication: not yet performed

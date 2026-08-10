@@ -63,12 +63,10 @@ class DeviceChallengeVerifier(
             challenge.id != proof.challengeId ||
             challenge.id.isBlank() || challenge.id.length > MAX_CHALLENGE_ID_LENGTH ||
             challenge.nonce.size !in MIN_CHALLENGE_BYTES..MAX_CHALLENGE_BYTES ||
-            challenge.expectedFingerprint?.let(::isValidFingerprint) == false ||
-            challenge.expiresAt == Instant.MIN || challenge.expiresAt == Instant.MAX
+            challenge.expectedFingerprint?.let(::isValidFingerprint) == false
         ) return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
 
-        val currentTime = now()
-        if (!currentTime.isBefore(challenge.expiresAt)) {
+        if (!now().isBefore(challenge.expiresAt)) {
             return reject("unknown", DeviceVerificationFailure.CHALLENGE_EXPIRED)
         }
 
@@ -110,7 +108,7 @@ class DeviceChallengeVerifier(
             reason = null,
             fingerprint = fingerprint
         )
-        if (runCatching { auditSink.record(allowAudit) }.getOrDefault(false).not()) {
+        if (!runCatching { auditSink.record(allowAudit) }.getOrDefault(false)) {
             return DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE)
         }
         return DeviceVerificationResult.Verified(fingerprint)

@@ -120,7 +120,7 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.INVALID_IDENTITY)
         }
 
-        if (request.requiredRole !in request.roles) {
+        if (request.roles.isEmpty() || request.roles.none { it == request.requiredRole }) {
             return AuthorizationDecision.Deny(DenyReason.MISSING_ROLE)
         }
 
@@ -155,10 +155,8 @@ object AuthorizationEngine {
     }
 
     private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
-        request.identityId.isNotBlank() &&
-            request.roles.isNotEmpty() &&
+        request.requiredRole.isNotBlank() &&
             request.roles.none { it.isBlank() } &&
-            request.requiredRole.isNotBlank() &&
             request.permissions.isNotEmpty() &&
             request.permissions.none { it.isBlank() } &&
             request.action.isNotBlank() &&

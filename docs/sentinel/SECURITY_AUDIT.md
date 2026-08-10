@@ -13,8 +13,10 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Signature algorithm | PASS at source level | P-256 / `SHA256withECDSA` |
 | Fingerprint encoding | PASS at source + unit coverage | SHA-256 + deterministic lowercase hex |
 | Challenge minimum size | PASS | 32-byte minimum in server verifier |
-| Challenge replay | Contract present | `ChallengeReplayGuard.consume()` must be atomic/persistent in production |
-| Identity substitution | PASS at domain level | fingerprint derived from submitted public key; optional expected fingerprint binding |
+| Trusted challenge state | PASS at domain boundary | nonce and expected fingerprint come only from `ChallengeStore` |
+| Challenge replay | Contract present | `ChallengeStore.consume()` must be atomic/persistent in production |
+| Identity substitution | PASS at domain level | fingerprint derived from submitted public key; expected fingerprint comes from trusted challenge state |
+| Challenge tampering | PASS at domain level | client cannot replace server-issued nonce or identity context |
 | Default Deny | PASS at domain level | explicit typed deny decisions |
 | Role enforcement | PASS at domain level | required role must be present |
 | Permission enforcement | PASS at domain level | resource/action permission required independently |
@@ -47,7 +49,7 @@ The following remain blockers for claiming a production-ready Minimal Alpha RC:
 9. Android instrumentation on a real/emulated device;
 10. performance and chaos evidence;
 11. production release signing and release artifact verification;
-12. repository-level GitHub Advanced Security configuration if CodeQL/Dependency Review is expected to be enforced as a required check.
+12. repository-level GitHub Advanced Security configuration if CodeQL is expected to be enforced as a required check.
 
 ## Acceptance rule
 

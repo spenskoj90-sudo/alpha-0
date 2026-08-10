@@ -9,15 +9,6 @@ import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
 
-/**
- * Server-side cryptographic verification boundary.
- *
- * The client submits only a challenge ID, public key and signature. Nonce,
- * fingerprint binding and expiry are loaded from trusted server-side state.
- * This verifier proves key possession only; enrollment, authorization and
- * revocation remain separate server-side decisions.
- */
-
 data class IssuedDeviceChallenge(
     val id: String,
     val nonce: ByteArray,
@@ -49,11 +40,11 @@ sealed interface DeviceVerificationResult {
 
 interface ChallengeStore {
     fun find(challengeId: String): IssuedDeviceChallenge?
-
     /** Atomically consumes the challenge. False means it was already consumed. */
     fun consume(challengeId: String): Boolean
 }
 
+/** Cryptographic proof-of-possession boundary. Enrollment and authorization are separate controls. */
 class DeviceChallengeVerifier(
     private val challengeStore: ChallengeStore,
     private val auditSink: AuditSink,
@@ -64,24 +55,20 @@ class DeviceChallengeVerifier(
             proof.challengeId.isBlank() || proof.challengeId.length > MAX_CHALLENGE_ID_LENGTH ||
             proof.publicKeyEncoded.isEmpty() || proof.publicKeyEncoded.size > MAX_PUBLIC_KEY_BYTES ||
             proof.signature.isEmpty() || proof.signature.size > MAX_SIGNATURE_BYTES
-        ) {
-            return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
-        }
+        ) return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
 
         val challenge = challengeStore.find(proof.challengeId)
             ?: return reject("unknown", DeviceVerificationFailure.CHALLENGE_NOT_FOUND)
-
         if (
             challenge.id != proof.challengeId ||
             challenge.id.isBlank() || challenge.id.length > MAX_CHALLENGE_ID_LENGTH ||
             challenge.nonce.size !in MIN_CHALLENGE_BYTES..MAX_CHALLENGE_BYTES ||
-            !now().isBefore(challenge.expiresAt) ||
-            challenge.expectedFingerprint?.let(::isValidFingerprint) == false
-        ) {
-            return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
-        }
+            challenge.expectedFingerprint?.let(::isValidFingerprint) == false ||
+            challenge.expiresAt == Instant.MIN || challenge.expiresAt == Instant.MAX
+        ) return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
 
-        if (!now().isBefore(challenge.expiresAt)) {
+        val currentTime = now()
+        if (!currentTime.isBefore(challenge.expiresAt)) {
             return reject("unknown", DeviceVerificationFailure.CHALLENGE_EXPIRED)
         }
 
@@ -102,20 +89,16 @@ class DeviceChallengeVerifier(
                 challenge.expectedFingerprint.toByteArray(Charsets.US_ASCII),
                 fingerprint.toByteArray(Charsets.US_ASCII)
             )
-        ) {
-            return reject(fingerprint, DeviceVerificationFailure.DEVICE_MISMATCH)
-        }
+        ) return reject(fingerprint, DeviceVerificationFailure.DEVICE_MISMATCH)
 
         val validSignature = try {
             Signature.getInstance(SIGNATURE_ALGORITHM).apply {
                 initVerify(publicKey)
                 update(challenge.nonce)
             }.verify(proof.signature)
-        } catch (_: Exception) {
-            false
-        }
-
+        } catch (_: Exception) { false }
         if (!validSignature) return reject(fingerprint, DeviceVerificationFailure.INVALID_SIGNATURE)
+
         if (!challengeStore.consume(proof.challengeId)) {
             return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }
@@ -127,34 +110,31 @@ class DeviceChallengeVerifier(
             reason = null,
             fingerprint = fingerprint
         )
-        val auditSucceeded = runCatching { auditSink.record(allowAudit) }.getOrDefault(false)
-        if (!auditSucceeded) return DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE)
+        if (runCatching { auditSink.record(allowAudit) }.getOrDefault(false).not()) {
+            return DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE)
+        }
         return DeviceVerificationResult.Verified(fingerprint)
     }
 
     private fun reject(subjectId: String, reason: DeviceVerificationFailure): DeviceVerificationResult.Rejected {
         runCatching {
-            auditSink.record(
-                AuditEvent(
-                    action = "device.challenge.verify",
-                    subjectId = subjectId,
-                    outcome = "DENY",
-                    reason = reason.name,
-                    fingerprint = null
-                )
-            )
+            auditSink.record(AuditEvent(
+                action = "device.challenge.verify",
+                subjectId = subjectId,
+                outcome = "DENY",
+                reason = reason.name,
+                fingerprint = null
+            ))
         }
         return DeviceVerificationResult.Rejected(reason)
     }
 
     private fun fingerprint(encodedPublicKey: ByteArray): String =
-        MessageDigest.getInstance(HASH_ALGORITHM)
-            .digest(encodedPublicKey)
+        MessageDigest.getInstance(HASH_ALGORITHM).digest(encodedPublicKey)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun isP256(key: ECPublicKey): Boolean =
-        key.params.curve.field.fieldSize == P256_FIELD_SIZE_BITS &&
-            key.params.order.bitLength() == P256_ORDER_BITS
+        key.params.curve.field.fieldSize == P256_FIELD_SIZE_BITS && key.params.order.bitLength() == P256_ORDER_BITS
 
     private fun isValidFingerprint(value: String): Boolean =
         value.length == FINGERPRINT_HEX_LENGTH && value.all { it in '0'..'9' || it in 'a'..'f' }

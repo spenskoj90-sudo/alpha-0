@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.Signature
 
 class DeviceChallengeVerifierTest {
@@ -25,12 +26,33 @@ class DeviceChallengeVerifierTest {
         )
 
         val result = verifier.verify(
-            DeviceProof("device-1", keyPair.public.encoded, signature, challenge)
+            DeviceProof(keyPair.public.encoded, signature, challenge)
         )
 
         assertTrue(result is DeviceVerificationResult.Verified)
         assertEquals(1, audit.events.size)
         assertEquals("ALLOW", audit.events.single().outcome)
+    }
+
+    @Test
+    fun expectedFingerprintBindsChallengeToTheKey() {
+        val keyPair = generateP256KeyPair()
+        val otherKeyPair = generateP256KeyPair()
+        val nonce = ByteArray(32) { 9 }
+        val expected = fingerprint(otherKeyPair.public.encoded)
+        val challenge = DeviceChallenge("challenge-1", nonce, expectedFingerprint = expected)
+        val signature = sign(keyPair, nonce)
+        val verifier = DeviceChallengeVerifier(
+            replayGuard = ChallengeReplayGuard { true },
+            auditSink = RecordingAuditSink()
+        )
+
+        val result = verifier.verify(DeviceProof(keyPair.public.encoded, signature, challenge))
+
+        assertEquals(
+            DeviceVerificationResult.Rejected(DeviceVerificationFailure.DEVICE_MISMATCH),
+            result
+        )
     }
 
     @Test
@@ -46,7 +68,6 @@ class DeviceChallengeVerifierTest {
 
         val result = verifier.verify(
             DeviceProof(
-                "device-1",
                 keyPair.public.encoded,
                 byteArrayOf(1, 2, 3),
                 DeviceChallenge("challenge-1", nonce)
@@ -74,7 +95,7 @@ class DeviceChallengeVerifierTest {
         )
 
         val result = verifier.verify(
-            DeviceProof("device-1", keyPair.public.encoded, signature, challenge)
+            DeviceProof(keyPair.public.encoded, signature, challenge)
         )
 
         assertEquals(
@@ -95,7 +116,6 @@ class DeviceChallengeVerifierTest {
 
         val result = verifier.verify(
             DeviceProof(
-                "device-1",
                 keyPair.public.encoded,
                 byteArrayOf(1),
                 DeviceChallenge("challenge-1", ByteArray(16))
@@ -118,6 +138,11 @@ class DeviceChallengeVerifierTest {
             initSign(keyPair.private)
             update(nonce)
         }.sign()
+
+    private fun fingerprint(encodedPublicKey: ByteArray): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(encodedPublicKey)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private class RecordingAuditSink : AuditSink {
         val events = mutableListOf<AuditEvent>()

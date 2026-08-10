@@ -2,10 +2,13 @@ package com.sentinel.core.device
 
 import com.sentinel.core.audit.AuditEvent
 import com.sentinel.core.audit.AuditSink
+import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
 import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
 
@@ -41,7 +44,7 @@ sealed interface DeviceVerificationResult {
 
 interface ChallengeStore {
     fun find(challengeId: String): IssuedDeviceChallenge?
-    /** Atomically consumes the challenge. False means it was already consumed. */
+    /** Atomically consumes the challenge. False means it was already consumed or expired. */
     fun consume(challengeId: String): Boolean
 }
 
@@ -145,8 +148,14 @@ class DeviceChallengeVerifier(
         MessageDigest.getInstance(HASH_ALGORITHM).digest(encodedPublicKey)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-    private fun isP256(key: ECPublicKey): Boolean =
-        key.params.curve.field.fieldSize == P256_FIELD_SIZE_BITS && key.params.order.bitLength() == P256_ORDER_BITS
+    private fun isP256(key: ECPublicKey): Boolean {
+        val actual = key.params
+        val expected = P256_PARAMS
+        return actual.curve == expected.curve &&
+            actual.generator == expected.generator &&
+            actual.order == expected.order &&
+            actual.cofactor == expected.cofactor
+    }
 
     private fun isValidFingerprint(value: String): Boolean =
         value.length == FINGERPRINT_HEX_LENGTH && value.all { it in '0'..'9' || it in 'a'..'f' }
@@ -159,9 +168,12 @@ class DeviceChallengeVerifier(
         const val MAX_CHALLENGE_BYTES = 64
         const val MAX_CHALLENGE_ID_LENGTH = 256
         const val MAX_PUBLIC_KEY_BYTES = 512
-        const val MAX_SIGNATURE_BYTES = 1024
+        const val MAX_SIGNATURE_BYTES = 128
         const val FINGERPRINT_HEX_LENGTH = 64
-        const val P256_FIELD_SIZE_BITS = 256
-        const val P256_ORDER_BITS = 256
+        val P256_PARAMS: ECParameterSpec by lazy {
+            AlgorithmParameters.getInstance("EC").apply {
+                init(ECGenParameterSpec("secp256r1"))
+            }.getParameterSpec(ECParameterSpec::class.java)
+        }
     }
 }

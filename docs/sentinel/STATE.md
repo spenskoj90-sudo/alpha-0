@@ -46,12 +46,15 @@ Minimal Alpha Release Candidate
 - policy evaluation with fail-closed exceptions
 - context validation
 - explicit `ALLOW` / typed `DENY` decisions
+- bounded authorization inputs to reduce memory/CPU abuse
 - server-side P-256 challenge/signature verification boundary
 - trusted server-issued challenge-state lookup
+- challenge expiry enforcement
+- bounded challenge/public-key/signature inputs
 - atomic challenge-consume contract for replay prevention
-- server-issued expected-fingerprint binding
+- server-issued expected-fingerprint binding with constant-time comparison
 - mandatory audit-sink contract for security-success acknowledgement
-- regression tests for positive, negative, boundary, replay, substitution, challenge-tampering and audit-failure paths
+- regression tests for positive, negative, boundary, replay, substitution, challenge-tampering, expiry, resource-limit and audit-failure paths
 
 ### Engineering / supply chain
 
@@ -95,9 +98,11 @@ Interfaces and domain code do not count as production implementation until execu
 - invalid signature → DENY
 - modified client challenge data → DENY
 - unknown challenge → DENY
+- expired challenge → DENY
 - replayed challenge → DENY
 - device/key mismatch → DENY
 - malformed authorization request → DENY
+- oversized authorization input → DENY
 - missing role → DENY
 - missing permission → DENY
 - scope mismatch → DENY

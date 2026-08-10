@@ -4,12 +4,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.time.Instant
 
 class DeviceRegistryTest {
     private val now = Instant.parse("2026-08-10T12:00:00Z")
-    private val fingerprint = "a".repeat(64)
-    private val publicKey = ByteArray(91) { it.toByte() }
+    private val keyPair = KeyPairGenerator.getInstance("EC").apply { initialize(256) }.generateKeyPair()
+    private val publicKey = keyPair.public.encoded
+    private val fingerprint = MessageDigest.getInstance("SHA-256").digest(publicKey)
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     @Test
     fun registrationStartsPendingAndDoesNotGrantActiveState() {
@@ -38,6 +42,15 @@ class DeviceRegistryTest {
         store.devices[fingerprint] = store.devices[fingerprint]!!.copy(state = DeviceState.REVOKED)
         assertEquals(DeviceRegistryResult.Rejected(DeviceRegistryFailure.REVOKED), registry.activate(fingerprint))
         assertFalse(registry.isActive(fingerprint))
+    }
+
+    @Test
+    fun fingerprintMustMatchPublicKey() {
+        val registry = DeviceRegistry(MemoryStore()) { now }
+        assertEquals(
+            DeviceRegistryResult.Rejected(DeviceRegistryFailure.MALFORMED_REQUEST),
+            registry.registerPending("a".repeat(64), publicKey)
+        )
     }
 
     @Test

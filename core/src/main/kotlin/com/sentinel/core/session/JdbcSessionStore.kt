@@ -6,7 +6,7 @@ import java.time.Instant
 import javax.sql.DataSource
 
 /** PostgreSQL-backed session store. Tokens are never persisted in raw form. */
-class JdbcSessionStore(private val dataSource: DataSource) : SessionStore {
+class JdbcSessionStore(private val dataSource: DataSource) : SessionRotationStore {
     override fun save(record: SessionRecord): Boolean {
         if (!isValid(record)) return false
         dataSource.connection.use { connection ->
@@ -54,6 +54,40 @@ class JdbcSessionStore(private val dataSource: DataSource) : SessionStore {
         }
     }
 
+    override fun rotate(oldTokenHash: ByteArray, replacement: SessionRecord, revokedAt: Instant): Boolean {
+        if (oldTokenHash.size != TOKEN_HASH_BYTES || !isValid(replacement)) return false
+        dataSource.connection.use { connection ->
+            connection.autoCommit = false
+            try {
+                connection.prepareStatement(INSERT_ROTATION_SQL).use { insert ->
+                    insert.setString(1, replacement.sessionId)
+                    insert.setString(2, replacement.subjectId)
+                    insert.setBytes(3, replacement.tokenHash)
+                    insert.setTimestamp(4, Timestamp.from(replacement.expiresAt))
+                    if (insert.executeUpdate() != 1) {
+                        connection.rollback()
+                        return false
+                    }
+                }
+                connection.prepareStatement(REVOKE_BY_HASH_SQL).use { revoke ->
+                    revoke.setTimestamp(1, Timestamp.from(revokedAt))
+                    revoke.setBytes(2, oldTokenHash)
+                    if (revoke.executeUpdate() != 1) {
+                        connection.rollback()
+                        return false
+                    }
+                }
+                connection.commit()
+                return true
+            } catch (_: Exception) {
+                runCatching { connection.rollback() }
+                return false
+            } finally {
+                connection.autoCommit = true
+            }
+        }
+    }
+
     private fun isValid(record: SessionRecord): Boolean =
         record.sessionId.isNotBlank() && record.sessionId.length <= MAX_SESSION_ID_LENGTH &&
             record.subjectId.isNotBlank() && record.subjectId.length <= MAX_SUBJECT_LENGTH &&
@@ -65,9 +99,10 @@ class JdbcSessionStore(private val dataSource: DataSource) : SessionStore {
         const val MAX_SUBJECT_LENGTH = 256
         const val INSERT_SQL = """
             INSERT INTO sentinel_sessions(session_id, subject_id, token_hash, expires_at, revoked_at)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, NULL)
             ON CONFLICT (session_id) DO NOTHING
         """
+        const val INSERT_ROTATION_SQL = INSERT_SQL
         const val SELECT_SQL = """
             SELECT session_id, subject_id, token_hash, expires_at, revoked_at
             FROM sentinel_sessions
@@ -77,6 +112,11 @@ class JdbcSessionStore(private val dataSource: DataSource) : SessionStore {
             UPDATE sentinel_sessions
             SET revoked_at = COALESCE(revoked_at, ?)
             WHERE session_id = ? AND revoked_at IS NULL
+        """
+        const val REVOKE_BY_HASH_SQL = """
+            UPDATE sentinel_sessions
+            SET revoked_at = COALESCE(revoked_at, ?)
+            WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
         """
     }
 }

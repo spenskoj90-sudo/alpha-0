@@ -18,9 +18,7 @@ Minimal Alpha Release Candidate
 
 ## Current authoritative branch
 
-`main` — `b8ab17fdaf3193094dff8234596dba866af73262`
-
-The modernization and Core work is currently isolated in PR #1 / `agent/modernize-alpha0` and is not part of `main` until accepted.
+`main` remains the accepted baseline. The modernization and security work is isolated in PR #1 / `agent/modernize-alpha0` until CI and review evidence are complete.
 
 ## Implemented in source
 
@@ -30,58 +28,87 @@ The modernization and Core work is currently isolated in PR #1 / `agent/moderniz
 - Android Keystore-backed P-256 device identity
 - SHA-256 public-key fingerprint
 - ECDSA `SHA256withECDSA` signing and local verification
-- Deterministic hexadecimal encoding
+- deterministic hexadecimal encoding
+- runtime cryptographic self-test
+- cleartext traffic disabled
+- backup/device-transfer extraction disabled
 - JVM fingerprint/hex tests
-- Android CI configuration
+- Android build, lint and artifact CI
 
 ### Sentinel Core foundation
 
 - Kotlin/JVM `core` module
-- deterministic authorization domain model
-- explicit role membership requirement
+- centralized Default Deny authorization engine
+- explicit required-role membership
 - permission check independent from role
-- versioned scope ruleset
+- versioned scope ruleset with structural validation
 - entitlement status/time-window evaluation
-- policy evaluation
+- policy evaluation with fail-closed exceptions
 - context validation
 - explicit `ALLOW` / typed `DENY` decisions
-- regression tests for positive and deny paths
+- server-side P-256 challenge/signature verification boundary
+- challenge replay-guard contract
+- server-issued expected-fingerprint binding
+- mandatory audit-sink contract for successful security decisions
+- regression tests for positive, negative, boundary, replay, substitution and audit-failure paths
 
-The Core authorization engine is a domain foundation only. It is not yet exposed through a server/API and must not be treated as completed server-side authorization.
+### Engineering / supply chain
 
-## Not yet implemented
+- GitHub Actions build/test/lint workflow
+- APK SHA-256 checksum artifact
+- CodeQL analysis
+- dependency vulnerability review
+- Dependabot for Gradle and GitHub Actions
+- `.gitignore` for build, IDE, backup and signing material
+- security policy
+- durable state and traceability documentation
 
-- Device registration
-- Server-side device binding and verification
-- Session management
-- Device revocation
+## Intentionally not accepted as complete
+
+- HTTP/API transport
 - PostgreSQL persistence
-- Server/API adapter around Core authorization
-- Audit persistence
-- Network resilience
-- Recovery flows
+- production challenge store / replay guard
+- explicit device enrollment and binding approval workflow
+- session/token lifecycle
+- revocation
+- recovery
+- network/VPN resilience
+- production release signing and artifact verification
+- Android instrumentation on real/emulated devices
+- client ↔ server end-to-end authentication tests
+- performance and chaos benchmarks
+
+Interfaces and domain code do not count as production implementation until execution evidence exists.
 
 ## Evidence status
 
-- Source inspection: verified
-- Build execution on current modernization/Core head: pending / CI status must be checked
+- Source inspection: verified on modernization branch
+- CI: must be checked against the latest head after changes
 - Runtime Android identity verification: not yet performed
-- Server security verification: not yet implemented
+- Server integration verification: not yet performed
 - Performance benchmark: not performed
+- Chaos testing: not performed
+
+## Security acceptance matrix
+
+- unknown/unbound device → DENY
+- invalid signature → DENY
+- modified challenge → DENY
+- replayed challenge → DENY
+- device/key mismatch → DENY
+- malformed authorization request → DENY
+- missing role → DENY
+- missing permission → DENY
+- scope mismatch → DENY
+- invalid/expired entitlement → DENY
+- policy denial/exception → DENY
+- invalid context → DENY
+- audit persistence failure → DENY
+- valid bound device + valid authorization context → ALLOW
 
 ## Next vertical slice
 
-Device Registration → Server-side Challenge Verification → Persistence → Audit → protected operation through the Core authorization engine.
-
-Minimum security outcomes:
-
-- unknown device → DENY
-- unbound device → DENY
-- invalid signature → DENY
-- modified challenge → DENY
-- malformed request → DENY
-- valid bound device → authenticated context
-- missing role/permission/scope/entitlement/policy/context → DENY
+Device Registration → Server Challenge Store → Server Challenge Verification → Device Binding Approval → PostgreSQL Persistence → Audit → protected operation through Core Authorization.
 
 ## Continuity rule
 

@@ -128,6 +128,33 @@ class DeviceChallengeVerifierTest {
         )
     }
 
+    @Test
+    fun auditFailureFailsClosedAfterChallengeConsumption() {
+        val keyPair = generateP256KeyPair()
+        val nonce = ByteArray(32) { 4 }
+        val consumed = mutableSetOf<String>()
+        val verifier = DeviceChallengeVerifier(
+            replayGuard = ChallengeReplayGuard { consumed.add(it) },
+            auditSink = object : AuditSink {
+                override fun record(event: AuditEvent): Boolean = false
+            }
+        )
+
+        val result = verifier.verify(
+            DeviceProof(
+                keyPair.public.encoded,
+                sign(keyPair, nonce),
+                DeviceChallenge("challenge-1", nonce)
+            )
+        )
+
+        assertEquals(
+            DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE),
+            result
+        )
+        assertTrue(consumed.contains("challenge-1"))
+    }
+
     private fun generateP256KeyPair(): KeyPair =
         KeyPairGenerator.getInstance("EC").apply {
             initialize(256)
@@ -147,8 +174,9 @@ class DeviceChallengeVerifierTest {
     private class RecordingAuditSink : AuditSink {
         val events = mutableListOf<AuditEvent>()
 
-        override fun record(event: AuditEvent) {
+        override fun record(event: AuditEvent): Boolean {
             events += event
+            return true
         }
     }
 }

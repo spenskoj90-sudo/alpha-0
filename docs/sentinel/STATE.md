@@ -47,17 +47,17 @@ Minimal Alpha Release Candidate
 - context validation
 - explicit `ALLOW` / typed `DENY` decisions
 - server-side P-256 challenge/signature verification boundary
-- challenge replay-guard contract
+- trusted server-issued challenge-state lookup
+- atomic challenge-consume contract for replay prevention
 - server-issued expected-fingerprint binding
-- mandatory audit-sink contract for successful security decisions
-- regression tests for positive, negative, boundary, replay, substitution and audit-failure paths
+- mandatory audit-sink contract for security-success acknowledgement
+- regression tests for positive, negative, boundary, replay, substitution, challenge-tampering and audit-failure paths
 
 ### Engineering / supply chain
 
 - GitHub Actions build/test/lint workflow
 - APK SHA-256 checksum artifact
-- CodeQL analysis
-- dependency vulnerability review
+- CodeQL analysis workflow
 - Dependabot for Gradle and GitHub Actions
 - `.gitignore` for build, IDE, backup and signing material
 - security policy
@@ -67,7 +67,7 @@ Minimal Alpha Release Candidate
 
 - HTTP/API transport
 - PostgreSQL persistence
-- production challenge store / replay guard
+- production challenge store / atomic replay implementation
 - explicit device enrollment and binding approval workflow
 - session/token lifecycle
 - revocation
@@ -93,7 +93,8 @@ Interfaces and domain code do not count as production implementation until execu
 
 - unknown/unbound device → DENY
 - invalid signature → DENY
-- modified challenge → DENY
+- modified client challenge data → DENY
+- unknown challenge → DENY
 - replayed challenge → DENY
 - device/key mismatch → DENY
 - malformed authorization request → DENY

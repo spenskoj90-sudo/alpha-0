@@ -1,6 +1,7 @@
 package com.sentinel.core.device
 
 import java.sql.ResultSet
+import java.sql.SQLException
 import javax.sql.DataSource
 
 /**
@@ -35,15 +36,36 @@ class JdbcChallengeStore(
         }
     }
 
-    private fun ResultSet.toChallenge(): IssuedDeviceChallenge = IssuedDeviceChallenge(
-        id = getString("challenge_id"),
-        nonce = getBytes("nonce"),
-        expiresAt = getTimestamp("expires_at").toInstant(),
-        expectedFingerprint = getString("expected_fingerprint")
-    )
+    private fun ResultSet.toChallenge(): IssuedDeviceChallenge {
+        val id = getString("challenge_id")
+        val nonce = getBytes("nonce")
+        val expiresAt = getTimestamp("expires_at")?.toInstant()
+        val fingerprint = getString("expected_fingerprint")
+
+        if (id.isNullOrBlank() || id.length > MAX_ID_LENGTH ||
+            nonce == null || nonce.size !in MIN_NONCE_BYTES..MAX_NONCE_BYTES ||
+            expiresAt == null || fingerprint?.let(::isValidFingerprint) == false
+        ) {
+            throw SQLException("Invalid persisted challenge state")
+        }
+
+        return IssuedDeviceChallenge(
+            id = id,
+            nonce = nonce,
+            expiresAt = expiresAt,
+            expectedFingerprint = fingerprint
+        )
+    }
+
+    private fun isValidFingerprint(value: String): Boolean =
+        value.length == FINGERPRINT_LENGTH &&
+            value.all { it in '0'..'9' || it in 'a'..'f' }
 
     private companion object {
         const val MAX_ID_LENGTH = 256
+        const val MIN_NONCE_BYTES = 32
+        const val MAX_NONCE_BYTES = 64
+        const val FINGERPRINT_LENGTH = 64
         const val SELECT_SQL = """
             SELECT challenge_id, nonce, expires_at, expected_fingerprint
             FROM sentinel_device_challenges

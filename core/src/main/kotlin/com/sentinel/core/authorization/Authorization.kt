@@ -63,6 +63,7 @@ fun interface Policy {
 data class AuthorizationRequest(
     val identityId: String,
     val roles: Set<String>,
+    val requiredRole: String,
     val permissions: Set<String>,
     val scope: ScopeRuleset,
     val entitlement: Entitlement,
@@ -94,7 +95,7 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.INVALID_IDENTITY)
         }
 
-        if (request.roles.isEmpty()) {
+        if (request.requiredRole.isBlank() || request.requiredRole !in request.roles) {
             return AuthorizationDecision.Deny(DenyReason.MISSING_ROLE)
         }
 

@@ -7,9 +7,7 @@ CREATE TABLE IF NOT EXISTS sentinel_device_challenges (
     CONSTRAINT sentinel_device_challenges_nonce_size
         CHECK (octet_length(nonce) BETWEEN 32 AND 64),
     CONSTRAINT sentinel_device_challenges_fingerprint_format
-        CHECK (expected_fingerprint IS NULL OR expected_fingerprint ~ '^[0-9a-f]{64}$'),
-    CONSTRAINT sentinel_device_challenges_consumed_after_issue
-        CHECK (consumed_at IS NULL OR consumed_at >= (expires_at - INTERVAL '30 days'))
+        CHECK (expected_fingerprint IS NULL OR expected_fingerprint ~ '^[0-9a-f]{64}$')
 );
 
 CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_active_expiry

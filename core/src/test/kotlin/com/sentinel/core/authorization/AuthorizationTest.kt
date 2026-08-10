@@ -96,6 +96,19 @@ class AuthorizationTest {
     }
 
     @Test
+    fun invalidScopeDefinitionIsDeniedAsMalformedRequest() {
+        val invalidScope = ScopeRuleset(
+            version = 0,
+            rules = listOf(ScopeRule("profile", "user-1", setOf("read")))
+        )
+
+        assertEquals(
+            AuthorizationDecision.Deny(DenyReason.MALFORMED_REQUEST),
+            AuthorizationEngine.decide(request(requestScope = invalidScope))
+        )
+    }
+
+    @Test
     fun expiredEntitlementIsDenied() {
         val expired = entitlement.copy(
             status = EntitlementStatus.EXPIRED,
@@ -109,10 +122,31 @@ class AuthorizationTest {
     }
 
     @Test
+    fun entitlementWithReversedTimeWindowIsMalformed() {
+        val invalid = entitlement.copy(
+            startsAt = now.plusSeconds(60),
+            expiresAt = now.minusSeconds(60)
+        )
+
+        assertEquals(
+            AuthorizationDecision.Deny(DenyReason.MALFORMED_REQUEST),
+            AuthorizationEngine.decide(request(requestEntitlement = invalid))
+        )
+    }
+
+    @Test
     fun policyDenialIsEnforced() {
         assertEquals(
             AuthorizationDecision.Deny(DenyReason.POLICY_DENIED),
             AuthorizationEngine.decide(request(policy = Policy { false }))
+        )
+    }
+
+    @Test
+    fun policyFailureFailsClosed() {
+        assertEquals(
+            AuthorizationDecision.Deny(DenyReason.POLICY_DENIED),
+            AuthorizationEngine.decide(request(policy = Policy { error("policy failure") }))
         )
     }
 
@@ -123,6 +157,16 @@ class AuthorizationTest {
             AuthorizationEngine.decide(
                 request(context = AuthorizationContext(mapOf("region" to "")))
             )
+        )
+    }
+
+    @Test
+    fun expirationBoundaryIsDenied() {
+        val boundary = entitlement.copy(expiresAt = now)
+
+        assertEquals(
+            AuthorizationDecision.Deny(DenyReason.ENTITLEMENT_DENIED),
+            AuthorizationEngine.decide(request(requestEntitlement = boundary))
         )
     }
 }

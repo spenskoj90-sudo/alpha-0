@@ -33,9 +33,9 @@ This audit covers the current Alpha-0 modernization branch against the accepted 
 | Audit failure | PASS | audit unavailable becomes DENY |
 | Cleartext network | PASS | Android manifest + network security config |
 | Backup/data transfer | PASS | disabled in manifest and extraction rules |
-| CI build/test/lint | Automated | GitHub Actions; current head still running |
+| CI build/test/lint | Automated | GitHub Actions; current head validation pending |
 | Artifact integrity | Automated | APK SHA-256 checksum |
-| Static analysis | Configured | CodeQL workflow; current head queued |
+| Static analysis | Configured | CodeQL workflow; current head validation pending |
 | Secrets in source | Guarded | `.gitignore`, CI secret-backed release signing |
 
 ## Release blockers

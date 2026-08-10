@@ -30,8 +30,7 @@ interface ChallengeStore {
 class DeviceChallengeVerifier(
     private val challengeStore: ChallengeStore,
     private val auditSink: AuditSink,
-    private val now: () -> Instant = Instant::now,
-    private val atomicAuditStore: AtomicChallengeAuditStore? = challengeStore as? AtomicChallengeAuditStore
+    private val now: () -> Instant = Instant::now
 ) {
     fun verify(proof: PresentedDeviceProof): DeviceVerificationResult {
         if (proof.challengeId.isBlank() || proof.challengeId.length > MAX_CHALLENGE_ID_LENGTH || proof.publicKeyEncoded.isEmpty() || proof.publicKeyEncoded.size > MAX_PUBLIC_KEY_BYTES || proof.signature.isEmpty() || proof.signature.size > MAX_SIGNATURE_BYTES) return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
@@ -51,8 +50,9 @@ class DeviceChallengeVerifier(
         if (!now().isBefore(challenge.expiresAt)) return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_EXPIRED)
 
         val allowAudit = AuditEvent("device.challenge.verify", fingerprint, "ALLOW", null, fingerprint)
-        atomicAuditStore?.let { store ->
-            val committed = try { store.consumeAndRecord(proof.challengeId, allowAudit) } catch (_: Exception) { false }
+        val atomicStore = challengeStore as? AtomicChallengeAuditStore
+        if (atomicStore != null) {
+            val committed: Boolean = try { atomicStore.consumeAndRecord(proof.challengeId, allowAudit) } catch (_: Exception) { false }
             return if (committed) DeviceVerificationResult.Verified(fingerprint) else DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }
         val consumed = try { challengeStore.consume(proof.challengeId) } catch (_: Exception) { return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_STORE_UNAVAILABLE) }

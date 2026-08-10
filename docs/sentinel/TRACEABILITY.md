@@ -20,8 +20,9 @@ This map records the current implementation-to-contract boundary. `Implemented` 
 | Default Deny decision paths | `Authorization.kt` | Implemented in domain engine | Server enforcement pending |
 | Least Privilege | Core authorization contract | Foundation implemented | Server enforcement pending |
 | Server-side challenge verification | `core/.../DeviceChallengeVerifier.kt` | Implemented domain boundary | Integration/persistence pending |
-| Challenge replay protection | `ChallengeReplayGuard` | Interface contract | Atomic persistent implementation pending |
-| Device fingerprint binding | server-issued challenge context | Implemented domain boundary | Integration/persistence pending |
+| Trusted challenge state | `ChallengeStore` | Interface contract | Persistent implementation pending |
+| Challenge replay protection | `ChallengeStore.consume()` | Interface contract | Atomic persistent implementation pending |
+| Device fingerprint binding | server-issued challenge state | Implemented domain boundary | Integration/persistence pending |
 | Mandatory auditability | `AuditSink` | Interface contract | Durable persistence pending |
 | Audit failure → deny | `DeviceChallengeVerifier` | Implemented | Core CI execution pending |
 | Centralized authorization truth | Sentinel Core | Foundation implemented | API/service enforcement pending |

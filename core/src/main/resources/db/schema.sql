@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS sentinel_devices (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT sentinel_device_fingerprint_format CHECK (fingerprint ~ '^[0-9a-f]{64}$'),
     CONSTRAINT sentinel_device_public_key_size CHECK (octet_length(public_key) BETWEEN 1 AND 512),
-    CONSTRAINT sentinel_device_state CHECK (state IN ('PENDING', 'ACTIVE', 'REVOKED'))
+    CONSTRAINT sentinel_device_state CHECK (state IN ('PENDING', 'ACTIVE', 'REVOKED')),
+    CONSTRAINT sentinel_device_updated_not_before_registered CHECK (updated_at >= registered_at)
 );
 CREATE INDEX IF NOT EXISTS idx_sentinel_devices_state ON sentinel_devices (state);
 CREATE INDEX IF NOT EXISTS idx_sentinel_devices_updated ON sentinel_devices (updated_at);
@@ -26,10 +27,10 @@ CREATE TABLE IF NOT EXISTS sentinel_device_challenges (
     challenge_id VARCHAR(256) PRIMARY KEY,
     nonce BYTEA NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
-    expected_fingerprint CHAR(64),
+    expected_fingerprint CHAR(64) NOT NULL,
     consumed_at TIMESTAMPTZ,
     CONSTRAINT sentinel_challenge_nonce_size CHECK (octet_length(nonce) BETWEEN 32 AND 64),
-    CONSTRAINT sentinel_challenge_fingerprint_format CHECK (expected_fingerprint IS NULL OR expected_fingerprint ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT sentinel_challenge_fingerprint_format CHECK (expected_fingerprint ~ '^[0-9a-f]{64}$'),
     CONSTRAINT sentinel_challenge_expiry CHECK (expires_at IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS idx_sentinel_device_challenges_expiry ON sentinel_device_challenges (expires_at);
@@ -57,7 +58,10 @@ CREATE TABLE IF NOT EXISTS sentinel_audit_events (
     outcome VARCHAR(8) NOT NULL,
     reason VARCHAR(256),
     fingerprint CHAR(64),
+    CONSTRAINT sentinel_audit_action_nonempty CHECK (length(action) BETWEEN 1 AND 128),
+    CONSTRAINT sentinel_audit_subject_nonempty CHECK (length(subject_id) BETWEEN 1 AND 256),
     CONSTRAINT sentinel_audit_outcome CHECK (outcome IN ('ALLOW', 'DENY')),
+    CONSTRAINT sentinel_audit_reason_size CHECK (reason IS NULL OR length(reason) <= 256),
     CONSTRAINT sentinel_audit_fingerprint_format CHECK (fingerprint IS NULL OR fingerprint ~ '^[0-9a-f]{64}$')
 );
 CREATE INDEX IF NOT EXISTS idx_sentinel_audit_subject_time ON sentinel_audit_events (subject_id, event_time DESC);

@@ -13,6 +13,8 @@ object PostgresDataSourceFactory {
         val user = required(env, "SENTINEL_DB_USER")
         val password = required(env, "SENTINEL_DB_PASSWORD")
         require(url.startsWith("jdbc:postgresql://")) { "SENTINEL_DB_URL must be a PostgreSQL JDBC URL" }
+        require(!url.contains("sslmode=", ignoreCase = true)) { "SENTINEL_DB_URL must not override sslmode" }
+        require(!url.contains("channelBinding=", ignoreCase = true)) { "SENTINEL_DB_URL must not override channelBinding" }
 
         return PGSimpleDataSource().apply {
             setUrl(withSecurityParameters(url))

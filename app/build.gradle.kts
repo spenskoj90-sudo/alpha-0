@@ -39,12 +39,30 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("ciRelease")
+            val ciSigningConfigured = listOf(
+                System.getenv("ALPHA0_KEYSTORE_PATH"),
+                System.getenv("ALPHA0_KEYSTORE_PASSWORD"),
+                System.getenv("ALPHA0_KEY_ALIAS"),
+                System.getenv("ALPHA0_KEY_PASSWORD")
+            ).all { !it.isNullOrBlank() }
+
+            if (ciSigningConfigured) {
+                signingConfig = signingConfigs.getByName("ciRelease")
+            }
         }
 
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("ciRelease")
+            val ciSigningConfigured = listOf(
+                System.getenv("ALPHA0_KEYSTORE_PATH"),
+                System.getenv("ALPHA0_KEYSTORE_PASSWORD"),
+                System.getenv("ALPHA0_KEY_ALIAS"),
+                System.getenv("ALPHA0_KEY_PASSWORD")
+            ).all { !it.isNullOrBlank() }
+
+            if (ciSigningConfigured) {
+                signingConfig = signingConfigs.getByName("ciRelease")
+            }
         }
     }
 }

@@ -42,6 +42,8 @@ Minimal Alpha Release Candidate
 - typed ALLOW/DENY decisions
 - server-side authorization middleware
 - protected HTTP endpoint enforcement
+- protected authorization ALLOW/DENY decisions audited when a durable audit sink is configured
+- audit persistence failure fails closed
 
 ### Device lifecycle
 
@@ -77,6 +79,9 @@ Minimal Alpha Release Candidate
 
 - device/challenge/session/audit/recovery persistence
 - integrity constraints and indexes
+- challenge expected fingerprint is mandatory
+- audit subject/action bounds
+- device timestamp ordering constraint
 - PostgreSQL TLS + channel binding required by runtime configuration
 - bounded connection/socket timeouts
 - canonical schema and migrations
@@ -85,7 +90,12 @@ Minimal Alpha Release Candidate
 
 - standalone JVM server
 - localhost-by-default
-- bounded request bodies
+- bounded request bodies and form fields
+- strict form content type
+- duplicate request parameters rejected
+- bounded in-process per-client rate limiting
+- security response headers
+- graceful shutdown hook
 - health endpoint
 - device registration/activation
 - recovery/key rotation
@@ -141,7 +151,11 @@ These are execution gates, not missing domain implementations.
 - stale session after rotation → DENY
 - revoked device → DENY
 - invalid/expired recovery code → DENY
-- valid bound device + valid authorization context → ALLOW
+- oversized/malformed HTTP body → DENY
+- duplicate form parameter → DENY
+- unsupported form content type → DENY
+- excessive request rate → DENY
+- valid bound device + valid authorization context + successful audit → ALLOW
 
 ## Acceptance rule
 

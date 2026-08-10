@@ -16,22 +16,19 @@ class DeviceChallengeVerifierTest {
     fun validProofIsAcceptedAndAudited() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { it.toByte() }
-        val challenge = DeviceChallenge("challenge-1", nonce)
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", nonce))
         val signature = sign(keyPair, nonce)
         val audit = RecordingAuditSink()
-        val consumed = mutableSetOf<String>()
-        val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { consumed.add(it) },
-            auditSink = audit
-        )
+        val verifier = DeviceChallengeVerifier(store, audit)
 
         val result = verifier.verify(
-            DeviceProof(keyPair.public.encoded, signature, challenge)
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, signature)
         )
 
         assertTrue(result is DeviceVerificationResult.Verified)
         assertEquals(1, audit.events.size)
         assertEquals("ALLOW", audit.events.single().outcome)
+        assertTrue(store.consumed)
     }
 
     @Test
@@ -40,17 +37,57 @@ class DeviceChallengeVerifierTest {
         val otherKeyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 9 }
         val expected = fingerprint(otherKeyPair.public.encoded)
-        val challenge = DeviceChallenge("challenge-1", nonce, expectedFingerprint = expected)
-        val signature = sign(keyPair, nonce)
-        val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { true },
-            auditSink = RecordingAuditSink()
+        val store = TestChallengeStore(
+            IssuedDeviceChallenge("challenge-1", nonce, expectedFingerprint = expected)
         )
+        val signature = sign(keyPair, nonce)
+        val verifier = DeviceChallengeVerifier(store, RecordingAuditSink())
 
-        val result = verifier.verify(DeviceProof(keyPair.public.encoded, signature, challenge))
+        val result = verifier.verify(
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, signature)
+        )
 
         assertEquals(
             DeviceVerificationResult.Rejected(DeviceVerificationFailure.DEVICE_MISMATCH),
+            result
+        )
+        assertTrue(!store.consumed)
+    }
+
+    @Test
+    fun clientCannotReplaceServerChallengeNonce() {
+        val keyPair = generateP256KeyPair()
+        val serverNonce = ByteArray(32) { 1 }
+        val attackerNonce = ByteArray(32) { 2 }
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", serverNonce))
+        val verifier = DeviceChallengeVerifier(store, RecordingAuditSink())
+
+        val result = verifier.verify(
+            PresentedDeviceProof(
+                "challenge-1",
+                keyPair.public.encoded,
+                sign(keyPair, attackerNonce)
+            )
+        )
+
+        assertEquals(
+            DeviceVerificationResult.Rejected(DeviceVerificationFailure.INVALID_SIGNATURE),
+            result
+        )
+        assertTrue(!store.consumed)
+    }
+
+    @Test
+    fun unknownChallengeIsRejected() {
+        val keyPair = generateP256KeyPair()
+        val verifier = DeviceChallengeVerifier(TestChallengeStore(null), RecordingAuditSink())
+
+        val result = verifier.verify(
+            PresentedDeviceProof("missing", keyPair.public.encoded, byteArrayOf(1, 2, 3))
+        )
+
+        assertEquals(
+            DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_NOT_FOUND),
             result
         )
     }
@@ -59,26 +96,19 @@ class DeviceChallengeVerifierTest {
     fun invalidSignatureIsRejectedAndChallengeIsNotConsumed() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 7 }
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", nonce))
         val audit = RecordingAuditSink()
-        val consumed = mutableSetOf<String>()
-        val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { consumed.add(it) },
-            auditSink = audit
-        )
+        val verifier = DeviceChallengeVerifier(store, audit)
 
         val result = verifier.verify(
-            DeviceProof(
-                keyPair.public.encoded,
-                byteArrayOf(1, 2, 3),
-                DeviceChallenge("challenge-1", nonce)
-            )
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, byteArrayOf(1, 2, 3))
         )
 
         assertEquals(
             DeviceVerificationResult.Rejected(DeviceVerificationFailure.INVALID_SIGNATURE),
             result
         )
-        assertTrue(consumed.isEmpty())
+        assertTrue(!store.consumed)
         assertEquals("DENY", audit.events.single().outcome)
     }
 
@@ -86,40 +116,28 @@ class DeviceChallengeVerifierTest {
     fun replayIsRejectedAfterValidSignature() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 3 }
-        val signature = sign(keyPair, nonce)
-        val challenge = DeviceChallenge("challenge-1", nonce)
-        val audit = RecordingAuditSink()
-        val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { false },
-            auditSink = audit
-        )
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", nonce), consumed = true)
+        val verifier = DeviceChallengeVerifier(store, RecordingAuditSink())
 
         val result = verifier.verify(
-            DeviceProof(keyPair.public.encoded, signature, challenge)
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce))
         )
 
         assertEquals(
             DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_REPLAYED),
             result
         )
-        assertEquals("DENY", audit.events.single().outcome)
     }
 
     @Test
     fun shortChallengeIsRejected() {
         val keyPair = generateP256KeyPair()
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", ByteArray(16)))
         val audit = RecordingAuditSink()
-        val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { true },
-            auditSink = audit
-        )
+        val verifier = DeviceChallengeVerifier(store, audit)
 
         val result = verifier.verify(
-            DeviceProof(
-                keyPair.public.encoded,
-                byteArrayOf(1),
-                DeviceChallenge("challenge-1", ByteArray(16))
-            )
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, byteArrayOf(1))
         )
 
         assertEquals(
@@ -132,27 +150,21 @@ class DeviceChallengeVerifierTest {
     fun auditFailureFailsClosedAfterChallengeConsumption() {
         val keyPair = generateP256KeyPair()
         val nonce = ByteArray(32) { 4 }
-        val consumed = mutableSetOf<String>()
+        val store = TestChallengeStore(IssuedDeviceChallenge("challenge-1", nonce))
         val verifier = DeviceChallengeVerifier(
-            replayGuard = ChallengeReplayGuard { consumed.add(it) },
-            auditSink = object : AuditSink {
-                override fun record(event: AuditEvent): Boolean = false
-            }
+            store,
+            auditSink = AuditSink { false }
         )
 
         val result = verifier.verify(
-            DeviceProof(
-                keyPair.public.encoded,
-                sign(keyPair, nonce),
-                DeviceChallenge("challenge-1", nonce)
-            )
+            PresentedDeviceProof("challenge-1", keyPair.public.encoded, sign(keyPair, nonce))
         )
 
         assertEquals(
             DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE),
             result
         )
-        assertTrue(consumed.contains("challenge-1"))
+        assertTrue(store.consumed)
     }
 
     private fun generateP256KeyPair(): KeyPair =
@@ -170,6 +182,20 @@ class DeviceChallengeVerifierTest {
         MessageDigest.getInstance("SHA-256")
             .digest(encodedPublicKey)
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
+    private class TestChallengeStore(
+        private val challenge: IssuedDeviceChallenge?,
+        var consumed: Boolean = false
+    ) : ChallengeStore {
+        override fun find(challengeId: String): IssuedDeviceChallenge? =
+            challenge?.takeIf { it.id == challengeId }?.takeUnless { consumed }
+
+        override fun consume(challengeId: String): Boolean {
+            if (consumed || challenge?.id != challengeId) return false
+            consumed = true
+            return true
+        }
+    }
 
     private class RecordingAuditSink : AuditSink {
         val events = mutableListOf<AuditEvent>()

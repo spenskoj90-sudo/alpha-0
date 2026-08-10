@@ -104,8 +104,7 @@ object AuthorizationEngine {
     private fun deny(reason: DenyReason) = AuthorizationDecision.Deny(reason)
 
     private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
-        request.identityId.isNotBlank() && request.identityId.length <= MAX_TEXT_LENGTH &&
-            request.roles.isNotEmpty() && request.roles.size <= MAX_SET_SIZE &&
+        request.roles.isNotEmpty() && request.roles.size <= MAX_SET_SIZE &&
             request.roles.all { it.isNotBlank() && it.length <= MAX_TEXT_LENGTH } &&
             request.permissions.isNotEmpty() && request.permissions.size <= MAX_SET_SIZE &&
             request.permissions.all { it.isNotBlank() && it.length <= MAX_PERMISSION_LENGTH } &&

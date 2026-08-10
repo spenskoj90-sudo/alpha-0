@@ -1,28 +1,33 @@
 package com.sentinel.core.device
 
+import com.sentinel.core.audit.AuditEvent
+import com.sentinel.core.audit.AuditSink
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
 import java.security.spec.X509EncodedKeySpec
-import com.sentinel.core.audit.AuditEvent
-import com.sentinel.core.audit.AuditSink
 
 /**
  * Server-side cryptographic verification boundary.
  *
- * This verifier proves possession of the private key corresponding to a submitted
- * P-256 public key. It deliberately does NOT bind the key to an account or grant
- * authorization. Binding and authorization remain separate server-side decisions.
+ * The proof contains only cryptographic material and a server-issued challenge.
+ * No caller-supplied device/account identifier is trusted as identity. For an
+ * already-bound device, the challenge may carry an expected fingerprint; the
+ * verifier compares it to the fingerprint derived from the submitted public key.
+ *
+ * This verifier proves possession of a P-256 private key. It deliberately does NOT
+ * bind a new key to an account or grant authorization. Those remain separate,
+ * explicitly authorized server-side decisions.
  */
 
 data class DeviceChallenge(
     val id: String,
-    val nonce: ByteArray
+    val nonce: ByteArray,
+    val expectedFingerprint: String? = null
 )
 
 data class DeviceProof(
-    val deviceId: String,
     val publicKeyEncoded: ByteArray,
     val signature: ByteArray,
     val challenge: DeviceChallenge
@@ -32,6 +37,7 @@ enum class DeviceVerificationFailure {
     MALFORMED_REQUEST,
     UNSUPPORTED_KEY,
     INVALID_SIGNATURE,
+    DEVICE_MISMATCH,
     CHALLENGE_REPLAYED
 }
 
@@ -51,26 +57,35 @@ class DeviceChallengeVerifier(
 ) {
     fun verify(proof: DeviceProof): DeviceVerificationResult {
         if (
-            proof.deviceId.isBlank() ||
             proof.challenge.id.isBlank() ||
             proof.challenge.nonce.size < MIN_CHALLENGE_BYTES ||
             proof.publicKeyEncoded.isEmpty() ||
-            proof.signature.isEmpty()
+            proof.signature.isEmpty() ||
+            proof.challenge.expectedFingerprint?.let(::isValidFingerprint) == false
         ) {
-            return reject(proof, DeviceVerificationFailure.MALFORMED_REQUEST)
+            return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
         }
 
         val publicKey = try {
             val key = KeyFactory.getInstance(EC_ALGORITHM)
                 .generatePublic(X509EncodedKeySpec(proof.publicKeyEncoded))
             key as? ECPublicKey
-                ?: return reject(proof, DeviceVerificationFailure.UNSUPPORTED_KEY)
+                ?: return reject("unknown", DeviceVerificationFailure.UNSUPPORTED_KEY)
         } catch (_: Exception) {
-            return reject(proof, DeviceVerificationFailure.UNSUPPORTED_KEY)
+            return reject("unknown", DeviceVerificationFailure.UNSUPPORTED_KEY)
         }
 
         if (!isP256(publicKey)) {
-            return reject(proof, DeviceVerificationFailure.UNSUPPORTED_KEY)
+            return reject("unknown", DeviceVerificationFailure.UNSUPPORTED_KEY)
+        }
+
+        val fingerprint = fingerprint(proof.publicKeyEncoded)
+
+        if (
+            proof.challenge.expectedFingerprint != null &&
+            proof.challenge.expectedFingerprint != fingerprint
+        ) {
+            return reject(fingerprint, DeviceVerificationFailure.DEVICE_MISMATCH)
         }
 
         val validSignature = try {
@@ -83,21 +98,17 @@ class DeviceChallengeVerifier(
         }
 
         if (!validSignature) {
-            return reject(proof, DeviceVerificationFailure.INVALID_SIGNATURE)
+            return reject(fingerprint, DeviceVerificationFailure.INVALID_SIGNATURE)
         }
 
         if (!replayGuard.consume(proof.challenge.id)) {
-            return reject(proof, DeviceVerificationFailure.CHALLENGE_REPLAYED)
+            return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }
-
-        val fingerprint = MessageDigest.getInstance(HASH_ALGORITHM)
-            .digest(proof.publicKeyEncoded)
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
         auditSink.record(
             AuditEvent(
                 action = "device.challenge.verify",
-                subjectId = proof.deviceId,
+                subjectId = fingerprint,
                 outcome = "ALLOW",
                 reason = null,
                 fingerprint = fingerprint
@@ -107,14 +118,11 @@ class DeviceChallengeVerifier(
         return DeviceVerificationResult.Verified(fingerprint)
     }
 
-    private fun reject(
-        proof: DeviceProof,
-        reason: DeviceVerificationFailure
-    ): DeviceVerificationResult.Rejected {
+    private fun reject(subjectId: String, reason: DeviceVerificationFailure): DeviceVerificationResult.Rejected {
         auditSink.record(
             AuditEvent(
                 action = "device.challenge.verify",
-                subjectId = proof.deviceId.ifBlank { "unknown" },
+                subjectId = subjectId,
                 outcome = "DENY",
                 reason = reason.name,
                 fingerprint = null
@@ -123,9 +131,17 @@ class DeviceChallengeVerifier(
         return DeviceVerificationResult.Rejected(reason)
     }
 
+    private fun fingerprint(encodedPublicKey: ByteArray): String =
+        MessageDigest.getInstance(HASH_ALGORITHM)
+            .digest(encodedPublicKey)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
     private fun isP256(key: ECPublicKey): Boolean =
         key.params.curve.field.fieldSize == P256_FIELD_SIZE_BITS &&
             key.params.order.bitLength() == P256_ORDER_BITS
+
+    private fun isValidFingerprint(value: String): Boolean =
+        value.length == 64 && value.all { it in '0'..'9' || it in 'a'..'f' }
 
     private companion object {
         const val EC_ALGORITHM = "EC"

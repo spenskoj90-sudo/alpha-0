@@ -68,8 +68,14 @@ class DeviceChallengeVerifier(
         if (!now().isBefore(challenge.expiresAt)) return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_EXPIRED)
 
         val allowAudit = AuditEvent("device.challenge.verify", fingerprint, "ALLOW", null, fingerprint)
-        if (challengeStore is AtomicChallengeAuditStore && auditSink === challengeStore) {
-            return if (runCatching { challengeStore.consumeAndRecord(proof.challengeId, allowAudit) }.getOrDefault(false)) {
+        val atomicStore = challengeStore as? AtomicChallengeAuditStore
+        if (atomicStore != null && auditSink === atomicStore) {
+            val committed = try {
+                atomicStore.consumeAndRecord(proof.challengeId, allowAudit)
+            } catch (_: Exception) {
+                false
+            }
+            return if (committed) {
                 DeviceVerificationResult.Verified(fingerprint)
             } else {
                 DeviceVerificationResult.Rejected(DeviceVerificationFailure.CHALLENGE_REPLAYED)

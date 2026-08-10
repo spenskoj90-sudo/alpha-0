@@ -90,7 +90,6 @@ jobs:
           gradle-version: "8.9"
       - name: Run bounded security stress suite
         run: gradle --no-daemon --stacktrace :core:test --tests '*StressTest'
-        continue-on-error: false
       - name: Verify fail-closed code paths are covered
         run: |
           set -euo pipefail
@@ -105,6 +104,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - uses: android-actions/setup-android@v4.0.1
       - uses: gradle/actions/setup-gradle@v6.1.0
         with:
           gradle-version: "8.9"

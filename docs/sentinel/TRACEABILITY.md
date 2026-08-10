@@ -11,13 +11,16 @@ This map records the current implementation-to-contract boundary. `Implemented` 
 | SHA-256 fingerprint | `DeviceIdentity` | Implemented | Unit coverage present; execution evidence pending |
 | ECDSA sign/verify | `DeviceIdentity` | Implemented | Device/instrumentation verification pending |
 | Deterministic hex | `security/Hex.kt` | Implemented | Unit coverage present; execution evidence pending |
-| Default Deny | Server authorization | Not implemented | Not applicable |
-| Least Privilege | Server authorization | Not implemented | Not applicable |
-| RBAC + Scope | Authorization engine | Not implemented | Not applicable |
-| Entitlement-aware access | Authorization engine | Not implemented | Not applicable |
-| Policy-aware authorization | Authorization engine | Not implemented | Not applicable |
-| Context-aware authorization | Authorization engine | Not implemented | Not applicable |
-| Centralized authorization truth | Sentinel Core | Not implemented | Not applicable |
+| Explicit role membership | `core/.../Authorization.kt` | Implemented | Core unit execution pending |
+| Permission independent from role | `Authorization.kt` | Implemented | Core unit execution pending |
+| Versioned Scope ruleset | `Authorization.kt` | Implemented | Core unit execution pending |
+| Entitlement status/time window | `Authorization.kt` | Implemented | Core unit execution pending |
+| Policy evaluation | `Authorization.kt` | Implemented | Core unit execution pending |
+| Context validation | `Authorization.kt` | Implemented | Core unit execution pending |
+| Default Deny decision paths | `Authorization.kt` | Implemented in domain engine | Server integration pending |
+| Least Privilege | Core authorization contract | Partial foundation | Server integration pending |
+| Server-side authorization | API/server adapter | Not implemented | Not applicable |
+| Centralized authorization truth | Sentinel Core service | Partial foundation | Server integration pending |
 | Auditability | Core persistence/audit | Not implemented | Not applicable |
 | PostgreSQL persistence | Sentinel Core | Not implemented | Not applicable |
 | Device registration | Backend | Not implemented | Not applicable |

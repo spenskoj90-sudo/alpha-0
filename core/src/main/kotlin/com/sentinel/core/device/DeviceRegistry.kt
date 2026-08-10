@@ -2,6 +2,7 @@ package com.sentinel.core.device
 
 import java.security.AlgorithmParameters
 import java.security.KeyFactory
+import java.security.MessageDigest
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
@@ -51,6 +52,13 @@ class DeviceRegistry(
         if (!isValidFingerprint(fingerprint) || !isP256PublicKey(publicKeyEncoded)) {
             return DeviceRegistryResult.Rejected(DeviceRegistryFailure.MALFORMED_REQUEST)
         }
+        val derivedFingerprint = fingerprintOf(publicKeyEncoded)
+        if (!MessageDigest.isEqual(
+                fingerprint.toByteArray(Charsets.US_ASCII),
+                derivedFingerprint.toByteArray(Charsets.US_ASCII)
+            )
+        ) return DeviceRegistryResult.Rejected(DeviceRegistryFailure.MALFORMED_REQUEST)
+
         return try {
             if (store.find(fingerprint) != null) {
                 DeviceRegistryResult.Rejected(DeviceRegistryFailure.ALREADY_REGISTERED)
@@ -95,6 +103,10 @@ class DeviceRegistry(
 
     private fun isValidFingerprint(value: String): Boolean =
         value.length == FINGERPRINT_LENGTH && value.all { it in '0'..'9' || it in 'a'..'f' }
+
+    private fun fingerprintOf(encoded: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(encoded)
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun isP256PublicKey(encoded: ByteArray): Boolean = runCatching {
         if (encoded.isEmpty() || encoded.size > MAX_PUBLIC_KEY_BYTES) return false

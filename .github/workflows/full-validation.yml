@@ -105,6 +105,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v4.0.1
+      - name: Install pinned Android build tools
+        run: sdkmanager "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v6.1.0
         with:
           gradle-version: "8.9"
@@ -117,4 +119,4 @@ jobs:
           apk="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$apk"
           sha256sum "$apk" | tee "$apk.sha256"
-          apksigner verify --verbose "$apk"
+          "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --verbose "$apk"

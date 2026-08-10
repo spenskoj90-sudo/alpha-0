@@ -54,13 +54,17 @@ Minimal Alpha Release Candidate
 - registration does not grant authorization
 - activation is a separate state transition
 - revoked devices cannot be reactivated through the normal activation path
+- registration requires an actual P-256 public key
+- supplied fingerprint must match the submitted public key
 - store failures fail closed
 - active binding is checked before cryptographic proof acceptance
+- PostgreSQL device registry implementation
 
 ### Device challenge security
 
 - server-side P-256 challenge/signature verification boundary
-- client submits only challenge ID, public key and signature
+- server-side challenge issuance
+- client submits only challenge ID, public key and signature for proof
 - trusted server-issued nonce, expiry and expected fingerprint
 - 32–64 byte challenge nonce bound
 - bounded challenge ID, public-key and signature inputs
@@ -75,23 +79,25 @@ Minimal Alpha Release Candidate
 - active binding required before proof acceptance
 - regression coverage for positive, negative, replay, substitution, expiry, malformed, oversized, non-P256, revoked-device and storage-failure paths
 
-### PostgreSQL persistence slice
+### PostgreSQL persistence
 
 - PostgreSQL JDBC 42.7.13
 - `JdbcChallengeStore`
+- `JdbcChallengeIssuer`
+- `JdbcDeviceRegistryStore`
 - `JdbcSessionStore`
-- server-side persisted challenge state
-- server-side persisted session state
-- atomic replay protection using conditional `UPDATE`
+- `JdbcAuditSink`
+- server-side persisted device, challenge, session and audit state
+- atomic challenge replay protection using conditional `UPDATE`
 - persisted nonce/fingerprint/token-hash integrity validation
 - session token hash uniqueness
-- V1 challenge and V2 session migrations
-- canonical schema includes challenges and sessions
-- active-expiry and state indexes
+- V1 challenge, V2 session, V3 device and V4 audit migrations
+- canonical schema includes device, challenge, session and audit tables
+- active-expiry/state indexes
 - environment-driven PostgreSQL configuration with TLS and channel binding required
 - bounded connection and socket timeouts
 
-### Session security foundation
+### Session security
 
 - opaque 256-bit bearer session credentials
 - raw token returned only at issuance
@@ -103,6 +109,20 @@ Minimal Alpha Release Candidate
 - PostgreSQL persistence implementation
 - revocation API foundation
 - unit regression coverage for issue/authenticate/expiry/revocation/malformed/store-failure paths
+
+### Runnable server foundation
+
+- standalone JVM `server` module
+- localhost-by-default binding
+- bounded request body size
+- health endpoint
+- registration endpoint
+- bootstrap-token-protected activation endpoint
+- server-issued challenge endpoint
+- challenge proof verification endpoint
+- bearer-session revocation endpoint
+- no raw database credentials in source
+- no bearer token logging
 
 ### Engineering / supply chain
 
@@ -116,16 +136,15 @@ Minimal Alpha Release Candidate
 
 ## Intentionally not accepted as complete
 
-- HTTP/API transport
-- production device registration and binding approval workflow
-- challenge issuance API
-- production session rotation and token operational policy
-- production revocation enforcement across all protected operations
+- production TLS termination/API gateway configuration
 - transactional coupling of challenge consumption and mandatory audit persistence
+- session rotation
+- production revocation enforcement across every protected operation
 - recovery/key rotation
-- production database operational configuration and integration execution evidence
-- Android instrumentation on real/emulated devices
+- formal authorization middleware on every HTTP protected operation
+- PostgreSQL integration execution evidence
 - client ↔ server end-to-end authentication tests
+- Android instrumentation on real/emulated devices
 - performance benchmarks
 - chaos/failure-injection tests
 - production release signing and artifact verification
@@ -136,8 +155,8 @@ Interfaces and domain code do not count as production acceptance until execution
 ## Evidence status
 
 - Source inspection: current modernization branch
-- Latest Android CI: pending/queued after current head changes
-- Latest CodeQL: queued after current head changes
+- Latest Android CI: must be rechecked after latest server/database changes
+- Latest CodeQL: must be rechecked after latest server/database changes
 - Runtime Android identity verification: not yet performed
 - PostgreSQL integration execution: not yet performed
 - End-to-end authentication: not yet performed
@@ -165,11 +184,12 @@ Interfaces and domain code do not count as production acceptance until execution
 - invalid context → DENY
 - audit persistence failure → DENY
 - expired/revoked session → DENY
+- revoked device → DENY
 - valid bound device + valid authorization context → ALLOW
 
 ## Next vertical slice
 
-Device Registration API → Binding Approval → Server-issued Challenge → Proof Verification → Session Issuance → Revocation → Recovery/Key Rotation → HTTP/API enforcement → PostgreSQL integration tests → Client/Server E2E → performance → chaos → release verification.
+Run/verify the new server against PostgreSQL → wire authorization middleware into protected operations → transactional audit/challenge boundary → session rotation → revocation enforcement → recovery/key rotation → Android client API integration → E2E → performance → chaos → release verification.
 
 ## Continuity rule
 

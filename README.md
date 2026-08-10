@@ -30,10 +30,11 @@ of a device key, while Sentinel Core remains the authoritative authorization bou
 - Fail-closed malformed-input handling
 - Fail-closed policy evaluation errors
 - Server-side P-256 challenge/signature verification boundary
-- Challenge replay-guard interface with atomic-consume contract
+- Trusted server-side challenge-state lookup and atomic consume contract
 - Device fingerprint binding for server-issued challenges
+- Client cannot replace the server-issued challenge nonce or identity context
 - Mandatory audit-sink contract for successful security decisions
-- Unit coverage for positive, negative, boundary, replay, substitution, and audit-failure cases
+- Unit coverage for positive, negative, boundary, replay, substitution, challenge-tampering, and audit-failure cases
 
 **Engineering / supply chain**
 
@@ -49,7 +50,7 @@ The following still require production infrastructure and runtime evidence befor
 
 - HTTP/API transport layer
 - Persistent PostgreSQL repositories
-- Production challenge store / replay guard implementation
+- Production challenge store / atomic replay store implementation
 - Device enrollment and explicit device-binding approval workflow
 - Session lifecycle and token management
 - Device revocation
@@ -105,6 +106,6 @@ A successful CI run is evidence for the configured checks only; it does not by i
 
 Device private keys are generated and stored by Android Keystore and are not exported by the application. The client is not the authoritative authorization boundary. Sentinel Core is the single source of truth for authorization.
 
-Server-side challenge verification proves cryptographic possession only. Device binding, entitlement, authorization, revocation, and policy decisions remain separate server-side controls.
+Server-side challenge verification consumes only trusted server-issued challenge state. Cryptographic possession does not itself grant device binding or authorization; binding, entitlement, authorization, revocation, and policy decisions remain separate server-side controls.
 
 Production signing credentials must be supplied through CI secrets and must never be committed to the repository.

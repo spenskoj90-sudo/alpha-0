@@ -30,6 +30,7 @@ enum class DeviceVerificationFailure {
     INVALID_SIGNATURE,
     DEVICE_MISMATCH,
     CHALLENGE_REPLAYED,
+    CHALLENGE_STORE_UNAVAILABLE,
     AUDIT_UNAVAILABLE
 }
 
@@ -57,8 +58,12 @@ class DeviceChallengeVerifier(
             proof.signature.isEmpty() || proof.signature.size > MAX_SIGNATURE_BYTES
         ) return reject("unknown", DeviceVerificationFailure.MALFORMED_REQUEST)
 
-        val challenge = challengeStore.find(proof.challengeId)
-            ?: return reject("unknown", DeviceVerificationFailure.CHALLENGE_NOT_FOUND)
+        val challenge = try {
+            challengeStore.find(proof.challengeId)
+        } catch (_: Exception) {
+            return reject("unknown", DeviceVerificationFailure.CHALLENGE_STORE_UNAVAILABLE)
+        } ?: return reject("unknown", DeviceVerificationFailure.CHALLENGE_NOT_FOUND)
+
         if (
             challenge.id != proof.challengeId ||
             challenge.id.isBlank() || challenge.id.length > MAX_CHALLENGE_ID_LENGTH ||
@@ -103,9 +108,12 @@ class DeviceChallengeVerifier(
             return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_EXPIRED)
         }
 
-        if (!challengeStore.consume(proof.challengeId)) {
-            return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
+        val consumed = try {
+            challengeStore.consume(proof.challengeId)
+        } catch (_: Exception) {
+            return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_STORE_UNAVAILABLE)
         }
+        if (!consumed) return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
 
         val allowAudit = AuditEvent(
             action = "device.challenge.verify",

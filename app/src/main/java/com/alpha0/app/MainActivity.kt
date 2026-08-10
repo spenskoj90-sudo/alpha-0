@@ -51,7 +51,7 @@ class MainActivity : Activity() {
                 it[0] = (it[0].toInt() xor 0x01).toByte()
             }
             val tamperedRejected = !identity.verify(tamperedChallenge, signature)
-            val keyNonExportable = !identity.isPrivateKeyExported()
+            val keyNonExportable = identity.isPrivateKeyNonExportable()
             val cryptoPassed = signatureValid && tamperedRejected && keyNonExportable
 
             status.text = """

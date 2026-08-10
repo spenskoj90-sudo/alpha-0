@@ -97,6 +97,12 @@ class DeviceChallengeVerifier(
         } catch (_: Exception) { false }
         if (!validSignature) return reject(fingerprint, DeviceVerificationFailure.INVALID_SIGNATURE)
 
+        // Re-check expiry immediately before the atomic consume to close the
+        // verify-at-time-T1 / consume-at-time-T2 expiry window.
+        if (!now().isBefore(challenge.expiresAt)) {
+            return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_EXPIRED)
+        }
+
         if (!challengeStore.consume(proof.challengeId)) {
             return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }

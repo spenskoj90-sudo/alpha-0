@@ -33,15 +33,19 @@ fun main() {
         ?: error("Missing required environment variable: SENTINEL_ENROLLMENT_TOKEN")
     val allowedOperators = env["SENTINEL_OPERATOR_SUBJECTS"]
         ?.split(',')?.map(String::trim)?.filter(String::isNotBlank)?.toSet() ?: emptySet()
-    val authorization = AuthorizationMiddleware(sessions, AuthorizationProfileStore { subject ->
-        if (subject !in allowedOperators && "*" !in allowedOperators) return@AuthorizationProfileStore null
-        AuthorizationProfile(
-            roles = setOf("operator"), requiredRole = "operator", permissions = setOf("protected:read"),
-            scope = ScopeRuleset(1, listOf(ScopeRule("protected", null, setOf("read")))),
-            entitlement = Entitlement("sentinel-bootstrap", EntitlementStatus.ACTIVE, Instant.EPOCH, null),
-            policy = Policy { true }
-        )
-    })
+    val authorization = AuthorizationMiddleware(
+        sessions,
+        AuthorizationProfileStore { subject ->
+            if (subject !in allowedOperators && "*" !in allowedOperators) return@AuthorizationProfileStore null
+            AuthorizationProfile(
+                roles = setOf("operator"), requiredRole = "operator", permissions = setOf("protected:read"),
+                scope = ScopeRuleset(1, listOf(ScopeRule("protected", null, setOf("read")))),
+                entitlement = Entitlement("sentinel-bootstrap", EntitlementStatus.ACTIVE, Instant.EPOCH, null),
+                policy = Policy { true }
+            )
+        },
+        auditSink = auditSink
+    )
 
     val registrationLimiter = SlidingWindowRateLimiter(30, Duration.ofMinutes(1))
     val activationLimiter = SlidingWindowRateLimiter(20, Duration.ofMinutes(1))

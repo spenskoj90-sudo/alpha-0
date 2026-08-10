@@ -7,6 +7,8 @@ import java.time.Instant
  *
  * This module intentionally contains no transport, persistence, billing, or UI code.
  * The server/API adapter must invoke this engine before protected operations are executed.
+ *
+ * Security invariant: malformed input and evaluation failures fail closed.
  */
 
 data class Resource(
@@ -23,6 +25,12 @@ data class ScopeRule(
         action in actions &&
             resourceType == resource.type &&
             (resourceId == null || resourceId == resource.id)
+
+    fun isValid(): Boolean =
+        resourceType.isNotBlank() &&
+            (resourceId == null || resourceId.isNotBlank()) &&
+            actions.isNotEmpty() &&
+            actions.none { it.isBlank() }
 }
 
 data class ScopeRuleset(
@@ -31,6 +39,9 @@ data class ScopeRuleset(
 ) {
     fun permits(action: String, resource: Resource): Boolean =
         rules.any { it.permits(action, resource) }
+
+    fun isValid(): Boolean =
+        version > 0 && rules.isNotEmpty() && rules.all(ScopeRule::isValid)
 }
 
 enum class EntitlementStatus {
@@ -47,14 +58,23 @@ data class Entitlement(
     val expiresAt: Instant?
 ) {
     fun isActiveAt(now: Instant): Boolean =
-        status == EntitlementStatus.ACTIVE &&
+        source.isNotBlank() &&
+            status == EntitlementStatus.ACTIVE &&
             !now.isBefore(startsAt) &&
             (expiresAt == null || now.isBefore(expiresAt))
+
+    fun isValid(): Boolean =
+        source.isNotBlank() &&
+            (expiresAt == null || !expiresAt.isBefore(startsAt))
 }
 
 data class AuthorizationContext(
     val attributes: Map<String, String> = emptyMap()
-)
+) {
+    fun isValid(): Boolean =
+        attributes.keys.none { it.isBlank() } &&
+            attributes.values.none { it.isBlank() }
+}
 
 fun interface Policy {
     fun permits(request: AuthorizationRequest): Boolean
@@ -75,6 +95,7 @@ data class AuthorizationRequest(
 )
 
 enum class DenyReason {
+    MALFORMED_REQUEST,
     INVALID_IDENTITY,
     MISSING_ROLE,
     MISSING_PERMISSION,
@@ -91,11 +112,15 @@ sealed interface AuthorizationDecision {
 
 object AuthorizationEngine {
     fun decide(request: AuthorizationRequest): AuthorizationDecision {
+        if (!isRequestWellFormed(request)) {
+            return AuthorizationDecision.Deny(DenyReason.MALFORMED_REQUEST)
+        }
+
         if (request.identityId.isBlank()) {
             return AuthorizationDecision.Deny(DenyReason.INVALID_IDENTITY)
         }
 
-        if (request.requiredRole.isBlank() || request.requiredRole !in request.roles) {
+        if (request.requiredRole !in request.roles) {
             return AuthorizationDecision.Deny(DenyReason.MISSING_ROLE)
         }
 
@@ -112,14 +137,34 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.ENTITLEMENT_DENIED)
         }
 
-        if (request.context.attributes.any { (key, value) -> key.isBlank() || value.isBlank() }) {
+        if (!request.context.isValid()) {
             return AuthorizationDecision.Deny(DenyReason.CONTEXT_DENIED)
         }
 
-        if (!request.policy.permits(request)) {
+        val policyPermits = try {
+            request.policy.permits(request)
+        } catch (_: Exception) {
+            false
+        }
+
+        if (!policyPermits) {
             return AuthorizationDecision.Deny(DenyReason.POLICY_DENIED)
         }
 
         return AuthorizationDecision.Allow(scopeVersion = request.scope.version)
     }
+
+    private fun isRequestWellFormed(request: AuthorizationRequest): Boolean =
+        request.identityId.isNotBlank() &&
+            request.roles.isNotEmpty() &&
+            request.roles.none { it.isBlank() } &&
+            request.requiredRole.isNotBlank() &&
+            request.permissions.isNotEmpty() &&
+            request.permissions.none { it.isBlank() } &&
+            request.action.isNotBlank() &&
+            request.resource.type.isNotBlank() &&
+            request.resource.id.isNotBlank() &&
+            request.scope.isValid() &&
+            request.entitlement.isValid() &&
+            request.context.isValid()
 }

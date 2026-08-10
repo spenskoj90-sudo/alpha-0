@@ -38,7 +38,8 @@ enum class DeviceVerificationFailure {
     UNSUPPORTED_KEY,
     INVALID_SIGNATURE,
     DEVICE_MISMATCH,
-    CHALLENGE_REPLAYED
+    CHALLENGE_REPLAYED,
+    AUDIT_UNAVAILABLE
 }
 
 sealed interface DeviceVerificationResult {
@@ -105,29 +106,34 @@ class DeviceChallengeVerifier(
             return reject(fingerprint, DeviceVerificationFailure.CHALLENGE_REPLAYED)
         }
 
-        auditSink.record(
-            AuditEvent(
-                action = "device.challenge.verify",
-                subjectId = fingerprint,
-                outcome = "ALLOW",
-                reason = null,
-                fingerprint = fingerprint
-            )
+        val allowAudit = AuditEvent(
+            action = "device.challenge.verify",
+            subjectId = fingerprint,
+            outcome = "ALLOW",
+            reason = null,
+            fingerprint = fingerprint
         )
+
+        val auditSucceeded = runCatching { auditSink.record(allowAudit) }.getOrDefault(false)
+        if (!auditSucceeded) {
+            return DeviceVerificationResult.Rejected(DeviceVerificationFailure.AUDIT_UNAVAILABLE)
+        }
 
         return DeviceVerificationResult.Verified(fingerprint)
     }
 
     private fun reject(subjectId: String, reason: DeviceVerificationFailure): DeviceVerificationResult.Rejected {
-        auditSink.record(
-            AuditEvent(
-                action = "device.challenge.verify",
-                subjectId = subjectId,
-                outcome = "DENY",
-                reason = reason.name,
-                fingerprint = null
+        runCatching {
+            auditSink.record(
+                AuditEvent(
+                    action = "device.challenge.verify",
+                    subjectId = subjectId,
+                    outcome = "DENY",
+                    reason = reason.name,
+                    fingerprint = null
+                )
             )
-        )
+        }
         return DeviceVerificationResult.Rejected(reason)
     }
 

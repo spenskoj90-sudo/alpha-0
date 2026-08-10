@@ -63,14 +63,14 @@ class DeviceIdentity {
         ensureKeyExists()
 
         return loadKeyStore().getKey(KEY_ALIAS, null) as? PrivateKey
-            ?: throw IllegalStateException("ALPHA-0 private key is unavailable")
+            ?: throw IllegalStateException("SENTINEL private key is unavailable")
     }
 
     private fun getPublicKey(): PublicKey {
         ensureKeyExists()
 
         return loadKeyStore().getCertificate(KEY_ALIAS)?.publicKey
-            ?: throw IllegalStateException("ALPHA-0 public key is unavailable")
+            ?: throw IllegalStateException("SENTINEL public key is unavailable")
     }
 
     fun getIdentityInfo(): IdentityInfo {
@@ -84,6 +84,19 @@ class DeviceIdentity {
             fingerprint = fingerprint,
             algorithm = "EC / $CURVE / $SIGNATURE_ALGORITHM"
         )
+    }
+
+    /**
+     * Android Keystore private keys are intentionally non-exportable. The provider
+     * exposes no encoded private-key material; a non-null encoding would indicate
+     * that the provider contract has changed and should fail the self-test.
+     */
+    fun isPrivateKeyNonExportable(): Boolean {
+        return try {
+            getPrivateKey().encoded == null
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun sign(challenge: ByteArray): ByteArray {

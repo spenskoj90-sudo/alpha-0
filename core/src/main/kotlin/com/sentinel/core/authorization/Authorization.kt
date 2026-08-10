@@ -137,6 +137,10 @@ object AuthorizationEngine {
             return AuthorizationDecision.Deny(DenyReason.ENTITLEMENT_DENIED)
         }
 
+        if (!request.context.isValid()) {
+            return AuthorizationDecision.Deny(DenyReason.CONTEXT_DENIED)
+        }
+
         val policyPermits = try {
             request.policy.permits(request)
         } catch (_: Exception) {
@@ -157,6 +161,5 @@ object AuthorizationEngine {
             request.resource.type.isNotBlank() &&
             request.resource.id.isNotBlank() &&
             request.scope.isValid() &&
-            request.entitlement.isValid() &&
-            request.context.isValid()
+            request.entitlement.isValid()
 }

@@ -49,10 +49,14 @@ INSERT INTO wow_patches (id, label, family, protocol_generation) VALUES
 ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, supported = TRUE;
 
 INSERT INTO wow_realms (id, name, realm_type, patch_id, source, monitoring_profile, client_integration) VALUES
-('mmotop-sirus', 'Sirus', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private', 'launcher-plus-addon'),
-('mmotop-firstspawn', 'FirstSpawn', 'private', 'vanilla-1.12', 'MMOTOP', 'vanilla-private', 'launcher-plus-addon'),
-('mmotop-valor', 'VALOR', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private-custom', 'launcher-plus-addon'),
-('mmotop-diablo-wow', 'Diablo-WOW', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private-custom', 'launcher-plus-addon'),
-('mmotop-avalon', 'Avalon', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private-custom', 'launcher-plus-addon'),
-('mmotop-wowonelove', 'WoWOneLove', 'private', 'mop-5.4.8', 'MMOTOP', 'mop-private', 'launcher-plus-addon')
+('mmotop-uwow', 'Uwow', 'private', 'legion-7.3.5', 'MMOTOP', 'legion-private', 'launcher-plus-addon'),
+('mmotop-skyblood', 'SkyBlood', 'private', 'legion-7.3.5', 'MMOTOP', 'legion-private', 'launcher-plus-addon'),
+('mmotop-wow-prime', 'WoW-Prime', 'private', 'legion-7.3.5', 'MMOTOP', 'custom-launcher', 'launcher-plus-addon'),
+('mmotop-neverest', 'Neverest', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private', 'launcher-plus-addon'),
+('mmotop-epicwow', 'EpicWoW', 'private', 'legion-7.3.5', 'MMOTOP', 'legion-private', 'launcher-plus-addon'),
+('mmotop-1001wow', '1001WOW', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private', 'launcher-plus-addon'),
+('mmotop-northwind', 'Northwind', 'private', 'vanilla-1.12', 'MMOTOP', 'vanilla-private', 'launcher-plus-addon'),
+('mmotop-poligon7', 'Poligon7', 'private', 'vanilla-1.12', 'MMOTOP', 'vanilla-private', 'launcher-plus-addon'),
+('mmotop-nozdor', 'Nozdor', 'private', 'wotlk-3.3.5a', 'MMOTOP', 'wotlk-private', 'launcher-plus-addon'),
+('mmotop-turbo-wow', 'Turbo-WoW', 'private', 'dragonflight-10.2.7', 'MMOTOP', 'dragonflight-private', 'launcher-plus-addon')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, patch_id = EXCLUDED.patch_id, enabled = TRUE;

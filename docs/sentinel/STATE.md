@@ -16,6 +16,10 @@ Minimal Alpha Release Candidate
 - Verification: Test Matrix v1
 - Decisions: Decision Log
 
+## Repository visibility
+
+The GitHub repository is now **public**. Public-release hardening is therefore part of the active security boundary.
+
 ## Current authoritative branch
 
 `main` remains the accepted baseline. The completed hardening/full-validation work is isolated in PR #1 / `agent/modernize-alpha0` until runtime evidence and review are complete.
@@ -32,6 +36,7 @@ Minimal Alpha Release Candidate
 - backup/device-transfer extraction disabled
 - JVM tests
 - Android instrumentation smoke test and emulator CI
+- debug CI does not require production signing secrets
 
 ### Authorization
 
@@ -105,11 +110,24 @@ Minimal Alpha Release Candidate
 - protected authorization endpoint
 - no raw bearer-token logging
 
-### Validation / supply chain
+### Public-repository / supply-chain hardening
+
+- Dependabot for Gradle and GitHub Actions
+- Dependency Review gate for pull requests
+- CodeQL
+- minimal workflow `GITHUB_TOKEN` permissions
+- public PR CI does not require production signing secrets
+- Android checkout disables persisted Git credentials
+- release signing remains isolated to tag/manual release workflow
+- `.gitignore` excludes signing material and local secrets
+- `SECURITY.md` documents vulnerability handling
+
+### Validation
 
 - Android build/test/lint CI
 - CodeQL
 - Dependabot
+- dependency review
 - full JVM/server validation workflow
 - PostgreSQL TLS-backed server E2E workflow
 - Android emulator instrumentation workflow
@@ -118,9 +136,13 @@ Minimal Alpha Release Candidate
 - signed production release workflow
 - APK signature and SHA-256 verification
 
+## Known regression fixed in current cycle
+
+`AuthorizationMiddlewareTest` previously passed the deterministic clock lambda as the trailing SAM argument, where Kotlin interpreted it as `AuditSink`. The test therefore failed compilation with `Instant` versus `Boolean`. The test now uses explicit named arguments (`now = ...`, `auditSink = ...`) so the intended dependency injection is unambiguous.
+
 ## Evidence still required
 
-Source implementation is now substantially complete, but runtime acceptance still requires GitHub Actions to execute successfully on the final head and, separately, production environment evidence for:
+Source implementation is substantially complete, but runtime acceptance still requires the current GitHub Actions cycle to finish successfully and, separately, production environment evidence for:
 
 - real PostgreSQL deployment configuration;
 - Android device/emulator instrumentation;
@@ -129,7 +151,7 @@ Source implementation is now substantially complete, but runtime acceptance stil
 - production release signing with repository secrets;
 - API gateway/TLS termination configuration.
 
-These are execution gates, not missing domain implementations.
+These are execution/deployment gates, not missing domain implementations.
 
 ## Security acceptance matrix
 

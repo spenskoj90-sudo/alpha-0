@@ -13,20 +13,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.game.GameCatalog
 
 @Composable
-fun CharacterDashboard(
-    characterName: String,
-    level: Int,
-    health: Int,
-    energy: Int,
-    syncState: String
-) {
+fun CharacterDashboard(characterName: String, level: Int, health: Int, energy: Int, syncState: String) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("SENTINEL", style = MaterialTheme.typography.headlineMedium)
             Text(characterName, style = MaterialTheme.typography.headlineSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -38,6 +30,14 @@ fun CharacterDashboard(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("SYNC", style = MaterialTheme.typography.labelLarge)
                     Text(syncState, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("SUPPORTED GAMES", style = MaterialTheme.typography.labelLarge)
+                    GameCatalog.diablo.forEach { game ->
+                        Text("${game.name} · ${game.platform}", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }

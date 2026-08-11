@@ -23,7 +23,7 @@ class AuthorizationMiddlewareTest {
             entitlement = Entitlement("license", EntitlementStatus.ACTIVE, now.minusSeconds(1), now.plusSeconds(60)),
             policy = Policy { true }
         )
-        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }) { now }
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, now = { now })
         assertTrue(middleware.authorize(credential.token, "read", Resource("report", "r1")) is ProtectedAuthorizationResult.Allow)
     }
 
@@ -31,7 +31,7 @@ class AuthorizationMiddlewareTest {
     fun missingProfileDenies() {
         val sessions = SessionManager(MemorySessionStore(), now = { now })
         val credential = sessions.issue("device-1", Duration.ofMinutes(10))!!
-        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { null }) { now }
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { null }, now = { now })
         assertEquals(ProtectedAuthorizationResult.Deny(403, "forbidden"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
     }
 
@@ -44,7 +44,7 @@ class AuthorizationMiddlewareTest {
             scope = ScopeRuleset(1, listOf(ScopeRule("report", null, setOf("read")))),
             entitlement = Entitlement("license", EntitlementStatus.ACTIVE, now.minusSeconds(1), null), policy = Policy { true }
         )
-        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }) { now }
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, now = { now })
         assertEquals(ProtectedAuthorizationResult.Deny(403, "missing_role"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
     }
 
@@ -58,7 +58,7 @@ class AuthorizationMiddlewareTest {
             entitlement = Entitlement("license", EntitlementStatus.ACTIVE, now.minusSeconds(1), null), policy = Policy { true }
         )
         val sink = AuditSink { false }
-        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, { now }, sink)
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, now = { now }, auditSink = sink)
         assertEquals(ProtectedAuthorizationResult.Deny(503, "audit_unavailable"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
     }
 
@@ -73,7 +73,7 @@ class AuthorizationMiddlewareTest {
         )
         val events = mutableListOf<AuditEvent>()
         val sink = AuditSink { event -> events += event; true }
-        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, { now }, sink)
+        val middleware = AuthorizationMiddleware(sessions, AuthorizationProfileStore { profile }, now = { now }, auditSink = sink)
         assertEquals(ProtectedAuthorizationResult.Deny(403, "missing_role"), middleware.authorize(credential.token, "read", Resource("report", "r1")))
         assertEquals("DENY", events.single().outcome)
         assertTrue(events.single().reason!!.contains("missing_role"))

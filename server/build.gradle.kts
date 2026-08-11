@@ -9,6 +9,11 @@ kotlin {
 
 dependencies {
     implementation(project(":core"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 application {

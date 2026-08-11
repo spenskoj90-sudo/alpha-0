@@ -25,7 +25,7 @@ class Policy:
 
 
 class AuthorizationEngine:
-    """Pure, deterministic default-deny authorization decision engine."""
+    """Pure, deterministic authorization decision engine with default deny."""
 
     def __init__(self, policies: tuple[Policy, ...]) -> None:
         self._policies = {p.action: p for p in policies}
@@ -36,13 +36,11 @@ class AuthorizationEngine:
         policy = self._policies.get(action)
         if policy is None:
             return False
-        if not policy.required_roles.issubset(ctx.roles):
-            return False
-        if not policy.required_scopes.issubset(ctx.scopes):
-            return False
-        if not policy.required_entitlements.issubset(ctx.entitlements):
-            return False
-        return True
+        return (
+            policy.required_roles.issubset(ctx.roles)
+            and policy.required_scopes.issubset(ctx.scopes)
+            and policy.required_entitlements.issubset(ctx.entitlements)
+        )
 
 
 class ReplayGuard:
@@ -52,24 +50,23 @@ class ReplayGuard:
         self.max_skew_seconds = max_skew_seconds
         self._consumed: set[str] = set()
 
-    def verify_and_consume(self, nonce: str, expires_at: datetime, now: datetime | None = None) -> bool:
+    def is_valid(self, nonce: str, expires_at: datetime, now: datetime | None = None) -> bool:
         now = now or datetime.now(timezone.utc)
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if nonce in self._consumed:
-            return False
-        if expires_at.timestamp() + self.max_skew_seconds < now.timestamp():
-            return False
+        return nonce not in self._consumed and expires_at.timestamp() + self.max_skew_seconds >= now.timestamp()
+
+    def consume(self, nonce: str) -> None:
         self._consumed.add(nonce)
+
+    def verify_and_consume(self, nonce: str, expires_at: datetime, now: datetime | None = None) -> bool:
+        if not self.is_valid(nonce, expires_at, now):
+            return False
+        self.consume(nonce)
         return True
 
 
-def canonical_session_message(
-    session_id: str,
-    device_id: str,
-    nonce: str,
-    request_hash: bytes,
-) -> bytes:
+def canonical_session_message(session_id: str, device_id: str, nonce: str, request_hash: bytes) -> bytes:
     domain = b"SENTINEL_SESSION_V1"
     return b"|".join((domain, session_id.encode(), device_id.encode(), nonce.encode(), request_hash.hex().encode()))
 

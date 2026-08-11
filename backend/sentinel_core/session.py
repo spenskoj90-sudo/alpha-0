@@ -7,7 +7,7 @@ import secrets
 from uuid import UUID, uuid4
 
 from .device_identity import verify_signature
-from .security import canonical_session_message, ReplayGuard
+from .security import ReplayGuard, canonical_session_message
 
 
 @dataclass
@@ -21,12 +21,7 @@ class Challenge:
 
 
 class SessionProtocol:
-    """Reference implementation of challenge-response session establishment.
-
-    Persistence is deliberately injected so production can use PostgreSQL while unit
-    tests can use an in-memory implementation. No client-controlled authorization data
-    is accepted by this service.
-    """
+    """Challenge-response session establishment with replay-safe nonce consumption."""
 
     def __init__(self, ttl_seconds: int = 900, challenge_ttl_seconds: int = 60) -> None:
         self.ttl_seconds = ttl_seconds
@@ -49,32 +44,22 @@ class SessionProtocol:
         self._challenges[session_id] = challenge
         return challenge
 
-    def verify(
-        self,
-        session_id: UUID,
-        device_id: UUID,
-        public_key_spki: bytes,
-        signature: bytes,
-        request_hash: bytes,
-    ) -> str:
+    def verify(self, session_id: UUID, device_id: UUID, public_key_spki: bytes, signature: bytes, request_hash: bytes) -> str:
         challenge = self._challenges.get(session_id)
-        if challenge is None:
-            raise ValueError("unknown session challenge")
+        if challenge is None or challenge.consumed:
+            raise ValueError("unknown or replayed session challenge")
         if challenge.device_id != device_id:
             raise ValueError("device mismatch")
-        if challenge.consumed:
-            raise ValueError("nonce replay")
         if challenge.request_hash != request_hash:
             raise ValueError("request hash mismatch")
-        if not self._replay.verify_and_consume(challenge.nonce, challenge.expires_at):
+        if not self._replay.is_valid(challenge.nonce, challenge.expires_at):
             raise ValueError("nonce expired or replayed")
 
-        message = canonical_session_message(
-            str(session_id), str(device_id), challenge.nonce, request_hash
-        )
+        message = canonical_session_message(str(session_id), str(device_id), challenge.nonce, request_hash)
         if not verify_signature(public_key_spki, message, signature):
             raise ValueError("invalid device signature")
 
+        self._replay.consume(challenge.nonce)
         challenge.consumed = True
         token = secrets.token_urlsafe(48)
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.ttl_seconds)

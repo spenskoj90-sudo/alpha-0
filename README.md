@@ -1,36 +1,37 @@
-# ALPHA-0
+# SENTINEL / ALPHA-0
 
-ALPHA-0 Android client.
+Security-first modular monolith with Android, SENTINEL CORE and a web control plane.
 
-## BUILD-001A
+## Current implementation baseline
 
-Initial Android client shell.
+- Android Device Identity: Android Keystore EC/secp256r1 + SHA-256 fingerprint
+- Device key lifecycle: GENERATED → ACTIVE → ROTATING → REVOKED
+- Replay protection: one-time challenge + timestamp window
+- Local-first event queue and game adapter contract
+- Compose character dashboard
+- Secure AES-GCM session storage backed by Android Keystore
+- FastAPI SENTINEL CORE vertical slice
+- RBAC + scope + policy authorization engine with default deny
+- Device registration and ECDSA proof verification
+- Backend session issuance and revocation-ready session model
+- Idempotent game event ingestion with sequence replay protection
+- Audit event capture
+- Knowledge/recommendation contract with confidence and provenance
+- PostgreSQL schema and indexes
+- Next.js web dashboard design baseline
+- Full architecture and Mermaid diagrams in `docs/ARCHITECTURE_V4.md`
 
-### Current scope
+## Repository structure
 
-- Android application
-- CI build
-- Debug APK artifact
-- Basic application launch
-
-### Not implemented yet
-
-- Device Identity
-- Device binding
-- Ed25519 authentication
-- Backend
-- Session management
-- Device revocation
-- VPN/network resilience
-- Recovery flows
+- `app/` — Android client
+- `server/` — SENTINEL CORE FastAPI service
+- `web/` — Next.js personal control plane
+- `docs/` — architecture and intelligence contracts
 
 ## Acceptance rule
 
 Code is not considered implemented until it has been built and tested.
 
-FAIL
-→ root cause
-→ FIX
-→ regression
-→ PASS
-→ ACCEPTED
+`FAIL → root cause → FIX → regression → PASS → ACCEPTED`
+
+The current branch contains the implementation baseline; CI acceptance remains the authoritative gate for release readiness.

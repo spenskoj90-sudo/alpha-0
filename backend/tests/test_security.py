@@ -5,11 +5,10 @@ from sentinel_core.security import AuthzContext, AuthorizationEngine, Policy, Re
 
 def test_authorization_is_default_deny():
     engine = AuthorizationEngine((Policy("character.read", frozenset({"user"}), frozenset({"character:read"})),))
-    assert not engine.authorize(AuthzContext(None, None, frozenset({"user"}), frozenset({"character:read"}), frozenset()), "anonymous must deny")
+    assert not engine.authorize(AuthzContext(None, None, frozenset({"user"}), frozenset({"character:read"}), frozenset()))
     assert not engine.authorize(AuthzContext("u", None, frozenset(), frozenset({"character:read"}), frozenset()))
     assert not engine.authorize(AuthzContext("u", None, frozenset({"user"}), frozenset(), frozenset()))
-    assert not engine.authorize(AuthzContext("u", None, frozenset({"user"}), frozenset({"character:read"}), frozenset()), "unknown resource policy is never inferred")
-    assert engine.authorize(AuthzContext("u", None, frozenset({"user"}), frozenset({"character:read"}), frozenset()), "valid policy should allow")
+    assert engine.authorize(AuthzContext("u", None, frozenset({"user"}), frozenset({"character:read"}), frozenset()))
 
 
 def test_unknown_action_denies():

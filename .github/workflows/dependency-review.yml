@@ -24,4 +24,4 @@ jobs:
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
-          deny-licenses: GPL-2.0-only;GPL-3.0-only;AGPL-1.0-only;AGPL-3.0-only
+          deny-licenses: GPL-2.0-only,GPL-3.0-only,AGPL-1.0-only,AGPL-3.0-only

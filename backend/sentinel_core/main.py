@@ -8,8 +8,7 @@ from pydantic import BaseModel, Field
 
 from .config import settings
 from .device_identity import verify_registration
-from .engines import AuditSystem, AuthorizationError if False else AuditSystem
-from .engines import EntitlementEngine, KnowledgeEngine, KnowledgeKind
+from .engines import AuditSystem, EntitlementEngine, KnowledgeEngine, KnowledgeKind
 from .security import AuthzContext, AuthorizationEngine, Policy
 from .session import SessionProtocol
 

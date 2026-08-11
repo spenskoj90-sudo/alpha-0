@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from base64 import b64decode
-from hashlib import sha256
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .config import settings
 from .device_identity import verify_registration
-from .engines import AuditSystem, EntitlementEngine, KnowledgeEngine, KnowledgeKind
-from .security import AuthzContext, AuthorizationEngine, Policy, request_digest
+from .engines import AuditSystem, AuthorizationError if False else AuditSystem
+from .engines import EntitlementEngine, KnowledgeEngine, KnowledgeKind
+from .security import AuthzContext, AuthorizationEngine, Policy
 from .session import SessionProtocol
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
@@ -75,7 +75,8 @@ class KnowledgeResponse(BaseModel):
 
 @app.middleware("http")
 async def request_limits(request: Request, call_next):
-    if request.headers.get("content-length") and int(request.headers["content-length"]) > settings.max_body_bytes:
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > settings.max_body_bytes:
         raise HTTPException(status_code=413, detail="request too large")
     return await call_next(request)
 
@@ -94,7 +95,6 @@ def ready() -> dict[str, str]:
 def register_device(payload: DeviceRegistration, enrollment_token: str | None = Header(default=None, alias="X-Enrollment-Token")):
     if settings.environment == "production" or not enrollment_token:
         raise HTTPException(status_code=403, detail="enrollment disabled")
-    # In development, enrollment_token is deliberately a non-secret local gate.
     if enrollment_token != "development-only-enrollment":
         raise HTTPException(status_code=403, detail="invalid enrollment token")
     try:
@@ -111,11 +111,7 @@ def create_challenge(payload: ChallengeRequest):
     if payload.device_id not in devices:
         raise HTTPException(status_code=404, detail="device not found")
     challenge = session_protocol.issue_challenge(payload.device_id)
-    return ChallengeResponse(
-        session_id=challenge.session_id,
-        challenge=challenge.nonce,
-        expires_at=challenge.expires_at.isoformat(),
-    )
+    return ChallengeResponse(session_id=challenge.session_id, challenge=challenge.nonce, expires_at=challenge.expires_at.isoformat())
 
 
 @app.post("/v1/sessions/verify", response_model=SessionResponse)
@@ -150,8 +146,9 @@ def list_devices(session: tuple[UUID, UUID] = Depends(require_session)):
 
 @app.get("/v1/knowledge", response_model=list[KnowledgeResponse])
 def get_knowledge(session: tuple[UUID, UUID] = Depends(require_session)):
-    user_id, _ = session
-    ctx = AuthzContext(str(user_id), None, frozenset({"user"}), frozenset({"knowledge:read"}), frozenset())
+    _, device_id = session
+    user_id, _ = devices[device_id]
+    ctx = AuthzContext(str(user_id), str(device_id), frozenset({"user"}), frozenset({"knowledge:read"}), frozenset())
     if not authz.authorize(ctx, "knowledge.read"):
         audit.record(user_id, "knowledge.read", f"user:{user_id}", "DENY", uuid4())
         raise HTTPException(status_code=403, detail="access denied")

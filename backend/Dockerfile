@@ -6,8 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir .
 COPY sentinel_core ./sentinel_core
+RUN pip install --no-cache-dir .
 
 USER 65532:65532
 EXPOSE 8000

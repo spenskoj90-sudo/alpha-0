@@ -6,62 +6,84 @@ of a device key, while Sentinel Core remains the authoritative authorization bou
 
 ## Current release
 
-**0.3.0 — foundation hardening**
+**0.3.0 — security-hardened runnable vertical slice**
 
-### Implemented in source
+## Implemented
 
-**Android client**
+### Android client
 
-- Android application shell
 - Android Keystore-backed P-256 (`secp256r1`) device identity
 - ECDSA `SHA256withECDSA` challenge signing and local verification
 - SHA-256 public-key fingerprint generation
-- Deterministic lowercase hexadecimal encoding with unit tests
-- Runtime cryptographic self-test on application startup
-- Explicitly disabled cleartext traffic
-- Explicitly disabled backup/device-transfer extraction
-- Debug builds do not require production release-signing secrets
+- deterministic lowercase hexadecimal encoding with unit tests
+- runtime cryptographic self-test on application startup
+- explicit cleartext-traffic prohibition
+- explicit backup/device-transfer exclusion
+- debug CI builds do not require production release-signing secrets
 
-**Sentinel Core**
+### Sentinel Core
 
-- Centralized Default Deny authorization engine
-- Required Role + Permission + Scope + Entitlement + Policy + Context evaluation
-- Versioned scope rules
-- Fail-closed malformed-input handling
-- Fail-closed policy evaluation errors
-- Server-side P-256 challenge/signature verification boundary
-- Trusted server-side challenge-state lookup and atomic consume contract
-- Device fingerprint binding for server-issued challenges
-- Client cannot replace the server-issued challenge nonce or identity context
-- Mandatory audit-sink contract for successful security decisions
-- Unit coverage for positive, negative, boundary, replay, substitution, challenge-tampering, and audit-failure cases
+- centralized Default Deny authorization engine
+- Role + Permission + Scope + Entitlement + Policy + Context evaluation
+- versioned scope rules
+- bounded inputs and fail-closed malformed-input handling
+- fail-closed policy evaluation errors
+- server-side P-256 challenge/signature verification boundary
+- trusted server-side challenge-state lookup and atomic consume contract
+- device fingerprint binding for server-issued challenges
+- client cannot replace the server-issued challenge nonce or identity context
+- mandatory audit-sink contract for security-sensitive decisions
+- session expiry/revocation/rotation
+- recovery-code hashing and atomic device key rotation
 
-**Engineering / supply chain**
+### Server / persistence
 
-- Gradle build/test/lint CI
-- APK SHA-256 checksum artifact
-- CodeQL static analysis
-- Dependabot for Gradle and GitHub Actions updates
-- Durable Sentinel state and traceability documentation
+- runnable JVM server
+- device registration and explicit activation
+- server-issued challenges and proof verification
+- PostgreSQL persistence for devices, recovery codes, challenges, sessions and audit events
+- PostgreSQL TLS + channel-binding enforcement
+- protected authorization endpoint
+- bounded request bodies/form fields
+- strict form content type
+- duplicate parameter rejection
+- bounded per-client rate limiting
+- security response headers
+- graceful shutdown
+- no raw bearer-token logging
+
+### Validation / supply chain
+
+- Android build/test/lint CI
+- Android emulator instrumentation
+- Server + PostgreSQL E2E
+- CodeQL
+- Dependabot
+- dependency review
+- security regression tests
+- bounded security stress tests
+- failure-closed regression coverage
+- signed release workflow with APK signature and SHA-256 verification
+
+## Public repository security
+
+This repository is public. Production credentials, signing keys and deployment secrets are never part of the source tree. Public pull-request CI is designed to operate without production signing secrets. Release signing is isolated to the tag/manual release workflow.
+
+GitHub secret scanning runs automatically for public repositories. Push protection should remain enabled; never bypass a secret-detection block unless the value has been independently verified to be non-sensitive.
 
 ## Intentionally not claimed as complete
 
-The following still require production infrastructure and runtime evidence before Alpha RC acceptance:
+Runtime acceptance and production deployment still require evidence for:
 
-- HTTP/API transport layer
-- Persistent PostgreSQL repositories
-- Production challenge store / atomic replay store implementation
-- Device enrollment and explicit device-binding approval workflow
-- Session lifecycle and token management
-- Device revocation
-- Recovery flows
-- Network resilience / VPN integration
-- Production release-signing pipeline and release artifact verification
-- Android instrumentation tests on physical/emulated devices
-- End-to-end client ↔ server authentication tests
-- Performance and chaos benchmarks
+- latest GitHub Actions validation on the final head;
+- production PostgreSQL configuration and certificates;
+- production API gateway/TLS termination;
+- production release-signing secrets and artifact publication;
+- supported physical-device/emulator acceptance matrix;
+- measured performance benchmarks in a defined target environment;
+- production operational monitoring and recovery procedures.
 
-These are not treated as implemented merely because domain interfaces exist.
+These are execution/deployment gates, not reasons to weaken the accepted Sentinel architecture.
 
 ## Security invariants
 
@@ -81,31 +103,8 @@ These are not treated as implemented merely because domain interfaces exist.
 
 ## Acceptance rule
 
-Source code is not considered accepted merely because it exists or compiles. SENTINEL uses:
+Source code is not considered accepted merely because it exists or compiles.
 
 `FAIL → root cause → FIX → regression → PASS → ACCEPTED`
 
 Runtime/build/test/security claims require actual execution evidence.
-
-## CI validation
-
-The Android CI workflow validates:
-
-1. `assembleDebug`
-2. JVM unit tests for all modules
-3. Android Lint
-4. APK existence
-5. APK SHA-256 checksum generation
-6. Debug APK artifact publication
-
-CodeQL runs separately when repository security scanning is available. Dependabot tracks Gradle and GitHub Actions updates. Dependency Review is intentionally not configured because the current private-repository security configuration does not support that action; it must be enabled at the repository security-settings level before it can become a required check.
-
-A successful CI run is evidence for the configured checks only; it does not by itself establish production security, device-runtime acceptance, server deployment readiness, or Minimal Alpha RC readiness.
-
-## Security notes
-
-Device private keys are generated and stored by Android Keystore and are not exported by the application. The client is not the authoritative authorization boundary. Sentinel Core is the single source of truth for authorization.
-
-Server-side challenge verification consumes only trusted server-issued challenge state. Cryptographic possession does not itself grant device binding or authorization; binding, entitlement, authorization, revocation, and policy decisions remain separate server-side controls.
-
-Production signing credentials must be supplied through CI secrets and must never be committed to the repository.

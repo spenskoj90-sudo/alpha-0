@@ -48,17 +48,21 @@ WOW_PATCHES: tuple[WoWPatch, ...] = (
     WoWPatch("dragonflight-10.2.7", "Dragonflight 10.2.7", "classic", "classic-10"),
 )
 
-# MMOTOP's live ranking is intentionally treated as external, time-varying data.
-# These entries are seed profiles discovered from current MMOTOP pages; rank must
-# never be inferred from this static list. Monitoring stays passive and does not
-# bypass authentication, anti-cheat, DRM, or server rules.
+# Snapshot of the currently accessible MMOTOP World of Warcraft main-rating page.
+# The source is time-varying; Sentinel stores the observed snapshot and never
+# treats it as permanent truth. All private-server integration is passive and
+# does not bypass authentication, anti-cheat, DRM, or server rules.
 MMOTOP_REALM_SEEDS: tuple[WoWRealmProfile, ...] = (
-    WoWRealmProfile("mmotop-sirus", "Sirus", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private", "launcher-plus-addon"),
-    WoWRealmProfile("mmotop-firstspawn", "FirstSpawn", RealmType.PRIVATE, "vanilla-1.12", "MMOTOP", "vanilla-private", "launcher-plus-addon"),
-    WoWRealmProfile("mmotop-valor", "VALOR", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private-custom", "launcher-plus-addon"),
-    WoWRealmProfile("mmotop-diablo-wow", "Diablo-WOW", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private-custom", "launcher-plus-addon"),
-    WoWRealmProfile("mmotop-avalon", "Avalon", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private-custom", "launcher-plus-addon"),
-    WoWRealmProfile("mmotop-wowonelove", "WoWOneLove", RealmType.PRIVATE, "mop-5.4.8", "MMOTOP", "mop-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-uwow", "Uwow", RealmType.PRIVATE, "legion-7.3.5", "MMOTOP", "legion-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-skyblood", "SkyBlood", RealmType.PRIVATE, "legion-7.3.5", "MMOTOP", "legion-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-wow-prime", "WoW-Prime", RealmType.PRIVATE, "legion-7.3.5", "MMOTOP", "custom-launcher", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-neverest", "Neverest", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-epicwow", "EpicWoW", RealmType.PRIVATE, "legion-7.3.5", "MMOTOP", "legion-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-1001wow", "1001WOW", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-northwind", "Northwind", RealmType.PRIVATE, "vanilla-1.12", "MMOTOP", "vanilla-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-poligon7", "Poligon7", RealmType.PRIVATE, "vanilla-1.12", "MMOTOP", "vanilla-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-nozdor", "Nozdor", RealmType.PRIVATE, "wotlk-3.3.5a", "MMOTOP", "wotlk-private", "launcher-plus-addon"),
+    WoWRealmProfile("mmotop-turbo-wow", "Turbo-WoW", RealmType.PRIVATE, "dragonflight-10.2.7", "MMOTOP", "dragonflight-private", "launcher-plus-addon"),
 )
 
 

@@ -24,10 +24,10 @@ android {
             val keyPassword = System.getenv("ALPHA0_KEY_PASSWORD")
 
             if (
-                keystorePath != null &&
-                keystorePassword != null &&
-                keyAlias != null &&
-                keyPassword != null
+                !keystorePath.isNullOrBlank() &&
+                !keystorePassword.isNullOrBlank() &&
+                !keyAlias.isNullOrBlank() &&
+                !keyPassword.isNullOrBlank()
             ) {
                 storeFile = file(keystorePath)
                 storePassword = keystorePassword
@@ -39,12 +39,23 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("ciRelease")
+            // Use the standard Android debug keystore. CI must not require
+            // release-signing secrets for ordinary debug validation.
         }
 
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("ciRelease")
+
+            val ciSigningConfigured = listOf(
+                System.getenv("ALPHA0_KEYSTORE_PATH"),
+                System.getenv("ALPHA0_KEYSTORE_PASSWORD"),
+                System.getenv("ALPHA0_KEY_ALIAS"),
+                System.getenv("ALPHA0_KEY_PASSWORD")
+            ).all { !it.isNullOrBlank() }
+
+            if (ciSigningConfigured) {
+                signingConfig = signingConfigs.getByName("ciRelease")
+            }
         }
     }
 }

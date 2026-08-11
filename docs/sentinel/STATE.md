@@ -68,7 +68,7 @@ The GitHub repository is now **public**. Public-release hardening is therefore p
 - replay protection
 - constant-time fingerprint comparison
 - trusted challenge state only
-- transactional challenge-consumption + mandatory ALLOW audit persistence
+- transactional challenge-consumption + mandatory ALLOW audit persistence in the production server composition
 
 ### Sessions
 
@@ -136,9 +136,13 @@ The GitHub repository is now **public**. Public-release hardening is therefore p
 - signed production release workflow
 - APK signature and SHA-256 verification
 
-## Known regression fixed in current cycle
+## Current verification state
 
-`AuthorizationMiddlewareTest` previously passed the deterministic clock lambda as the trailing SAM argument, where Kotlin interpreted it as `AuditSink`. The test therefore failed compilation with `Instant` versus `Boolean`. The test now uses explicit named arguments (`now = ...`, `auditSink = ...`) so the intended dependency injection is unambiguous.
+Latest corrected head is `ba6547506dcfffc8d901655025d9c93f8b7557f4`.
+
+On the preceding implementation head, the following gates had real PASS evidence: CodeQL, Server E2E, release artifact verification, security regression/static checks, bounded performance/failure-injection tests, and Android debug APK build. Android unit tests exposed a missing server-side JUnit Jupiter test dependency; the defect was fixed in the current head. New GitHub Actions runs are now executing against the corrected head.
+
+Dependency Review remains blocked because the GitHub repository Dependency Graph is disabled. This is an administrative repository-security prerequisite; the workflow is intentionally not weakened or bypassed.
 
 ## Evidence still required
 
@@ -146,12 +150,14 @@ Source implementation is substantially complete, but runtime acceptance still re
 
 - real PostgreSQL deployment configuration;
 - Android device/emulator instrumentation;
-- server E2E;
-- performance/chaos gates;
+- server E2E on the corrected head;
+- measured target-environment performance benchmarks;
+- meaningful dependency/service failure-injection beyond bounded unit stress;
 - production release signing with repository secrets;
-- API gateway/TLS termination configuration.
+- API gateway/TLS termination configuration;
+- runtime observability and recovery procedures.
 
-These are execution/deployment gates, not missing domain implementations.
+These are execution/deployment gates, not reasons to weaken the accepted architecture.
 
 ## Security acceptance matrix
 

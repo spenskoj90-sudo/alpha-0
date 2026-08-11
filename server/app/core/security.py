@@ -37,11 +37,13 @@ class Policy:
     scopes: frozenset[str] = frozenset()
 
     def matches(self, action: str, resource: str) -> bool:
-        if self.action != "*" and self.action != action:
-            return False
-        if self.resource != "*" and self.resource != resource:
-            return False
-        return True
+        action_match = self.action == "*" or self.action == action or (
+            self.action.endswith(":*") and action.startswith(self.action[:-1])
+        )
+        resource_match = self.resource == "*" or self.resource == resource or (
+            self.resource.endswith(":*") and resource.startswith(self.resource[:-1])
+        )
+        return action_match and resource_match
 
 
 class AuthorizationEngine:

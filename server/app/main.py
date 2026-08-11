@@ -13,8 +13,10 @@ from app.core.entitlements import Entitlement, EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
 from app.core.models import AuthorizeRequest, AuthorizeResponse, DeviceProofRequest, DeviceRegisterRequest, DeviceRegisterResponse, EventBatchRequest, Recommendation, RecommendationRequest, RecommendationResponse, SessionResponse
 from app.core.security import AuthorizationEngine, Decision, Policy, Principal, canonical_json, fingerprint_public_key, fresh_request_timestamp, new_nonce, session_hash, verify_p256_signature
+from app.core.wow_api import router as wow_router
 
-app = FastAPI(title="SENTINEL CORE", version="0.2.0")
+app = FastAPI(title="SENTINEL CORE", version="0.3.0")
+app.include_router(wow_router)
 
 class MemoryStore:
     def __init__(self) -> None:

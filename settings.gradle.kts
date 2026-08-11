@@ -17,3 +17,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Alpha0"
 include(":app")
+include(":core")
+include(":server")

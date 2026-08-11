@@ -1,0 +1,53 @@
+name: SENTINEL Server E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: PostgreSQL + server end-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Start PostgreSQL with TLS and SCRAM
+        run: |
+          set -euo pipefail
+          docker run --name sentinel-postgres -e POSTGRES_DB=sentinel -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=sentinel-password -p 5432:5432 -d postgres:17
+          for i in {1..60}; do docker exec sentinel-postgres pg_isready -U sentinel -d sentinel && break; sleep 1; done
+          docker exec sentinel-postgres bash -lc 'openssl req -new -x509 -nodes -days 2 -subj "/CN=localhost" -keyout /var/lib/postgresql/server.key -out /var/lib/postgresql/server.crt >/dev/null 2>&1 && chown postgres:postgres /var/lib/postgresql/server.key /var/lib/postgresql/server.crt && chmod 600 /var/lib/postgresql/server.key && printf "ssl=on\nssl_cert_file=\x27/var/lib/postgresql/server.crt\x27\nssl_key_file=\x27/var/lib/postgresql/server.key\x27\npassword_encryption=\x27scram-sha-256\x27\n" >> /var/lib/postgresql/data/postgresql.conf'
+          docker restart sentinel-postgres
+          for i in {1..60}; do docker exec sentinel-postgres pg_isready -U sentinel -d sentinel && break; sleep 1; done
+          cat core/src/main/resources/db/schema.sql | docker exec -i sentinel-postgres psql -U sentinel -d sentinel
+      - name: Build server
+        run: gradle --no-daemon --stacktrace :server:installDist
+      - name: Start server
+        env:
+          SENTINEL_DB_URL: jdbc:postgresql://127.0.0.1:5432/sentinel
+          SENTINEL_DB_USER: sentinel
+          SENTINEL_DB_PASSWORD: sentinel-password
+          SENTINEL_ENROLLMENT_TOKEN: e2e-enrollment-token
+          SENTINEL_OPERATOR_SUBJECTS: "*"
+        run: |
+          set -euo pipefail
+          nohup server/build/install/server/bin/server > /tmp/sentinel-server.log 2>&1 &
+          for i in {1..60}; do curl -fsS http://127.0.0.1:8080/healthz >/dev/null && break; sleep 1; done
+      - name: Run server E2E
+        env:
+          SENTINEL_BASE_URL: http://127.0.0.1:8080
+          SENTINEL_ENROLLMENT_TOKEN: e2e-enrollment-token
+        run: bash scripts/server-e2e.sh
+      - name: Dump server logs on failure
+        if: failure()
+        run: cat /tmp/sentinel-server.log || true

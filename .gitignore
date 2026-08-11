@@ -1,0 +1,32 @@
+# Gradle
+.gradle/
+
+# Android build outputs
+build/
+*/build/
+
+# Local Android/IDE state
+.idea/
+*.iml
+local.properties
+
+# Signing and secret material
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+.env
+.env.*
+
+# Test/runtime artifacts
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Project backup directories
+.alpha0-backup/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

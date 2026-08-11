@@ -1,0 +1,132 @@
+name: SENTINEL Full Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main", "agent/modernize-alpha0"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  core-and-server:
+    name: Core + server validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Build and test all JVM modules
+        run: gradle --no-daemon --stacktrace test
+      - name: Build runnable server
+        run: gradle --no-daemon --stacktrace :server:installDist
+      - name: Validate server packaging
+        run: test -x server/build/install/server/bin/server
+
+  android-instrumentation:
+    name: Android instrumentation
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4.0.1
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Run JVM tests and lint
+        run: gradle --no-daemon --stacktrace test lintDebug
+      - name: Run emulator instrumentation
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: gradle --no-daemon --stacktrace connectedDebugAndroidTest
+
+  security-regression:
+    name: Security regression and static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Run security regression suite
+        run: gradle --no-daemon --stacktrace :core:test
+      - name: Reject committed secret material
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '\.(jks|keystore|p12|pem|key)$|(^|/)\.env($|\.)'; then
+            echo "Secret/signing material is tracked" >&2
+            exit 1
+          fi
+
+  performance-and-chaos:
+    name: Performance + failure injection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Run bounded security stress suite
+        run: gradle --no-daemon --stacktrace :core:test --tests '*StressTest'
+      - name: Verify fail-closed code paths are covered
+        run: |
+          set -euo pipefail
+          grep -R "fail closed\|fail-closed\|STORE_UNAVAILABLE\|POLICY_DENIED" core/src/test -n >/dev/null
+
+  release-verification:
+    name: Release artifact verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5.6.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4.0.1
+      - name: Install pinned Android build tools
+        run: sdkmanager "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-version: "8.9"
+      - name: Build debug artifact for reproducibility verification
+        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Verify artifact and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          sha256sum "$apk" | tee "$apk.sha256"
+          "${ANDROID_HOME}/build-tools/35.0.0/apksigner" verify --verbose "$apk"

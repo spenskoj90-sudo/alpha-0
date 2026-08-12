@@ -33,10 +33,16 @@ android {
     }
 
     buildTypes {
-        debug { signingConfig = signingConfigs.getByName("ciRelease") }
+        debug { }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("ciRelease")
+            val keystorePath = System.getenv("ALPHA0_KEYSTORE_PATH")
+            val keystorePassword = System.getenv("ALPHA0_KEYSTORE_PASSWORD")
+            val keyAlias = System.getenv("ALPHA0_KEY_ALIAS")
+            val keyPassword = System.getenv("ALPHA0_KEY_PASSWORD")
+            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
+                signingConfig = signingConfigs.getByName("ciRelease")
+            }
         }
     }
 

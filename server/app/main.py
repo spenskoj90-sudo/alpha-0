@@ -10,7 +10,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from app.core.models import AuthorizeRequest, AuthorizeResponse, DeviceProofRequest, DeviceRegisterRequest, DeviceRegisterResponse, EventBatchRequest, Recommendation, RecommendationRequest, RecommendationResponse, SessionResponse
 from app.core.security import AuthorizationEngine, Decision, Policy, Principal, canonical_json, fingerprint_public_key, fresh_request_timestamp, new_nonce, session_hash, verify_p256_signature
 
-app = FastAPI(title="SENTINEL CORE", version="0.1.0")
+app = FastAPI(title="SENTINEL CORE", version="1.0.0-RC1", docs_url="/docs", redoc_url="/redoc")
 
 class MemoryStore:
     def __init__(self) -> None:
@@ -43,7 +43,7 @@ def _session_principal(token: str) -> Principal:
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok", "service": "sentinel-core"}
+    return {"status": "ok", "service": "sentinel-core", "version": "1.0.0-RC1"}
 
 @app.post("/v1/devices/register", response_model=DeviceRegisterResponse)
 def register_device(payload: DeviceRegisterRequest, request: Request, x_request_id: str | None = Header(default=None)):

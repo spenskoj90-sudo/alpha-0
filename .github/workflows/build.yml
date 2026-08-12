@@ -71,7 +71,7 @@ jobs:
       - run: pytest -m postgres
       - name: Backup and restore smoke test
         run: |
-          PGPASSWORD=testpass pg_dump -h 127.0.0.1 -p 5432 -U sentinel -d sentinel_test --no-owner --no-privileges > /tmp/sentinel-backup.sql
+          docker run --rm --network host -e PGPASSWORD=testpass postgres:17-alpine pg_dump -h 127.0.0.1 -p 5432 -U sentinel -d sentinel_test --no-owner --no-privileges > /tmp/sentinel-backup.sql
           PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS sentinel_restore' -c 'CREATE DATABASE sentinel_restore'
           PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d sentinel_restore -v ON_ERROR_STOP=1 < /tmp/sentinel-backup.sql
           PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d sentinel_restore -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM identities LIMIT 1'

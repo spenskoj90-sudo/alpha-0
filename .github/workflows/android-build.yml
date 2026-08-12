@@ -1,14 +1,7 @@
 name: ALPHA-0 Android CI
 
 on:
-  push:
-    branches:
-      - "**"
   pull_request:
-
-concurrency:
-  group: sentinel-rc1-${{ github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: read

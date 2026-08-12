@@ -8,8 +8,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-os.environ["SENTINEL_ENROLLMENT_TOKEN"] = "u1:secret"
-os.environ["SENTINEL_REQUIRE_ENROLLMENT"] = "true"
+os.environ.setdefault("SENTINEL_ENROLLMENT_TOKEN", "u1:secret")
+os.environ.setdefault("SENTINEL_REQUIRE_ENROLLMENT", "true")
 
 from app.main import app, store
 

@@ -30,3 +30,6 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+markers = [
+  "postgres: requires a live PostgreSQL database",
+]

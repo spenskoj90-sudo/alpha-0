@@ -6,6 +6,10 @@ on:
       - "**"
   pull_request:
 
+concurrency:
+  group: sentinel-rc1-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -1,219 +1,175 @@
-BEGIN;
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE TABLE users (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  external_subject text NOT NULL UNIQUE,
-  status text NOT NULL CHECK (status IN ('ACTIVE','SUSPENDED','DELETED')) DEFAULT 'ACTIVE',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS identities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_handle TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE roles (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL UNIQUE,
-  version bigint NOT NULL DEFAULT 1
+CREATE TABLE IF NOT EXISTS device_bindings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+    fingerprint_sha256 CHAR(64) NOT NULL UNIQUE,
+    public_key_der_b64 TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('android', 'windows')),
+    state TEXT NOT NULL CHECK (state IN ('ACTIVE', 'REVOKED', 'SUSPENDED')) DEFAULT 'ACTIVE',
+    key_version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS device_bindings_identity_idx ON device_bindings(identity_id);
+
+CREATE TABLE IF NOT EXISTS roles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    version BIGINT NOT NULL DEFAULT 1
 );
 
-CREATE TABLE permissions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  action text NOT NULL,
-  resource text NOT NULL,
-  UNIQUE(action, resource)
+CREATE TABLE IF NOT EXISTS permissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    UNIQUE(action, resource)
 );
 
-CREATE TABLE user_roles (
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role_id uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  PRIMARY KEY(user_id, role_id)
+CREATE TABLE IF NOT EXISTS role_permissions (
+    role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id UUID NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY(role_id, permission_id)
 );
 
-CREATE TABLE role_permissions (
-  role_id uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
-  permission_id uuid NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-  PRIMARY KEY(role_id, permission_id)
+CREATE TABLE IF NOT EXISTS scopes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scope_id TEXT NOT NULL,
+    ruleset_version TEXT NOT NULL,
+    resource_pattern TEXT NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(scope_id, ruleset_version)
 );
 
-CREATE TABLE scopes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL UNIQUE
+CREATE TABLE IF NOT EXISTS games (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    family TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('windows', 'android')),
+    versioning TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE user_scopes (
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  scope_id uuid NOT NULL REFERENCES scopes(id) ON DELETE CASCADE,
-  PRIMARY KEY(user_id, scope_id)
+CREATE TABLE IF NOT EXISTS entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+    game_id TEXT NOT NULL REFERENCES games(id),
+    source TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'EXPIRED', 'SUSPENDED')),
+    valid_from TIMESTAMPTZ NOT NULL,
+    valid_until TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (valid_until >= valid_from)
+);
+CREATE INDEX IF NOT EXISTS entitlements_identity_game_idx ON entitlements(identity_id, game_id, status);
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+    plan_code TEXT NOT NULL,
+    status TEXT NOT NULL,
+    currency CHAR(3) NOT NULL CHECK (currency IN ('EUR', 'USD', 'RUB')),
+    started_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ
 );
 
-CREATE TABLE policies (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  effect text NOT NULL CHECK (effect IN ('ALLOW','DENY')),
-  action text NOT NULL,
-  resource_pattern text NOT NULL,
-  condition_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-  version bigint NOT NULL DEFAULT 1,
-  active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE IF NOT EXISTS billing_customers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    provider_customer_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    UNIQUE(provider, provider_customer_id)
 );
 
-CREATE TABLE devices (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  state text NOT NULL CHECK (state IN ('GENERATED','ACTIVE','ROTATING','REVOKED')),
-  platform text NOT NULL CHECK (platform IN ('android')),
-  public_key_der bytea NOT NULL,
-  fingerprint_sha256 text NOT NULL UNIQUE,
-  key_version integer NOT NULL DEFAULT 1,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  last_seen_at timestamptz,
-  revoked_at timestamptz
-);
-CREATE INDEX devices_user_idx ON devices(user_id);
-
-CREATE TABLE device_challenges (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  nonce_hash text NOT NULL UNIQUE,
-  expires_at timestamptz NOT NULL,
-  consumed_at timestamptz
-);
-CREATE INDEX device_challenges_device_idx ON device_challenges(device_id, expires_at);
-
-CREATE TABLE sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  device_id uuid REFERENCES devices(id) ON DELETE SET NULL,
-  session_hash text NOT NULL UNIQUE,
-  scopes_json jsonb NOT NULL DEFAULT '[]'::jsonb,
-  issued_at timestamptz NOT NULL DEFAULT now(),
-  expires_at timestamptz NOT NULL,
-  revoked_at timestamptz
-);
-CREATE INDEX sessions_user_idx ON sessions(user_id, expires_at);
-
-CREATE TABLE entitlements (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  product_code text NOT NULL,
-  source text NOT NULL,
-  status text NOT NULL CHECK (status IN ('ACTIVE','EXPIRED','REVOKED')),
-  starts_at timestamptz NOT NULL,
-  ends_at timestamptz,
-  metadata_json jsonb NOT NULL DEFAULT '{}'::jsonb
-);
-CREATE INDEX entitlements_lookup_idx ON entitlements(user_id, product_code, status);
-
-CREATE TABLE billing_customers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  provider text NOT NULL,
-  provider_customer_id text NOT NULL,
-  status text NOT NULL,
-  UNIQUE(provider, provider_customer_id)
+CREATE TABLE IF NOT EXISTS billing_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id UUID NOT NULL REFERENCES billing_customers(id) ON DELETE CASCADE,
+    provider_subscription_id TEXT NOT NULL UNIQUE,
+    product_code TEXT NOT NULL,
+    status TEXT NOT NULL,
+    current_period_end TIMESTAMPTZ
 );
 
-CREATE TABLE billing_subscriptions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid NOT NULL REFERENCES billing_customers(id) ON DELETE CASCADE,
-  provider_subscription_id text NOT NULL UNIQUE,
-  product_code text NOT NULL,
-  status text NOT NULL,
-  current_period_end timestamptz
+CREATE TABLE IF NOT EXISTS characters (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
+    game_id TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    state_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(identity_id, game_id, external_id)
 );
 
-CREATE TABLE characters (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  game_id text NOT NULL,
-  external_id text NOT NULL,
-  name text NOT NULL,
-  version bigint NOT NULL DEFAULT 0,
-  state_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(user_id, game_id, external_id)
+CREATE TABLE IF NOT EXISTS knowledge_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    namespace TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    predicate TEXT NOT NULL,
+    object_json JSONB NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('fact', 'inference', 'recommendation')),
+    confidence DOUBLE PRECISION NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+    provenance_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    version BIGINT NOT NULL DEFAULT 1
 );
+CREATE INDEX IF NOT EXISTS knowledge_subject_idx ON knowledge_items(namespace, subject);
 
-CREATE TABLE knowledge_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  namespace text NOT NULL,
-  subject text NOT NULL,
-  predicate text NOT NULL,
-  object_json jsonb NOT NULL,
-  kind text NOT NULL CHECK (kind IN ('fact','inference','recommendation')),
-  confidence double precision NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
-  provenance_json jsonb NOT NULL DEFAULT '[]'::jsonb,
-  version bigint NOT NULL DEFAULT 1
+CREATE TABLE IF NOT EXISTS outbox_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    aggregate_type TEXT NOT NULL,
+    aggregate_id UUID,
+    event_type TEXT NOT NULL,
+    payload_json JSONB NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('PENDING','PROCESSING','DONE','FAILED')) DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    locked_until TIMESTAMPTZ
 );
-CREATE INDEX knowledge_subject_idx ON knowledge_items(namespace, subject);
+CREATE INDEX IF NOT EXISTS outbox_claim_idx ON outbox_events(status, available_at);
 
-CREATE TABLE game_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id text NOT NULL UNIQUE,
-  device_id uuid NOT NULL REFERENCES devices(id),
-  user_id uuid NOT NULL REFERENCES users(id),
-  type text NOT NULL,
-  schema_version integer NOT NULL,
-  occurred_at timestamptz NOT NULL,
-  sequence bigint NOT NULL,
-  payload_json jsonb NOT NULL,
-  received_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(device_id, sequence)
+CREATE TABLE IF NOT EXISTS worker_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind TEXT NOT NULL,
+    payload_json JSONB NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('PENDING','PROCESSING','DONE','FAILED')) DEFAULT 'PENDING',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    available_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    locked_until TIMESTAMPTZ,
+    last_error TEXT
 );
-CREATE INDEX game_events_user_time_idx ON game_events(user_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS worker_claim_idx ON worker_jobs(status, available_at);
 
-CREATE TABLE outbox_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  aggregate_type text NOT NULL,
-  aggregate_id uuid,
-  event_type text NOT NULL,
-  payload_json jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('PENDING','PROCESSING','DONE','FAILED')) DEFAULT 'PENDING',
-  attempts integer NOT NULL DEFAULT 0,
-  available_at timestamptz NOT NULL DEFAULT now(),
-  locked_until timestamptz
+CREATE TABLE IF NOT EXISTS audit_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identity_id UUID REFERENCES identities(id) ON DELETE SET NULL,
+    device_id UUID REFERENCES device_bindings(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    decision TEXT NOT NULL CHECK (decision IN ('ALLOW', 'DENY')),
+    reason_code TEXT NOT NULL,
+    policy_version TEXT NOT NULL DEFAULT 'v1',
+    context JSONB NOT NULL DEFAULT '{}'::jsonb,
+    request_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX outbox_claim_idx ON outbox_events(status, available_at);
+CREATE INDEX IF NOT EXISTS audit_identity_time_idx ON audit_events(identity_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audit_resource_time_idx ON audit_events(resource, created_at DESC);
 
-CREATE TABLE audit_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
-  actor_device_id uuid REFERENCES devices(id) ON DELETE SET NULL,
-  action text NOT NULL,
-  resource_type text NOT NULL,
-  resource_id text,
-  decision text NOT NULL,
-  reason_code text NOT NULL,
-  metadata_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX audit_actor_time_idx ON audit_events(actor_user_id, created_at DESC);
-CREATE INDEX audit_resource_time_idx ON audit_events(resource_type, resource_id, created_at DESC);
-
-CREATE TABLE idempotency_keys (
-  key text PRIMARY KEY,
-  actor_id text NOT NULL,
-  request_hash text NOT NULL,
-  response_json jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  expires_at timestamptz NOT NULL
-);
-
-CREATE TABLE worker_jobs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind text NOT NULL,
-  payload_json jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('PENDING','PROCESSING','DONE','FAILED')) DEFAULT 'PENDING',
-  attempts integer NOT NULL DEFAULT 0,
-  available_at timestamptz NOT NULL DEFAULT now(),
-  locked_until timestamptz,
-  last_error text
-);
-CREATE INDEX worker_claim_idx ON worker_jobs(status, available_at);
-
--- Defense in depth. Application authorization is still mandatory.
-ALTER TABLE characters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE entitlements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
-
-COMMIT;
+INSERT INTO games (id, name, family, platform, versioning) VALUES
+('diablo-1-pc', 'Diablo', 'Diablo', 'windows', 'release'),
+('diablo-2-pc', 'Diablo II', 'Diablo', 'windows', 'release'),
+('diablo-2-resurrected-pc', 'Diablo II: Resurrected', 'Diablo', 'windows', 'release'),
+('diablo-3-pc', 'Diablo III', 'Diablo', 'windows', 'season-patch'),
+('diablo-4-pc', 'Diablo IV', 'Diablo', 'windows', 'season-patch'),
+('diablo-immortal-android', 'Diablo Immortal', 'Diablo', 'android', 'server-client-patch')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, enabled = TRUE;

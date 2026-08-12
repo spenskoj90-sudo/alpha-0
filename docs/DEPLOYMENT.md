@@ -1,42 +1,52 @@
-# SENTINEL Deployment Guide
+# SENTINEL Deployment Guide — 1.0.0-RC1
 
 ## Runtime
 
 - Android client: API 29+, target SDK 35.
 - Core: Python 3.12+, FastAPI/Uvicorn.
-- Database: PostgreSQL.
+- Database: PostgreSQL 17 in the reference compose deployment.
 - Web: Next.js App Router.
 
 ## Production topology
 
-Run the FastAPI core behind a TLS-terminating WAF/load balancer. Run workers separately from API replicas. PostgreSQL is the system of record. Store secrets outside Git. Use separate credentials for migrations, runtime API and workers.
+Run SENTINEL CORE behind a TLS-terminating WAF/load balancer. PostgreSQL is the production system of record. Use separate credentials for migration and runtime access in real deployments. Do not expose PostgreSQL publicly.
 
-## Environment
+The reference deployment is in `docker-compose.yml` and the Core image is `server/Dockerfile`.
+
+## Required environment
 
 ```text
-DATABASE_URL=postgresql+psycopg://...
 SENTINEL_ENV=production
-SESSION_TTL_SECONDS=43200
+DATABASE_URL=postgresql+psycopg://...
+SENTINEL_ENROLLMENT_TOKEN=<user-id>:<high-entropy-secret>
+SENTINEL_REQUIRE_ENROLLMENT=true
+SESSION_TTL_SECONDS=3600
+REFRESH_TTL_SECONDS=2592000
 MAX_REQUEST_SKEW_SECONDS=120
+RATE_LIMIT_PER_MINUTE=120
 ```
 
-No environment value containing a secret should be committed.
+No secret may be committed to Git. Production startup intentionally fails closed if `DATABASE_URL` or the enrollment configuration is missing.
 
 ## Database rollout
 
+`server/migrate.py` is the authoritative migration runner for the reference deployment. It records migration checksums in `schema_migrations` and refuses to continue when an already-applied migration has been modified.
+
 1. Provision PostgreSQL.
-2. Apply migrations in order.
-3. Verify indexes and RLS.
-4. Run integration tests against a disposable database.
-5. Deploy API.
-6. Deploy workers.
-7. Run smoke tests.
-8. Only then enable production traffic.
+2. Set production secrets outside Git.
+3. Start the Core container; it runs `migrate.py` before Uvicorn.
+4. Verify `/healthz`.
+5. Run the release smoke/security tests against the deployed endpoint.
+6. Only then enable production traffic.
 
 ## Rollback
 
-Application deployments must be backward-compatible with the previous schema. Never drop security/audit columns as part of an emergency rollback. Disable the new release, restore the previous application image, and investigate the failed gate.
+Application deployments must remain backward-compatible with the previous schema. Never remove security or audit columns during an emergency rollback. Restore the previous application image and investigate the failed release gate.
 
 ## Observability
 
-Minimum signals: request rate, latency, 4xx/5xx rate, authorization denials, device-proof failures, replay rejections, queue depth, worker retries, dead-letter count and database saturation. Sentry/PostHog are optional sinks; they are not sources of security truth.
+Minimum signals: request rate, latency, 4xx/5xx rate, authorization denials, device-proof failures, replay rejections, idempotency conflicts, database saturation and migration failures. Sentry/PostHog are optional sinks; they are not sources of security truth.
+
+## Release acceptance
+
+Use `docs/RELEASE_GATES.md`. An unverified gate is not a pass.

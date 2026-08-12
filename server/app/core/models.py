@@ -13,10 +13,10 @@ class ErrorResponse(BaseModel):
 
 
 class DeviceRegisterRequest(BaseModel):
-    user_id: str
+    user_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:@-]+$")
     platform: Literal["android"]
-    public_key_der_b64: str
-    fingerprint_sha256: str
+    public_key_der_b64: str = Field(min_length=32, max_length=4096)
+    fingerprint_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
 
 
 class DeviceRegisterResponse(BaseModel):
@@ -26,21 +26,26 @@ class DeviceRegisterResponse(BaseModel):
 
 
 class DeviceProofRequest(BaseModel):
-    challenge: str
+    challenge: str = Field(min_length=16, max_length=512)
     timestamp: int
-    request_id: str
-    signature_b64: str
+    request_id: str = Field(min_length=1, max_length=128)
+    signature_b64: str = Field(min_length=16, max_length=4096)
 
 
 class SessionResponse(BaseModel):
     session_token: str
+    refresh_token: str
     expires_at: datetime
     scopes: list[str]
 
 
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=32, max_length=512)
+
+
 class AuthorizeRequest(BaseModel):
-    action: str = Field(min_length=1, max_length=200)
-    resource: str = Field(min_length=1, max_length=500)
+    action: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9._:-]+$")
+    resource: str = Field(min_length=1, max_length=500, pattern=r"^[A-Za-z0-9._:/*-]+$")
 
 
 class AuthorizeResponse(BaseModel):
@@ -50,10 +55,10 @@ class AuthorizeResponse(BaseModel):
 
 class GameEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    event_id: str
-    device_id: str
-    type: str
-    schema_version: int = Field(ge=1)
+    event_id: str = Field(min_length=8, max_length=128)
+    device_id: str = Field(min_length=8, max_length=128)
+    type: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$")
+    schema_version: int = Field(ge=1, le=1000)
     occurred_at: datetime
     sequence: int = Field(ge=0)
     payload: dict[str, Any]
@@ -64,15 +69,15 @@ class EventBatchRequest(BaseModel):
 
 
 class RecommendationRequest(BaseModel):
-    context: dict[str, Any]
+    context: dict[str, Any] = Field(max_length=100)
 
 
 class Recommendation(BaseModel):
     kind: Literal["fact", "inference", "recommendation"]
-    text: str
+    text: str = Field(min_length=1, max_length=2000)
     confidence: float = Field(ge=0.0, le=1.0)
-    provenance: list[str]
+    provenance: list[str] = Field(max_length=20)
 
 
 class RecommendationResponse(BaseModel):
-    recommendations: list[Recommendation]
+    recommendations: list[Recommendation] = Field(max_length=20)

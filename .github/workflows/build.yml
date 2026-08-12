@@ -145,27 +145,20 @@ jobs:
     needs: [core, postgres, docker]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: docker/setup-buildx-action@v3
       - name: Build runtime image
-        run: docker build -f server/Dockerfile -t sentinel-core:smoke server
+        run: docker build -f server/Dockerfile -t sentinel-core:smoke .
       - name: Start PostgreSQL
         run: |
           docker run -d --name sentinel-postgres -e POSTGRES_DB=sentinel -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=testpass -p 5432:5432 postgres:17-alpine
           for i in {1..30}; do pg_isready -h 127.0.0.1 -p 5432 -U sentinel && break; sleep 2; done
-      - name: Migrate database
-        working-directory: server
-        env:
-          DATABASE_URL: postgresql://sentinel:testpass@127.0.0.1:5432/sentinel
-          SENTINEL_ENV: production
-          SENTINEL_ENROLLMENT_TOKEN: smoke:secret
-          SENTINEL_REQUIRE_ENROLLMENT: "true"
-        run: |
-          python -m pip install '.[test]'
-          python migrate.py
       - name: Start API and verify health
         run: |
           docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql://sentinel:testpass@127.0.0.1:5432/sentinel -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
-          for i in {1..30}; do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 2; done
+          for i in {1..30}; do curl -fsS http://127.0.0.1:8080/healthz && exit 0; sleep 2; done
           docker logs sentinel-api
           exit 1
       - name: Cleanup deployment smoke

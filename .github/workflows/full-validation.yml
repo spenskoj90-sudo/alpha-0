@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: sentinel-full-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -34,7 +38,8 @@ jobs:
 
   android-instrumentation:
     name: Android instrumentation
-    runs-on: macos-13
+    runs-on: macos-15-intel
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7.0.1
         with:

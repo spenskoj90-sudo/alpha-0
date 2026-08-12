@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import secrets
@@ -15,8 +14,16 @@ from sqlalchemy import create_engine, text
 
 from app.core.security import session_hash
 
-
 SCOPES = ["character:read", "game:write", "game:read", "audit:read"]
+
+
+def event_hash_payload(events: list[dict[str, Any]]) -> str:
+    """Hash only durable event intent; request IDs are transport metadata."""
+    canonical = [
+        {key: value for key, value in event.items() if key != "request_id"}
+        for event in events
+    ]
+    return hashlib.sha256(json.dumps(canonical, sort_keys=True, default=str).encode()).hexdigest()
 
 
 class Store(ABC):
@@ -135,7 +142,7 @@ class MemoryStore(Store):
             return True
 
     def save_event_batch(self, principal, events, idempotency_key):
-        request_hash = hashlib.sha256(json.dumps(events, sort_keys=True, default=str).encode()).hexdigest()
+        request_hash = event_hash_payload(events)
         with self.lock:
             key = (principal["user_id"], idempotency_key) if idempotency_key else None
             if key and key in self.idempotency:
@@ -248,7 +255,7 @@ class PostgresStore(Store):
             return result.rowcount == 1
 
     def save_event_batch(self, principal, events, idempotency_key):
-        request_hash = hashlib.sha256(json.dumps(events, sort_keys=True, default=str).encode()).hexdigest()
+        request_hash = event_hash_payload(events)
         with self.engine.begin() as conn:
             if idempotency_key:
                 row = conn.execute(text("SELECT request_hash,response_json FROM idempotency_keys WHERE key=:k AND actor_id=:a AND expires_at>now() FOR UPDATE"), {"k": idempotency_key, "a": principal["user_id"]}).mappings().first()

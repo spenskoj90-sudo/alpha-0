@@ -26,6 +26,16 @@ jobs:
           test -s docs/KEY_MANAGEMENT_EVIDENCE.md
           ! find . -type f \( -name '*.keystore' -o -name '*.jks' -o -name '*.p12' -o -name '*.pem' \) -not -path './.git/*' | grep -q .
           ! git grep -n -I -E 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ALPHA0_KEYSTORE_PASSWORD=|DB_PASSWORD=' -- ':!*.md' ':!.github/workflows/sentinel-full-validation.yml'
+      - name: "GATE J — Release Candidate"
+        run: |
+          set -euo pipefail
+          grep -q '1.0.0-RC1' app/build.gradle.kts
+          grep -q '1.0.0rc1' server/pyproject.toml
+          grep -q '1.0.0-RC1' server/openapi.yaml
+          test -s docs/IMPLEMENTATION_CONTRACT_V1.md
+          test -s docs/TEST_MATRIX_V1.md
+          echo 'SENTINEL 1.0.0-RC1 — automated gates A-J passed when all parallel gate jobs are green.'
+          echo 'Final signed artifact creation is isolated from ordinary CI and requires the verified release keystore.'
 
   gate-bc-server:
     name: "GATE B/C/F/G/H — Core Security, Persistence, Security Regression, Reliability, Performance"
@@ -121,22 +131,3 @@ jobs:
           grep -q 'USER sentinel' server/Dockerfile
           grep -q 'no-new-privileges' docker-compose.production.yml
           grep -q 'cap_drop' docker-compose.production.yml
-
-  gate-j-release:
-    name: "GATE J — Release Candidate"
-    runs-on: ubuntu-latest
-    needs: [gate-a-key-management, gate-bc-server, gate-d-android, gate-e-api, gate-i-deployment]
-    steps:
-      - uses: actions/checkout@v6
-      - name: Verify RC1 release metadata
-        run: |
-          set -euo pipefail
-          grep -q '1.0.0-RC1' app/build.gradle.kts
-          grep -q '1.0.0rc1' server/pyproject.toml
-          grep -q '1.0.0-RC1' server/openapi.yaml
-          test -s docs/IMPLEMENTATION_CONTRACT_V1.md
-          test -s docs/TEST_MATRIX_V1.md
-      - name: Release readiness summary
-        run: |
-          echo 'SENTINEL 1.0.0-RC1 — automated gates A-J passed.'
-          echo 'Final signed artifact creation is intentionally isolated from ordinary CI and requires the verified release keystore.'

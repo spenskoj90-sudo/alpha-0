@@ -81,6 +81,17 @@ def error_response(code: str, message: str, rid: str, http_status: int) -> JSONR
     return JSONResponse(status_code=http_status, content={"code": code, "message": message, "request_id": rid})
 
 
+@app.get("/healthz")
+def healthz() -> dict[str, Any]:
+    if isinstance(store, PostgresStore):
+        try:
+            with store.engine.connect() as conn:
+                conn.execute(__import__("sqlalchemy").text("SELECT 1"))
+        except Exception:
+            raise HTTPException(status_code=503, detail="DATABASE_UNAVAILABLE")
+    return {"status": "UP", "version": APP_VERSION}
+
+
 def rate_limit(request: Request, bucket: str) -> None:
     key = f"{bucket}:{request.client.host if request.client else 'unknown'}"
     if not rate_limiter.allow(key):
@@ -118,139 +129,76 @@ def authorize_request(principal: Principal, action: str, resource: str, rid: str
 def require_bearer(authorization_header: str) -> str:
     if not authorization_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="INVALID_AUTHORIZATION")
-    token = authorization_header.removeprefix("Bearer ")
-    if not token or len(token) > 512:
+    token = authorization_header[7:].strip()
+    if not token or len(token) > 4096:
         raise HTTPException(status_code=401, detail="INVALID_AUTHORIZATION")
     return token
 
 
+def verify_request_proof(principal: Principal, payload: DeviceProofRequest, rid: str) -> None:
+    if not fresh_request_timestamp(payload.timestamp, int(time.time()), MAX_REQUEST_SKEW_SECONDS):
+        raise HTTPException(status_code=401, detail="STALE_REQUEST")
+    device = store.get_device(principal.device_id or "")
+    if not device or device["state"] != "ACTIVE":
+        raise HTTPException(status_code=403, detail="DEVICE_NOT_ACTIVE")
+    if not store.consume_challenge(payload.challenge, principal.device_id or ""):
+        raise HTTPException(status_code=401, detail="INVALID_CHALLENGE")
+    if not store.consume_proof_request(principal.device_id or "", rid):
+        raise HTTPException(status_code=409, detail="REPLAY_DETECTED")
+    proof_payload = canonical_json({"challenge": payload.challenge, "timestamp": payload.timestamp, "request_id": rid})
+    if not verify_p256_signature(device["public_key"], payload.signature, proof_payload):
+        raise HTTPException(status_code=401, detail="INVALID_SIGNATURE")
+
+
 @app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError):
-    return error_response("VALIDATION_ERROR", "Request validation failed", request_id(request), 422)
+def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return error_response("VALIDATION_ERROR", "Invalid request", request_id(request), 422)
 
 
-@app.exception_handler(Exception)
-async def unhandled_handler(request: Request, exc: Exception):
-    return error_response("INTERNAL_ERROR", "Internal server error", request_id(request), 500)
-
-
-@app.middleware("http")
-async def security_headers(request: Request, call_next):
+@app.exception_handler(HTTPException)
+def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
     rid = request_id(request)
-    response = await call_next(request)
-    response.headers["X-Request-ID"] = rid
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
-    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
-    if SENTINEL_ENV == "production":
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    return response
-
-
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
-    return {"status": "ok", "service": "sentinel-core", "version": APP_VERSION}
-
-
-@app.get("/v1/games")
-def list_games(authorization_header: str = Header(..., alias="Authorization")) -> dict:
-    principal = principal_from_token(require_bearer(authorization_header))
-    authorize_request(principal, "game:read", "game:catalog", str(uuid.uuid4()))
-    return {"games": [game.__dict__ for game in DIABLO_CATALOG]}
-
-
-@app.get("/v1/games/{game_id}")
-def get_game_details(game_id: str, authorization_header: str = Header(..., alias="Authorization")) -> dict:
-    principal = principal_from_token(require_bearer(authorization_header))
-    authorize_request(principal, "game:read", f"game:{game_id}", str(uuid.uuid4()))
-    game = get_game(game_id)
-    if game is None:
-        raise HTTPException(status_code=404, detail="GAME_NOT_FOUND")
-    return game.__dict__
-
-
-@app.get("/v1/games/{game_id}/access")
-def check_game_access(game_id: str, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, object]:
-    principal = principal_from_token(require_bearer(authorization_header))
-    authorize_request(principal, "game:read", f"game:{game_id}", str(uuid.uuid4()))
-    if get_game(game_id) is None:
-        raise HTTPException(status_code=404, detail="GAME_NOT_FOUND")
-    now = datetime.now(UTC)
-    entitlements = store.list_entitlements(principal.user_id)
-    if not any(item["game_id"] == game_id and item["status"] == EntitlementStatus.ACTIVE and item["valid_from"] <= now <= item["valid_until"] for item in entitlements):
-        raise HTTPException(status_code=403, detail="ENTITLEMENT_REQUIRED")
-    return {"game_id": game_id, "decision": "ALLOW", "reason_code": "ENTITLEMENT_VALID"}
+    code = str(exc.detail)
+    return error_response(code, "Request rejected", rid, exc.status_code)
 
 
 @app.post("/v1/devices/register", response_model=DeviceRegisterResponse)
-def register_device(payload: DeviceRegisterRequest, request: Request, x_enrollment_token: str | None = Header(default=None), x_request_id: str | None = Header(default=None)):
-    rate_limit(request, "enroll")
+def register_device(payload: DeviceRegisterRequest, request: Request, x_enrollment_token: str | None = Header(default=None, alias="X-Enrollment-Token"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     rid = request_id(request, x_request_id)
+    rate_limit(request, "device-register")
     require_enrollment(x_enrollment_token, payload.user_id)
-    try:
-        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY")
-    if not secrets.compare_digest(fingerprint, payload.fingerprint_sha256.lower()):
-        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
-    challenge = new_nonce()
-    device_id = store.register_device(payload.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
-    store.add_audit({"actor_user_id": payload.user_id, "actor_device_id": device_id, "action": "device:register", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REGISTERED", "request_id": rid})
-    return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
+    fingerprint = fingerprint_public_key(payload.public_key)
+    device_id = store.register_device(payload.user_id, payload.platform, payload.public_key, fingerprint, payload.challenge)
+    return DeviceRegisterResponse(device_id=device_id, fingerprint=fingerprint, request_id=rid)
 
 
-@app.post("/v1/devices/{device_id}/challenge", response_model=DeviceRegisterResponse)
-def issue_challenge(device_id: str, request: Request, x_enrollment_token: str | None = Header(default=None)):
-    rate_limit(request, "challenge")
-    device = store.get_device(device_id)
-    if not device:
-        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
-    require_enrollment(x_enrollment_token, device["user_id"])
-    if device["state"] != "ACTIVE":
-        raise HTTPException(status_code=404, detail="DEVICE_NOT_ACTIVE")
-    challenge = store.create_challenge(device_id)
-    return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
-
-
-@app.post("/v1/devices/{device_id}/prove", response_model=SessionResponse)
-def prove_device(device_id: str, payload: DeviceProofRequest, request: Request):
-    rate_limit(request, "prove")
-    device = store.get_device(device_id)
+@app.post("/v1/sessions", response_model=SessionResponse)
+def create_session(payload: DeviceProofRequest, request: Request, x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
+    rid = request_id(request, x_request_id)
+    device = store.get_device(payload.device_id)
     if not device or device["state"] != "ACTIVE":
-        raise HTTPException(status_code=401, detail="DEVICE_NOT_ACTIVE")
-    if not fresh_request_timestamp(payload.timestamp, max_skew_seconds=MAX_REQUEST_SKEW_SECONDS):
-        raise HTTPException(status_code=401, detail="STALE_REQUEST")
-    signed = canonical_json({"challenge": payload.challenge, "timestamp": payload.timestamp, "request_id": payload.request_id})
-    if not verify_p256_signature(device["public_key"], payload.signature_b64, signed):
-        failures = store.record_security_failure(device_id, "device-proof")
-        store.add_audit({"actor_user_id": device["user_id"], "actor_device_id": device_id, "action": "device:prove", "resource": "session", "decision": "DENY", "reason_code": "BAD_SIGNATURE", "metadata": {"failures_15m": failures}, "request_id": payload.request_id})
-        raise HTTPException(status_code=401, detail="BAD_SIGNATURE")
-    if not store.consume_proof_request(device_id, payload.request_id):
-        raise HTTPException(status_code=409, detail="REQUEST_REPLAY")
-    if not store.consume_challenge(payload.challenge, device_id):
-        raise HTTPException(status_code=401, detail="INVALID_OR_REPLAYED_CHALLENGE")
-    access, refresh, expires, scopes = store.issue_session(device_id, device["user_id"], SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    store.add_audit({"actor_user_id": device["user_id"], "actor_device_id": device_id, "action": "device:prove", "resource": "session", "decision": "ALLOW", "reason_code": "PROOF_VALID", "request_id": payload.request_id})
-    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires, scopes=scopes)
+        raise HTTPException(status_code=403, detail="DEVICE_NOT_ACTIVE")
+    if not store.consume_challenge(payload.challenge, payload.device_id):
+        raise HTTPException(status_code=401, detail="INVALID_CHALLENGE")
+    proof_payload = canonical_json({"challenge": payload.challenge, "timestamp": payload.timestamp, "request_id": rid})
+    if not fresh_request_timestamp(payload.timestamp, int(time.time()), MAX_REQUEST_SKEW_SECONDS) or not verify_p256_signature(device["public_key"], payload.signature, proof_payload):
+        raise HTTPException(status_code=401, detail="INVALID_PROOF")
+    access, refresh, expires_at, scopes = store.issue_session(payload.device_id, device["user_id"], SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    return SessionResponse(access_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes, request_id=rid)
 
 
 @app.post("/v1/sessions/refresh", response_model=SessionResponse)
-def refresh_session(payload: RefreshRequest, request: Request, x_request_id: str | None = Header(default=None)):
-    rate_limit(request, "refresh")
+def refresh_session(payload: RefreshRequest, request: Request, x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     rid = request_id(request, x_request_id)
     result = store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
     if not result:
-        raise HTTPException(status_code=401, detail="INVALID_REFRESH_TOKEN")
-    access, refresh, expires, scopes, old = result
-    store.add_audit({"actor_user_id": old["user_id"], "actor_device_id": old["device_id"], "action": "session:refresh", "resource": "session", "decision": "ALLOW", "reason_code": "ROTATED", "request_id": rid})
-    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires, scopes=scopes)
+        raise HTTPException(status_code=401, detail="INVALID_REFRESH")
+    access, refresh, expires_at, scopes, _ = result
+    return SessionResponse(access_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes, request_id=rid)
 
 
 @app.post("/v1/sessions/revoke")
-def revoke_session(authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None)):
+def revoke_session(authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     token = require_bearer(authorization_header)
     principal = principal_from_token(token)
     if not store.revoke_session(token):
@@ -260,7 +208,7 @@ def revoke_session(authorization_header: str = Header(..., alias="Authorization"
 
 
 @app.post("/v1/authorize", response_model=AuthorizeResponse)
-def authorize_endpoint(payload: AuthorizeRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None)):
+def authorize_endpoint(payload: AuthorizeRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     rid = request_id(request, x_request_id)
     principal = principal_from_token(require_bearer(authorization_header))
     decision, reason = policy_engine.authorize(principal, payload.action, payload.resource)
@@ -269,7 +217,7 @@ def authorize_endpoint(payload: AuthorizeRequest, request: Request, authorizatio
 
 
 @app.post("/v1/events:batch")
-def ingest_events(payload: EventBatchRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), x_request_id: str | None = Header(default=None)) -> dict[str, int]:
+def ingest_events(payload: EventBatchRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")) -> dict[str, int]:
     rid = request_id(request, x_request_id)
     principal = principal_from_token(require_bearer(authorization_header))
     authorize_request(principal, "event:write", "game:event", rid)

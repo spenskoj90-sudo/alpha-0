@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: sentinel-full-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

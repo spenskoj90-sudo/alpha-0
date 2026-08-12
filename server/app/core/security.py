@@ -45,32 +45,37 @@ class Policy:
         )
         return action_match and resource_match
 
+    def requirements_met(self, principal: Principal) -> bool:
+        return self.roles.issubset(principal.roles) and self.scopes.issubset(principal.scopes)
+
+    def is_fallback_deny(self) -> bool:
+        return self.effect is Decision.DENY and self.action == "*" and self.resource == "*" and not self.roles and not self.scopes
+
 
 class AuthorizationEngine:
-    """Default-deny RBAC + scope + policy evaluator.
+    """Default-deny authorization with explicit policy precedence.
 
-    Deny rules win. A policy requiring roles/scopes only matches when the
-    principal contains every required value.
+    Specific deny rules override allows. A catch-all deny acts only as the
+    final fallback, so an explicit allow can authorize an operation without
+    requiring callers to remove a global default-deny policy.
     """
 
     def __init__(self, policies: list[Policy] | None = None) -> None:
         self._policies = policies or []
 
     def authorize(self, principal: Principal, action: str, resource: str) -> tuple[Decision, str]:
-        matching = [p for p in self._policies if p.matches(action, resource)]
+        matching = [p for p in self._policies if p.matches(action, resource) and p.requirements_met(principal)]
         if not matching:
             return Decision.DENY, "NO_MATCHING_POLICY"
-        for policy in matching:
-            if not policy.roles.issubset(principal.roles):
-                continue
-            if not policy.scopes.issubset(principal.scopes):
-                continue
-            if policy.effect is Decision.DENY:
-                return Decision.DENY, "POLICY_DENY"
-        for policy in matching:
-            if policy.effect is Decision.ALLOW and policy.roles.issubset(principal.roles) and policy.scopes.issubset(principal.scopes):
-                return Decision.ALLOW, "POLICY_ALLOW"
-        return Decision.DENY, "REQUIREMENTS_NOT_MET"
+
+        explicit_denies = [p for p in matching if p.effect is Decision.DENY and not p.is_fallback_deny()]
+        if explicit_denies:
+            return Decision.DENY, "POLICY_DENY"
+
+        if any(p.effect is Decision.ALLOW for p in matching):
+            return Decision.ALLOW, "POLICY_ALLOW"
+
+        return Decision.DENY, "POLICY_DENY"
 
 
 def canonical_json(value: Any) -> bytes:

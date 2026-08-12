@@ -67,6 +67,11 @@ jobs:
         run: gradle --no-daemon --stacktrace test
       - name: Verify RC1 version
         run: grep -q 'versionName = "1.0.0-RC1"' app/build.gradle.kts
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-sentinel-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Run instrumentation tests on API 35
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -74,8 +79,10 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -no-audio -no-boot-anim
+          cores: 2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-audio -no-boot-anim -camera-back none
           disable-animations: true
+          emulator-boot-timeout: 600
           script: gradle --no-daemon --stacktrace connectedDebugAndroidTest
       - name: Verify APK artifact
         run: test -s app/build/outputs/apk/debug/app-debug.apk

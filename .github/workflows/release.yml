@@ -1,0 +1,36 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build Android artifact
+        run: gradle --no-daemon assembleDebug
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build Core source artifact
+        run: tar -czf sentinel-core-${GITHUB_REF_NAME}.tar.gz server docs docker-compose.yml
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            app/build/outputs/apk/debug/app-debug.apk \
+            "sentinel-core-${GITHUB_REF_NAME}.tar.gz" \
+            --generate-notes \
+            --title "SENTINEL ${GITHUB_REF_NAME}"

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: sentinel-full-validation-${{ github.ref }}
+  group: sentinel-rc1-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

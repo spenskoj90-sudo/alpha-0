@@ -1,0 +1,120 @@
+openapi: 3.0.3
+info:
+  title: SENTINEL CORE API
+  version: 1.0.0-RC1
+  description: Security-first modular monolith API contract.
+servers:
+  - url: /v1
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: {}
+    AuthorizeRequest:
+      type: object
+      required: [action, resource]
+      properties:
+        action: {type: string, minLength: 1}
+        resource: {type: string, minLength: 1}
+    AuthorizeResponse:
+      type: object
+      required: [decision, reason_code]
+      properties:
+        decision: {type: string, enum: [ALLOW, DENY]}
+        reason_code: {type: string}
+    DeviceRegisterRequest:
+      type: object
+      required: [user_id, platform, public_key_der_b64, fingerprint_sha256]
+      properties:
+        user_id: {type: string}
+        platform: {type: string}
+        public_key_der_b64: {type: string}
+        fingerprint_sha256: {type: string, pattern: '^[0-9a-fA-F]{64}$'}
+    DeviceRegisterResponse:
+      type: object
+      required: [device_id, state, challenge]
+      properties:
+        device_id: {type: string}
+        state: {type: string}
+        challenge: {type: string}
+    DeviceProofRequest:
+      type: object
+      required: [challenge, timestamp, request_id, signature_b64]
+      properties:
+        challenge: {type: string}
+        timestamp: {type: integer, format: int64}
+        request_id: {type: string}
+        signature_b64: {type: string}
+    SessionResponse:
+      type: object
+      required: [session_token, expires_at, scopes]
+      properties:
+        session_token: {type: string}
+        expires_at: {type: string, format: date-time}
+        scopes:
+          type: array
+          items: {type: string}
+paths:
+  /devices/register:
+    post:
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeviceRegisterRequest'}
+      responses:
+        '200': {description: Registered, content: {application/json: {schema: {$ref: '#/components/schemas/DeviceRegisterResponse'}}}}
+        '400': {description: Invalid key or fingerprint}
+  /devices/{device_id}/prove:
+    post:
+      operationId: proveDevice
+      parameters:
+        - {name: device_id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DeviceProofRequest'}
+      responses:
+        '200': {description: Session issued, content: {application/json: {schema: {$ref: '#/components/schemas/SessionResponse}}}}
+        '401': {description: Proof rejected}
+  /authorize:
+    post:
+      operationId: authorize
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AuthorizeRequest'}
+      responses:
+        '200': {description: Authorization decision, content: {application/json: {schema: {$ref: '#/components/schemas/AuthorizeResponse'}}}}
+        '401': {description: Invalid session}
+  /events:batch:
+    post:
+      operationId: ingestEvents
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Batch accepted}
+        '403': {description: Not authorized}
+        '409': {description: Replay or sequence conflict}
+  /audit:
+    get:
+      operationId: audit
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Audit events}
+        '403': {description: Not authorized}
+  /recommendations:
+    post:
+      operationId: recommendations
+      security: [{bearerAuth: []}]
+      responses:
+        '200': {description: Recommendations}

@@ -1,8 +1,6 @@
 import base64
 import hashlib
 import json
-import os
-import time
 
 import pytest
 from cryptography.hazmat.primitives import hashes, serialization
@@ -20,22 +18,26 @@ def test_postgres_auth_event_and_audit_flow():
     public = key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     public64 = base64.b64encode(public).decode()
     fingerprint = hashlib.sha256(public).hexdigest()
-    user_id = f"pg-smoke-{int(time.time())}"
-    enrollment = f"{user_id}:secret"
-    os.environ["SENTINEL_ENROLLMENT_TOKEN"] = enrollment
+    user_id = "pg-smoke"
+    enrollment = "pg-smoke:secret"
 
     reg = client.post("/v1/devices/register", headers={"X-Enrollment-Token": enrollment}, json={"user_id": user_id, "platform": "android", "public_key_der_b64": public64, "fingerprint_sha256": fingerprint})
     assert reg.status_code == 200
     device = reg.json()
 
-    body = {"challenge": device["challenge"], "timestamp": int(time.time()), "request_id": "pg-smoke-1"}
+    body = {"challenge": device["challenge"], "timestamp": 1775930400, "request_id": "pg-smoke-1"}
     signed = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    body["signature_b64"] = base64.b64encode(key.sign(signed, ec.ECDSA(hashes.SHA256()))).decode()
+    # The test timestamp is replaced with current time so the freshness gate is real.
+    import time
+    body["timestamp"] = int(time.time())
+    signed = json.dumps({"challenge": body["challenge"], "timestamp": body["timestamp"], "request_id": body["request_id"]}, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     body["signature_b64"] = base64.b64encode(key.sign(signed, ec.ECDSA(hashes.SHA256()))).decode()
     proof = client.post(f"/v1/devices/{device['device_id']}/prove", json=body)
     assert proof.status_code == 200
     session = proof.json()
 
-    event = {"events": [{"event_id": f"pg-event-{int(time.time())}", "device_id": device["device_id"], "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-12T06:00:00Z", "sequence": 0, "payload": {"hp": 100}}]}
+    event = {"events": [{"event_id": "pg-event-1", "device_id": device["device_id"], "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-12T06:00:00Z", "sequence": 0, "payload": {"hp": 100}}]}
     ingested = client.post("/v1/events:batch", headers={"Authorization": "Bearer " + session["session_token"], "Idempotency-Key": "pg-smoke-batch"}, json=event)
     assert ingested.status_code == 200
     assert ingested.json()["accepted"] == 1

@@ -12,8 +12,8 @@ android {
         applicationId = "com.alpha0.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 10001
+        versionName = "1.0.0-RC1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

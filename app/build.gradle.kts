@@ -34,19 +34,18 @@ android {
 
 // Do not read or validate release signing secrets during ordinary configuration.
 // Gradle's Provider API captures the environment lazily; values are materialized
-// only after the execution graph is known to contain a Release task. No dummy or
-// empty credentials are supplied to the release signing configuration.
+// only when the requested Gradle task names actually target a Release variant.
 val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
 val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
 val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
 val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
 
-gradle.taskGraph.whenReady {
-    val releaseRequested = allTasks.any { task ->
-        task.name.contains("Release", ignoreCase = false)
-    }
+val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
+}
 
-    if (releaseRequested) {
+if (releaseRequested) {
+    gradle.taskGraph.whenReady {
         val keystorePath = androidKeystorePath.orNull
             ?: error("ANDROID_KEYSTORE_PATH is required for release signing")
         val keystorePassword = androidKeystorePassword.orNull

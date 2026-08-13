@@ -36,7 +36,7 @@ def test_expired_nonce_is_rejected():
     reset_store()
     key, device, _ = provision()
     challenge = store.create_challenge(device["device_id"])
-    store.challenges[next(iter(store.challenges))]["expires_at"] = 0
+    store.challenges[challenge]["expires_at"] = 0
     response = client.post(f"/v1/devices/{device['device_id']}/prove", json=signed_proof(key, challenge, "expired-nonce"))
     assert response.status_code == 401
 
@@ -45,8 +45,8 @@ def test_invalid_signature_and_altered_payload_are_rejected():
     reset_store()
     key, device, _ = provision()
     challenge = store.create_challenge(device["device_id"])
-    bad = signed_proof(key, challenge, "bad-signature")
-    bad["signature_b64"] = base64.b64encode(b"invalid").decode()
+    wrong_key = ec.generate_private_key(ec.SECP256R1())
+    bad = signed_proof(wrong_key, challenge, "bad-signature")
     assert client.post(f"/v1/devices/{device['device_id']}/prove", json=bad).status_code == 401
 
     challenge = store.create_challenge(device["device_id"])
@@ -108,7 +108,7 @@ def test_direct_unauthorized_recommendation_call_is_blocked():
     _, _, session = provision()
     record = store.sessions[session_hash(session["session_token"])]
     record["scopes"] = ["character:read"]
-    response = client.post("/v1/recommendations", headers={"Authorization": "Bearer " + session["session_token"]}, json={})
+    response = client.post("/v1/recommendations", headers={"Authorization": "Bearer " + session["session_token"]}, json={"context": {}})
     assert response.status_code == 403
 
 
@@ -122,14 +122,14 @@ def test_cross_device_event_submission_duplicate_and_sequence_replay():
     assert registered.status_code == 200
     device_b = registered.json()["device_id"]
     headers = {"Authorization": "Bearer " + session["session_token"], "Idempotency-Key": "negative-events"}
-    event = {"event_id": "cross-device", "device_id": device_b, "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-13T00:00:00Z", "sequence": 0, "payload": {"hp": 100}}
-    assert client.post("/v1/events:batch", headers=headers, json={"events": [event]}).status_code == 403
+    cross_device = {"event_id": "cross-device", "device_id": device_b, "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-13T00:00:00Z", "sequence": 0, "payload": {"hp": 100}}
+    assert client.post("/v1/events:batch", headers=headers, json={"events": [cross_device]}).status_code == 403
 
-    own = {**event, "event_id": "duplicate", "device_id": device_a}
+    own = {**cross_device, "event_id": "duplicate-event", "device_id": device_a, "sequence": 1}
     first = client.post("/v1/events:batch", headers=headers, json={"events": [own]})
     second = client.post("/v1/events:batch", headers=headers, json={"events": [own]})
     assert first.status_code == second.status_code == 200
     assert first.json() == second.json() == {"accepted": 1, "duplicates": 0}
 
-    replay = {**own, "event_id": "sequence-replay", "sequence": 0}
+    replay = {**own, "event_id": "sequence-replay", "sequence": 1}
     assert client.post("/v1/events:batch", headers={**headers, "Idempotency-Key": "sequence-replay"}, json={"events": [replay]}).status_code == 409

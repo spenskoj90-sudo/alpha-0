@@ -98,7 +98,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$ANDROID_KEYSTORE_BASE64"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/sentinel-release.jks"
+          python - <<'PY'
+          import base64, os, pathlib
+          raw = os.environ["ANDROID_KEYSTORE_BASE64"]
+          compact = "".join(raw.split())
+          padded = compact + ("=" * (-len(compact) % 4))
+          data = base64.b64decode(padded, validate=False)
+          pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks").write_bytes(data)
+          PY
           chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
       - name: Verify release signing certificate fingerprint
         env:

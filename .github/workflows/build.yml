@@ -119,7 +119,12 @@ jobs:
           set -e
           if [ "$rc" -ne 0 ]; then
             echo "keytool keystore inspection failed; fingerprint comparison cannot be performed."
-            cat "$RUNNER_TEMP/keystore-error.txt"
+            echo "Decoded keystore size: $(stat -c '%s' "$RUNNER_TEMP/sentinel-release.jks") bytes"
+            echo "Decoded keystore magic: $(xxd -p -l 8 "$RUNNER_TEMP/sentinel-release.jks")"
+            echo "keytool stdout:"
+            cat "$RUNNER_TEMP/keystore-list.txt" || true
+            echo "keytool stderr:"
+            cat "$RUNNER_TEMP/keystore-error.txt" || true
             exit "$rc"
           fi
           mapfile -t actuals < <(awk -F': ' '/SHA256:/{print $2}' "$RUNNER_TEMP/keystore-list.txt")
@@ -128,9 +133,7 @@ jobs:
           echo "Expected release signing certificate SHA-256: $expected"
           matched=false
           for actual in "${actuals[@]}"; do
-            if [ "$actual" = "$expected" ]; then
-              matched=true
-            fi
+            if [ "$actual" = "$expected" ]; then matched=true; fi
           done
           if [ "$matched" != true ]; then
             echo "Fingerprint comparison: FAIL"

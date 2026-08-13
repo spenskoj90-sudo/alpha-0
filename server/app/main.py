@@ -88,6 +88,7 @@ policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "event:write", "game:event", scopes=frozenset({"game:write"})),
     Policy(Decision.ALLOW, "audit:read", "audit", scopes=frozenset({"audit:read"})),
     Policy(Decision.ALLOW, "game:read", "game:*", scopes=frozenset({"game:read"})),
+    Policy(Decision.ALLOW, "knowledge:recommend", "recommendation", scopes=frozenset({"game:read"})),
 ])
 
 
@@ -317,8 +318,9 @@ def admin_create_entitlement(payload: AdminEntitlementRequest, x_sentinel_admin_
 
 
 @app.post("/v1/recommendations", response_model=RecommendationResponse)
-def recommendations(payload: RecommendationRequest, authorization_header: str = Header(..., alias="Authorization")):
+def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
+    rid = request_id(request, x_request_id)
     principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "knowledge:recommend", "recommendation", rid)
     result = [Recommendation(kind="recommendation", text="Review the most recent character events before making a progression decision.", confidence=0.72, provenance=["sentinel-core:context-baseline"])]
-    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "knowledge:recommend", "resource": "recommendation", "decision": "ALLOW", "reason_code": "SAFE_RECOMMENDATION", "request_id": None})
     return RecommendationResponse(recommendations=result)

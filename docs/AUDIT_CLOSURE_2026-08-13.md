@@ -49,23 +49,29 @@ The selected implementation changes only the instrumentation job runner to `maco
 
 ## Reproducible deployment — failure and fix
 
-The first exact-head reproducibility comparison was intentionally allowed to fail and its logs were inspected. It proved that the original Docker build was **not reproducible**.
+Two exact-head comparisons were allowed to fail and their logs were inspected.
 
-Evidence from Build & Test run `31679499650`, job `94381891358`:
+### Failure 1 — nondeterministic Python wheel
+
+Build & Test run `31679499650`, job `94381891358`:
 - artifact A image ID: `sha256:9de063341a5a4cb401d3d72a6cfad82eccca73dda0d8591cf1059d31992652c2`
 - artifact B image ID: `sha256:a0920be1a5f050e5a6104c7c22c13eef522b005a58aac0f755f04e430f714a42`
-- the first four base/runtime layers matched, but the Python package/venv layers diverged.
-- the locally built `sentinel-core` wheel hash changed from `9f7c810fe627bfb1c46bcffd60b4690f9f16ddd9f50241c422fef5efd827f89e` to `3982f36cfdf91a1666c52d842a815792e1c1bf60e917b3c2fc7d5a1b38c28d42`.
-- Docker was resolving the same Python base digest, so the failure was not a mutable base-image problem alone; the build backend was range-pinned (`setuptools>=75,<81`) and Docker upgraded pip without a fixed version, leaving build metadata/timestamps nondeterministic.
+- locally built wheel hashes differed: `9f7c810fe627bfb1c46bcffd60b4690f9f16ddd9f50241c422fef5efd827f89e` vs `3982f36cfdf91a1666c52d842a815792e1c1bf60e917b3c2fc7d5a1b38c28d42`.
 
-Implemented deterministic build controls:
-- pin Python base image to `sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36` in both stages;
-- pin pip to `26.2.1`;
-- pin setuptools build backend to `80.9.0`;
-- use `--no-build-isolation` after installing the pinned backend;
-- set `SOURCE_DATE_EPOCH=0`, `PYTHONHASHSEED=0`, and `TZ=UTC` in build/runtime stages.
+Fix: pin base digest, pip `26.2.1`, setuptools `80.9.0`, disable build isolation, and set deterministic Python/build environment variables.
 
-A new exact-head reproducibility comparison is required. It must compare image ID and layer digests again; only a green result can move this gate to VERIFIED.
+### Failure 2 — runtime user creation remained nondeterministic
+
+Build & Test run `31679821312`, job `94382634367`:
+- the locally built wheel was now identical in both builds (`c60960a29f...`), proving the Python wheel issue was fixed;
+- the first differing final-image layer was the runtime user/group creation layer (`RUN addgroup --system sentinel && adduser --system --ingroup sentinel sentinel`);
+- artifact A and B therefore still had different image IDs and all following copied layers diverged.
+
+Root cause: the runtime `addgroup/adduser` mutation changes `/etc/passwd`/`/etc/group` and associated filesystem metadata during the image build. That mutation is time/build-instance dependent even after SOURCE_DATE_EPOCH controls were applied.
+
+Fix: remove runtime user/group creation entirely and run the container as fixed numeric non-root identity `10001:10001`. The application only needs read access to its packaged files and writes state to PostgreSQL, so no writable application filesystem ownership is required.
+
+A new exact-head reproducibility comparison is required. Only a green image-ID and layer-digest comparison can move this gate to VERIFIED.
 
 ## P1 implementation/evidence status
 
@@ -79,7 +85,7 @@ A new exact-head reproducibility comparison is required. It must compare image I
 | worker manager | VERIFIED | retry/complete semantics tested |
 | RLS policies | VERIFIED | explicit policies and policy tests; production role/context configuration remains an operational boundary |
 | SCA/dependency report | VERIFIED | exact-SHA P1 Evidence workflow produces Python, npm and Gradle artifacts |
-| reproducible deployment | IMPLEMENTED + first exact-head comparison FAILED; deterministic fix committed; final comparison pending | first failure is understood and fixed; next exact-head run is the required proof |
+| reproducible deployment | IMPLEMENTED; two concrete failures diagnosed and fixed; final exact-head comparison pending | final proof requires a green comparison after the fixed numeric non-root runtime identity |
 | performance/load baseline | VERIFIED baseline | regression guards + P1 evidence workflow; production load characterization remains OPEN |
 | backup/restore | VERIFIED smoke only | production-level evidence remains OPEN and is intentionally not simulated |
 

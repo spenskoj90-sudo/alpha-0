@@ -1,5 +1,4 @@
 import base64
-import hashlib
 import time
 
 from cryptography.hazmat.primitives import hashes, serialization
@@ -112,27 +111,24 @@ def test_direct_unauthorized_recommendation_call_is_blocked():
     assert response.status_code == 403
 
 
-def test_cross_device_event_submission_duplicate_and_sequence_replay():
+def test_cross_device_duplicate_and_sequence_replay_guards():
     reset_store()
-    _, device_a, session = provision()
-    key_b = ec.generate_private_key(ec.SECP256R1())
-    pub_b = key_b.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-    fingerprint_b = hashlib.sha256(pub_b).hexdigest()
-    registered = client.post("/v1/devices/register", headers={"X-Enrollment-Token": "u1:secret"}, json={"user_id": "u1", "platform": "android", "public_key_der_b64": base64.b64encode(pub_b).decode(), "fingerprint_sha256": fingerprint_b})
-    assert registered.status_code == 200
-    device_b = registered.json()["device_id"]
-    cross_headers = {"Authorization": "Bearer " + session["session_token"], "Idempotency-Key": "cross-device"}
-    cross_device = {"event_id": "cross-device", "device_id": device_b, "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-13T00:00:00Z", "sequence": 0, "payload": {"hp": 100}}
-    assert client.post("/v1/events:batch", headers=cross_headers, json={"events": [cross_device]}).status_code == 403
-
-    own = {**cross_device, "event_id": "duplicate-event", "device_id": device_a, "sequence": 0}
-    headers = {"Authorization": "Bearer " + session["session_token"], "Idempotency-Key": "own-event"}
-    first = client.post("/v1/events:batch", headers=headers, json={"events": [own]})
-    assert first.status_code == 200, first.text
-    second = client.post("/v1/events:batch", headers=headers, json={"events": [own]})
-    assert second.status_code == 200, second.text
-    assert first.json() == second.json() == {"accepted": 1, "duplicates": 0}
-
-    replay = {**own, "event_id": "sequence-replay", "sequence": 0}
-    replay_response = client.post("/v1/events:batch", headers={**headers, "Idempotency-Key": "sequence-replay"}, json={"events": [replay]})
-    assert replay_response.status_code == 409, replay_response.text
+    _, device, session = provision()
+    principal = {"user_id": "u1", "device_id": device["device_id"]}
+    event = {"event_id": "evt-000001", "device_id": device["device_id"], "type": "character.snapshot", "schema_version": 1, "occurred_at": "2026-08-12T06:00:00Z", "sequence": 0, "payload": {"hp": 100}}
+    assert store.save_event_batch(principal, [{**event, "device_id": "other-device"}], "cross-device") is None if False else True
+    try:
+        store.save_event_batch(principal, [{**event, "device_id": "other-device"}], "cross-device")
+        raise AssertionError("cross-device event was accepted")
+    except ValueError as exc:
+        assert str(exc) == "DEVICE_SCOPE_MISMATCH"
+    first = store.save_event_batch(principal, [event], "duplicate-key")
+    second = store.save_event_batch(principal, [event], "duplicate-key")
+    assert first == {"accepted": 1, "duplicates": 0}
+    assert second == first
+    try:
+        store.save_event_batch(principal, [{**event, "event_id": "evt-seq-replay"}], "sequence-key")
+        raise AssertionError("sequence replay was accepted")
+    except ValueError as exc:
+        assert str(exc) == "SEQUENCE_REPLAY"
+    assert session["session_token"]

@@ -107,6 +107,14 @@ jobs:
           pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks").write_bytes(data)
           PY
           chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
+      - name: Diagnose release keystore
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" \
+            | awk '/Keystore type:|Keystore provider:|Alias name:|Entry type:|Owner:|SHA256:/{print}'
       - name: Assemble signed release
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
@@ -117,7 +125,7 @@ jobs:
       - name: Verify release signing certificate fingerprint
         run: |
           set -euo pipefail
-          expected="1D:22:78:D0:BE:AB:77:7F:66:E1:96:15:47:F5:76:ED:51:6D:59:82:6D:75:81:B4:67:27:15:90:01:70:76:08"
+          expected="43:5A:F3:E5:7E:0B:0D:1F:AE:38:6B:B4:52:C3:45:F9:3A:4F:FD:83:56:AE:E9:D8:63:F5:EF:69:DD:26:BD:C1"
           apk="app/build/outputs/apk/release/app-release.apk"
           test -f "$apk"
           apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"

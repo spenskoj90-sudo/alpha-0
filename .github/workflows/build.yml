@@ -194,11 +194,16 @@ jobs:
           echo "raw artifact B image id: $(cat /tmp/repro-b.id)"
           echo "raw artifact A layers: $(cat /tmp/repro-a.layers)"
           echo "raw artifact B layers: $(cat /tmp/repro-b.layers)"
+          rm -rf /tmp/repro-root-a /tmp/repro-root-b
+          mkdir -p /tmp/repro-root-a /tmp/repro-root-b
           docker create --name sentinel-repro-a sentinel-core:repro-a >/dev/null
           docker create --name sentinel-repro-b sentinel-core:repro-b >/dev/null
-          docker export sentinel-repro-a | tar --extract --to-stdout 2>/dev/null >/dev/null || true
-          docker export sentinel-repro-a | tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.tar -
-          docker export sentinel-repro-b | tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.tar -
-          sha256sum /tmp/repro-a.tar /tmp/repro-b.tar
-          cmp /tmp/repro-a.tar /tmp/repro-b.tar
+          docker export sentinel-repro-a > /tmp/repro-a.raw.tar
+          docker export sentinel-repro-b > /tmp/repro-b.raw.tar
+          tar -xpf /tmp/repro-a.raw.tar -C /tmp/repro-root-a
+          tar -xpf /tmp/repro-b.raw.tar -C /tmp/repro-root-b
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.canonical.tar -C /tmp/repro-root-a .
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.canonical.tar -C /tmp/repro-root-b .
+          sha256sum /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
+          cmp /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
           docker rm sentinel-repro-a sentinel-repro-b >/dev/null

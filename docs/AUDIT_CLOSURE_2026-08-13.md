@@ -11,15 +11,18 @@ The following external values/files are required only to close the release-signi
 5. A SHA-256 fingerprint of the supplied keystore/certificate, so the received material can be verified without exposing the private key.
 6. If CI must validate the same material: the exact secret names/format expected by the workflow (`base64` keystore payload plus the three password/alias values), supplied through GitHub Actions Secrets or another protected channel.
 
-Do **not** paste private key material, passwords, or secret values into this chat. A protected file/secret channel is preferred; if only text transfer is available, provide non-secret fingerprints/metadata here and place secret values in the repository's secret manager.
+Do **not** paste private key material, passwords, or secret values into this chat. A protected file/secret channel is preferred; non-secret fingerprints/metadata may be provided in chat while secret values remain in the repository secret manager.
+
+## External boundary — explicitly not pursued in this pass
+
+- **Gate A:** OPEN; owner will provide the keystore/secrets through a protected channel.
+- **Production-level backup/restore:** OPEN; requires a real production or production-equivalent staging database, representative backup set, restore target, credentials, network access, and evidence that the restored service is functionally equivalent. CI smoke restore is not relabeled as production evidence.
+- **Production load characterization:** OPEN; requires real staging/production-equivalent infrastructure, representative traffic/data profile, agreed SLOs, load generator access, and monitoring. No production load is simulated or claimed here.
+- **Live Stripe:** intentionally untouched.
 
 ## Release baseline
 
-Selected baseline: `sentinel-1.0.0-rc1-final` at the exact release-candidate HEAD. P0 items explicitly accepted by the owner are not reopened.
-
-- `main`: `70702f3f992097cea9553c406b5d8febb3a47539`
-- P0 reference HEAD supplied for this pass: `8888c17c64af6a981d054dce7f74ca3bb6b4dada`
-- PR #19 head: `sentinel-1.0.0-rc1-final`
+The prior owner-supplied P0 baseline was `8888c17c64af6a981d054dce7f74ca3bb6b4dada`. P0 items explicitly accepted by the owner are not reopened. Code changes for this continuation are isolated on `p1-close-2026-08-13`; the final release evidence must use the exact final HEAD recorded in the final report.
 
 ## P0 implementation status — accepted / not reopened
 
@@ -30,27 +33,41 @@ Selected baseline: `sentinel-1.0.0-rc1-final` at the exact release-candidate HEA
 | Negative security suite | ACCEPTED | owner-accepted; existing suite remains authoritative |
 | Core/Web validation | ACCEPTED | owner-accepted; existing green jobs remain authoritative |
 
-## Full Validation at supplied HEAD
+## Android instrumentation infrastructure decision
 
-At the supplied HEAD, Build & Test run `31675634466` completed the following successfully: Android build/tests, PostgreSQL integration/recovery, Web build, Container build, Deployment smoke/health, and repository verification. The dedicated Android instrumentation job failed on the hosted runner during emulator handling: the emulator reported no KVM access, ADB repeatedly reported `device offline`, and final cleanup failed with ADB exit code `224` after boot completed. The job was rerun once; at the time this document was written the rerun was still in progress. No code-level instrumentation failure has been observed in the available log.
+The previous Linux hosted emulator path is not retried. Its confirmed failure mode was missing `/dev/kvm`, persistent `adb: device offline`, and final ADB cleanup exit code `224` after the emulator eventually reported boot completion.
 
-Important exact-HEAD distinction: PR-triggered Build & Test checks out the synthetic merge commit `e707dc43e4b34060217c2319dccb5b3ef2022adb`, whose first parent is the requested release-candidate HEAD. The dedicated Android push workflow can validate the branch head directly. Evidence from a synthetic merge commit is never relabeled as exact-head evidence.
+### Alternatives evaluated
+
+| Option | Assessment | Decision |
+|---|---|---|
+| GitHub hosted macOS Intel (`macos-15-intel`) | Minimal workflow change; existing emulator runner remains usable; Android Emulator uses macOS Hypervisor.framework; no new cloud credentials | **SELECTED** |
+| Firebase Test Lab | Strong cloud/real-device coverage, but requires Firebase/GCP project setup, IAM, Cloud Storage permissions, credentials and potentially billing; larger workflow change | Alternative, not selected for this closure pass |
+| Self-hosted KVM runner | Maximum control and Linux parity, but requires human-owned server, KVM/virtualization support, runner lifecycle, patching and security isolation | Requires human infrastructure decision; not introduced |
+
+The selected implementation changes only the instrumentation job runner to `macos-15-intel`, retains API 35/x86_64 and the existing Gradle instrumentation command, and explicitly records the macOS virtualization check. This is the lowest-change path that removes the exact Linux KVM failure without introducing external credentials.
 
 ## P1 implementation/evidence status
 
 | P1 item | Status | Evidence / remaining gate |
 |---|---|---|
-| session refresh/revoke | IMPLEMENTED + TESTED | existing API tests cover refresh rotation/replay and revoke |
-| device rotate/revoke | PARTIAL | Android key lifecycle exists; server API lifecycle extension still requires production-path integration test |
-| entitlement engine | IMPLEMENTED + UNIT TESTED | deterministic fail-closed engine added |
-| billing runtime | IMPLEMENTED + UNIT TESTED | provider-neutral state machine; live Stripe intentionally excluded |
-| outbox | IMPLEMENTED + UNIT TESTED | deterministic state machine added |
-| worker manager | IMPLEMENTED + UNIT TESTED | retry/complete semantics tested |
-| RLS policies | IMPLEMENTED + POLICY TEST | explicit policies added; production context/role configuration remains an operational gate |
-| SCA/dependency report | AUTOMATED | exact-SHA P1 Evidence workflow produces pip/npm/Gradle artifacts |
-| reproducible deployment test | PARTIAL | container/deployment smoke is green; deterministic reproducibility needs a successful artifact comparison run |
-| performance/load baseline | AUTOMATED | existing regression guards + P1 evidence workflow capture output; full load profile remains separate |
-| backup/restore evidence | SMOKE ONLY | CI backup/restore smoke is green; production-level evidence still requires production-equivalent target access |
+| session refresh/revoke | VERIFIED | existing API tests cover refresh rotation/replay and revoke |
+| device rotate/revoke | IMPLEMENTED + INTEGRATION TESTED; final exact-head CI evidence pending | rotate atomically revokes old device/session path, creates new key binding/challenge; new integration test verifies old-session denial, new-key proof, new-session authorization, revoke, and final denial |
+| entitlement engine | VERIFIED | deterministic fail-closed engine and unit tests |
+| billing runtime | VERIFIED | provider-neutral state machine; live Stripe intentionally excluded |
+| outbox | VERIFIED | deterministic state machine with duplicate protection/retry/completion tests |
+| worker manager | VERIFIED | retry/complete semantics tested |
+| RLS policies | VERIFIED | explicit policies and policy tests; production role/context configuration remains an operational boundary |
+| SCA/dependency report | VERIFIED | exact-SHA P1 Evidence workflow produces Python, npm and Gradle artifacts |
+| reproducible deployment | IMPLEMENTED; final exact-head comparison pending | CI performs independent no-cache Docker rebuild and compares image ID plus root filesystem layers |
+| performance/load baseline | VERIFIED baseline | regression guards + P1 evidence workflow; production load characterization remains OPEN |
+| backup/restore | VERIFIED smoke only | production-level evidence remains OPEN and is intentionally not simulated |
+
+## Full Validation evidence
+
+For the continuation branch, Build & Test run `31679419386` at exact HEAD `61bcfd085cad6d1eb706da1399bc45f4415274e1` had repository verification and core tests green while Android build, PostgreSQL, Web, and the macOS instrumentation job were still executing at the time of this document revision. The core job recorded 32 passed tests, including the new device lifecycle integration test.
+
+No final gate is marked VERIFIED here until its exact-head CI job has completed successfully. The final report must replace the pending statuses with the final exact HEAD and completed run IDs.
 
 ## Evidence rule
 
@@ -58,4 +75,4 @@ This document records implementation and evidence mapping only. It never turns a
 
 ## External boundaries
 
-Production credentials, live Stripe integrations, live infrastructure and external Android keystore secrets are intentionally not touched by repository automation. Gate A is independent and must be closed separately.
+Production credentials, live Stripe integrations, live infrastructure and external Android keystore secrets are intentionally not touched by repository automation. Gate A and production operational evidence are independent gates.

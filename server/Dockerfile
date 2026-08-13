@@ -18,7 +18,7 @@ RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade 'pip==26.2.1' \
     && /opt/venv/bin/pip install 'setuptools==80.9.0' \
     && /opt/venv/bin/pip install --no-build-isolation /build/server \
-    && find /opt/venv /build/server -exec touch -h -d '@${SOURCE_DATE_EPOCH}' {} +
+    && find /opt/venv /build/server -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
 
 FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 AS runtime
 

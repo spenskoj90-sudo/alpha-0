@@ -19,8 +19,9 @@
 
 ### Reproducible deployment
 - Added a CI gate that performs an independent no-cache Docker rebuild and compares image identity plus root filesystem layer digests.
-- First exact-head reproducibility run **failed for a concrete reason**: artifact A and B used the same pinned base digest and the same dependency versions, but the locally built `sentinel-core` wheel differed (`9f7c810f...` vs `3982f36c...`), which changed the venv/runtime layer digests. The project build backend was only range-pinned (`setuptools>=75,<81`) and Docker upgraded pip implicitly, leaving build metadata/timestamps nondeterministic.
-- Fixed by pinning the Docker base image digest, pinning pip `26.2.1`, pinning setuptools `80.9.0`, using `--no-build-isolation`, and setting `SOURCE_DATE_EPOCH=0`, `PYTHONHASHSEED=0`, and `TZ=UTC` in both build and runtime stages. A new exact-head CI comparison is required to close this gate.
+- First exact-head reproducibility run failed because the locally built `sentinel-core` wheel changed between builds despite the same base image and dependency versions. The build backend was range-pinned and pip was floating.
+- Pinned the Docker base image digest, pip `26.2.1`, setuptools `80.9.0`, disabled build isolation, and set `SOURCE_DATE_EPOCH=0`, `PYTHONHASHSEED=0`, and `TZ=UTC`.
+- Second exact-head reproducibility run showed the wheel itself was now byte-identical (`c60960a29f...` in both builds), but the first differing final-image layer was the runtime `addgroup/adduser` layer. The layer changed because creating system users mutates `/etc/passwd`/`/etc/group` with build-time metadata. Removed that runtime mutation and switched to the fixed numeric non-root identity `USER 10001:10001`. A new exact-head comparison is required for final proof.
 
 ### Full Validation evidence
 - Exact-head validation is run from branch `p1-close-2026-08-13`; final evidence must reference the resulting exact HEAD only.

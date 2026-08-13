@@ -18,10 +18,12 @@
 - macOS Intel was selected over Firebase Test Lab because it requires only a runner-label change, keeps the existing Gradle/instrumentation test contract, avoids adding cloud credentials/project/IAM/billing dependencies, and uses the Android Emulator's native macOS Hypervisor.framework path. Firebase Test Lab remains a valid alternative if cloud-device coverage is preferred. Self-hosted KVM is intentionally not introduced without a human infrastructure decision.
 
 ### Reproducible deployment
-- Added a CI gate that performs an independent no-cache Docker rebuild and compares image identity plus root filesystem layer digests. A successful comparison is required before the gate is considered verified.
+- Added a CI gate that performs an independent no-cache Docker rebuild and compares image identity plus root filesystem layer digests.
+- First exact-head reproducibility run **failed for a concrete reason**: artifact A and B used the same pinned base digest and the same dependency versions, but the locally built `sentinel-core` wheel differed (`9f7c810f...` vs `3982f36c...`), which changed the venv/runtime layer digests. The project build backend was only range-pinned (`setuptools>=75,<81`) and Docker upgraded pip implicitly, leaving build metadata/timestamps nondeterministic.
+- Fixed by pinning the Docker base image digest, pinning pip `26.2.1`, pinning setuptools `80.9.0`, using `--no-build-isolation`, and setting `SOURCE_DATE_EPOCH=0`, `PYTHONHASHSEED=0`, and `TZ=UTC` in both build and runtime stages. A new exact-head CI comparison is required to close this gate.
 
 ### Full Validation evidence
-- Exact-head validation is now run from branch `p1-close-2026-08-13`; final evidence must reference the resulting exact HEAD only.
+- Exact-head validation is run from branch `p1-close-2026-08-13`; final evidence must reference the resulting exact HEAD only.
 - The synthetic PR merge SHA remains distinct from the release-candidate branch HEAD and is never relabeled as exact-head evidence.
 
 ### Evidence policy

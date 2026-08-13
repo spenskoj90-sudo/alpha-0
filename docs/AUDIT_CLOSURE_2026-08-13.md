@@ -47,27 +47,45 @@ The previous Linux hosted emulator path is not retried. Its confirmed failure mo
 
 The selected implementation changes only the instrumentation job runner to `macos-15-intel`, retains API 35/x86_64 and the existing Gradle instrumentation command, and explicitly records the macOS virtualization check. This is the lowest-change path that removes the exact Linux KVM failure without introducing external credentials.
 
+## Reproducible deployment — failure and fix
+
+The first exact-head reproducibility comparison was intentionally allowed to fail and its logs were inspected. It proved that the original Docker build was **not reproducible**.
+
+Evidence from Build & Test run `31679499650`, job `94381891358`:
+- artifact A image ID: `sha256:9de063341a5a4cb401d3d72a6cfad82eccca73dda0d8591cf1059d31992652c2`
+- artifact B image ID: `sha256:a0920be1a5f050e5a6104c7c22c13eef522b005a58aac0f755f04e430f714a42`
+- the first four base/runtime layers matched, but the Python package/venv layers diverged.
+- the locally built `sentinel-core` wheel hash changed from `9f7c810fe627bfb1c46bcffd60b4690f9f16ddd9f50241c422fef5efd827f89e` to `3982f36cfdf91a1666c52d842a815792e1c1bf60e917b3c2fc7d5a1b38c28d42`.
+- Docker was resolving the same Python base digest, so the failure was not a mutable base-image problem alone; the build backend was range-pinned (`setuptools>=75,<81`) and Docker upgraded pip without a fixed version, leaving build metadata/timestamps nondeterministic.
+
+Implemented deterministic build controls:
+- pin Python base image to `sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36` in both stages;
+- pin pip to `26.2.1`;
+- pin setuptools build backend to `80.9.0`;
+- use `--no-build-isolation` after installing the pinned backend;
+- set `SOURCE_DATE_EPOCH=0`, `PYTHONHASHSEED=0`, and `TZ=UTC` in build/runtime stages.
+
+A new exact-head reproducibility comparison is required. It must compare image ID and layer digests again; only a green result can move this gate to VERIFIED.
+
 ## P1 implementation/evidence status
 
 | P1 item | Status | Evidence / remaining gate |
 |---|---|---|
 | session refresh/revoke | VERIFIED | existing API tests cover refresh rotation/replay and revoke |
-| device rotate/revoke | IMPLEMENTED + INTEGRATION TESTED; final exact-head CI evidence pending | rotate atomically revokes old device/session path, creates new key binding/challenge; new integration test verifies old-session denial, new-key proof, new-session authorization, revoke, and final denial |
+| device rotate/revoke | IMPLEMENTED + INTEGRATION TESTED; final exact-head CI evidence pending | rotate atomically revokes old device/session path, creates new key binding/challenge; integration test verifies old-session denial, new-key proof, new-session authorization, revoke, and final denial |
 | entitlement engine | VERIFIED | deterministic fail-closed engine and unit tests |
 | billing runtime | VERIFIED | provider-neutral state machine; live Stripe intentionally excluded |
 | outbox | VERIFIED | deterministic state machine with duplicate protection/retry/completion tests |
 | worker manager | VERIFIED | retry/complete semantics tested |
 | RLS policies | VERIFIED | explicit policies and policy tests; production role/context configuration remains an operational boundary |
 | SCA/dependency report | VERIFIED | exact-SHA P1 Evidence workflow produces Python, npm and Gradle artifacts |
-| reproducible deployment | IMPLEMENTED; final exact-head comparison pending | CI performs independent no-cache Docker rebuild and compares image ID plus root filesystem layers |
+| reproducible deployment | IMPLEMENTED + first exact-head comparison FAILED; deterministic fix committed; final comparison pending | first failure is understood and fixed; next exact-head run is the required proof |
 | performance/load baseline | VERIFIED baseline | regression guards + P1 evidence workflow; production load characterization remains OPEN |
 | backup/restore | VERIFIED smoke only | production-level evidence remains OPEN and is intentionally not simulated |
 
 ## Full Validation evidence
 
-For the continuation branch, Build & Test run `31679419386` at exact HEAD `61bcfd085cad6d1eb706da1399bc45f4415274e1` had repository verification and core tests green while Android build, PostgreSQL, Web, and the macOS instrumentation job were still executing at the time of this document revision. The core job recorded 32 passed tests, including the new device lifecycle integration test.
-
-No final gate is marked VERIFIED here until its exact-head CI job has completed successfully. The final report must replace the pending statuses with the final exact HEAD and completed run IDs.
+Final release evidence must reference only the final exact HEAD after the deterministic-build fix. Prior runs are retained as diagnostic evidence and are not mixed into the final PASS/VERIFIED claim.
 
 ## Evidence rule
 

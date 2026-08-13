@@ -107,39 +107,6 @@ jobs:
           pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks").write_bytes(data)
           PY
           chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
-      - name: Verify release signing certificate fingerprint
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          expected="1D:22:78:D0:BE:AB:77:7F:66:E1:96:15:47:F5:76:ED:51:6D:59:82:6D:75:81:B4:67:27:15:90:01:70:76:08"
-          set +e
-          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2> "$RUNNER_TEMP/keystore-error.txt"
-          rc=$?
-          set -e
-          if [ "$rc" -ne 0 ]; then
-            echo "keytool keystore inspection failed; fingerprint comparison cannot be performed."
-            echo "Decoded keystore size: $(stat -c '%s' "$RUNNER_TEMP/sentinel-release.jks") bytes"
-            echo "Decoded keystore magic: $(xxd -p -l 8 "$RUNNER_TEMP/sentinel-release.jks")"
-            echo "keytool stdout:"
-            cat "$RUNNER_TEMP/keystore-list.txt" || true
-            echo "keytool stderr:"
-            cat "$RUNNER_TEMP/keystore-error.txt" || true
-            exit "$rc"
-          fi
-          mapfile -t actuals < <(awk -F': ' '/SHA256:/{print $2}' "$RUNNER_TEMP/keystore-list.txt")
-          printf '%s\n' "Release signing certificate SHA-256 values found in keystore:"
-          printf '  %s\n' "${actuals[@]}"
-          echo "Expected release signing certificate SHA-256: $expected"
-          matched=false
-          for actual in "${actuals[@]}"; do
-            if [ "$actual" = "$expected" ]; then matched=true; fi
-          done
-          if [ "$matched" != true ]; then
-            echo "Fingerprint comparison: FAIL"
-            exit 1
-          fi
-          echo "Fingerprint comparison: PASS"
       - name: Assemble signed release
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
@@ -147,6 +114,22 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleRelease
+      - name: Verify release signing certificate fingerprint
+        run: |
+          set -euo pipefail
+          expected="1D:22:78:D0:BE:AB:77:7F:66:E1:96:15:47:F5:76:ED:51:6D:59:82:6D:75:81:B4:67:27:15:90:01:70:76:08"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -f "$apk"
+          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
+          test -x "$apksigner"
+          actual="$("$apksigner" verify --print-certs "$apk" | awk -F': ' '/SHA-256 digest:/{print $2; exit}')"
+          echo "Release APK certificate SHA-256 actual: $actual"
+          echo "Release APK certificate SHA-256 expected: $expected"
+          if [ "$actual" != "$expected" ]; then
+            echo "Fingerprint comparison: FAIL"
+            exit 1
+          fi
+          echo "Fingerprint comparison: PASS"
       - name: Upload Android instrumentation artifacts
         uses: actions/upload-artifact@v4
         with:

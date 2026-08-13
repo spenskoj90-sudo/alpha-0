@@ -9,16 +9,25 @@
 - Added explicit PostgreSQL RLS policies with fail-closed service-policy opt-in.
 - Added P1 evidence workflow producing exact-SHA Python, npm and Gradle dependency artifacts plus performance output.
 - Added P1 runtime regression tests.
+- Added server-side device rotate/revoke lifecycle: rotation atomically invalidates the old device/session path, creates a new device key binding and challenge, and device revoke invalidates all sessions for that device.
+- Added an API integration test covering rotate → old-session denial → new-key proof → new-session authorization → revoke → denial for both new and old credentials.
+
+### Android instrumentation infrastructure
+- Replaced the Linux hosted emulator path with `macos-15-intel` for the dedicated instrumentation job.
+- The previous Linux failure was caused by unavailable `/dev/kvm`, persistent ADB `device offline`, and cleanup exit code 224; no application assertion failure was observed.
+- macOS Intel was selected over Firebase Test Lab because it requires only a runner-label change, keeps the existing Gradle/instrumentation test contract, avoids adding cloud credentials/project/IAM/billing dependencies, and uses the Android Emulator's native macOS Hypervisor.framework path. Firebase Test Lab remains a valid alternative if cloud-device coverage is preferred. Self-hosted KVM is intentionally not introduced without a human infrastructure decision.
+
+### Reproducible deployment
+- Added a CI gate that performs an independent no-cache Docker rebuild and compares image identity plus root filesystem layer digests. A successful comparison is required before the gate is considered verified.
 
 ### Full Validation evidence
-- Android build/tests, PostgreSQL integration/recovery, Web build, Container build, Deployment smoke/health and repository verification are green for Build & Test run `31675634466`.
-- Android instrumentation remains an infrastructure-bound gate while the hosted emulator/ADB rerun is unresolved; no instrumentation assertion failure has been observed in the available logs.
-- The synthetic PR merge SHA `e707dc43e4b34060217c2319dccb5b3ef2022adb` is kept distinct from release-candidate HEAD `8888c17c64af6a981d054dce7f74ca3bb6b4dada`.
+- Exact-head validation is now run from branch `p1-close-2026-08-13`; final evidence must reference the resulting exact HEAD only.
+- The synthetic PR merge SHA remains distinct from the release-candidate branch HEAD and is never relabeled as exact-head evidence.
 
 ### Evidence policy
 - Release status is based only on CI evidence from the selected exact release commit.
 - Architecture documents, mockups and screenshots are not runtime evidence.
-- Production-level backup/restore, reproducible deployment comparison, live Stripe integration and external keystore/secrets remain explicit external gates.
+- Gate A, production-level backup/restore, production load characterization and live Stripe remain explicit external gates.
 
 ## 1.0.0-RC1 — 2026-08-12
 

@@ -1,7 +1,11 @@
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=0 \
+    TZ=UTC \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /build
@@ -11,13 +15,18 @@ COPY server/migrations /build/server/migrations
 COPY server/migrate.py /build/server/migrate.py
 
 RUN python -m venv /opt/venv \
-    && /opt/venv/bin/pip install --upgrade pip \
-    && /opt/venv/bin/pip install /build/server
+    && /opt/venv/bin/pip install --upgrade 'pip==26.2.1' \
+    && /opt/venv/bin/pip install 'setuptools==80.9.0' \
+    && /opt/venv/bin/pip install --no-build-isolation /build/server
 
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 AS runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ARG SOURCE_DATE_EPOCH=0
+ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=0 \
+    TZ=UTC \
     PATH="/opt/venv/bin:$PATH"
 
 RUN addgroup --system sentinel && adduser --system --ingroup sentinel sentinel

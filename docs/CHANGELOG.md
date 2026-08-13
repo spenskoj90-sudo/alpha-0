@@ -13,13 +13,15 @@
 - Added an API integration test covering rotate → old-session denial → new-key proof → new-session authorization → revoke → denial for both new and old credentials.
 
 ### Android instrumentation infrastructure
-- Replaced the Linux hosted emulator path with a GitHub-hosted macOS ARM64 runner (`macos-15`) and Android ARM64 emulator path for the dedicated instrumentation job.
+- Replaced the Linux hosted emulator path with Firebase Test Lab instrumentation using the existing Android debug and test APK artifacts.
 - The previous Linux failure was caused by unavailable `/dev/kvm`, persistent ADB `device offline`, and cleanup exit code 224; no application assertion failure was observed.
-- macOS ARM64 was selected over Firebase Test Lab because it keeps the existing Gradle/instrumentation test contract with a runner/workflow change only, avoids adding Firebase/GCP credentials, IAM and billing dependencies, and uses the hosted macOS virtualization path. Firebase Test Lab remains the fallback if the hosted runner queue cannot provide a usable instrumentation execution path. Self-hosted KVM is intentionally not introduced without a human infrastructure decision.
+- Firebase Test Lab was selected over hosted macOS virtualization because it removes the established HVF/KVM virtualization dependency from the CI runner and executes instrumentation on managed Android infrastructure. Self-hosted KVM remains an alternative requiring a separate human infrastructure decision.
 
 ### Gate A / Android release signing
 - Gate A is now closed by the owner through repository GitHub Actions Secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`.
-- Release signing now decodes the keystore only into `$RUNNER_TEMP`, verifies the configured alias certificate SHA-256 fingerprint against the owner-supplied fingerprint, and invokes `assembleRelease` with secrets supplied only through the workflow environment.
+- Release signing decodes the keystore only into `$RUNNER_TEMP`, verifies the release artifact certificate SHA-256 fingerprint, and invokes `assembleRelease` with secrets supplied only through the workflow environment.
+- The previous PKCS12 keystore was retired because it could not support the required different store/key passwords. The replacement keystore uses alias `sentinel_release` with identical store and key passwords.
+- The active release certificate fingerprint is now `43:5A:F3:E5:7E:0B:0D:1F:AE:38:6B:B4:52:C3:45:F9:3A:4F:FD:83:56:AE:E9:D8:63:F5:EF:69:DD:26:BD:C1`. The superseded fingerprint is no longer valid.
 - The private keystore, passwords and private key are not stored in the repository or exposed to the agent.
 
 ### Reproducible deployment
@@ -30,7 +32,7 @@
 - Final exact-head reproducibility evidence is required for the current release commit; no reproducibility status is inferred from a successful Docker build alone.
 
 ### Full Validation evidence
-- Exact-head validation is run from branch `p1-close-2026-08-13`; final evidence must reference the resulting exact HEAD only.
+- Exact-head validation is run from branch `sentinel-ftl-2026-08-13`; final evidence must reference the resulting exact HEAD only.
 - The synthetic PR merge SHA remains distinct from the release-candidate branch HEAD and is never relabeled as exact-head evidence.
 
 ### Evidence policy

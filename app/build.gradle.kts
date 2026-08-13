@@ -18,20 +18,7 @@ android {
     }
 
     signingConfigs {
-        create("ciRelease") {
-            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
-            val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            val keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
-            require(!keystorePath.isNullOrBlank()) { "ANDROID_KEYSTORE_PATH is required for release signing" }
-            require(!keystorePassword.isNullOrBlank()) { "ANDROID_KEYSTORE_PASSWORD is required for release signing" }
-            require(!keyAlias.isNullOrBlank()) { "ANDROID_KEY_ALIAS is required for release signing" }
-            require(!keyPassword.isNullOrBlank()) { "ANDROID_KEY_PASSWORD is required for release signing" }
-            storeFile = file(keystorePath)
-            storePassword = keystorePassword
-            this.keyAlias = keyAlias
-            this.keyPassword = keyPassword
-        }
+        create("ciRelease")
     }
 
     buildTypes {
@@ -43,6 +30,38 @@ android {
     }
 
     buildFeatures { compose = true }
+}
+
+// Do not read or validate release signing secrets during ordinary configuration.
+// Gradle's Provider API captures the environment lazily; values are materialized
+// only after the execution graph is known to contain a Release task. No dummy or
+// empty credentials are supplied to the release signing configuration.
+val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
+val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
+val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
+val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
+
+gradle.taskGraph.whenReady {
+    val releaseRequested = allTasks.any { task ->
+        task.name.contains("Release", ignoreCase = false)
+    }
+
+    if (releaseRequested) {
+        val keystorePath = androidKeystorePath.orNull
+            ?: error("ANDROID_KEYSTORE_PATH is required for release signing")
+        val keystorePassword = androidKeystorePassword.orNull
+            ?: error("ANDROID_KEYSTORE_PASSWORD is required for release signing")
+        val keyAlias = androidKeyAlias.orNull
+            ?: error("ANDROID_KEY_ALIAS is required for release signing")
+        val keyPassword = androidKeyPassword.orNull
+            ?: error("ANDROID_KEY_PASSWORD is required for release signing")
+
+        val ciRelease = android.signingConfigs.getByName("ciRelease")
+        ciRelease.storeFile = file(keystorePath)
+        ciRelease.storePassword = keystorePassword
+        ciRelease.keyAlias = keyAlias
+        ciRelease.keyPassword = keyPassword
+    }
 }
 
 kotlin { jvmToolchain(17) }

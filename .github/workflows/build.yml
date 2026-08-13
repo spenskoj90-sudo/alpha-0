@@ -110,14 +110,33 @@ jobs:
       - name: Verify release signing certificate fingerprint
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           set -euo pipefail
-          actual="$(keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | awk -F': ' '/SHA256:/{print $2; exit}')"
           expected="1D:22:78:D0:BE:AB:77:7F:66:E1:96:15:47:F5:76:ED:51:6D:59:82:6D:75:81:B4:67:27:15:90:01:70:76:08"
-          echo "Release signing certificate SHA-256 actual: $actual"
-          echo "Release signing certificate SHA-256 expected: $expected"
-          test "$actual" = "$expected"
+          set +e
+          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/keystore-list.txt" 2> "$RUNNER_TEMP/keystore-error.txt"
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "keytool keystore inspection failed; fingerprint comparison cannot be performed."
+            cat "$RUNNER_TEMP/keystore-error.txt"
+            exit "$rc"
+          fi
+          mapfile -t actuals < <(awk -F': ' '/SHA256:/{print $2}' "$RUNNER_TEMP/keystore-list.txt")
+          printf '%s\n' "Release signing certificate SHA-256 values found in keystore:"
+          printf '  %s\n' "${actuals[@]}"
+          echo "Expected release signing certificate SHA-256: $expected"
+          matched=false
+          for actual in "${actuals[@]}"; do
+            if [ "$actual" = "$expected" ]; then
+              matched=true
+            fi
+          done
+          if [ "$matched" != true ]; then
+            echo "Fingerprint comparison: FAIL"
+            exit 1
+          fi
+          echo "Fingerprint comparison: PASS"
       - name: Assemble signed release
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks

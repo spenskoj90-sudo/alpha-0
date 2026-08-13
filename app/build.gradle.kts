@@ -19,16 +19,18 @@ android {
 
     signingConfigs {
         create("ciRelease") {
-            val keystorePath = System.getenv("ALPHA0_KEYSTORE_PATH")
-            val keystorePassword = System.getenv("ALPHA0_KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("ALPHA0_KEY_ALIAS")
-            val keyPassword = System.getenv("ALPHA0_KEY_PASSWORD")
-            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            }
+            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            val keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            val keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            require(!keystorePath.isNullOrBlank()) { "ANDROID_KEYSTORE_PATH is required for release signing" }
+            require(!keystorePassword.isNullOrBlank()) { "ANDROID_KEYSTORE_PASSWORD is required for release signing" }
+            require(!keyAlias.isNullOrBlank()) { "ANDROID_KEY_ALIAS is required for release signing" }
+            require(!keyPassword.isNullOrBlank()) { "ANDROID_KEY_PASSWORD is required for release signing" }
+            storeFile = file(keystorePath)
+            storePassword = keystorePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
         }
     }
 
@@ -36,13 +38,7 @@ android {
         debug { }
         release {
             isMinifyEnabled = false
-            val keystorePath = System.getenv("ALPHA0_KEYSTORE_PATH")
-            val keystorePassword = System.getenv("ALPHA0_KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("ALPHA0_KEY_ALIAS")
-            val keyPassword = System.getenv("ALPHA0_KEY_PASSWORD")
-            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
-                signingConfig = signingConfigs.getByName("ciRelease")
-            }
+            signingConfig = signingConfigs.getByName("ciRelease")
         }
     }
 

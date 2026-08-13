@@ -2,16 +2,23 @@
 
 ## 1.0.0-RC1 — 2026-08-13
 
-### P0 audit closure work
-- Enforced an explicit authorization policy for `POST /v1/recommendations` using the same server-side authorization layer as other sensitive endpoints.
-- Added the P0 negative security regression suite covering nonce invalidity/reuse/expiry, signature and payload tampering, stale timestamps, revoked devices, rotated keys, expired/revoked sessions, missing scope, wrong role, explicit deny, direct unauthorized recommendation calls, cross-device events, duplicate events and sequence replay.
-- Kept event request hashing independent of transport `request_id` and preserved idempotency-key conflict detection.
-- Kept production runtime fail-closed on missing `DATABASE_URL`; production uses `PostgresStore`, while `MemoryStore` remains a deterministic test/development double.
+### P1 pass continuation
+- Added deterministic entitlement decision engine with fail-closed handling for missing, suspended, future and expired entitlements.
+- Added provider-neutral billing runtime state transitions; live Stripe credentials and production provider calls remain intentionally out of scope.
+- Added outbox and worker state machines with duplicate protection, attempt counting, retry and completion semantics.
+- Added explicit PostgreSQL RLS policies with fail-closed service-policy opt-in.
+- Added P1 evidence workflow producing exact-SHA Python, npm and Gradle dependency artifacts plus performance output.
+- Added P1 runtime regression tests.
+
+### Full Validation evidence
+- Android build/tests, PostgreSQL integration/recovery, Web build, Container build, Deployment smoke/health and repository verification are green for Build & Test run `31675634466`.
+- Android instrumentation remains an infrastructure-bound gate while the hosted emulator/ADB rerun is unresolved; no instrumentation assertion failure has been observed in the available logs.
+- The synthetic PR merge SHA `e707dc43e4b34060217c2319dccb5b3ef2022adb` is kept distinct from release-candidate HEAD `8888c17c64af6a981d054dce7f74ca3bb6b4dada`.
 
 ### Evidence policy
 - Release status is based only on CI evidence from the selected exact release commit.
 - Architecture documents, mockups and screenshots are not runtime evidence.
-- Remaining P1 capabilities are not marked implemented until their runtime evidence exists.
+- Production-level backup/restore, reproducible deployment comparison, live Stripe integration and external keystore/secrets remain explicit external gates.
 
 ## 1.0.0-RC1 — 2026-08-12
 

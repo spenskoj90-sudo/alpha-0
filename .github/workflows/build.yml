@@ -57,6 +57,7 @@ jobs:
         working-directory: server
     env:
       DATABASE_URL: postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel_test
+      PGOPTIONS: -c app.service_role=true
       SENTINEL_ENV: production
       SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
       SENTINEL_REQUIRE_ENROLLMENT: "true"
@@ -154,7 +155,7 @@ jobs:
           for i in {1..30}; do pg_isready -h 127.0.0.1 -p 5432 -U sentinel && break; sleep 2; done
       - name: Start API and verify health
         run: |
-          docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
+          docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel -e PGOPTIONS='-c app.service_role=true' -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
           for i in {1..30}; do curl -fsS http://127.0.0.1:8080/healthz && exit 0; sleep 2; done
           docker logs sentinel-api
           exit 1

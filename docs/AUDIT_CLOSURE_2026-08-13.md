@@ -1,51 +1,61 @@
 # SENTINEL audit closure evidence — 2026-08-13
 
+## Gate A — external secrets / keystore (separate from code/CI)
+
+The following external values/files are required only to close the release-signing/keystore gate. They must **not** be committed to Git:
+
+1. Android release keystore file (`.jks` or `.keystore`) or an equivalent binary supplied through a protected file channel.
+2. Keystore store password.
+3. Key alias.
+4. Key password.
+5. A SHA-256 fingerprint of the supplied keystore/certificate, so the received material can be verified without exposing the private key.
+6. If CI must validate the same material: the exact secret names/format expected by the workflow (`base64` keystore payload plus the three password/alias values), supplied through GitHub Actions Secrets or another protected channel.
+
+Do **not** paste private key material, passwords, or secret values into this chat. A protected file/secret channel is preferred; if only text transfer is available, provide non-secret fingerprints/metadata here and place secret values in the repository's secret manager.
+
 ## Release baseline
 
-Selected baseline: `sentinel-1.0.0-rc1-final` at the exact current release candidate HEAD, not `main`.
+Selected baseline: `sentinel-1.0.0-rc1-final` at the exact release-candidate HEAD. P0 items explicitly accepted by the owner are not reopened.
 
 - `main`: `70702f3f992097cea9553c406b5d8febb3a47539`
-- RC baseline before this closure commit: `8d333557e7dca813f763d90437719013d479baa7`
-- Reason: the RC contains the PostgreSQL/runtime, CI, Android and release-gate work required by the audit; mixing main and RC would invalidate exact-HEAD evidence.
+- P0 reference HEAD supplied for this pass: `8888c17c64af6a981d054dce7f74ca3bb6b4dada`
+- PR #19 head: `sentinel-1.0.0-rc1-final`
 
-## P0 implementation status
+## P0 implementation status — accepted / not reopened
 
-### PostgreSQL/runtime
-Production mode is fail-closed when `DATABASE_URL` is absent and selects `PostgresStore` when it is present. The PostgreSQL integration workflow runs the real API flow through registration → device proof → session → event persistence → refresh → audit, followed by backup/restore smoke testing.
+| P0 item | Status | Evidence policy |
+|---|---|---|
+| PostgreSQL persistence | ACCEPTED | owner-accepted; existing CI evidence remains authoritative |
+| Authorization bypass fix | ACCEPTED | owner-accepted; existing security suite remains authoritative |
+| Negative security suite | ACCEPTED | owner-accepted; existing suite remains authoritative |
+| Core/Web validation | ACCEPTED | owner-accepted; existing green jobs remain authoritative |
 
-`MemoryStore` remains only as a deterministic test/development implementation; it is not selected by the production environment.
+## Full Validation at supplied HEAD
 
-### Authorization
-`POST /v1/recommendations` now passes through `authorize_request()` with action `knowledge:recommend` and resource `recommendation`, requiring `game:read`. The decision is audited before the endpoint returns data.
+At the supplied HEAD, Build & Test run `31675634466` completed the following successfully: Android build/tests, PostgreSQL integration/recovery, Web build, Container build, Deployment smoke/health, and repository verification. The dedicated Android instrumentation job failed on the hosted runner during emulator handling: the emulator reported no KVM access, ADB repeatedly reported `device offline`, and final cleanup failed with ADB exit code `224` after boot completed. The job was rerun once; at the time this document was written the rerun was still in progress. No code-level instrumentation failure has been observed in the available log.
 
-### Negative security suite
-The P0 suite explicitly exercises:
+Important exact-HEAD distinction: PR-triggered Build & Test checks out the synthetic merge commit `e707dc43e4b34060217c2319dccb5b3ef2022adb`, whose first parent is the requested release-candidate HEAD. The dedicated Android push workflow can validate the branch head directly. Evidence from a synthetic merge commit is never relabeled as exact-head evidence.
 
-- invalid nonce
-- reused nonce
-- expired nonce
-- invalid signature
-- altered signed payload / request ID
-- stale timestamp
-- revoked device
-- rotated device key
-- expired session
-- revoked session
-- missing scope
-- wrong role
-- explicit deny
-- direct unauthorized recommendation API call
-- cross-device event submission
-- duplicate event
-- sequence replay
+## P1 implementation/evidence status
 
-### Android instrumentation
-The full Build & Test workflow contains a dedicated `android-instrumentation` job using `reactivecircus/android-emulator-runner@v2` and `connectedDebugAndroidTest`. It is part of the release validation workflow rather than a documentation-only check.
+| P1 item | Status | Evidence / remaining gate |
+|---|---|---|
+| session refresh/revoke | IMPLEMENTED + TESTED | existing API tests cover refresh rotation/replay and revoke |
+| device rotate/revoke | PARTIAL | Android key lifecycle exists; server API lifecycle extension still requires production-path integration test |
+| entitlement engine | IMPLEMENTED + UNIT TESTED | deterministic fail-closed engine added |
+| billing runtime | IMPLEMENTED + UNIT TESTED | provider-neutral state machine; live Stripe intentionally excluded |
+| outbox | IMPLEMENTED + UNIT TESTED | deterministic state machine added |
+| worker manager | IMPLEMENTED + UNIT TESTED | retry/complete semantics tested |
+| RLS policies | IMPLEMENTED + POLICY TEST | explicit policies added; production context/role configuration remains an operational gate |
+| SCA/dependency report | AUTOMATED | exact-SHA P1 Evidence workflow produces pip/npm/Gradle artifacts |
+| reproducible deployment test | PARTIAL | container/deployment smoke is green; deterministic reproducibility needs a successful artifact comparison run |
+| performance/load baseline | AUTOMATED | existing regression guards + P1 evidence workflow capture output; full load profile remains separate |
+| backup/restore evidence | SMOKE ONLY | CI backup/restore smoke is green; production-level evidence still requires production-equivalent target access |
 
 ## Evidence rule
-This document records implementation intent and mapping only. It does not itself constitute a green gate. Final gate status must reference the exact GitHub Actions run for the final commit.
 
-## Remaining P1 audit scope
-The following remain separate P1 work unless exact runtime evidence is added: device/session lifecycle APIs beyond the currently implemented refresh/revoke flow, entitlement expansion, billing runtime/Stripe production configuration, outbox/worker manager, real RLS policy evidence, dependency/SCA report artifact, reproducible deployment test beyond smoke, performance baseline, operational alert evidence, and production backup/restore evidence.
+This document records implementation and evidence mapping only. It never turns a non-green or unavailable external gate into PASS. Every final gate must reference the exact commit and its actual CI/runtime artifact.
 
-Production credentials, live Stripe integrations, live infrastructure and external keystore secrets are intentionally not touched by this change set.
+## External boundaries
+
+Production credentials, live Stripe integrations, live infrastructure and external Android keystore secrets are intentionally not touched by repository automation. Gate A is independent and must be closed separately.

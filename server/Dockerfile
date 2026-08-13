@@ -29,14 +29,13 @@ ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
     TZ=UTC \
     PATH="/opt/venv/bin:$PATH"
 
-RUN addgroup --system sentinel && adduser --system --ingroup sentinel sentinel
 WORKDIR /app/server
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /build/server/app /app/server/app
 COPY --from=builder /build/server/migrations /app/server/migrations
 COPY --from=builder /build/server/migrate.py /app/server/migrate.py
 
-USER sentinel
+USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"
 

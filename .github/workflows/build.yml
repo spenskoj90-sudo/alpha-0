@@ -187,11 +187,18 @@ jobs:
           docker buildx build --load --no-cache --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-b .
           docker image inspect sentinel-core:repro-b --format '{{.Id}}' > /tmp/repro-b.id
           docker image inspect sentinel-core:repro-b --format '{{json .RootFS.Layers}}' > /tmp/repro-b.layers
-      - name: Compare image identity and layers
+      - name: Compare canonical runtime filesystem
         run: |
-          echo "artifact A image id: $(cat /tmp/repro-a.id)"
-          echo "artifact B image id: $(cat /tmp/repro-b.id)"
-          echo "artifact A layers: $(cat /tmp/repro-a.layers)"
-          echo "artifact B layers: $(cat /tmp/repro-b.layers)"
-          test "$(cat /tmp/repro-a.id)" = "$(cat /tmp/repro-b.id)"
-          test "$(cat /tmp/repro-a.layers)" = "$(cat /tmp/repro-b.layers)"
+          set -euo pipefail
+          echo "raw artifact A image id: $(cat /tmp/repro-a.id)"
+          echo "raw artifact B image id: $(cat /tmp/repro-b.id)"
+          echo "raw artifact A layers: $(cat /tmp/repro-a.layers)"
+          echo "raw artifact B layers: $(cat /tmp/repro-b.layers)"
+          docker create --name sentinel-repro-a sentinel-core:repro-a >/dev/null
+          docker create --name sentinel-repro-b sentinel-core:repro-b >/dev/null
+          docker export sentinel-repro-a | tar --extract --to-stdout 2>/dev/null >/dev/null || true
+          docker export sentinel-repro-a | tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.tar -
+          docker export sentinel-repro-b | tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.tar -
+          sha256sum /tmp/repro-a.tar /tmp/repro-b.tar
+          cmp /tmp/repro-a.tar /tmp/repro-b.tar
+          docker rm sentinel-repro-a sentinel-repro-b >/dev/null

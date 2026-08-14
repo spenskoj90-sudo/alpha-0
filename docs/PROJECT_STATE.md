@@ -10,19 +10,19 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical release-validation workflow:** `.github/workflows/build.yml` / **Build & Test**.
 
-## Exact HEAD / P0 / P1
+## Exact HEAD / validation state
 
-**Current exact HEAD:** `bf6f603b4725c8033bccfda879c51d3e7e765a09`.
+**Current exact HEAD:** `d75b4ead451d2a5d85388da4511e0d0d0ab73bc378`.
 
-The signing-code commit is `0809184a94c12ca3621ab25299b47c3c659bc621`, whose parent is exactly `8daa6545c9d4a4aaf68aa5da0e3a8d5e2e7364fe`. Machine comparison against that parent reports exactly one changed file, `.github/workflows/build.yml`, with exactly 2 additions and 2 deletions: only the two expected release-certificate fingerprint literals changed. No reproducible-deployment changes and no deployment gate were carried forward.
+**Validation run:** `31806890831` — Build & Test — checkout SHA `bf6f603b4725c8033bccfda879c51d3e7e765a09`.
 
-This HEAD adds only the state documentation commit after the clean signing commit.
+The clean signing commit is `0809184a94c12ca3621ab25299b47c3c659bc621`, parent `8daa6545c9d4a4aaf68aa5da0e3a8d5e2e7364fe`. Machine comparison against that parent reported exactly one changed file, `.github/workflows/build.yml`, with exactly 2 additions and 2 deletions: only the two expected release-certificate fingerprint literals. No reproducible-deployment changes and no deployment gate were carried forward.
 
-**P0:** validation pending. Current release certificate fingerprint: `86:CB:8D:8B:C5:A4:21:28:A3:8A:7A:0C:20:E6:05:25:C6:44:2B:AE:59:6B:FD:33:B0:B7:66:97:9C:72:D2:B4`.
+**P0: BLOCKED.** The canonical run reached Android signing validation and failed at **Keystore file and format validity** before store-password validation. `keytool -list` returned `java.io.EOFException`. The run's decode diagnostic reported `ANDROID_KEYSTORE_BASE64 length: 5406`, so the decoded byte stream is 4056 bytes after base64 padding. This is evidence of a malformed/truncated/incomplete keystore payload at decode/file level; it is not evidence of a password mismatch. No later signing or FTL evidence from this run is valid because those gates were skipped.
+
+**P1:** not revalidated on this exact validation state; do not infer GREEN from historical evidence.
 
 Required canonical chain: decode → keystore format → store password → alias → PrivateKeyEntry → certificate fingerprint → comparison → assembleRelease → apksigner → APK fingerprint → Firebase Test Lab.
-
-**P1:** not revalidated on this exact HEAD; do not infer GREEN from historical evidence.
 
 ## Workflow inventory
 
@@ -39,7 +39,7 @@ Required canonical chain: decode → keystore format → store password → alia
 
 ### Registered in GitHub but absent from the repository tree
 
-GitHub reports 14 registered workflows. Registered-but-absent from the repository tree include:
+GitHub reports 14 registered workflows. Registered-but-absent include:
 
 - `.github/workflows/ci.yml` — `sentinel-ci`
 - `.github/workflows/codeql.yml` — `SENTINEL CodeQL`
@@ -59,9 +59,9 @@ No branch is deleted in this pass.
 
 | Branch | Status / recommendation |
 |---|---|
-| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL** — points to this exact HEAD. |
-| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR** — candidate for deletion later; do not delete automatically. |
-| `main` | **BASE / decision point** — do not advance until release gates are green. |
+| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL**. |
+| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR**; candidate for deletion later, not deleted automatically. |
+| `main` | **BASE / decision point**; do not advance until release gates are green. |
 | `sentinel-1.0.0-rc1-final` | **OPEN PR HEAD**; PR #19 is open and draft. Explicit merge/close decision required. |
 | `p1-close-2026-08-13` | **STALE CANDIDATE**. |
 | `sentinel-fingerprint-diagnostic` | **STALE CANDIDATE**; temporary diagnostic line. |
@@ -76,7 +76,7 @@ No branch is deleted in this pass.
 ## Cleanup candidates — no deletion performed
 
 1. `.github/workflows/android-build.yml` should be compared with the Android portion of `build.yml`; if redundant, propose removal separately.
-2. Registered-but-absent workflows, especially `full-validation.yml`, `sentinel-full-validation.yml`, `ci.yml`, and temporary `fingerprint-diagnostic.yml`, should be retired/disabled only after explicit review of their history and triggers.
+2. Registered-but-absent workflows, especially `full-validation.yml`, `sentinel-full-validation.yml`, `ci.yml`, and temporary `fingerprint-diagnostic.yml`, should be retired/disabled only after explicit review of history and triggers.
 3. Stale branches above should be closed/deleted only after explicit approval.
 4. Historical reports/audits under `docs/` should be consolidated only after a repository-wide file inventory; no blind deletion.
 5. Committed APKs, build outputs, logs, or generated artifacts must be identified and proposed for removal if found; none are removed in this pass.

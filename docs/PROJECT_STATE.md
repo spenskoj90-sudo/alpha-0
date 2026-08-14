@@ -12,7 +12,7 @@ Single source of truth for current release-validation work. Update this file whe
 
 ## Exact HEAD / validation state
 
-**Current exact HEAD:** `d75b4ead451d2a5d85388da4511e0d0d0ab73bc378`.
+**Current exact HEAD:** `d75b4ead451d2a5d85388da4511e0d0ab73bc378`.
 
 **Validation run:** `31806890831` — Build & Test — checkout SHA `bf6f603b4725c8033bccfda879c51d3e7e765a09`.
 

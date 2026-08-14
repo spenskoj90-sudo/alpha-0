@@ -171,7 +171,7 @@ jobs:
           set -euo pipefail
           set +x
           keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-cert.txt"
-          actual="$(awk -F': ' '/^SHA256:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
+          actual="$(awk -F': ' '/^[[:space:]]*SHA256:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
           test -n "$actual"
           echo "Alias: $ANDROID_KEY_ALIAS"
           echo "Entry type: $(awk -F': ' '/^Entry type:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"

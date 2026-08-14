@@ -8,15 +8,15 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `sentinel-ftl-2026-08-13`
 
-Temporary repair branch: `sentinel-ftl-repair-2026-08-14`. It exists only to reconstruct the canonical branch cleanly after an erroneous workflow write; it is not a second development line.
-
 **Canonical release-validation workflow:** `.github/workflows/build.yml` / **Build & Test**.
 
 ## Exact HEAD / P0 / P1
 
-**Validation HEAD:** `0809184a94c12ca3621ab25299b47c3c659bc621`.
+**Current exact HEAD:** `bf6f603b4725c8033bccfda879c51d3e7e765a09`.
 
-Its parent is exactly `8daa6545c9d4a4aaf68aa5da0e3a8d5e2e7364fe`. Machine comparison reports exactly one changed file, `.github/workflows/build.yml`, with exactly 2 additions and 2 deletions: only the two expected release-certificate fingerprint literals changed. No reproducible-deployment changes and no deployment gate were carried forward.
+The signing-code commit is `0809184a94c12ca3621ab25299b47c3c659bc621`, whose parent is exactly `8daa6545c9d4a4aaf68aa5da0e3a8d5e2e7364fe`. Machine comparison against that parent reports exactly one changed file, `.github/workflows/build.yml`, with exactly 2 additions and 2 deletions: only the two expected release-certificate fingerprint literals changed. No reproducible-deployment changes and no deployment gate were carried forward.
+
+This HEAD adds only the state documentation commit after the clean signing commit.
 
 **P0:** validation pending. Current release certificate fingerprint: `86:CB:8D:8B:C5:A4:21:28:A3:8A:7A:0C:20:E6:05:25:C6:44:2B:AE:59:6B:FD:33:B0:B7:66:97:9C:72:D2:B4`.
 
@@ -59,9 +59,9 @@ No branch is deleted in this pass.
 
 | Branch | Status / recommendation |
 |---|---|
-| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL**. Move to the clean repaired HEAD after verification. |
-| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR**. Candidate for deletion after canonical ref is verified; do not delete automatically. |
-| `main` | **BASE / decision point**. Do not advance until release gates are green. |
+| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL** — points to this exact HEAD. |
+| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR** — candidate for deletion later; do not delete automatically. |
+| `main` | **BASE / decision point** — do not advance until release gates are green. |
 | `sentinel-1.0.0-rc1-final` | **OPEN PR HEAD**; PR #19 is open and draft. Explicit merge/close decision required. |
 | `p1-close-2026-08-13` | **STALE CANDIDATE**. |
 | `sentinel-fingerprint-diagnostic` | **STALE CANDIDATE**; temporary diagnostic line. |

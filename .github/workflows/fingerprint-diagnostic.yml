@@ -1,0 +1,55 @@
+name: Fingerprint Diagnostic
+
+on:
+  push:
+    branches: [sentinel-fingerprint-diagnostic]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, os, pathlib
+          raw = os.environ["ANDROID_KEYSTORE_BASE64"]
+          compact = "".join(raw.split())
+          padded = compact + ("=" * (-len(compact) % 4))
+          data = base64.b64decode(padded, validate=True)
+          pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks").write_bytes(data)
+          PY
+          chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
+      - name: Show exact SHA256 line
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          set +x
+          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-cert.txt"
+          echo '--- grep -i sha256 ---'
+          grep -i 'sha256' "$RUNNER_TEMP/release-cert.txt" || true
+          echo '--- cat -A matching lines ---'
+          grep -i 'sha256' "$RUNNER_TEMP/release-cert.txt" | cat -A || true
+          echo '--- numbered exact bytes ---'
+          python - <<'PY'
+          from pathlib import Path
+          p = Path(__import__('os').environ['RUNNER_TEMP']) / 'release-cert.txt'
+          for line in p.read_bytes().splitlines():
+              if b'sha256' in line.lower():
+                  print(repr(line))
+          PY
+      - name: Cleanup
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sentinel-release.jks" "$RUNNER_TEMP/release-cert.txt"

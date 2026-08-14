@@ -1,104 +1,94 @@
-# SENTINEL — Project State
+# SENTINEL — PROJECT STATE
 
-> Single source of truth for branch/workflow/validation state. Update this file whenever exact HEAD, P0/P1 status, or workflow structure changes.
+Single source of truth for current release-validation work. Update this file whenever exact HEAD, P0/P1 status, or workflow structure changes.
 
 **Last updated:** 2026-08-14
 
-## 1. Canonical working branch
+## Canonical branch
 
 **Canonical branch:** `sentinel-ftl-2026-08-13`
 
-**Current exact HEAD:** `82a6dd452a7079fe5f90d16db1e29d2e182ae400`
+Temporary repair branch: `sentinel-ftl-repair-2026-08-14`. It exists only to reconstruct the canonical branch cleanly after an erroneous workflow write; it is not a second development line.
 
-**HEAD commit:** `ci: add non-secret release password length diagnostics`
+**Canonical release-validation workflow:** `.github/workflows/build.yml` / **Build & Test**.
 
-**Branch disposition:** active integration/release-validation branch. Do not merge into `main` yet. After canonical release validation is green, move this work through a dedicated PR/merge decision. Do not delete branches as part of state maintenance.
+## Exact HEAD / P0 / P1
 
-## 2. Canonical release-validation workflow
+**Validation HEAD:** `0809184a94c12ca3621ab25299b47c3c659bc621`.
 
-**Canonical workflow:** `.github/workflows/build.yml` — **Build & Test**.
+Its parent is exactly `8daa6545c9d4a4aaf68aa5da0e3a8d5e2e7364fe`. Machine comparison reports exactly one changed file, `.github/workflows/build.yml`, with exactly 2 additions and 2 deletions: only the two expected release-certificate fingerprint literals changed. No reproducible-deployment changes and no deployment gate were carried forward.
 
-It is authoritative for current release validation. The Android job builds/tests debug, builds instrumentation APKs, decodes and validates the release keystore, validates password/alias/entry type, extracts and compares the release certificate fingerprint, assembles the signed release APK, verifies its signature/fingerprint, and uploads instrumentation artifacts. The workflow also runs repository verification, server core tests/coverage, PostgreSQL integration/recovery, Firebase Test Lab instrumentation, web build, Docker build, deployment smoke, and reproducible-container checks.
+**P0:** validation pending. Current release certificate fingerprint: `86:CB:8D:8B:C5:A4:21:28:A3:8A:7A:0C:20:E6:05:25:C6:44:2B:AE:59:6B:FD:33:B0:B7:66:97:9C:72:D2:B4`.
 
-### Workflow files present in the current HEAD
+Required canonical chain: decode → keystore format → store password → alias → PrivateKeyEntry → certificate fingerprint → comparison → assembleRelease → apksigner → APK fingerprint → Firebase Test Lab.
 
-| File | What it does | Status |
+**P1:** not revalidated on this exact HEAD; do not infer GREEN from historical evidence.
+
+## Workflow inventory
+
+### Workflow files present in the repository
+
+| Workflow | Role | Disposition |
 |---|---|---|
-| `.github/workflows/android-build.yml` | Android build/test CI. | Present; non-canonical parallel/legacy workflow. |
-| `.github/workflows/build.yml` | **Build & Test; canonical release-validation workflow.** | Present; authoritative. |
-| `.github/workflows/deploy.yml` | Deployment automation. | Present; separate workflow. |
-| `.github/workflows/p1-evidence.yml` | P1 SCA/dependency reports plus runtime/performance evidence and artifacts. | Present; evidence workflow. |
-| `.github/workflows/release.yml` | Release-oriented automation. | Present; separate release workflow. |
-| `.github/workflows/security.yml` | Security CI checks. | Present; separate security workflow. |
+| `.github/workflows/build.yml` | Build & Test; canonical release-validation chain including Android signing/fingerprint and FTL. | **USE / CANONICAL** |
+| `.github/workflows/android-build.yml` | Separate Android build/test CI. | **REVIEW / POSSIBLE DUPLICATE**; do not delete without explicit approval. |
+| `.github/workflows/deploy.yml` | Deployment automation. | **USE / SEPARATE**; not part of signing validation. |
+| `.github/workflows/p1-evidence.yml` | P1 evidence collection. | **USE / SEPARATE** |
+| `.github/workflows/release.yml` | Release automation. | **USE / SEPARATE** |
+| `.github/workflows/security.yml` | Security checks. | **USE / SEPARATE** |
 
-### Registered in GitHub but absent from current HEAD
+### Registered in GitHub but absent from the repository tree
 
-GitHub currently reports 14 registered workflows. The following registered workflows are not present in the current `.github/workflows/` tree:
+GitHub reports 14 registered workflows. Registered-but-absent from the repository tree include:
 
 - `.github/workflows/ci.yml` — `sentinel-ci`
 - `.github/workflows/codeql.yml` — `SENTINEL CodeQL`
 - `.github/workflows/dependency-review.yml` — `SENTINEL Dependency Review`
-- `.github/workflows/fingerprint-diagnostic.yml` — `Fingerprint Diagnostic` (temporary diagnostic workflow)
+- `.github/workflows/fingerprint-diagnostic.yml` — `Fingerprint Diagnostic`
 - `.github/workflows/full-validation.yml` — `SENTINEL Full Validation`
 - `.github/workflows/sentinel-backend-ci.yml` — `SENTINEL Backend CI`
 - `.github/workflows/sentinel-full-validation.yml` — `SENTINEL Full Validation`
 - `.github/workflows/server-e2e.yml` — `SENTINEL Server E2E`
 - `dynamic/dependabot/update-graph` — `Dependency Graph`
 
-Registered in GitHub does not mean present in the current HEAD; both states are recorded deliberately until obsolete workflows are formally retired.
+These are not deleted or disabled in this pass.
 
-## 3. Exact validation state / P0-P1
+## Branch inventory
 
-**Last confirmed exact HEAD:** `82a6dd452a7079fe5f90d16db1e29d2e182ae400`.
+No branch is deleted in this pass.
 
-### P0
-
-- **FIX COMMITTED; VALIDATION PENDING.**
-- Release certificate extraction parser is fixed and was previously proven against the actual `keytool -v` output: the certificate line contains leading whitespace before `SHA256:`.
-- Password, keystore decoding, alias, `PrivateKeyEntry`, certificate extraction, and keystore fingerprint comparison were confirmed by the preceding validation run on `1077801708fe7ff214faf6071d7593050345c1f6`.
-- That preceding run still failed at `assembleRelease` with `Get Key failed: Given final block not properly padded`.
-- This HEAD adds only non-secret password-length diagnostics immediately before `assembleRelease` to test the store-password/key-password mismatch hypothesis.
-- A successful canonical `Build & Test` run on this exact HEAD is still required before P0 can be marked GREEN.
-
-### P1
-
-- **NOT RE-VALIDATED on this exact HEAD.**
-- `.github/workflows/p1-evidence.yml` exists and defines the P1 evidence checks, but no new P1 evidence run on `82a6dd452a7079fe5f90d16db1e29d2e182ae400` is recorded here.
-- P1 therefore remains **pending current-HEAD validation** and must not be inferred GREEN from historical runs.
-
-### Latest canonical validation evidence
-
-Run `31794533213` on exact HEAD `1077801708fe7ff214faf6071d7593050345c1f6` passed keystore decode, store password, alias, entry type, certificate extraction, and certificate fingerprint comparison, but failed at `assembleRelease` while reading the private key. The new password-length diagnostics have not yet produced CI evidence.
-
-## 4. Branch inventory
-
-No branch is deleted by this state update.
-
-| Branch | Status |
+| Branch | Status / recommendation |
 |---|---|
-| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL** — current release validation. |
-| `sentinel-fingerprint-diagnostic` | **STALE / candidate for cleanup later** — temporary diagnostic branch. |
-| `main` | **BASE / merge decision point** — do not advance until release gates are green. |
-| `p1-close-2026-08-13` | **STALE / candidate for cleanup later**. |
-| `sentinel-1.0.0-rc1-final` | **STALE / candidate for cleanup later**. |
-| `sentinel/1.0.0-rc1-gates` | **STALE / candidate for cleanup later**. |
-| `sentinel-release-hardening-2026-08` | **STALE / candidate for cleanup later**. |
-| `security/public-release-hardening` | **STALE / candidate for cleanup later**. |
-| `agent/modernize-alpha0` | **STALE / candidate for cleanup later**. |
-| `agent/sentinel-complete-platform` | **STALE / candidate for cleanup later**. |
-| `automation/sentinel-pipeline` | **STALE / candidate for cleanup later**. |
-| `sentinel/full-stack-builder` | **STALE / candidate for cleanup later**. |
+| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL**. Move to the clean repaired HEAD after verification. |
+| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR**. Candidate for deletion after canonical ref is verified; do not delete automatically. |
+| `main` | **BASE / decision point**. Do not advance until release gates are green. |
+| `sentinel-1.0.0-rc1-final` | **OPEN PR HEAD**; PR #19 is open and draft. Explicit merge/close decision required. |
+| `p1-close-2026-08-13` | **STALE CANDIDATE**. |
+| `sentinel-fingerprint-diagnostic` | **STALE CANDIDATE**; temporary diagnostic line. |
+| `sentinel/1.0.0-rc1-gates` | **STALE CANDIDATE**. |
+| `sentinel-release-hardening-2026-08` | **STALE CANDIDATE**. |
+| `security/public-release-hardening` | **STALE CANDIDATE**. |
+| `agent/modernize-alpha0` | **STALE CANDIDATE**. |
+| `agent/sentinel-complete-platform` | **STALE CANDIDATE**. |
+| `automation/sentinel-pipeline` | **STALE CANDIDATE**. |
+| `sentinel/full-stack-builder` | **STALE CANDIDATE**. |
 
-## 5. Release keystore identity
+## Cleanup candidates — no deletion performed
 
-**Current release certificate SHA-256 fingerprint:**
+1. `.github/workflows/android-build.yml` should be compared with the Android portion of `build.yml`; if redundant, propose removal separately.
+2. Registered-but-absent workflows, especially `full-validation.yml`, `sentinel-full-validation.yml`, `ci.yml`, and temporary `fingerprint-diagnostic.yml`, should be retired/disabled only after explicit review of their history and triggers.
+3. Stale branches above should be closed/deleted only after explicit approval.
+4. Historical reports/audits under `docs/` should be consolidated only after a repository-wide file inventory; no blind deletion.
+5. Committed APKs, build outputs, logs, or generated artifacts must be identified and proposed for removal if found; none are removed in this pass.
 
-`60:52:36:AA:B5:EC:83:AC:86:EC:C7:38:FC:7F:18:EF:ED:8E:11:B9:FC:CB:B5:A9:74:59:D6:16:FF:AB:D9:9E`
+## Release keystore identity
 
-**Last key/keystore recreation date:** **2026-08-13**, supported by the current keystore's `keytool` creation date observed in CI. Passwords and key material are never recorded.
+**Current release certificate SHA-256:**
 
-## 6. Mandatory update rule
+`86:CB:8D:8B:C5:A4:21:28:A3:8A:7A:0C:20:E6:05:25:C6:44:2B:AE:59:6B:FD:33:B0:B7:66:97:9C:72:D2:B4`
 
-Whenever exact HEAD, P0/P1 status, workflow structure/canonical workflow, registered-vs-HEAD workflow inventory, release fingerprint, or branch disposition changes, update `docs/PROJECT_STATE.md` in the same commit or immediately in the next commit. Every genuine validation run must record its exact HEAD, workflow/run identifier, result, and P0/P1 impact.
+**Last recreation:** 2026-08-14, according to the owner's current keystore-recreation report. Passwords and key material are never recorded.
 
-This file supplements chat reports; it does not replace them.
+## Mandatory operating rule
+
+Whenever exact HEAD, P0/P1 status, or workflow structure changes, update this file in the same commit or immediately in the next commit. Every genuine validation run must record its exact HEAD, workflow/run identifier, result, and P0/P1 impact.

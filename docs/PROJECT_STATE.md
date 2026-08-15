@@ -18,7 +18,7 @@ Single source of truth for current release-validation work. Update this file whe
 
 The P1 run completed Python SCA, web SCA, Gradle dependency evidence, and the P1 runtime/performance suite successfully. The runtime/performance step executed 6 tests and passed 100%.
 
-**Latest release-validation run:** `31870519495` — checkout SHA `e070563e24b18e522d8a85f154a881942a8242cf` — all code/build/signing gates PASS through APK fingerprint verification. The descendant `34c3534a0a03c0a10e1740803cd44a1871a474c4` changes only this state document, so no application, signing, or workflow code differs from that validated release state.
+**Latest release-validation run before keystore rotation:** `31870519495` — checkout SHA `e070563e24b18e522d8a85f154a881942a8242cf` — all code/build/signing gates PASS through APK fingerprint verification using the previous release certificate. A new release keystore was then created atomically for backup/recovery purposes; the previous keystore was not considered defective.
 
 Required release chain: decode → keystore format → store password → alias → PrivateKeyEntry → certificate fingerprint → comparison → assembleRelease → apksigner → APK fingerprint → Android instrumentation.
 
@@ -28,8 +28,8 @@ Required release chain: decode → keystore format → store password → alias 
 
 | Item | Status | Evidence / note |
 |---|---|---|
-| Release keystore / signing | **VERIFIED** | Run `31870519495`: keystore format, store password, alias, PrivateKeyEntry, certificate fingerprint, assembleRelease and APK signature/fingerprint all PASS. |
-| APK fingerprint parser/comparison | **VERIFIED / CLOSED** | Parser fixed and normalization added; release validation run `31870519495` PASS. |
+| Release keystore / signing | **REVALIDATION REQUIRED** | New release keystore created intentionally for backup/recovery. GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` were updated. CI must now re-run the complete keystore → signing → apksigner → fingerprint chain against the new certificate. |
+| APK fingerprint parser/comparison | **VERIFIED / CLOSED** | Parser fixed and normalization added; previous release validation run `31870519495` PASS. |
 | Android instrumentation execution | **OPEN — INFRASTRUCTURE BLOCKED** | Firebase Test Lab is excluded because GCP billing/card is not acceptable; no self-hosted runner host exists or is planned. GitHub-hosted runners are VMs and nested virtualization is not officially supported, so no supported free hosted path is being claimed. This is not a P0/P1 code failure. |
 
 ### P1
@@ -54,9 +54,11 @@ Required release chain: decode → keystore format → store password → alias 
 
 **Current release certificate SHA-256:**
 
-`1D:3D:DF:15:A6:7F:BD:1F:D7:3F:A5:30:77:B7:AE:FE:3D:D3:AA:8F:1C:9A:A1:BD:08:DB:8E:99:3B:17:05:88`
+`2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`
 
-Passwords and private key material are never recorded here.
+**Rotation rationale:** the previous release keystore was fully working and already confirmed by CI. It was replaced only because its password existed solely inside a GitHub Secret and could not be extracted for a secure offline backup. The new keystore was generated atomically using the same verified method, with password backup completed immediately via GPG + Drive + KeePass. No further keystore recreation is planned.
+
+GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` have been updated to the new keystore. Passwords and private key material are never recorded here.
 
 ## Workflow inventory
 
@@ -105,11 +107,11 @@ No branches were deleted.
 
 ## Release verdict
 
-**VERDICT: ГОТОВ С ОГОВОРКАМИ.**
+**VERDICT: PENDING NEW-KEYSTORE CI VALIDATION.**
 
-The repository is **ready for the owner's own testing now**. Code/build/signing/P1 evidence is green. The only open validation item is Android instrumentation execution, blocked by external infrastructure constraints: no Firebase Test Lab because billing/card is not acceptable, no self-hosted runner host, and no supported GitHub-hosted nested-virtualization path is being claimed.
+The repository remains ready for the owner's own testing, but release signing evidence must be revalidated once against the newly backed-up keystore. The only infrastructure-open item remains Android instrumentation execution, blocked by external infrastructure constraints: no Firebase Test Lab because billing/card is not acceptable, no self-hosted runner host, and no supported GitHub-hosted nested-virtualization path is being claimed.
 
-This infrastructure limitation does not represent a P0/P1 code failure and does not invalidate the successful release APK/signing evidence.
+This keystore rotation is an operational backup/recovery change, not a code defect correction. The new certificate is the expected release identity for all subsequent signing evidence.
 
 ## Mandatory operating rule
 

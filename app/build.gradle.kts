@@ -15,6 +15,12 @@ android {
         versionCode = 10001
         versionName = "1.0.0-RC1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${project.findProperty("sentinelApiBaseUrl") ?: "http://10.0.2.2:8080/"}\"")
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
     }
 
     signingConfigs {
@@ -29,39 +35,37 @@ android {
         }
     }
 
-    buildFeatures { compose = true }
+    // Keep release signing secrets out of ordinary debug/unit-test configuration.
+    // For release tasks they are read during project evaluation, before the Android
+    // plugin has finalized the signing config; this avoids late mutation errors.
+    val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
+    val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
+    val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
+    val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
+
+    val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
+        taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
+    }
+
+    if (releaseRequested) {
+        val keystorePath = androidKeystorePath.orNull
+            ?: error("ANDROID_KEYSTORE_PATH is required for release signing")
+        val keystorePassword = androidKeystorePassword.orNull
+            ?: error("ANDROID_KEYSTORE_PASSWORD is required for release signing")
+        val keyAlias = androidKeyAlias.orNull
+            ?: error("ANDROID_KEY_ALIAS is required for release signing")
+        val keyPassword = androidKeyPassword.orNull
+            ?: error("ANDROID_KEY_PASSWORD is required for release signing")
+
+        val ciRelease = android.signingConfigs.getByName("ciRelease")
+        ciRelease.storeFile = file(keystorePath)
+        ciRelease.storePassword = keystorePassword
+        ciRelease.keyAlias = keyAlias
+        ciRelease.keyPassword = keyPassword
+    }
+
+    kotlin { jvmToolchain(17) }
 }
-
-// Keep release signing secrets out of ordinary debug/unit-test configuration.
-// For release tasks they are read during project evaluation, before the Android
-// plugin has finalized the signing config; this avoids late mutation errors.
-val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
-val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
-val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
-val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
-
-val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
-    taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
-}
-
-if (releaseRequested) {
-    val keystorePath = androidKeystorePath.orNull
-        ?: error("ANDROID_KEYSTORE_PATH is required for release signing")
-    val keystorePassword = androidKeystorePassword.orNull
-        ?: error("ANDROID_KEYSTORE_PASSWORD is required for release signing")
-    val keyAlias = androidKeyAlias.orNull
-        ?: error("ANDROID_KEY_ALIAS is required for release signing")
-    val keyPassword = androidKeyPassword.orNull
-        ?: error("ANDROID_KEY_PASSWORD is required for release signing")
-
-    val ciRelease = android.signingConfigs.getByName("ciRelease")
-    ciRelease.storeFile = file(keystorePath)
-    ciRelease.storePassword = keystorePassword
-    ciRelease.keyAlias = keyAlias
-    ciRelease.keyPassword = keyPassword
-}
-
-kotlin { jvmToolchain(17) }
 
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.01.00")

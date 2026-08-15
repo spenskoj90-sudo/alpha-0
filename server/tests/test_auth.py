@@ -14,10 +14,12 @@ def test_register_creates_hashed_user_session():
     body = response.json()
     assert body["session_token"]
     assert body["refresh_token"]
+    assert set(body["scopes"]) == {"character:read", "game:read", "audit:read"}
     record = store.get_session(body["session_token"])
     assert record is not None
     assert record["user_id"] == email
     assert record["device_id"] is None
+    assert "game:write" not in record["scopes"]
 
 
 def test_login_issues_user_session_and_wrong_password_denies():
@@ -50,7 +52,7 @@ def test_short_password_is_rejected():
     assert response.status_code == 422
 
 
-def test_user_session_can_refresh_and_revoke():
+def test_user_session_can_refresh_and_revoke_without_scope_escalation():
     response = client.post(
         "/v1/auth/register",
         json={"email": "auth-session@example.com", "password": "Correct-Horse-Battery-Staple-999"},
@@ -59,7 +61,12 @@ def test_user_session_can_refresh_and_revoke():
     body = response.json()
     refreshed = client.post("/v1/sessions/refresh", json={"refresh_token": body["refresh_token"]})
     assert refreshed.status_code == 200
+    assert set(refreshed.json()["scopes"]) == {"character:read", "game:read", "audit:read"}
     new_token = refreshed.json()["session_token"]
+    record = store.get_session(new_token)
+    assert record is not None
+    assert record["device_id"] is None
+    assert "game:write" not in record["scopes"]
     revoked = client.post("/v1/sessions/revoke", headers={"Authorization": f"Bearer {new_token}"})
     assert revoked.status_code == 200
     assert client.post("/v1/sessions/revoke", headers={"Authorization": f"Bearer {new_token}"}).status_code == 401

@@ -15,7 +15,7 @@ android {
         versionCode = 10001
         versionName = "1.0.0-RC1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${project.findProperty("sentinelApiBaseUrl") ?: "http://10.0.2.2:8080/"}\"")
+        buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
     }
 
     buildFeatures {

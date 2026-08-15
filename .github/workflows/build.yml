@@ -240,6 +240,9 @@ jobs:
 
   android-instrumentation:
     name: Android instrumentation (Firebase Test Lab)
+    if: ${{ false }}
+    # Intentionally skipped by design: Firebase Test Lab requires GCP billing/card,
+    # and no self-hosted Android emulator host is available or planned.
     runs-on: ubuntu-latest
     needs: [android]
     timeout-minutes: 30

@@ -3,13 +3,34 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ErrorResponse(BaseModel):
     code: str
     message: str
     request_id: str
+
+
+class UserCredentials(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=12, max_length=256)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized or normalized.startswith("@") or normalized.endswith("@"):
+            raise ValueError("INVALID_EMAIL")
+        return normalized
+
+
+class RegisterRequest(UserCredentials):
+    pass
+
+
+class LoginRequest(UserCredentials):
+    pass
 
 
 class DeviceRegisterRequest(BaseModel):
@@ -80,7 +101,7 @@ class Recommendation(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    recommendations: list[Recommendation] = Field(max_length=20)
+    recommendations: list[Recommendation]
 
 
 class AdminEntitlementRequest(BaseModel):

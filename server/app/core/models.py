@@ -101,7 +101,7 @@ class Recommendation(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
-    recommendations: list[Recommendation]
+    recommendations: list[Recommendation] = Field(max_length=20)
 
 
 class AdminEntitlementRequest(BaseModel):

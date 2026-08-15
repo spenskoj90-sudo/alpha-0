@@ -48,15 +48,15 @@ class AuthApi(private val baseUrl: String) {
                 val access = json.optString("session_token")
                 val refresh = json.optString("refresh_token")
                 if (access.isBlank() || refresh.isBlank()) {
-                    Failure("AUTH_RESPONSE_INVALID")
+                    Result.Failure("AUTH_RESPONSE_INVALID")
                 } else {
-                    Success(Session(access, refresh, scopes))
+                    Result.Success(Session(access, refresh, scopes))
                 }
             } else {
-                Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${connection.responseCode}")
+                Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${connection.responseCode}")
             }
         } catch (_: IOException) {
-            Failure("NETWORK_ERROR")
+            Result.Failure("NETWORK_ERROR")
         } finally {
             connection.disconnect()
         }

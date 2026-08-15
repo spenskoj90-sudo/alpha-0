@@ -198,7 +198,7 @@ def register_user(payload: RegisterRequest, request: Request):
     try:
         user_id = user_store.register(payload.email, payload.password)
     except Exception as exc:
-        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+        if "EMAIL_ALREADY_REGISTERED" in str(exc) or "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
         raise
     access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)

@@ -202,6 +202,8 @@ def register_user(payload: RegisterRequest, request: Request):
             raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
         raise
     access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
+    scopes = ["character:read", "game:read", "audit:read"]
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
 
@@ -213,6 +215,8 @@ def login_user(payload: LoginRequest, request: Request):
     if not user_id:
         raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
     access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
+    scopes = ["character:read", "game:read", "audit:read"]
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:login", "resource": "session", "decision": "ALLOW", "reason_code": "CREDENTIALS_VALID", "request_id": request_id(request)})
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
 

@@ -6,15 +6,21 @@ The running FastAPI service publishes OpenAPI at `/openapi.json` and Swagger UI 
 
 - `GET /healthz`
 
+## User authentication
+
+- `POST /v1/auth/register` — create an account with an email and password; returns a user session.
+- `POST /v1/auth/login` — authenticate an existing account and issue a user session.
+- User passwords are stored only as salted scrypt password hashes.
+- User sessions have a nullable device binding and receive only non-device scopes until device proof succeeds.
+
 ## Device identity
 
-- `POST /v1/devices/register` — user-bound enrollment, public-key fingerprint validation.
-- `POST /v1/devices/{device_id}/challenge` — issue a one-time challenge.
-- `POST /v1/devices/{device_id}/prove` — P-256 signed challenge proof and opaque session issuance.
+- `POST /v1/devices/register` — authenticated user-bound enrollment, public-key fingerprint validation. The legacy enrollment-token path remains supported for non-user bootstrap flows.
+- `POST /v1/devices/{device_id}/prove` — P-256 signed challenge proof and opaque device-bound session issuance.
 
 ## Sessions
 
-- `POST /v1/sessions/refresh` — one-time refresh rotation.
+- `POST /v1/sessions/refresh` — one-time refresh rotation; user sessions retain their least-privilege scope set.
 - `POST /v1/sessions/revoke` — revoke the current access session.
 
 ## Authorization and events

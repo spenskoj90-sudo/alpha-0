@@ -215,9 +215,11 @@ jobs:
           test -x "$apksigner"
           "$apksigner" verify --verbose --print-certs "$apk"
           actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
+          expected_norm="$(printf '%s' "$expected" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           echo "EXPECTED: $expected"
           echo "ACTUAL:   $actual"
-          if [ "$actual" != "$expected" ]; then
+          if [ "$actual_norm" != "$expected_norm" ]; then
             echo "APK fingerprint comparison: FAIL"
             exit 1
           fi

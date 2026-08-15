@@ -182,7 +182,7 @@ jobs:
       - name: Compare keystore certificate fingerprint
         run: |
           set -euo pipefail
-          expected="1D:3D:DF:15:A6:7F:BD:1F:D7:3F:A5:30:77:B7:AE:FE:3D:D3:AA:8F:1C:9A:A1:BD:08:DB:8E:99:3B:17:05:88"
+          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
           actual="$(cat "$RUNNER_TEMP/release-fingerprint.txt")"
           expected="$(printf '%s' "$expected" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
           actual="$(printf '%s' "$actual" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
@@ -208,7 +208,7 @@ jobs:
       - name: Verify release APK signature and fingerprint
         run: |
           set -euo pipefail
-          expected="1D:3D:DF:15:A6:7F:BD:1F:D7:3F:A5:30:77:B7:AE:FE:3D:D3:AA:8F:1C:9A:A1:BD:08:DB:8E:99:3B:17:05:88"
+          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
           apk="app/build/outputs/apk/release/app-release.apk"
           test -f "$apk"
           apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"

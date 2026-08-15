@@ -25,10 +25,12 @@ from app.core.models import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
     EventBatchRequest,
+    LoginRequest,
     Recommendation,
     RecommendationRequest,
     RecommendationResponse,
     RefreshRequest,
+    RegisterRequest,
     SessionResponse,
 )
 from app.core.security import (
@@ -42,6 +44,7 @@ from app.core.security import (
     verify_p256_signature,
 )
 from app.core.store import MemoryStore, PostgresStore, Store
+from app.core.user_store import UserAccountStore
 from app.core.wow_api import router as wow_router
 
 APP_VERSION = "1.0.0-rc1"
@@ -83,6 +86,7 @@ async def security_headers(request: Request, call_next):
 
 
 store: Store = PostgresStore(DATABASE_URL) if DATABASE_URL else MemoryStore()
+user_store = UserAccountStore(DATABASE_URL)
 policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "character:read", "character:*", scopes=frozenset({"character:read"})),
     Policy(Decision.ALLOW, "event:write", "game:event", scopes=frozenset({"game:write"})),
@@ -188,24 +192,57 @@ def healthz() -> dict[str, Any]:
     return {"status": "UP", "version": APP_VERSION}
 
 
+@app.post("/v1/auth/register", response_model=SessionResponse)
+def register_user(payload: RegisterRequest, request: Request):
+    rate_limit(request, "auth-register")
+    try:
+        user_id = user_store.register(payload.email, payload.password)
+    except Exception as exc:
+        if "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
+        raise
+    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/auth/login", response_model=SessionResponse)
+def login_user(payload: LoginRequest, request: Request):
+    rate_limit(request, "auth-login")
+    user_id = user_store.authenticate(payload.email, payload.password)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:login", "resource": "session", "decision": "ALLOW", "reason_code": "CREDENTIALS_VALID", "request_id": request_id(request)})
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
 @app.post("/v1/devices/register", response_model=DeviceRegisterResponse)
 def register_device(
     payload: DeviceRegisterRequest,
     request: Request,
+    authorization_header: str | None = Header(default=None, alias="Authorization"),
     x_enrollment_token: str | None = Header(default=None, alias="X-Enrollment-Token"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ):
     rid = request_id(request, x_request_id)
     rate_limit(request, "device-register")
-    require_enrollment(x_enrollment_token, payload.user_id)
+    if authorization_header:
+        principal = principal_from_token(require_bearer(authorization_header))
+        user_id = principal.user_id
+        if payload.user_id != user_id:
+            raise HTTPException(status_code=403, detail="USER_SCOPE_MISMATCH")
+    else:
+        user_id = payload.user_id
+        require_enrollment(x_enrollment_token, user_id)
     try:
         fingerprint = fingerprint_public_key(payload.public_key_der_b64)
     except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
     if fingerprint.lower() != payload.fingerprint_sha256.lower():
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
-    challenge = __import__("secrets").token_urlsafe(32)
-    device_id = store.register_device(payload.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    challenge = secrets.token_urlsafe(32)
+    device_id = store.register_device(user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 

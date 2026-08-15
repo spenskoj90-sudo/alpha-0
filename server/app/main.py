@@ -276,7 +276,11 @@ def refresh_session(payload: RefreshRequest):
     result = store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
     if not result:
         raise HTTPException(status_code=401, detail="INVALID_REFRESH")
-    access, refresh, expires_at, scopes, _ = result
+    access, refresh, expires_at, scopes, previous = result
+    if previous.get("device_id") is None:
+        user_scopes = {"character:read", "game:read", "audit:read"}
+        user_store.restrict_session_scopes(store, access, user_scopes)
+        scopes = sorted(user_scopes)
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
 
 

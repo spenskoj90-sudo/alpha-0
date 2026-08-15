@@ -214,7 +214,7 @@ jobs:
           apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
           test -x "$apksigner"
           "$apksigner" verify --verbose --print-certs "$apk"
-          actual="$("$apksigner" verify --print-certs "$apk" | awk -F': ' '/SHA-256 digest:/{print $2; exit}')"
+          actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
           echo "EXPECTED: $expected"
           echo "ACTUAL:   $actual"
           if [ "$actual" != "$expected" ]; then

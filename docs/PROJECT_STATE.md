@@ -8,17 +8,23 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical release-validation branch:** `sentinel-ftl-2026-08-13`.
 
-**Current evidence HEAD:** `34c3534a0a03c0a10e1740803cd44a1871a474c4` on `sentinel-1.0.0-rc1-final` (PR #19). This commit is docs-only relative to the release-validation code state; the release-validation evidence below was produced on its immediate code predecessor `e070563e24b18e522d8a85f154a881942a8242cf`.
+**Current evidence HEAD:** `34c3534a0a03c0a10e1740803cd44a1871a474c4` on `sentinel-1.0.0-rc1-final` (PR #19). Subsequent commits update only CI/docs state for release-key rotation.
 
 **Canonical release-validation workflow:** `.github/workflows/build.yml` / **Build & Test**.
 
 ## Exact validation state
 
-**P1 Evidence run:** `31871298252` — checkout SHA `34c3534a0a03c0a10e1740803cd44a1871a474c4` — **PASS**.
+**P1 Evidence run:** `31874460989` — **PASS**.
 
-The P1 run completed Python SCA, web SCA, Gradle dependency evidence, and the P1 runtime/performance suite successfully. The runtime/performance step executed 6 tests and passed 100%.
+**Security run:** `31874461060` — **PASS**.
 
-**Latest release-validation run before keystore rotation:** `31870519495` — checkout SHA `e070563e24b18e522d8a85f154a881942a8242cf` — all code/build/signing gates PASS through APK fingerprint verification using the previous release certificate. A new release keystore was then created atomically for backup/recovery purposes; the previous keystore was not considered defective.
+**ALPHA-0 Android CI run:** `31874461061` — **PASS**.
+
+**New-keystore Build & Test run:** `31874461048` — **FAIL at keystore format validation**. The Android job successfully completed debug build, unit tests, and instrumentation APK assembly, then decoded `ANDROID_KEYSTORE_BASE64` but `keytool -list` failed with `java.io.EOFException` at the keystore format step. Therefore store-password validation, alias validation, PrivateKeyEntry validation, release assembly, apksigner verification, and fingerprint comparison were not reached in this run.
+
+The CI log reported `ANDROID_KEYSTORE_BASE64 length: 5738`. The secret value is syntactically valid Base64 because the decode step succeeded, but the resulting byte stream is not accepted as a complete keystore by `keytool`. This is an **infrastructure/secret-material validation failure**, not evidence of an application-code failure.
+
+**Previous release-validation run:** `31870519495` — checkout SHA `e070563e24b18e522d8a85f154a881942a8242cf` — all code/build/signing gates PASS through APK fingerprint verification using the previous release certificate. The previous keystore was fully working and was replaced only for backup/recovery reasons.
 
 Required release chain: decode → keystore format → store password → alias → PrivateKeyEntry → certificate fingerprint → comparison → assembleRelease → apksigner → APK fingerprint → Android instrumentation.
 
@@ -28,27 +34,27 @@ Required release chain: decode → keystore format → store password → alias 
 
 | Item | Status | Evidence / note |
 |---|---|---|
-| Release keystore / signing | **REVALIDATION REQUIRED** | New release keystore created intentionally for backup/recovery. GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` were updated. CI must now re-run the complete keystore → signing → apksigner → fingerprint chain against the new certificate. |
-| APK fingerprint parser/comparison | **VERIFIED / CLOSED** | Parser fixed and normalization added; previous release validation run `31870519495` PASS. |
+| Release keystore / signing | **OPEN — NEW SECRET MATERIAL NOT VALIDATED** | New keystore fingerprint is recorded below and expected in both signing comparison points in `build.yml`. CI run `31874461048` decoded the secret successfully but `keytool -list` returned `java.io.EOFException`, so the new keystore cannot yet be certified by CI. |
+| APK fingerprint parser/comparison | **VERIFIED / CLOSED** | Parser fixed and normalization added; previous release validation run `31870519495` PASS. New-keystore comparison has not been reached because keystore format validation failed first. |
 | Android instrumentation execution | **OPEN — INFRASTRUCTURE BLOCKED** | Firebase Test Lab is excluded because GCP billing/card is not acceptable; no self-hosted runner host exists or is planned. GitHub-hosted runners are VMs and nested virtualization is not officially supported, so no supported free hosted path is being claimed. This is not a P0/P1 code failure. |
 
 ### P1
 
 | Item | Status | Evidence |
 |---|---|---|
-| Session refresh / revoke | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| Device rotate / revoke | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| Entitlement engine | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| Billing state machine | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| Outbox | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| Worker manager | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| RLS policies | **PASS*** | P1 Evidence run `31871298252` — aggregate P1 runtime/performance suite PASS. |
-| SCA / dependency report | **PASS** | Python SCA, web SCA and Gradle dependency evidence completed successfully in `31871298252`. |
-| Performance baseline | **PASS** | P1 runtime/performance suite in `31871298252` passed all 6 tests. |
-| Reproducible deployment | **PASS** | `31870519495`: reproducible container build comparison PASS. |
-| Production backup/restore smoke | **PASS** | `31870519495`: PostgreSQL backup and restore smoke test PASS. Production-level backup/restore remains outside scope. |
+| Session refresh / revoke | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| Device rotate / revoke | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| Entitlement engine | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| Billing state machine | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| Outbox | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| Worker manager | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| RLS policies | **PASS*** | P1 Evidence run `31874460989` — aggregate P1 runtime/performance suite PASS. |
+| SCA / dependency report | **PASS** | P1 Evidence run `31874460989` completed successfully. |
+| Performance baseline | **PASS** | P1 Evidence run `31874460989` passed. |
+| Reproducible deployment | **PASS** | Build & Test run `31874461048` passed the reproducible container build comparison. |
+| Production backup/restore smoke | **PASS** | Build & Test run `31874461048` passed PostgreSQL backup/restore smoke. Production-level backup/restore remains outside scope. |
 
-`*` The P1 workflow exposes the aggregate runtime/performance suite as one CI step; its log does not publish one separate GitHub job per named functional sub-item. No historical run is being substituted for the current P1 run.
+`*` The P1 workflow exposes the aggregate runtime/performance suite as one CI step; its log does not publish one separate GitHub job per named functional sub-item.
 
 ## Release certificate
 
@@ -58,7 +64,7 @@ Required release chain: decode → keystore format → store password → alias 
 
 **Rotation rationale:** the previous release keystore was fully working and already confirmed by CI. It was replaced only because its password existed solely inside a GitHub Secret and could not be extracted for a secure offline backup. The new keystore was generated atomically using the same verified method, with password backup completed immediately via GPG + Drive + KeePass. No further keystore recreation is planned.
 
-GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` have been updated to the new keystore. Passwords and private key material are never recorded here.
+GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` were updated to the new keystore. The current CI result means the stored Base64 material is not yet accepted by `keytool` as a complete keystore; revalidate the secret payload against the local backed-up keystore before any further code change. Passwords and private key material are never recorded here.
 
 ## Workflow inventory
 
@@ -107,11 +113,13 @@ No branches were deleted.
 
 ## Release verdict
 
-**VERDICT: PENDING NEW-KEYSTORE CI VALIDATION.**
+**VERDICT: NOT YET RELEASE-SIGNED BY NEW KEYSTORE.**
 
-The repository remains ready for the owner's own testing, but release signing evidence must be revalidated once against the newly backed-up keystore. The only infrastructure-open item remains Android instrumentation execution, blocked by external infrastructure constraints: no Firebase Test Lab because billing/card is not acceptable, no self-hosted runner host, and no supported GitHub-hosted nested-virtualization path is being claimed.
+The codebase itself remains healthy: P1, security, Android CI, repository verification, core tests, PostgreSQL, web, container, reproducibility, and deployment smoke all pass on the new CI cycle. However, the new release keystore has **not** passed the first cryptographic validation gate because the GitHub Secret decodes to a byte stream that `keytool` rejects with `java.io.EOFException`.
 
-This keystore rotation is an operational backup/recovery change, not a code defect correction. The new certificate is the expected release identity for all subsequent signing evidence.
+This is not a reason to recreate the keystore again. The correct next action is to verify/rewrite the three GitHub Secret values from the already-backed-up keystore/password material, then rerun the exact same CI chain. No application-code change is indicated by the failure.
+
+Android instrumentation remains separately **OPEN — infrastructure blocked** as previously established.
 
 ## Mandatory operating rule
 

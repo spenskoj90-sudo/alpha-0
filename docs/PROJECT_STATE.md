@@ -1,134 +1,142 @@
 # SENTINEL — PROJECT STATE
 
-Single source of truth for current release-validation work. Update this file whenever exact HEAD, P0/P1 status, or workflow structure changes.
+Single source of truth for release-validation, repository hygiene, and owner-testing readiness.
 
 **Last updated:** 2026-08-15
 
-## Canonical branch
+## Canonical branches / evidence
 
-**Canonical release-validation branch:** `sentinel-ftl-2026-08-13`.
+- **Canonical release-validation branch:** `sentinel-ftl-2026-08-13`.
+- **Current evidence branch:** `sentinel-1.0.0-rc1-final` (PR #19).
+- **Latest application/workflow evidence HEAD:** `8aefde75cfa000d4688a65631f18c9e75ef51834`.
+- Documentation-only updates may advance the branch HEAD; they do not replace the exact code/workflow HEAD cited by validation evidence.
+- `main` remains the base/decision point; no branch deletion or merge was performed.
 
-**Current evidence HEAD:** `8aefde75cfa000d4688a65631f18c9e75ef51834` on `sentinel-1.0.0-rc1-final` (PR #19). This commit only changes the Firebase Test Lab job from executable to explicitly skipped-by-design; application code, keystore material, signing configuration, and release fingerprint are unchanged.
+## Canonical workflow
 
-**Canonical release-validation workflow:** `.github/workflows/build.yml` / **Build & Test**.
+`.github/workflows/build.yml` / **Build & Test** is the canonical release-validation workflow.
 
-## Exact validation state
+## Validation evidence
 
-**Build & Test run:** `31877362872` — checkout SHA `8aefde75cfa000d4688a65631f18c9e75ef51834` — **PASS**.
+- Build & Test `31877362872` — checkout SHA `8aefde75cfa000d4688a65631f18c9e75ef51834` — **PASS**.
+- P1 Evidence `31877362864` — same checkout SHA — **PASS**.
+- Security `31877362868` — **PASS**.
+- ALPHA-0 Android CI `31877362869` — **PASS**.
 
-**P1 Evidence run:** `31877362864` — checkout SHA `8aefde75cfa000d4688a65631f18c9e75ef51834` — **PASS**.
+The Build & Test Android release chain passed on the exact evidence HEAD: debug build, unit tests, instrumentation APK build, keystore Base64 decode, PKCS12 format, store password, alias, PrivateKeyEntry, certificate fingerprint, fingerprint comparison, assembleRelease, apksigner verification/fingerprint, cleanup and artifact upload.
 
-**Security run:** `31877362868` — **PASS**.
+Firebase Test Lab is **not used**. Android instrumentation through external CI remains **OPEN — infrastructure blocked / deferred by decision**. No GCP billing/card, no self-hosted runner host, and no supported free hosted nested-virtualization path is available/planned. This is not a P0/P1 code failure.
 
-**ALPHA-0 Android CI run:** `31877362869` — **PASS**.
-
-The Build & Test Android job passed the complete release chain on this exact HEAD: debug build → unit tests → instrumentation APK → Base64 decode → keystore format → store password → alias → PrivateKeyEntry → certificate fingerprint → fingerprint comparison → assembleRelease → apksigner verification/fingerprint → cleanup/artifact upload.
-
-The Firebase Test Lab job is explicitly skipped by job-level conditional and completed with conclusion `skipped`. GitHub treats a conditionally skipped job as a successful status for required-check purposes, so the Build & Test workflow itself is green without falsely claiming that Android instrumentation executed. citeturn2search0turn2search1
-
-## P0 / P1 status
-
-### P0 / release gates
-
-| Item | Status | Evidence / note |
-|---|---|---|
-| Repository verification | **PASS** | Build & Test `31877362872` |
-| Core tests / coverage | **PASS** | Build & Test `31877362872` |
-| PostgreSQL integration + recovery | **PASS** | Build & Test `31877362872`; backup/restore smoke PASS |
-| Web build | **PASS** | Build & Test `31877362872` |
-| Container build | **PASS** | Build & Test `31877362872` |
-| Deployment smoke / health | **PASS** | Build & Test `31877362872` |
-| Reproducible container build comparison | **PASS** | Build & Test `31877362872` |
-| Release keystore / signing | **PASS** | Exact HEAD `8aefde75...`; store password, alias, PrivateKeyEntry and release signing all PASS |
-| APK fingerprint parser / comparison | **PASS / CLOSED** | Exact HEAD `8aefde75...`; apksigner fingerprint comparison PASS |
-| Android instrumentation execution | **OPEN — INFRASTRUCTURE BLOCKED / SKIPPED BY DESIGN** | Firebase Test Lab is excluded because GCP billing/card is not acceptable; no self-hosted host exists or is planned; no supported free GitHub-hosted nested-virtualization path is claimed. The FTL job is now explicitly skipped so it does not produce a false CI failure. This is not a P0/P1 code failure. |
-
-### P1
+## P0 / release gates
 
 | Item | Status | Evidence |
 |---|---|---|
-| Session refresh / revoke | **PASS*** | P1 Evidence `31877362864` |
-| Device rotate / revoke | **PASS*** | P1 Evidence `31877362864` |
-| Entitlement engine | **PASS*** | P1 Evidence `31877362864` |
-| Billing state machine | **PASS*** | P1 Evidence `31877362864` |
-| Outbox | **PASS*** | P1 Evidence `31877362864` |
-| Worker manager | **PASS*** | P1 Evidence `31877362864` |
-| RLS policies | **PASS*** | P1 Evidence `31877362864` |
-| SCA / dependency report | **PASS** | P1 Evidence `31877362864` |
-| Performance baseline | **PASS** | P1 Evidence `31877362864` |
-| Reproducible deployment | **PASS** | Build & Test `31877362872` |
-| Production backup/restore smoke | **PASS** | Build & Test `31877362872`; production-level backup/restore remains outside scope |
+| Repository verification | PASS | Build & Test `31877362872` |
+| Core tests / coverage | PASS | Build & Test `31877362872` |
+| PostgreSQL integration + recovery | PASS | Build & Test `31877362872` |
+| Web build | PASS | Build & Test `31877362872` |
+| Container build | PASS | Build & Test `31877362872` |
+| Deployment smoke / health | PASS | Build & Test `31877362872` |
+| Reproducible container comparison | PASS | Build & Test `31877362872` |
+| Release keystore / signing | PASS | Exact evidence HEAD `8aefde75...` |
+| APK fingerprint parser / comparison | PASS / CLOSED | Exact evidence HEAD `8aefde75...` |
+| Android instrumentation execution | OPEN — infrastructure blocked | Firebase/Selectel path deferred; not a code failure |
 
-`*` The P1 workflow exposes the aggregate runtime/performance suite as one CI step; it does not publish one separate GitHub job per named functional sub-item. The current evidence is nevertheless from the exact current HEAD and is not historical substitution.
+## P1
 
-## Release certificate
+| Item | Status | Evidence |
+|---|---|---|
+| Session refresh / revoke | PASS | P1 Evidence `31877362864` |
+| Device rotate / revoke | PASS | P1 Evidence `31877362864` |
+| Entitlement engine | PASS | P1 Evidence `31877362864` |
+| Billing state machine | PASS | P1 Evidence `31877362864` |
+| Outbox | PASS | P1 Evidence `31877362864` |
+| Worker manager | PASS | P1 Evidence `31877362864` |
+| RLS policies | PASS | P1 Evidence `31877362864` |
+| SCA / dependency report | PASS | P1 Evidence `31877362864` |
+| Performance baseline | PASS | P1 Evidence `31877362864` |
+| Reproducible deployment | PASS | Build & Test `31877362872` |
+| Production backup/restore smoke | PASS | Build & Test `31877362872`; production-level operation remains outside scope |
 
-**Current release certificate SHA-256:**
+The P1 workflow provides aggregate runtime/performance evidence rather than a separate job for every named sub-item; the cited run is nevertheless on the exact evidence HEAD.
+
+## Release certificate / signing
+
+Current release certificate SHA-256:
 
 `2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`
 
-**Rotation rationale:** the previous release keystore was fully working and already confirmed by CI. It was replaced only because its password existed solely inside a GitHub Secret and could not be extracted for a secure offline backup. The fifth keystore was generated atomically using the verified method, and its password was backed up immediately via GPG + Drive + KeePass. No further keystore recreation is planned.
+The fifth keystore was created atomically because the fourth keystore password could not be safely exported for offline backup. The fifth keystore itself was confirmed by CI and its password was backed up immediately through GPG + Drive + KeePass. No further keystore recreation is planned.
 
-GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD` are updated to the fifth keystore. No secret values are recorded here.
+GitHub Secrets in use include `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_PASSWORD`; values are never recorded here.
+
+## Android debug build for owner testing
+
+Latest successful Build & Test run: **31877362872**, exact evidence HEAD `8aefde75cfa000d4688a65631f18c9e75ef51834`.
+
+Artifact: `alpha-0-android-instrumentation-cd9392020a424f5d6c85d17d79701e6b782ae59b` (artifact ID `9245144382`, expires 2026-11-13). It contains `debug/app-debug.apk` and `androidTest/debug/app-debug-androidTest.apk`.
+
+Android application configuration: `applicationId=com.alpha0.app`, `minSdk=29`, `targetSdk=35`, version `1.0.0-RC1`. The manifest declares no runtime permissions; `allowBackup=false`.
+
+On first launch, `MainActivity` invokes `DeviceIdentity`. If the Android Keystore alias `alpha0.device.identity.v1` does not exist, the app automatically creates an EC P-256 key pair in the Android Keystore. No manual registration step or user password is required for this local device-identity bootstrap. The UI reports `DEVICE IDENTITY READY` when initialization succeeds.
 
 ## Workflow inventory
 
-### Workflow files present in repository
+### Workflow YAML files present in repository
 
-| Workflow | Role | Disposition |
-|---|---|---|
-| `.github/workflows/build.yml` | Canonical Build & Test; release signing/fingerprint chain and explicitly skipped FTL gate | **USE / CANONICAL** |
-| `.github/workflows/android-build.yml` | Separate Android build/test CI | **REVIEW / POSSIBLE DUPLICATE**; no deletion without approval |
-| `.github/workflows/deploy.yml` | Deployment automation | **USE / SEPARATE** |
-| `.github/workflows/p1-evidence.yml` | P1 evidence collection | **USE / SEPARATE** |
-| `.github/workflows/release.yml` | Release automation | **USE / SEPARATE** |
-| `.github/workflows/security.yml` | Security checks | **USE / SEPARATE** |
+1. `.github/workflows/build.yml` — **USE / CANONICAL**; Build & Test, release signing/fingerprint, FTL intentionally skipped.
+2. `.github/workflows/android-build.yml` — **USE / REVIEW**; separate Android build/test workflow; potential overlap with Build & Test, no deletion performed.
+3. `.github/workflows/deploy.yml` — **USE / SEPARATE**; deployment automation.
+4. `.github/workflows/p1-evidence.yml` — **USE / SEPARATE**; P1 evidence.
+5. `.github/workflows/release.yml` — **USE / SEPARATE**; release automation.
+6. `.github/workflows/security.yml` — **USE / SEPARATE**; security checks.
 
-### Registered in GitHub but absent from repository tree
-
-Known registered-but-absent workflows include `ci.yml`, `codeql.yml`, `dependency-review.yml`, `fingerprint-diagnostic.yml`, `full-validation.yml`, `sentinel-backend-ci.yml`, `sentinel-full-validation.yml`, `server-e2e.yml`, and `dynamic/dependabot/update-graph`. No deletion/disablement performed.
-
-### Actions history
-
-The large Actions count (1500+) is accumulated historical run/check history from development, PRs, reruns, and debugging. It is not evidence of 1500 active workflow definitions. It does not affect builds, signing, secrets, or release behavior. No cleanup is required for correctness; history may be retained as audit/debug evidence.
+Known GitHub-registered workflows not present in the current repository tree: `ci.yml`, `codeql.yml`, `dependency-review.yml`, `fingerprint-diagnostic.yml`, `full-validation.yml`, `sentinel-backend-ci.yml`, `sentinel-full-validation.yml`, `server-e2e.yml`, and `dynamic/dependabot/update-graph`. These are historical/registered definitions and are not counted as repository workflow files.
 
 ## Branch inventory
 
-| Branch | Status |
-|---|---|
-| `sentinel-ftl-2026-08-13` | **ACTIVE / CANONICAL** |
-| `sentinel-1.0.0-rc1-final` | **OPEN PR #19 / current evidence branch** |
-| `main` | **BASE / decision point** |
-| `sentinel-ftl-repair-2026-08-14` | **TEMPORARY REPAIR / deletion candidate** |
-| `p1-close-2026-08-13` | **STALE CANDIDATE** |
-| `sentinel-fingerprint-diagnostic` | **STALE CANDIDATE** |
-| `sentinel/1.0.0-rc1-gates` | **STALE CANDIDATE** |
-| `sentinel-release-hardening-2026-08` | **STALE CANDIDATE** |
-| `security/public-release-hardening` | **STALE CANDIDATE** |
-| `agent/modernize-alpha0` | **STALE CANDIDATE** |
-| `agent/sentinel-complete-platform` | **STALE CANDIDATE** |
-| `automation/sentinel-pipeline` | **STALE CANDIDATE** |
-| `sentinel/full-stack-builder` | **STALE CANDIDATE** |
+- `sentinel-ftl-2026-08-13` — **ACTIVE / CANONICAL**.
+- `sentinel-1.0.0-rc1-final` — **OPEN PR #19 / current evidence branch**.
+- `main` — **BASE / decision point**.
+- `sentinel-ftl-repair-2026-08-14` — **TEMPORARY REPAIR / deletion candidate**.
+- `p1-close-2026-08-13` — **STALE CANDIDATE**.
+- `sentinel-fingerprint-diagnostic` — **STALE CANDIDATE**.
+- `sentinel/1.0.0-rc1-gates` — **STALE CANDIDATE**.
+- `sentinel-release-hardening-2026-08` — **STALE CANDIDATE**.
+- `security/public-release-hardening` — **STALE CANDIDATE**.
+- `agent/modernize-alpha0` — **STALE CANDIDATE**.
+- `agent/sentinel-complete-platform` — **STALE CANDIDATE**.
+- `automation/sentinel-pipeline` — **STALE CANDIDATE**.
+- `sentinel/full-stack-builder` — **STALE CANDIDATE**.
 
 No branches were deleted.
 
-## Cleanup candidates — no deletion performed
+## Repository cleanup candidates — review only, no deletion
 
-1. Review whether `android-build.yml` duplicates the Android portion of `build.yml`.
-2. Review/retire registered-but-absent historical workflows after trigger/history review.
-3. Close/delete stale branches only after explicit approval.
-4. Consolidate historical docs/reports only after repository-wide inventory.
-5. Remove committed build artifacts only if found and explicitly reviewed.
+### Workflow candidates
+- `android-build.yml`: review for duplicate Android coverage versus `build.yml`; do not delete until trigger/required-check usage is reviewed.
+- Registered-but-absent historical workflows listed above: review/retire only after confirming no required checks depend on them.
 
-## Release verdict
+### Branch candidates
+The stale/temporary branches listed above are candidates for closure after explicit owner approval. No deletion has been performed.
+
+### Files outside active product code
+Potential cleanup/review candidates include `update-alpha0.sh`, `update-alpha0-build003a.sh`, and `verify.sh` if they are obsolete one-off migration/build helpers. `docs/AUDIT_CLOSURE_2026-08-13.md` and other dated documentation should be retained until historical evidence is intentionally consolidated; no deletion is recommended merely because it is old.
+
+### Build artifacts committed to git
+The current evidence tree contains no committed APK/JAR build outputs; the APKs are CI artifacts, not repository files. No artifact deletion is required.
+
+## Actions history
+
+The 1500+ Actions entries are accumulated historical runs/checks from development, PRs, reruns and debugging, not 1500 active workflow definitions. Run history does not affect builds, signing, secrets or release behavior and does not need cleanup for correctness.
+
+## Owner testing verdict
 
 **VERDICT: ГОТОВ С ОГОВОРКАМИ.**
 
-The repository's code, tests, security evidence, Android build, release keystore, signing, APK fingerprint, P1 evidence, reproducibility, deployment smoke, and backup/restore smoke are all PASS on the same exact HEAD `8aefde75cfa000d4688a65631f18c9e75ef51834`.
+All declared code/release/security/P1 evidence gates are PASS on the same exact evidence HEAD `8aefde75cfa000d4688a65631f18c9e75ef51834`. Android instrumentation through external CI remains the sole OPEN item and is infrastructure-limited, not a code/signing defect.
 
-The sole remaining OPEN item is Android instrumentation execution. It is an infrastructure constraint, not a code failure: Firebase Test Lab is intentionally excluded because GCP billing/card is not acceptable; no self-hosted runner host exists or is planned; and no supported free GitHub-hosted nested-virtualization path is being claimed. The workflow now records this explicitly as a skipped-by-design job rather than presenting a false CI failure.
-
-**Owner testing readiness: YES.** The repository is ready for the owner's own functional/manual testing now. Android instrumentation is the only declared infrastructure-limited exception and does not invalidate the release-code/signing/P1 evidence.
+**Owner testing readiness: YES.** The debug APK is ready for manual installation and functional testing on an Android device meeting `minSdk 29`. No special registration or production keystore setup is required merely to launch the app; the app bootstraps its device identity automatically in Android Keystore.
 
 ## Mandatory operating rule
 

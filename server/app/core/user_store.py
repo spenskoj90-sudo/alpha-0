@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from threading import Lock
-from typing import Any
+from typing import Any, Iterable
 
 from sqlalchemy import create_engine, text
 
 from app.core.auth import hash_password, verify_password
+from app.core.security import session_hash
 
 
 class UserAccountStore:
@@ -30,13 +32,10 @@ class UserAccountStore:
                     text("INSERT INTO identities(user_handle) VALUES (:u) ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"),
                     {"u": user_id},
                 ).scalar_one()
-                try:
-                    conn.execute(
-                        text("INSERT INTO users(id,identity_id,email,password_hash,status) VALUES (:id,:identity,:email,:password,'ACTIVE')"),
-                        {"id": identity, "identity": identity, "email": email, "password": password_hash},
-                    )
-                except Exception:
-                    raise
+                conn.execute(
+                    text("INSERT INTO users(identity_id,email,password_hash,status) VALUES (:identity,:email,:password,'ACTIVE')"),
+                    {"identity": identity, "email": email, "password": password_hash},
+                )
             return user_id
         with self._lock:
             if email in self._users:
@@ -60,3 +59,16 @@ class UserAccountStore:
         if not row or row["status"] != "ACTIVE" or not verify_password(password, row["password_hash"]):
             return None
         return row["user_id"]
+
+    def restrict_session_scopes(self, store: Any, access_token: str, scopes: Iterable[str]) -> None:
+        normalized = sorted(set(scopes))
+        if self._engine:
+            with self._engine.begin() as conn:
+                conn.execute(
+                    text("UPDATE sessions SET scopes_json=:scopes WHERE session_hash=:session_hash"),
+                    {"scopes": json.dumps(normalized), "session_hash": session_hash(access_token)},
+                )
+            return
+        record = store.sessions.get(session_hash(access_token))
+        if record is not None:
+            record["scopes"] = normalized

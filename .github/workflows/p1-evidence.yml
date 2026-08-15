@@ -1,0 +1,72 @@
+name: P1 Evidence
+
+on:
+  push:
+    branches: [sentinel-1.0.0-rc1-final]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  p1-evidence:
+    name: P1 evidence artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install server and audit tooling
+        working-directory: server
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip install '.[test]'
+
+      - name: Generate Python SCA report
+        working-directory: server
+        run: |
+          mkdir -p ../artifacts
+          set +e
+          pip-audit --format json --output ../artifacts/pip-audit.json
+          rc=$?
+          set -e
+          cat ../artifacts/pip-audit.json
+          exit $rc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate web SCA report
+        working-directory: web
+        run: |
+          npm install
+          mkdir -p ../artifacts
+          set +e
+          npm audit --json > ../artifacts/npm-audit.json
+          rc=$?
+          set -e
+          cat ../artifacts/npm-audit.json
+          exit $rc
+
+      - name: Generate Gradle dependency report
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:dependencies --configuration debugRuntimeClasspath > artifacts/gradle-dependencies.txt
+
+      - name: Run P1 unit/performance evidence
+        working-directory: server
+        run: |
+          pytest -q tests/test_p1_runtime.py tests/test_performance.py | tee ../artifacts/p1-performance.txt
+
+      - name: Upload P1 evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-p1-evidence-${{ github.sha }}
+          path: artifacts/
+          if-no-files-found: error

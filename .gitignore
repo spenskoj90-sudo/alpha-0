@@ -1,0 +1,46 @@
+# Gradle / Android
+.gradle/
+build/
+**/build/
+*.iml
+.idea/
+local.properties
+*.apk
+*.aab
+*.log
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+*.properties
+!gradle.properties.example
+*.keystore
+*.jks
+
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+web/.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+
+# Generated reports
+reports/
+coverage/

@@ -8,7 +8,7 @@ import secrets
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -44,6 +44,22 @@ class Policy:
             self.resource.endswith(":*") and resource.startswith(self.resource[:-1])
         )
         return action_match and resource_match
+
+
+class ScopeEngine:
+    """Small, deterministic scope boundary used by the authorization core.
+
+    Scope composition can only narrow privileges. A request for a scope that
+    is not already granted is rejected rather than implicitly escalating.
+    """
+
+    @staticmethod
+    def compose(granted: Iterable[str], requested: Iterable[str]) -> frozenset[str]:
+        granted_set = frozenset(granted)
+        requested_set = frozenset(requested)
+        if not requested_set.issubset(granted_set):
+            raise ValueError("SCOPE_NOT_GRANTED")
+        return requested_set
 
 
 class AuthorizationEngine:

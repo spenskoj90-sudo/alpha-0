@@ -12,28 +12,17 @@ android {
         applicationId = "com.alpha0.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 10001
+        versionName = "1.0.0-RC1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        create("ciRelease") {
-            val keystorePath = System.getenv("ALPHA0_KEYSTORE_PATH")
-            val keystorePassword = System.getenv("ALPHA0_KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("ALPHA0_KEY_ALIAS")
-            val keyPassword = System.getenv("ALPHA0_KEY_PASSWORD")
-            if (keystorePath != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            }
-        }
+        create("ciRelease")
     }
 
     buildTypes {
-        debug { signingConfig = signingConfigs.getByName("ciRelease") }
+        debug { }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("ciRelease")
@@ -41,6 +30,35 @@ android {
     }
 
     buildFeatures { compose = true }
+}
+
+// Keep release signing secrets out of ordinary debug/unit-test configuration.
+// For release tasks they are read during project evaluation, before the Android
+// plugin has finalized the signing config; this avoids late mutation errors.
+val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
+val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
+val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
+val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
+
+val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
+}
+
+if (releaseRequested) {
+    val keystorePath = androidKeystorePath.orNull
+        ?: error("ANDROID_KEYSTORE_PATH is required for release signing")
+    val keystorePassword = androidKeystorePassword.orNull
+        ?: error("ANDROID_KEYSTORE_PASSWORD is required for release signing")
+    val keyAlias = androidKeyAlias.orNull
+        ?: error("ANDROID_KEY_ALIAS is required for release signing")
+    val keyPassword = androidKeyPassword.orNull
+        ?: error("ANDROID_KEY_PASSWORD is required for release signing")
+
+    val ciRelease = android.signingConfigs.getByName("ciRelease")
+    ciRelease.storeFile = file(keystorePath)
+    ciRelease.storePassword = keystorePassword
+    ciRelease.keyAlias = keyAlias
+    ciRelease.keyPassword = keyPassword
 }
 
 kotlin { jvmToolchain(17) }

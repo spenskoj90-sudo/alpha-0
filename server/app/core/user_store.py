@@ -65,7 +65,7 @@ class UserAccountStore:
         if self._engine:
             with self._engine.begin() as conn:
                 conn.execute(
-                    text("UPDATE sessions SET scopes_json=:scopes WHERE session_hash=:session_hash"),
+                    text("UPDATE sessions SET scopes_json=CAST(:scopes AS jsonb) WHERE session_hash=:session_hash"),
                     {"scopes": json.dumps(normalized), "session_hash": session_hash(access_token)},
                 )
             return

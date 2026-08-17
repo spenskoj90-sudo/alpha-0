@@ -27,6 +27,7 @@ policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "character:read", "character:*", scopes=frozenset({"character:read"})),
     Policy(Decision.ALLOW, "event:write", "game:event", scopes=frozenset({"game:write"})),
     Policy(Decision.ALLOW, "audit:read", "audit", scopes=frozenset({"audit:read"})),
+    Policy(Decision.ALLOW, "knowledge:recommend", "recommendation", roles=frozenset({"user"})),
 ])
 
 def _request_id(request: Request, header_value: str | None) -> str:
@@ -114,6 +115,9 @@ def audit(authorization: str = Header(...)) -> dict:
 def recommendations(payload: RecommendationRequest, authorization: str = Header(...)):
     if not authorization.startswith("Bearer "): raise HTTPException(status_code=401, detail="INVALID_AUTHORIZATION")
     principal = _session_principal(authorization.removeprefix("Bearer "))
+    decision, reason = policy_engine.authorize(principal, "knowledge:recommend", "recommendation")
+    _audit(principal.user_id, principal.device_id, "knowledge:recommend", "recommendation", decision, reason)
+    if decision is Decision.DENY:
+        raise HTTPException(status_code=403, detail=reason)
     result = [Recommendation(kind="recommendation", text="Review the most recent character events before making a progression decision.", confidence=0.72, provenance=["sentinel-core:context-baseline"])]
-    _audit(principal.user_id, principal.device_id, "knowledge:recommend", "recommendation", Decision.ALLOW, "SAFE_RECOMMENDATION")
     return RecommendationResponse(recommendations=result)

@@ -3,7 +3,7 @@
 **State record:** 2026-08-17  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD:** `20c022074e151cb2e1d8a5916146e16214566905`
+**Canonical HEAD:** `14998ebe8e9d9059014006494014bca4af95e9c7`
 
 > This document is repository-grounded. It separates current `main` implementation from architecture, branch-only work, historical evidence, and unverified AI claims.
 

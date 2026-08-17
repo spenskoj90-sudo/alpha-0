@@ -15,7 +15,7 @@
 ## D-003 — Evidence integrity
 
 **Date:** 2026-08-17  
-**Decision:** A bare `PASS` is prohibited in engineering handoffs. Status must specify branch/PR/main/release scope and exact SHA.  
+**Decision:** A bare `PASS` is prohibited in engineering handoffs. Status must specify branch/PR/main/release scope and exact SHA. The stricter seven-part evidence bundle in `SENTINEL_EVIDENCE_PROTOCOL.md` is binding.  
 **Reason:** Previous project history contained CI-verified work that was not merged into main.
 
 ## D-004 — Branch-state ownership
@@ -40,10 +40,36 @@
 
 **Date:** 2026-08-17  
 **Decision:** Security findings must reference the actual current backend stack and exact source paths.  
-**Reason:** A recent red-team report cited Go-style paths that do not correspond to the current Python/FastAPI repository and therefore cannot be accepted as direct evidence.
+**Reason:** A red-team report cited Go-style paths such as `internal/store/memory/store.go`, `internal/auth/policy.go`, and `internal/challenge/*`, while the canonical backend is Python/FastAPI under `server/`. Those claims cannot be treated as direct repository evidence without reproduction against the actual tree.
 
 ## D-008 — Product work may proceed independently from backend reconciliation
 
 **Date:** 2026-08-17  
 **Decision:** UX/design exploration may proceed in parallel, but implementation against backend endpoints waits for canonical-state reconciliation.  
 **Reason:** Design does not require speculative backend changes; integration does.
+
+## D-009 — Current main contains real recommendation authorization gap
+
+**Date:** 2026-08-17  
+**Decision:** `/v1/recommendations` is an active security/authorization work item because the current `main` handler authenticates the session but does not call `policy_engine.authorize` before returning a recommendation.  
+**Evidence:** `server/app/main.py` at the current canonical line.  
+**Reason:** This finding is directly reproducible in the actual Python/FastAPI code and is therefore distinct from stack-incompatible red-team claims.
+
+## D-010 — Challenge lifecycle finding from DeepSeek is rejected against main
+
+**Date:** 2026-08-17  
+**Decision:** Do not implement DeepSeek's proposed nonce/expiration fix as a new feature. The current `main` code already generates a nonce, stores its hashed form, sets a 120-second expiry, tracks `consumed`, and rejects consumed/expired challenges.  
+**Evidence:** `server/app/main.py` at the current canonical line.  
+**Reason:** The proposed Go-path finding describes a different codebase and would create duplicate/conflicting work.
+
+## D-011 — Idempotency finding must be narrowed
+
+**Date:** 2026-08-17  
+**Decision:** Do not accept the claim that the repository has no idempotency storage. `server/migrations/001_initial.sql` contains `idempotency_keys`. The remaining question is runtime enforcement, which must be audited separately.  
+**Reason:** Schema presence and runtime behavior are different claims; neither should be inferred from the other.
+
+## D-012 — RLS finding must distinguish enabled from policy-protected
+
+**Date:** 2026-08-17  
+**Decision:** Current migration enables RLS on `characters`, `entitlements`, and `audit_events`, but contains no `CREATE POLICY` statements. This is a real schema-hardening gap, not evidence that RLS is entirely absent.  
+**Reason:** The distinction prevents both under-reporting and over-reporting the security state.

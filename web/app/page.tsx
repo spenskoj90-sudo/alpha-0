@@ -1,8 +1,10 @@
-const metrics = [
-  ["DEVICE", "ACTIVE", "ok"],
-  ["SESSION", "12h", "info"],
-  ["ENTITLEMENT", "CORE", "ok"],
-  ["SYNC QUEUE", "0", "ok"],
+const games = [
+  ['Diablo', 'Windows', 'diablo-1-pc'],
+  ['Diablo II', 'Windows', 'diablo-2-pc'],
+  ['Diablo II: Resurrected', 'Windows', 'diablo-2-resurrected-pc'],
+  ['Diablo III', 'Windows', 'diablo-3-pc'],
+  ['Diablo IV', 'Windows', 'diablo-4-pc'],
+  ['Diablo Immortal', 'Android', 'diablo-immortal-android'],
 ] as const;
 
 export default function Dashboard() {
@@ -10,26 +12,14 @@ export default function Dashboard() {
     <main className="shell">
       <header className="top">
         <div><div className="brand">SENTINEL</div><div className="label">PERSONAL CONTROL PLANE</div></div>
-        <div className="badge">SECURITY FIRST / DEFAULT DENY</div>
+        <div><a className="badge" href="/admin">ADMIN CONTROL</a> <span className="badge">SECURITY FIRST / DEFAULT DENY</span></div>
       </header>
       <section className="grid">
-        {metrics.map(([label, value, tone]) => <article className="card" key={label}><div className="label">{label}</div><div className={`value ${tone}`}>{value}</div></article>)}
+        {[["DEVICE", "ACTIVE", "ok"], ["SESSION", "12h", "info"], ["ENTITLEMENT", "SERVER-AUTH", "ok"], ["SYNC QUEUE", "0", "ok"]].map(([label, value, tone]) => <article className="card" key={label}><div className="label">{label}</div><div className={`value ${tone}`}>{value}</div></article>)}
       </section>
       <section className="section">
-        <article className="card">
-          <div className="label">CHARACTER</div>
-          <h2>Operator</h2>
-          <div className="item"><span className="label">LEVEL</span><strong> 27</strong></div>
-          <div className="item"><span className="label">HEALTH</span><strong> 94%</strong></div>
-          <div className="item"><span className="label">LAST EVENT</span><strong> 2 min ago</strong></div>
-        </article>
-        <article className="card">
-          <div className="label">SECURITY</div>
-          <div className="item"><span className="ok">●</span> Device key active</div>
-          <div className="item"><span className="ok">●</span> Replay protection active</div>
-          <div className="item"><span className="ok">●</span> Audit trail enabled</div>
-          <div className="item"><span className="info">●</span> No pending actions</div>
-        </article>
+        <article className="card"><div className="label">SUPPORTED DIABLO CATALOG</div>{games.map(([name, platform, id]) => <div className="item" key={id}><strong>{name}</strong><span className="label"> {platform} · {id}</span></div>)}</article>
+        <article className="card"><div className="label">SECURITY</div><div className="item"><span className="ok">●</span> Device key active</div><div className="item"><span className="ok">●</span> Replay protection active</div><div className="item"><span className="ok">●</span> Server authorization active</div><div className="item"><span className="info">●</span> Audit trail enabled</div></article>
       </section>
     </main>
   );

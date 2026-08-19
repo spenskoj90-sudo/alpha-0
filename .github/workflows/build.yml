@@ -1,0 +1,378 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, sentinel-1.0.0-rc1-final, p1-close-2026-08-13, sentinel-ftl-2026-08-13]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Repository verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash verify.sh
+
+  core:
+    name: Core tests and coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: server/pyproject.toml
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install '.[test]'
+      - run: python -m compileall -q app migrate.py
+      - run: pytest -m 'not postgres' --cov=app --cov-report=term-missing
+
+  postgres:
+    name: PostgreSQL integration and recovery
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: sentinel_test
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: server
+    env:
+      DATABASE_URL: postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel_test
+      PGOPTIONS: -c app.service_role=true
+      SENTINEL_ENV: production
+      SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
+      SENTINEL_REQUIRE_ENROLLMENT: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install '.[test]'
+      - run: python migrate.py
+      - run: pytest -m postgres
+      - name: Backup and restore smoke test
+        run: |
+          docker run --rm --network host -e PGPASSWORD=testpass postgres:17-alpine pg_dump -h 127.0.0.1 -p 5432 -U sentinel -d sentinel_test --no-owner --no-privileges > /tmp/sentinel-backup.sql
+          PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d postgres -v ON_ERROR_STOP=1 -c 'DROP DATABASE IF EXISTS sentinel_restore' -c 'CREATE DATABASE sentinel_restore'
+          PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d sentinel_restore -v ON_ERROR_STOP=1 < /tmp/sentinel-backup.sql
+          PGPASSWORD=testpass psql -h 127.0.0.1 -U sentinel -d sentinel_restore -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM identities LIMIT 1'
+
+  android:
+    name: Android build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - run: ./gradlew --no-daemon assembleDebug
+      - run: ./gradlew --no-daemon test
+      - name: Build instrumentation test APK
+        run: ./gradlew --no-daemon assembleDebugAndroidTest
+      - name: Decode release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          set +x
+          echo "ANDROID_KEYSTORE_BASE64 length: ${#ANDROID_KEYSTORE_BASE64}"
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          python - <<'PY'
+          import base64, os, pathlib
+          raw = os.environ["ANDROID_KEYSTORE_BASE64"]
+          compact = "".join(raw.split())
+          padded = compact + ("=" * (-len(compact) % 4))
+          data = base64.b64decode(padded, validate=True)
+          if not data:
+              raise SystemExit("decoded keystore is empty")
+          path = pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks")
+          path.write_bytes(data)
+          PY
+          chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
+          test -s "$RUNNER_TEMP/sentinel-release.jks"
+
+      - name: Keystore file and format validity
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -s "$RUNNER_TEMP/sentinel-release.jks"
+          keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
+
+      - name: Keystore store password validation
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/keystore-store-list.txt"
+          grep -q '^Keystore type:' "$RUNNER_TEMP/keystore-store-list.txt"
+          echo "Store password validation: PASS"
+          rm -f "$RUNNER_TEMP/keystore-store-list.txt"
+
+      - name: Verify release key alias exists
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          set +x
+          aliases="$(keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" | awk -F, '/^[^,]+,/{print $1}')"
+          if ! printf '%s\n' "$aliases" | grep -Fxq "$ANDROID_KEY_ALIAS"; then
+            echo "Alias validation: FAIL"
+            echo "Expected alias: $ANDROID_KEY_ALIAS"
+            echo "Available aliases:"
+            printf '%s\n' "$aliases"
+            exit 1
+          fi
+          echo "Alias validation: PASS"
+
+      - name: Verify release key entry type
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          set +x
+          entry="$(keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | awk -F': ' '/^Entry type:/{print $2; exit}')"
+          echo "Entry type: $entry"
+          test "$entry" = "PrivateKeyEntry"
+          echo "Entry type validation: PASS"
+
+      - name: Extract release certificate fingerprint
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          set +x
+          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-cert.txt"
+          actual="$(awk -F': ' '/^[[:space:]]*SHA256:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
+          test -n "$actual"
+          echo "Alias: $ANDROID_KEY_ALIAS"
+          echo "Entry type: $(awk -F': ' '/^Entry type:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
+          echo "SHA-256 fingerprint: $actual"
+          printf '%s\n' "$actual" > "$RUNNER_TEMP/release-fingerprint.txt"
+          rm -f "$RUNNER_TEMP/release-cert.txt"
+
+      - name: Compare keystore certificate fingerprint
+        run: |
+          set -euo pipefail
+          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
+          actual="$(cat "$RUNNER_TEMP/release-fingerprint.txt")"
+          expected="$(printf '%s' "$expected" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
+          actual="$(printf '%s' "$actual" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
+          echo "EXPECTED: $expected"
+          echo "ACTUAL:   $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "RESULT: FAIL"
+            exit 1
+          fi
+          echo "RESULT: PASS"
+
+      - name: Assemble signed release
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "ANDROID_KEYSTORE_PASSWORD length: ${#ANDROID_KEYSTORE_PASSWORD}"
+          echo "ANDROID_KEY_PASSWORD length: ${#ANDROID_KEY_PASSWORD}"
+          ./gradlew --no-daemon assembleRelease
+
+      - name: Verify release APK signature and fingerprint
+        run: |
+          set -euo pipefail
+          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -f "$apk"
+          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
+          test -x "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk"
+          actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
+          expected_norm="$(printf '%s' "$expected" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          echo "EXPECTED: $expected"
+          echo "ACTUAL:   $actual"
+          if [ "$actual_norm" != "$expected_norm" ]; then
+            echo "APK fingerprint comparison: FAIL"
+            exit 1
+          fi
+          echo "APK fingerprint comparison: PASS"
+
+      - name: Cleanup temporary keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sentinel-release.jks" "$RUNNER_TEMP/release-fingerprint.txt" "$RUNNER_TEMP/keystore-store-list.txt" "$RUNNER_TEMP/release-cert.txt"
+
+      - name: Upload Android instrumentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-0-android-instrumentation-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+
+  android-instrumentation:
+    name: Android instrumentation (Firebase Test Lab)
+    runs-on: ubuntu-latest
+    needs: [android]
+    timeout-minutes: 30
+    steps:
+      - name: Download Android instrumentation artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: alpha-0-android-instrumentation-${{ github.sha }}
+          path: android-artifacts
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+      - name: Verify Firebase Test Lab configuration
+        env:
+          GCP_PROJECT_ID: ${{ secrets.FIREBASE_GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$GCP_PROJECT_ID"
+          gcloud config set project "$GCP_PROJECT_ID"
+          gcloud firebase test android models list --filter='supportedVersionIds:35' --format='value(id,versionIds)' | head -20
+      - name: Run Android instrumentation in Firebase Test Lab
+        env:
+          GCP_PROJECT_ID: ${{ secrets.FIREBASE_GCP_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p ftl-results
+          gcloud firebase test android run \
+            --project "$GCP_PROJECT_ID" \
+            --type instrumentation \
+            --app android-artifacts/app/build/outputs/apk/debug/app-debug.apk \
+            --test android-artifacts/app/build/outputs/apk/debug/app-debug-androidTest.apk \
+            --device model=redfin,version=35,locale=en,orientation=portrait \
+            --timeout 10m \
+            --results-history-name "alpha-0-${GITHUB_SHA}" \
+            --format=json | tee ftl-results/result.json
+      - name: Upload Firebase Test Lab result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpha-0-ftl-result-${{ github.sha }}
+          path: ftl-results/result.json
+          if-no-files-found: warn
+
+  web:
+    name: Web build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - run: npm run lint
+      - run: npm run build
+
+  docker:
+    name: Container build
+    runs-on: ubuntu-latest
+    needs: [core, postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: false
+          tags: sentinel-core:ci
+
+  deployment-smoke:
+    name: Deployment smoke and health
+    runs-on: ubuntu-latest
+    needs: [core, postgres, docker]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build runtime image
+        run: docker build -f server/Dockerfile -t sentinel-core:smoke .
+      - name: Start PostgreSQL
+        run: |
+          docker run -d --name sentinel-postgres -e POSTGRES_DB=sentinel -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=testpass -p 5432:5432 postgres:17-alpine
+          for i in {1..30}; do pg_isready -h 127.0.0.1 -p 5432 -U sentinel && break; sleep 2; done
+      - name: Start API and verify health
+        run: |
+          docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel -e PGOPTIONS='-c app.service_role=true' -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
+          for i in {1..30}; do curl -fsS http://127.0.0.1:8080/healthz && exit 0; sleep 2; done
+          docker logs sentinel-api
+          exit 1
+      - name: Cleanup deployment smoke
+        if: always()
+        run: docker rm -f sentinel-api sentinel-postgres 2>/dev/null || true
+
+  reproducible-deployment:
+    name: Reproducible container build comparison
+    runs-on: ubuntu-latest
+    needs: [core, postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build artifact A
+        run: |
+          docker buildx build --load --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-a .
+          docker image inspect sentinel-core:repro-a --format '{{.Id}}' > /tmp/repro-a.id
+          docker image inspect sentinel-core:repro-a --format '{{json .RootFS.Layers}}' > /tmp/repro-a.layers
+      - name: Independent rebuild artifact B
+        run: |
+          docker buildx prune -af
+          docker buildx build --load --no-cache --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-b .
+          docker image inspect sentinel-core:repro-b --format '{{.Id}}' > /tmp/repro-b.id
+          docker image inspect sentinel-core:repro-b --format '{{json .RootFS.Layers}}' > /tmp/repro-b.layers
+      - name: Compare canonical runtime filesystem
+        run: |
+          set -euo pipefail
+          echo "raw artifact A image id: $(cat /tmp/repro-a.id)"
+          echo "raw artifact B image id: $(cat /tmp/repro-b.id)"
+          echo "raw artifact A layers: $(cat /tmp/repro-a.layers)"
+          echo "raw artifact B layers: $(cat /tmp/repro-b.layers)"
+          rm -rf /tmp/repro-root-a /tmp/repro-root-b
+          mkdir -p /tmp/repro-root-a /tmp/repro-root-b
+          docker create --name sentinel-repro-a sentinel-core:repro-a >/dev/null
+          docker create --name sentinel-repro-b sentinel-core:repro-b >/dev/null
+          docker export sentinel-repro-a > /tmp/repro-a.raw.tar
+          docker export sentinel-repro-b > /tmp/repro-b.raw.tar
+          tar -xpf /tmp/repro-a.raw.tar -C /tmp/repro-root-a
+          tar -xpf /tmp/repro-b.raw.tar -C /tmp/repro-root-b
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.canonical.tar -C /tmp/repro-root-a .
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.canonical.tar -C /tmp/repro-root-b .
+          sha256sum /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
+          cmp /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
+          docker rm sentinel-repro-a sentinel-repro-b >/dev/null

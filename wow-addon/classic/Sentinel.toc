@@ -1,0 +1,7 @@
+## Interface: 11200
+## Title: SENTINEL Security Overlay
+## Notes: Defensive session telemetry and status overlay. No automation or gameplay modification.
+## Author: SENTINEL
+## Version: 0.3.0-classic
+## SavedVariables: SentinelDB
+Sentinel.lua

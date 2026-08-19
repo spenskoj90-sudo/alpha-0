@@ -54,7 +54,7 @@ The current canonical line must gain an authoritative server test/compile CI gat
 
 ### Instrumentation CI — OPEN
 
-The current Android workflow runs Gradle unit tests but does not establish Android instrumentation as a CI gate. Real-device/emulator evidence is required where behavior cannot be established by source/unit tests.
+The current Android workflow runs Gradle unit tests but does not establish Android instrumentation as a CI gate. Real-device/emulator evidence is required where behavior cannot be established from source/unit tests.
 
 ### Release readiness — NOT ACCEPTED
 

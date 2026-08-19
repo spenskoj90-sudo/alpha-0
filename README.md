@@ -2,14 +2,23 @@
 
 SENTINEL is a security-first modular monolith for device identity, server-authoritative authorization, game entitlements, auditability and a personal control plane.
 
+## Canonical repository state
+
+- Canonical branch: `main`.
+- Branch/PR work is not accepted as product state until merged into `main` and revalidated at the resulting main SHA.
+- Architecture documents describe the target/contract and must not be treated as proof of runtime implementation.
+- The authoritative current-state record is `docs/SENTINEL_CURRENT_STATE.md`.
+- Evidence/acceptance rules are `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
+- Engineering decisions are recorded in `docs/SENTINEL_DECISION_LOG.md`.
+
 ## RC1 scope
 
 - Android client with Android Keystore-backed P-256 identity and AES-GCM session storage.
-- FastAPI SENTINEL CORE with PostgreSQL production persistence.
+- FastAPI SENTINEL CORE with PostgreSQL production architecture and schema; runtime PostgreSQL persistence remains subject to exact-main validation.
 - Default-deny authorization with roles, scopes and policies.
 - User-bound device enrollment and one-time challenge proof.
-- Opaque access sessions and one-time refresh rotation.
-- Device-bound, sequence-protected and idempotent game events.
+- Opaque access sessions and one-time refresh rotation/session-security primitives.
+- Device-bound, sequence-protected and idempotent game events and supporting structures.
 - Diablo catalog, entitlement gate, admin entitlement control and WoW support.
 - Next.js web control plane.
 - Docker Compose reference deployment.
@@ -25,6 +34,14 @@ Authorization is server-side:
 
 Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.md` and the full architecture reference `docs/ARCHITECTURE_V4.md`.
 
+## Current-state limitations
+
+The PostgreSQL schema exists, but the current pre-merge `main` runtime path instantiates an in-memory `MemoryStore`. PostgreSQL must not be described as the authoritative runtime persistence layer until the runtime repository integration is merged and validated on `main`.
+
+The Android entry point on the pre-merge `main` state is the technical `CharacterDashboard` surface. Login/Register and later multi-section product navigation remain branch-only until verified on `main`.
+
+The current Android CI evidence identifies a signing-secret infrastructure dependency. No keystore recreation is authorized without root-cause evidence and Human Owner approval.
+
 ## Repository
 
 - `app/` — Android application.
@@ -32,7 +49,7 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 - `web/` — Next.js control plane.
 - `launcher/` — isolated desktop launcher surface.
 - `wow-addon/` — WoW adapter/addon surfaces.
-- `docs/` — architecture, security, deployment and release contracts.
+- `docs/` — architecture, security, deployment, release, current-state and evidence contracts.
 - `.github/workflows/` — CI/CD and security automation.
 
 ## Requirements
@@ -77,7 +94,7 @@ pytest
 ./gradlew test
 ```
 
-The CI debug build deliberately does not require production signing secrets. Release signing must be performed in a protected release environment.
+Release signing must be performed in a protected release environment. CI signing requirements are governed by the current workflow configuration and exact-main evidence.
 
 ### Web
 
@@ -92,15 +109,15 @@ npm run build
 
 The authoritative rule is:
 
-`FAIL → root cause → FIX → regression → PASS → ACCEPTED`
+`FAIL → root cause → FIX → regression → MAIN PASS → ACCEPTED`
 
-CI checks Core coverage (minimum 80%), Android build/tests, web lint/build, container build, CodeQL, dependency audit and filesystem secret scanning.
+The RC workflow scope includes Core coverage (minimum 80%), Android build/tests, web lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact `main` SHA being claimed.
 
 See `docs/RELEASE_GATES.md` for the RC acceptance matrix.
 
 ## Security
 
-Security controls include default deny, least privilege, server-side authorization, P-256 device proof, opaque token storage, refresh rotation, replay/idempotency controls, input bounds, audit logging and security headers.
+Security controls include default deny, least privilege, server-side authorization, P-256 device proof, opaque token/session storage, refresh rotation, replay/idempotency controls, input bounds, audit logging and security headers.
 
 Production secrets are never stored in Git. Production requires TLS termination and a PostgreSQL system of record. The process-local rate limiter must be fronted by a distributed WAF/API-gateway limiter before horizontally scaling Core.
 

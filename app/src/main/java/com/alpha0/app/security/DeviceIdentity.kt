@@ -50,8 +50,12 @@ private fun ensureKeyExists() {
         KEY_ALIAS,
         KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
     )
-        .setAlgorithmParameterSpec(ECGenParameterSpec(CURVE))
-        .setDigests(KeyProperties.DIGEST_SHA256)
+        .setAlgorithmParameterSpec(
+            ECGenParameterSpec(CURVE)
+        )
+        .setDigests(
+            KeyProperties.DIGEST_SHA256
+        )
         .build()
 
     generator.initialize(spec)
@@ -60,23 +64,39 @@ private fun ensureKeyExists() {
 
 private fun getPrivateKey(): PrivateKey {
     ensureKeyExists()
+
     val keyStore = loadKeyStore()
-    return keyStore.getKey(KEY_ALIAS, null) as? PrivateKey
-        ?: throw IllegalStateException("ALPHA-0 private key is unavailable")
+
+    return keyStore.getKey(
+        KEY_ALIAS,
+        null
+    ) as? PrivateKey
+        ?: throw IllegalStateException(
+            "ALPHA-0 private key is unavailable"
+        )
 }
 
 private fun getPublicKey(): PublicKey {
     ensureKeyExists()
+
     val keyStore = loadKeyStore()
-    return keyStore.getCertificate(KEY_ALIAS)?.publicKey
-        ?: throw IllegalStateException("ALPHA-0 public key is unavailable")
+
+    return keyStore
+        .getCertificate(KEY_ALIAS)
+        ?.publicKey
+        ?: throw IllegalStateException(
+            "ALPHA-0 public key is unavailable"
+        )
 }
 
 fun getIdentityInfo(): IdentityInfo {
     val publicKey = getPublicKey()
-    val fingerprint = MessageDigest.getInstance(HASH_ALGORITHM)
+
+    val fingerprint = MessageDigest
+        .getInstance(HASH_ALGORITHM)
         .digest(publicKey.encoded)
         .toHex()
+
     return IdentityInfo(
         fingerprint = fingerprint,
         algorithm = "EC / $CURVE / $SIGNATURE_ALGORITHM"
@@ -88,27 +108,44 @@ fun getPublicKeyDerBase64(): String {
 }
 
 fun sign(challenge: ByteArray): ByteArray {
-    require(challenge.isNotEmpty()) { "Challenge must not be empty" }
-    return Signature.getInstance(SIGNATURE_ALGORITHM).apply {
-        initSign(getPrivateKey())
-        update(challenge)
-    }.sign()
+    require(challenge.isNotEmpty()) {
+        "Challenge must not be empty"
+    }
+
+    return Signature
+        .getInstance(SIGNATURE_ALGORITHM)
+        .apply {
+            initSign(getPrivateKey())
+            update(challenge)
+        }
+        .sign()
 }
 
-fun verify(challenge: ByteArray, signatureBytes: ByteArray): Boolean {
-    if (challenge.isEmpty() || signatureBytes.isEmpty()) return false
+fun verify(
+    challenge: ByteArray,
+    signatureBytes: ByteArray
+): Boolean {
+    if (challenge.isEmpty() || signatureBytes.isEmpty()) {
+        return false
+    }
+
     return try {
-        Signature.getInstance(SIGNATURE_ALGORITHM).apply {
-            initVerify(getPublicKey())
-            update(challenge)
-        }.verify(signatureBytes)
+        Signature
+            .getInstance(SIGNATURE_ALGORITHM)
+            .apply {
+                initVerify(getPublicKey())
+                update(challenge)
+            }
+            .verify(signatureBytes)
     } catch (_: Exception) {
         false
     }
 }
 
-private fun ByteArray.toHex(): String = joinToString("") {
-    String.format(Locale.US, "%02x", it)
+private fun ByteArray.toHex(): String {
+    return joinToString("") {
+        String.format(Locale.US, "%02x", it)
+    }
 }
 
 }

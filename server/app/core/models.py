@@ -40,6 +40,12 @@ class DeviceRegisterRequest(BaseModel):
     fingerprint_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
 
 
+class DeviceBindRequest(BaseModel):
+    platform: Literal["android"]
+    public_key_der_b64: str = Field(min_length=32, max_length=4096)
+    fingerprint_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+
+
 class DeviceRegisterResponse(BaseModel):
     device_id: str
     state: Literal["ACTIVE"]

@@ -2,6 +2,7 @@ package com.alpha0.app.security
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Base64
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -100,6 +101,10 @@ fun getIdentityInfo(): IdentityInfo {
         fingerprint = fingerprint,
         algorithm = "EC / $CURVE / $SIGNATURE_ALGORITHM"
     )
+}
+
+fun getPublicKeyDerBase64(): String {
+    return Base64.encodeToString(getPublicKey().encoded, Base64.NO_WRAP)
 }
 
 fun sign(challenge: ByteArray): ByteArray {

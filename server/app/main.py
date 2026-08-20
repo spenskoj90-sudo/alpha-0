@@ -21,6 +21,7 @@ from app.core.models import (
     AdminEntitlementRequest,
     AuthorizeRequest,
     AuthorizeResponse,
+    DeviceBindRequest,
     DeviceProofRequest,
     DeviceRegisterRequest,
     DeviceRegisterResponse,
@@ -247,6 +248,28 @@ def register_device(
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
     challenge = secrets.token_urlsafe(32)
     device_id = store.register_device(user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
+
+
+@app.post("/v1/devices/bind", response_model=DeviceRegisterResponse)
+def bind_device(
+    payload: DeviceBindRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-bind")
+    principal = principal_from_token(require_bearer(authorization_header))
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    challenge = secrets.token_urlsafe(32)
+    device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND", "request_id": rid})
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 

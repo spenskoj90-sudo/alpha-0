@@ -29,6 +29,14 @@ def _prove(key, challenge: str, request_id: str):
     return {"challenge": challenge, "timestamp": timestamp, "request_id": request_id, "signature_b64": signature}
 
 
+def _bind_payload():
+    key = ec.generate_private_key(ec.SECP256R1())
+    public = key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    public64 = base64.b64encode(public).decode()
+    fingerprint = __import__("hashlib").sha256(public).hexdigest()
+    return {"platform": "android", "public_key_der_b64": public64, "fingerprint_sha256": fingerprint}
+
+
 def test_invalid_nonce_is_rejected():
     _, device_id, _ = _device()
     response = client.post(
@@ -85,6 +93,36 @@ def test_null_device_principal_cannot_bypass_device_scoped_event_policy():
     )
     assert denied.status_code == 200
     assert denied.json()["decision"] == "DENY"
+
+
+def test_authenticated_user_can_bind_device():
+    response = client.post(
+        "/v1/auth/register",
+        json={"email": "bind-device@example.com", "password": "Correct-Horse-Battery-Staple-123"},
+    )
+    token = response.json()["session_token"]
+    bind = client.post("/v1/devices/bind", headers={"Authorization": f"Bearer {token}"}, json=_bind_payload())
+    assert bind.status_code == 200
+    assert bind.json()["state"] == "ACTIVE"
+    assert bind.json()["device_id"]
+
+
+def test_device_bind_requires_authenticated_session():
+    response = client.post("/v1/devices/bind", json=_bind_payload())
+    assert response.status_code == 422
+
+
+def test_device_bind_rejects_fingerprint_mismatch():
+    response = client.post(
+        "/v1/auth/register",
+        json={"email": "bind-fingerprint@example.com", "password": "Correct-Horse-Battery-Staple-123"},
+    )
+    token = response.json()["session_token"]
+    payload = _bind_payload()
+    payload["fingerprint_sha256"] = "0" * 64
+    bind = client.post("/v1/devices/bind", headers={"Authorization": f"Bearer {token}"}, json=payload)
+    assert bind.status_code == 400
+    assert bind.json()["code"] == "FINGERPRINT_MISMATCH"
 
 
 def test_wrong_role_cannot_satisfy_role_policy():

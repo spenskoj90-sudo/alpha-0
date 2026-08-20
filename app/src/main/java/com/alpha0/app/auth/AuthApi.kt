@@ -55,8 +55,10 @@ class AuthApi(private val baseUrl: String) {
             } else {
                 Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${connection.responseCode}")
             }
-        } catch (_: IOException) {
-            Result.Failure("NETWORK_ERROR")
+        } catch (e: IOException) {
+            Result.Failure("NETWORK_ERROR: ${e.javaClass.simpleName}: ${e.message}")
+        } catch (e: Exception) {
+            Result.Failure("UNEXPECTED_ERROR: ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             connection.disconnect()
         }

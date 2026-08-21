@@ -215,3 +215,84 @@ def revoke_device(
         "request_id": None,
     })
     return {"revoked": True}
+
+
+@router.get("/v1/devices/me")
+def my_device(authorization_header: str = Header(..., alias="Authorization")) -> dict[str, Any]:
+    principal_from_token, require_bearer, store = _security_context()
+    principal = principal_from_token(require_bearer(authorization_header))
+    if not principal.device_id:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_BOUND")
+    device = store.get_device(principal.device_id)
+    if not device or device.get("user_id") != principal.user_id:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    result = {
+        "device_id": principal.device_id,
+        "state": device["state"],
+        "platform": device["platform"],
+        "fingerprint_sha256": device["fingerprint"],
+        "algorithm": "EC / secp256r1 / SHA256withECDSA",
+        "key_version": device.get("key_version", 1),
+        "last_sequence": device.get("last_sequence", -1),
+        "last_seen_at": device.get("last_seen_at"),
+        "bound_at": device.get("created_at"),
+        "security_status": "SECURE" if device["state"] == "ACTIVE" else "AT_RISK",
+    }
+    if not hasattr(store, "devices"):
+        with store.engine.begin() as conn:
+            row = conn.execute(
+                __import__("sqlalchemy").text(
+                    "SELECT created_at,last_seen_at FROM device_bindings WHERE id=:d AND state IN ('ACTIVE','SUSPENDED','REVOKED')"
+                ), {"d": principal.device_id}
+            ).mappings().first()
+        if row:
+            result["bound_at"] = row["created_at"].isoformat() if row["created_at"] else None
+            result["last_seen_at"] = row["last_seen_at"].isoformat() if row["last_seen_at"] else None
+    return result
+
+
+@router.get("/v1/entitlements/me")
+def my_entitlements(authorization_header: str = Header(..., alias="Authorization")) -> dict[str, list[dict[str, Any]]]:
+    principal_from_token, require_bearer, store = _security_context()
+    principal = principal_from_token(require_bearer(authorization_header))
+    items = store.list_entitlements(principal.user_id)
+    from app.core.game_catalog import get_game
+    enriched: list[dict[str, Any]] = []
+    for item in items:
+        game = get_game(item["game_id"])
+        enriched.append({
+            "id": item["id"],
+            "game_id": item["game_id"],
+            "game_name": game.name if game else item["game_id"],
+            "platform": game.platform.value if game else "unknown",
+            "status": item["status"],
+            "source": item["source"],
+            "valid_from": item["valid_from"],
+            "valid_until": item["valid_until"],
+        })
+    return {"entitlements": enriched}
+
+
+@router.get("/v1/entitlements/{entitlement_id}")
+def entitlement_detail(entitlement_id: str, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, Any]:
+    principal_from_token, require_bearer, store = _security_context()
+    principal = principal_from_token(require_bearer(authorization_header))
+    item = next((value for value in store.list_entitlements(principal.user_id) if value["id"] == entitlement_id), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail="ENTITLEMENT_NOT_FOUND")
+    from app.core.game_catalog import get_game
+    game = get_game(item["game_id"])
+    return {
+        "id": item["id"],
+        "game_id": item["game_id"],
+        "game_name": game.name if game else item["game_id"],
+        "platform": game.platform.value if game else "unknown",
+        "family": game.family if game else "unknown",
+        "versioning": game.versioning if game else "unknown",
+        "launcher_supported": game.launcher_supported if game else False,
+        "interaction_mode": game.interaction_mode if game else "unknown",
+        "status": item["status"],
+        "source": item["source"],
+        "valid_from": item["valid_from"],
+        "valid_until": item["valid_until"],
+    }

@@ -124,6 +124,17 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("login") {
                                         popUpTo("login") { inclusive = true }
                                     }
+                                },
+                                onRotated = { rotated ->
+                                    val newDeviceId = rotated.deviceId
+                                    val newAccessToken = rotated.sessionToken
+                                    val newRefreshToken = rotated.refreshToken
+                                    if (!newDeviceId.isNullOrBlank() && !newAccessToken.isNullOrBlank() && !newRefreshToken.isNullOrBlank()) {
+                                        sessionStore.save(this@MainActivity, newAccessToken, newRefreshToken, newDeviceId)
+                                        navController.navigate("dashboard/${Uri.encode(newDeviceId)}") {
+                                            popUpTo("device-details/${Uri.encode(deviceId)}") { inclusive = true }
+                                        }
+                                    }
                                 }
                             )
                         }

@@ -43,6 +43,8 @@ class DashboardApi(private val baseUrl: String) {
         val interactionMode: String
     )
 
+    data class DeviceActionResult(val deviceId: String? = null, val revoked: Boolean = false)
+
     sealed interface Result<out T> {
         data class Success<T>(val value: T) : Result<T>
         data class Failure(val message: String) : Result<Nothing>
@@ -59,6 +61,18 @@ class DashboardApi(private val baseUrl: String) {
             lastSeenAt = json.optString("last_seen_at").takeIf { it.isNotBlank() },
             securityStatus = json.optString("security_status")
         )
+    }
+
+    fun rotateDevice(accessToken: String, deviceId: String, platform: String, publicKeyDerB64: String, fingerprintSha256: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/rotate", "POST", JSONObject().apply {
+        put("platform", platform)
+        put("public_key_der_b64", publicKeyDerB64)
+        put("fingerprint_sha256", fingerprintSha256)
+    }) { json ->
+        DeviceActionResult(deviceId = json.optString("device_id").takeIf { it.isNotBlank() })
+    }
+
+    fun revokeDevice(accessToken: String, deviceId: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/revoke", "POST") {
+        DeviceActionResult(revoked = it.optBoolean("revoked"))
     }
 
     fun getEntitlements(accessToken: String): Result<List<Entitlement>> = request(accessToken, "/v1/entitlements/me") { json ->
@@ -98,19 +112,28 @@ class DashboardApi(private val baseUrl: String) {
         )
     }
 
-    private fun <T> request(accessToken: String, path: String, parser: (JSONObject) -> T): Result<T> {
+    private fun <T> request(accessToken: String, path: String, parser: (JSONObject) -> T): Result<T> = request(accessToken, path, "GET", null, parser)
+
+    private fun <T> request(accessToken: String, path: String, method: String, body: JSONObject? = null, parser: (JSONObject) -> T): Result<T> {
         val connection = (URL("${baseUrl.trimEnd('/')}$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
+            requestMethod = method
             connectTimeout = 10_000
             readTimeout = 15_000
             setRequestProperty("Authorization", "Bearer $accessToken")
             setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+            }
         }
         return try {
+            if (body != null) {
+                connection.outputStream.bufferedWriter().use { it.write(body.toString()) }
+            }
             val status = connection.responseCode
-            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+            val bodyText = (if (status in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            val json = runCatching { JSONObject(body) }.getOrNull()
+            val json = runCatching { JSONObject(bodyText) }.getOrNull()
             if (status in 200..299 && json != null) {
                 Result.Success(parser(json))
             } else {

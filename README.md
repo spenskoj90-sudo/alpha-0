@@ -5,16 +5,23 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 ## Canonical repository state
 
 - Canonical branch: `main`.
+- Current canonical HEAD: `4a0fd8255e4b7beb065e73a254ebb72d3b8b4d11`.
 - Branch/PR work is not accepted as product state until merged into `main` and revalidated at the resulting main SHA.
 - Architecture documents describe the target/contract and must not be treated as proof of runtime implementation.
 - The authoritative current-state record is `docs/SENTINEL_CURRENT_STATE.md`.
 - Evidence/acceptance rules are `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
 - Engineering decisions are recorded in `docs/SENTINEL_DECISION_LOG.md`.
 
-## RC1 scope
+## MVP scope currently implemented on main
 
 - Android client with Android Keystore-backed P-256 identity and AES-GCM session storage.
-- FastAPI SENTINEL CORE with PostgreSQL production architecture and schema; runtime PostgreSQL persistence remains subject to exact-main validation.
+- Login/Register.
+- Device Setup with authenticated device binding.
+- Dashboard with authenticated device/security and entitlement data.
+- Device Details with fingerprint, algorithm, state, binding/last-seen data, plus existing backend rotate/revoke actions.
+- Game Details backed by authenticated entitlement APIs and the existing game catalog.
+- Complete Android MVP navigation: `Login/Register → Device Setup → Dashboard → Device Details → Game Details`.
+- FastAPI SENTINEL CORE with PostgreSQL production architecture and schema; runtime persistence still requires exact-main runtime validation.
 - Default-deny authorization with roles, scopes and policies.
 - User-bound device enrollment and one-time challenge proof.
 - Opaque access sessions and one-time refresh rotation/session-security primitives.
@@ -36,11 +43,19 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 
 ## Current-state limitations
 
-The PostgreSQL schema exists, but the current pre-merge `main` runtime path instantiates an in-memory `MemoryStore`. PostgreSQL must not be described as the authoritative runtime persistence layer until the runtime repository integration is merged and validated on `main`.
+The current GitHub API status query for exact main HEAD `4a0fd8255e4b7beb065e73a254ebb72d3b8b4d11` returned no status records. Exact-head workflow PASS/FAIL and run URLs therefore must not be inferred from older PR runs.
 
-The Android entry point on the pre-merge `main` state is the technical `CharacterDashboard` surface. Login/Register and later multi-section product navigation remain branch-only until verified on `main`.
+The known release APK fingerprint previously verified in CI is:
 
-The current Android CI evidence identifies a signing-secret infrastructure dependency. No keystore recreation is authorized without root-cause evidence and Human Owner approval.
+`2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`
+
+That fingerprint evidence came from an earlier CI run and is not claimed as exact-main-HEAD evidence until `apksigner verify` is run for the current SHA.
+
+The PostgreSQL schema exists, but the current runtime persistence path must still be validated independently before PostgreSQL is described as the authoritative runtime system of record.
+
+The P1 Evidence workflow currently has a push trigger for the historical branch `sentinel-1.0.0-rc1-final` and a pull-request trigger for `main`; this CI configuration remains an open task and has not been changed here.
+
+The current deploy workflow file declares only `release.published` as its trigger. The historical observation of push-associated Deploy runs remains under investigation and is not treated as evidence that the current file triggers on push.
 
 ## Repository
 

@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
                                 onRevoked = {
                                     sessionStore.clear(this@MainActivity)
                                     navController.navigate("login") {
-                                        popUpTo(0) { inclusive = true }
+                                        popUpTo("login") { inclusive = true }
                                     }
                                 }
                             )

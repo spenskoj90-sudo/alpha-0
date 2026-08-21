@@ -105,7 +105,17 @@ class MainActivity : ComponentActivity() {
                         if (currentSession == null || deviceId.isNullOrBlank()) {
                             navController.navigate("login") { popUpTo("login") { inclusive = true } }
                         } else {
-                            DeviceDetailsScreen(accessToken = currentSession.accessToken, deviceId = deviceId, api = dashboardApi)
+                            DeviceDetailsScreen(
+                                accessToken = currentSession.accessToken,
+                                deviceId = deviceId,
+                                api = dashboardApi,
+                                onRevoked = {
+                                    sessionStore.clear(this@MainActivity)
+                                    navController.navigate("login") {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                     }
                     composable(

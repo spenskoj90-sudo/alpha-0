@@ -17,7 +17,7 @@
 
 ## Дальше по плану (не начинать без явного решения пользователя)
 
-- [~] Достроить Android-навигацию: Login/Register (готово) → Device Setup (реализован в этом PR) → Dashboard → Device Details → Game Details
+- [x] Достроить Android-навигацию: Login/Register (готово) → Device Setup (PR #36) → Dashboard → Device Details → Game Details — реализовано в PR #37, head `012ffa8c00a358e102444086bae93b0c97bb1b01`; Security #126 PASS, P1 Evidence #37 PASS, ALPHA-0 Android CI #893 PASS, Build & Test #206 PASS по всем code/build jobs; известный FTL/GCP job остаётся инфраструктурным blocker.
 - [ ] UI/визуальный дизайн — намеренно отложен до стабилизации основных экранов
 - [ ] Админ-панель для пользователя (статистика, нагрузка, capacity) — после MVP, не параллельно
 - [ ] PC/WoW-клиент и лаунчер — не начинать, пока Android MVP не протестирован вручную пользователем

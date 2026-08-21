@@ -29,7 +29,7 @@ fun DeviceSetupScreen(
     accessToken: String,
     deviceIdentity: DeviceIdentity,
     api: DeviceApi,
-    onBound: () -> Unit
+    onBound: (String) -> Unit
 ) {
     val identity = remember { deviceIdentity.getIdentityInfo() }
     val scope = rememberCoroutineScope()
@@ -72,7 +72,7 @@ fun DeviceSetupScreen(
                         }
                         busy = false
                         when (result) {
-                            is DeviceApi.Result.Success -> onBound()
+                            is DeviceApi.Result.Success -> onBound(result.value.deviceId)
                             is DeviceApi.Result.Failure -> error = result.message
                         }
                     }

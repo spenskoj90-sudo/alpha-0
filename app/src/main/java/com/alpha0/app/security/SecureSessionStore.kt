@@ -19,8 +19,9 @@ class SecureSessionStore {
         private const val PREFS = "sentinel_session"
         private const val ACCESS_TOKEN = "access_token"
         private const val REFRESH_TOKEN = "refresh_token"
+        private const val DEVICE_ID = "device_id"
 
-        data class Session(val accessToken: String, val refreshToken: String)
+        data class Session(val accessToken: String, val refreshToken: String, val deviceId: String? = null)
     }
 
     private fun key(): SecretKey {
@@ -41,11 +42,16 @@ class SecureSessionStore {
         return store.getKey(ALIAS, null) as SecretKey
     }
 
-    fun save(context: Context, accessToken: String, refreshToken: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+    fun save(context: Context, accessToken: String, refreshToken: String, deviceId: String? = null) {
+        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(ACCESS_TOKEN, encrypt(accessToken))
             .putString(REFRESH_TOKEN, encrypt(refreshToken))
-            .apply()
+        if (deviceId == null) {
+            editor.remove(DEVICE_ID)
+        } else {
+            editor.putString(DEVICE_ID, encrypt(deviceId))
+        }
+        editor.apply()
     }
 
     fun load(context: Context): Session? {
@@ -53,7 +59,8 @@ class SecureSessionStore {
         val access = prefs.getString(ACCESS_TOKEN, null) ?: return null
         val refresh = prefs.getString(REFRESH_TOKEN, null) ?: return null
         return try {
-            Session(decrypt(access), decrypt(refresh))
+            val deviceId = prefs.getString(DEVICE_ID, null)?.let { decrypt(it) }
+            Session(decrypt(access), decrypt(refresh), deviceId)
         } catch (_: Exception) {
             clear(context)
             null

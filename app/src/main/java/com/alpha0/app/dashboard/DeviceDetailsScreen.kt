@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,35 +20,41 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.security.DeviceIdentity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi) {
+fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi, onRevoked: () -> Unit = {}) {
     var device by remember { mutableStateOf<DashboardApi.Device?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var loading by remember { mutableStateOf(true) }
+    var actionInProgress by remember { mutableStateOf(false) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
+    var revoked by remember { mutableStateOf(false) }
+
+    fun showFailure(message: String) {
+        error = message
+    }
 
     LaunchedEffect(deviceId, accessToken) {
         when (val result = withContext(Dispatchers.IO) { api.getDevice(accessToken, deviceId) }) {
             is DashboardApi.Result.Success -> device = result.value
             is DashboardApi.Result.Failure -> error = result.message
         }
-        loading = false
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("DEVICE DETAILS", style = MaterialTheme.typography.headlineMedium)
             when {
-                loading -> CircularProgressIndicator()
+                device == null && error == null -> CircularProgressIndicator()
                 error != null -> Text("Load failed: $error", color = MaterialTheme.colorScheme.error)
-                device != null -> {
+                else -> {
                     val current = device!!
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("State: ${current.state}")
-                            Text("Security: ${current.securityStatus}")
+                            Text("State: ${if (revoked) "REVOKED" else current.state}")
+                            Text("Security: ${if (revoked) "AT_RISK" else current.securityStatus}")
                             Text("Platform: ${current.platform}")
                             Text("Algorithm: ${current.algorithm}")
                             Text("Fingerprint: ${current.fingerprint}")
@@ -54,7 +62,67 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                             Text("Last seen: ${current.lastSeenAt ?: "not reported"}")
                         }
                     }
-                    Text("Device revoke/rotate is available in the backend, but is intentionally not exposed in this MVP screen.", style = MaterialTheme.typography.bodySmall)
+
+                    if (actionMessage != null) {
+                        Text(actionMessage!!, color = MaterialTheme.colorScheme.primary)
+                    }
+                    if (error != null) {
+                        Text(error!!, color = MaterialTheme.colorScheme.error)
+                    }
+
+                    if (!revoked) {
+                        OutlinedButton(
+                            enabled = !actionInProgress,
+                            onClick = {
+                                actionInProgress = true
+                                error = null
+                                actionMessage = null
+                                val identity = DeviceIdentity().getIdentityInfo()
+                                val publicKey = DeviceIdentity().getPublicKeyDerBase64()
+                                kotlinx.coroutines.MainScope().launch(Dispatchers.IO) {
+                                    val result = api.rotateDevice(accessToken, current.deviceId, current.platform, publicKey, identity.fingerprint)
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        actionInProgress = false
+                                        when (result) {
+                                            is DashboardApi.Result.Success -> actionMessage = "Device binding rotated. New device id: ${result.value.deviceId}"
+                                            is DashboardApi.Result.Failure -> showFailure(result.message)
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Rotate key")
+                        }
+
+                        Button(
+                            enabled = !actionInProgress,
+                            onClick = {
+                                actionInProgress = true
+                                error = null
+                                actionMessage = null
+                                kotlinx.coroutines.MainScope().launch(Dispatchers.IO) {
+                                    val result = api.revokeDevice(accessToken, current.deviceId)
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        actionInProgress = false
+                                        when (result) {
+                                            is DashboardApi.Result.Success -> {
+                                                revoked = true
+                                                actionMessage = "Device revoked. Sign in again to continue."
+                                                onRevoked()
+                                            }
+                                            is DashboardApi.Result.Failure -> showFailure(result.message)
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Revoke device")
+                        }
+                    } else {
+                        Text("This device is revoked. Sign in again to continue.", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }

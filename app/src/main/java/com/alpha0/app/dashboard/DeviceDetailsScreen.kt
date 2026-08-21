@@ -27,7 +27,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi, onRevoked: () -> Unit = {}) {
+fun DeviceDetailsScreen(
+    accessToken: String,
+    deviceId: String,
+    api: DashboardApi,
+    onRevoked: () -> Unit = {},
+    onRotated: (DashboardApi.DeviceActionResult) -> Unit = {},
+) {
     var device by remember { mutableStateOf<DashboardApi.Device?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var actionInProgress by remember { mutableStateOf(false) }
@@ -80,7 +86,15 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                                     withContext(Dispatchers.Main) {
                                         actionInProgress = false
                                         when (result) {
-                                            is DashboardApi.Result.Success -> actionMessage = "Device binding rotated. New device id: ${result.value.deviceId}"
+                                            is DashboardApi.Result.Success -> {
+                                                val rotated = result.value
+                                                if (rotated.deviceId.isNullOrBlank() || rotated.sessionToken.isNullOrBlank() || rotated.refreshToken.isNullOrBlank()) {
+                                                    error = "UNEXPECTED_ERROR: Invalid rotate response: missing device/session data"
+                                                } else {
+                                                    actionMessage = "Device binding rotated. Session renewed."
+                                                    onRotated(rotated)
+                                                }
+                                            }
                                             is DashboardApi.Result.Failure -> error = result.message
                                         }
                                     }

@@ -37,7 +37,11 @@ class MainActivity : ComponentActivity() {
             SentinelTheme {
                 val navController = rememberNavController()
                 val startDestination = remember(session) {
-                    if (session == null) "login" else "device-setup"
+                    when {
+                        session == null -> "login"
+                        session.deviceId.isNullOrBlank() -> "device-setup"
+                        else -> "dashboard/${Uri.encode(session.deviceId)}"
+                    }
                 }
 
                 NavHost(navController = navController, startDestination = startDestination) {
@@ -61,6 +65,12 @@ class MainActivity : ComponentActivity() {
                                 deviceIdentity = deviceIdentity,
                                 api = deviceApi,
                                 onBound = { deviceId ->
+                                    sessionStore.save(
+                                        this@MainActivity,
+                                        currentSession.accessToken,
+                                        currentSession.refreshToken,
+                                        deviceId
+                                    )
                                     navController.navigate("dashboard/${Uri.encode(deviceId)}") {
                                         popUpTo("device-setup") { inclusive = true }
                                     }
@@ -75,9 +85,7 @@ class MainActivity : ComponentActivity() {
                         val currentSession = sessionStore.load(this@MainActivity)
                         val deviceId = entry.arguments?.getString("deviceId")
                         if (currentSession == null || deviceId.isNullOrBlank()) {
-                            navController.navigate("login") {
-                                popUpTo(0)
-                            }
+                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
                         } else {
                             DashboardScreen(
                                 accessToken = currentSession.accessToken,
@@ -95,13 +103,9 @@ class MainActivity : ComponentActivity() {
                         val currentSession = sessionStore.load(this@MainActivity)
                         val deviceId = entry.arguments?.getString("deviceId")
                         if (currentSession == null || deviceId.isNullOrBlank()) {
-                            navController.navigate("login") { popUpTo(0) }
+                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
                         } else {
-                            DeviceDetailsScreen(
-                                accessToken = currentSession.accessToken,
-                                deviceId = deviceId,
-                                api = dashboardApi
-                            )
+                            DeviceDetailsScreen(accessToken = currentSession.accessToken, deviceId = deviceId, api = dashboardApi)
                         }
                     }
                     composable(
@@ -111,13 +115,9 @@ class MainActivity : ComponentActivity() {
                         val currentSession = sessionStore.load(this@MainActivity)
                         val entitlementId = entry.arguments?.getString("entitlementId")
                         if (currentSession == null || entitlementId.isNullOrBlank()) {
-                            navController.navigate("login") { popUpTo(0) }
+                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
                         } else {
-                            GameDetailsScreen(
-                                accessToken = currentSession.accessToken,
-                                entitlementId = entitlementId,
-                                api = dashboardApi
-                            )
+                            GameDetailsScreen(accessToken = currentSession.accessToken, entitlementId = entitlementId, api = dashboardApi)
                         }
                     }
                 }

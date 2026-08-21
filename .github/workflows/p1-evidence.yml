@@ -2,7 +2,7 @@ name: P1 Evidence
 
 on:
   push:
-    branches: [sentinel-1.0.0-rc1-final]
+    branches: [main]
   pull_request:
     branches: [main]
 

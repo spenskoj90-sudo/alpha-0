@@ -17,11 +17,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -31,10 +33,8 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
     var actionInProgress by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var revoked by remember { mutableStateOf(false) }
-
-    fun showFailure(message: String) {
-        error = message
-    }
+    val scope = rememberCoroutineScope()
+    val identity = remember { DeviceIdentity() }
 
     LaunchedEffect(deviceId, accessToken) {
         when (val result = withContext(Dispatchers.IO) { api.getDevice(accessToken, deviceId) }) {
@@ -63,12 +63,8 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                         }
                     }
 
-                    if (actionMessage != null) {
-                        Text(actionMessage!!, color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (error != null) {
-                        Text(error!!, color = MaterialTheme.colorScheme.error)
-                    }
+                    actionMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
                     if (!revoked) {
                         OutlinedButton(
@@ -77,15 +73,15 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                                 actionInProgress = true
                                 error = null
                                 actionMessage = null
-                                val identity = DeviceIdentity().getIdentityInfo()
-                                val publicKey = DeviceIdentity().getPublicKeyDerBase64()
-                                kotlinx.coroutines.MainScope().launch(Dispatchers.IO) {
-                                    val result = api.rotateDevice(accessToken, current.deviceId, current.platform, publicKey, identity.fingerprint)
-                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                scope.launch(Dispatchers.IO) {
+                                    val info = identity.getIdentityInfo()
+                                    val publicKey = identity.getPublicKeyDerBase64()
+                                    val result = api.rotateDevice(accessToken, current.deviceId, current.platform, publicKey, info.fingerprint)
+                                    withContext(Dispatchers.Main) {
                                         actionInProgress = false
                                         when (result) {
                                             is DashboardApi.Result.Success -> actionMessage = "Device binding rotated. New device id: ${result.value.deviceId}"
-                                            is DashboardApi.Result.Failure -> showFailure(result.message)
+                                            is DashboardApi.Result.Failure -> error = result.message
                                         }
                                     }
                                 }
@@ -101,9 +97,9 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                                 actionInProgress = true
                                 error = null
                                 actionMessage = null
-                                kotlinx.coroutines.MainScope().launch(Dispatchers.IO) {
+                                scope.launch(Dispatchers.IO) {
                                     val result = api.revokeDevice(accessToken, current.deviceId)
-                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    withContext(Dispatchers.Main) {
                                         actionInProgress = false
                                         when (result) {
                                             is DashboardApi.Result.Success -> {
@@ -111,7 +107,7 @@ fun DeviceDetailsScreen(accessToken: String, deviceId: String, api: DashboardApi
                                                 actionMessage = "Device revoked. Sign in again to continue."
                                                 onRevoked()
                                             }
-                                            is DashboardApi.Result.Failure -> showFailure(result.message)
+                                            is DashboardApi.Result.Failure -> error = result.message
                                         }
                                     }
                                 }

@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${SENTINEL_DB_PASSWORD:?set SENTINEL_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - sentinel_pg:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core:
+    build:
+      context: ./backend
+    environment:
+      SENTINEL_ENVIRONMENT: development
+      SENTINEL_DATABASE_URL: postgresql://sentinel:${SENTINEL_DB_PASSWORD}@postgres:5432/sentinel
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  sentinel_pg:

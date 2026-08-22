@@ -1,0 +1,1 @@
+"""SENTINEL CORE modular monolith."""

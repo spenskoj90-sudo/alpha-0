@@ -78,8 +78,8 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
             "fingerprint_sha256": foreign_fingerprint,
         },
     )
-    assert foreign_attempt.status_code == 403, f"ACTUAL PAYLOAD: {foreign_attempt.json()}"
-    assert foreign_attempt.json()["code"] == "DEVICE_SCOPE_MISMATCH", f"ACTUAL PAYLOAD: {foreign_attempt.json()}"
+    assert foreign_attempt.status_code == 403
+    assert foreign_attempt.json()["code"] == "DEVICE_SCOPE_MISMATCH"
 
     new_key = ec.generate_private_key(ec.SECP256R1())
     new_public_b64, new_fingerprint = public_material(new_key)
@@ -93,8 +93,8 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
             "fingerprint_sha256": bad_fingerprint,
         },
     )
-    assert bad.status_code == 400, f"ACTUAL PAYLOAD: {bad.json()}"
-    assert bad.json()["code"] == "FINGERPRINT_MISMATCH", f"ACTUAL PAYLOAD: {bad.json()}"
+    assert bad.status_code == 400
+    assert bad.json()["code"] == "FINGERPRINT_MISMATCH"
 
     rotated = client.post(
         f"/v1/devices/{owner_device}/rotate",
@@ -105,17 +105,17 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
             "fingerprint_sha256": new_fingerprint,
         },
     )
-    assert rotated.status_code == 200, f"ACTUAL PAYLOAD: {rotated.json()}"
+    assert rotated.status_code == 200
     payload = rotated.json()
-    assert "device_id" in payload, f"ACTUAL PAYLOAD: {payload}"
-    assert payload["device_id"] != owner_device, f"ACTUAL PAYLOAD: {payload}"
-    assert "state" in payload, f"ACTUAL PAYLOAD: {payload}"
-    assert payload["state"] == "ACTIVE", f"ACTUAL PAYLOAD: {payload}"
-    assert "session_token" in payload, f"ACTUAL PAYLOAD: {payload}"
-    assert payload["session_token"], f"ACTUAL PAYLOAD: {payload}"
-    assert "refresh_token" in payload, f"ACTUAL PAYLOAD: {payload}"
-    assert payload["refresh_token"], f"ACTUAL PAYLOAD: {payload}"
-    assert store.get_session(owner_access) is None, f"ACTUAL PAYLOAD: {payload}"
+    assert "device_id" in payload
+    assert payload["device_id"] != owner_device
+    assert "state" in payload
+    assert payload["state"] == "ACTIVE"
+    assert "session_token" in payload
+    assert payload["session_token"]
+    assert "refresh_token" in payload
+    assert payload["refresh_token"]
+    assert store.get_session(owner_access) is None
 
     new_access = payload["session_token"]
     authorized = client.post(
@@ -123,8 +123,8 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
         headers={"Authorization": f"Bearer {new_access}"},
         json={"action": "character:read", "resource": "character:42"},
     )
-    assert authorized.status_code == 200, f"ACTUAL PAYLOAD: {authorized.json()}"
-    assert store.get_session(new_access)["device_id"] == payload["device_id"], f"ACTUAL PAYLOAD: {payload}"
+    assert authorized.status_code == 200
+    assert store.get_session(new_access)["device_id"] == payload["device_id"]
 
 
 def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():
@@ -146,21 +146,21 @@ def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():
         f"/v1/devices/{foreign_device}/revoke",
         headers={"Authorization": f"Bearer {owner_access}"},
     )
-    assert foreign_attempt.status_code == 403, f"ACTUAL PAYLOAD: {foreign_attempt.json()}"
-    assert foreign_attempt.json()["code"] == "DEVICE_SCOPE_MISMATCH", f"ACTUAL PAYLOAD: {foreign_attempt.json()}"
+    assert foreign_attempt.status_code == 403
+    assert foreign_attempt.json()["code"] == "DEVICE_SCOPE_MISMATCH"
 
     revoked = client.post(
         f"/v1/devices/{owner_device}/revoke",
         headers={"Authorization": f"Bearer {owner_access}"},
     )
-    assert revoked.status_code == 200, f"ACTUAL PAYLOAD: {revoked.json()}"
-    assert revoked.json() == {"revoked": True}, f"ACTUAL PAYLOAD: {revoked.json()}"
-    assert store.get_session(owner_access) is None, f"ACTUAL PAYLOAD: {revoked.json()}"
-    assert store.get_session(second_access) is None, f"ACTUAL PAYLOAD: {revoked.json()}"
+    assert revoked.status_code == 200
+    assert revoked.json() == {"revoked": True}
+    assert store.get_session(owner_access) is None
+    assert store.get_session(second_access) is None
 
     old_session = client.post(
         "/v1/authorize",
         headers={"Authorization": f"Bearer {second_access}"},
         json={"action": "character:read", "resource": "character:42"},
     )
-    assert old_session.status_code == 401, f"ACTUAL PAYLOAD: {old_session.json()}"
+    assert old_session.status_code == 401

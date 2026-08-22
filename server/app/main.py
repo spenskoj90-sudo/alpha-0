@@ -42,6 +42,7 @@ from app.core.security import (
     canonical_json,
     fingerprint_public_key,
     fresh_request_timestamp,
+    session_hash,
     verify_p256_signature,
 )
 from app.core.store import MemoryStore, PostgresStore, Store
@@ -170,6 +171,59 @@ def authorize_request(principal: Principal, action: str, resource: str, rid: str
         raise HTTPException(status_code=403, detail=reason)
 
 
+def bind_session_to_device(access_token: str, device_id: str) -> None:
+    if isinstance(store, MemoryStore):
+        record = store.sessions.get(session_hash(access_token))
+        if not record or record.get("revoked"):
+            raise HTTPException(status_code=401, detail="INVALID_SESSION")
+        record["device_id"] = device_id
+        return
+    with store.engine.begin() as conn:
+        result = conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE sessions SET device_id=(SELECT id FROM device_bindings WHERE id=:device_id) WHERE session_hash=:session_hash AND revoked_at IS NULL"
+            ),
+            {"device_id": device_id, "session_hash": session_hash(access_token)},
+        )
+        if result.rowcount != 1:
+            raise HTTPException(status_code=401, detail="INVALID_SESSION")
+
+
+def revoke_device_sessions(device_id: str) -> None:
+    if isinstance(store, MemoryStore):
+        with store.lock:
+            for record in store.sessions.values():
+                if record.get("device_id") == device_id:
+                    record["revoked"] = True
+        return
+    with store.engine.begin() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE sessions SET revoked_at=now() WHERE device_id=:device_id AND revoked_at IS NULL"
+            ),
+            {"device_id": device_id},
+        )
+
+
+def set_device_state(device_id: str, state: str) -> None:
+    if isinstance(store, MemoryStore):
+        device = store.devices.get(device_id)
+        if device:
+            device["state"] = state
+        return
+    with store.engine.begin() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE device_bindings SET state=:state, revoked_at=CASE WHEN :state='REVOKED' THEN now() ELSE revoked_at END WHERE id=:device_id"
+            ),
+            {"device_id": device_id, "state": state},
+        )
+
+
+def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str) -> bool:
+    return principal.device_id == device_id or device.get("user_id") == principal.user_id
+
+
 @app.exception_handler(RequestValidationError)
 def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return error_response("VALIDATION_ERROR", "Invalid request", request_id(request), 422)
@@ -260,7 +314,8 @@ def bind_device(
 ):
     rid = request_id(request, x_request_id)
     rate_limit(request, "device-bind")
-    principal = principal_from_token(require_bearer(authorization_header))
+    token = require_bearer(authorization_header)
+    principal = principal_from_token(token)
     try:
         fingerprint = fingerprint_public_key(payload.public_key_der_b64)
     except (ValueError, TypeError) as exc:
@@ -269,8 +324,90 @@ def bind_device(
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
     challenge = secrets.token_urlsafe(32)
     device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
-    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND", "request_id": rid})
+    bind_session_to_device(token, device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND_SESSION_LINKED", "request_id": rid})
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
+
+
+@app.get("/v1/devices/{device_id}")
+def get_device(device_id: str, authorization_header: str = Header(..., alias="Authorization")):
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if device.get("user_id") != principal.user_id:
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    return {
+        "device_id": device_id,
+        "state": device.get("state"),
+        "platform": device.get("platform"),
+        "fingerprint_sha256": device.get("fingerprint"),
+        "algorithm": "EC / secp256r1 / SHA256withECDSA",
+        "bound_at": None,
+        "last_seen_at": None,
+        "security_status": "SECURE" if device.get("state") == "ACTIVE" else "AT_RISK",
+    }
+
+
+@app.post("/v1/devices/{device_id}/revoke")
+def revoke_device(device_id: str, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if not device_owned_by(principal, device, device_id):
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if device.get("state") == "REVOKED":
+        raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
+    set_device_state(device_id, "REVOKED")
+    revoke_device_sessions(device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:revoke", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
+    return {"revoked": True}
+
+
+@app.post("/v1/devices/{device_id}/rotate")
+def rotate_device(
+    device_id: str,
+    payload: DeviceBindRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    token = require_bearer(authorization_header)
+    principal = principal_from_token(token)
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if not device_owned_by(principal, device, device_id):
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if device.get("state") != "ACTIVE":
+        raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    if fingerprint.lower() == str(device.get("fingerprint", "")).lower():
+        raise HTTPException(status_code=409, detail="KEY_UNCHANGED")
+
+    challenge = secrets.token_urlsafe(32)
+    new_device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    new_access, new_refresh, expires_at, scopes = store.issue_session(new_device_id, principal.user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    set_device_state(device_id, "REVOKED")
+    revoke_device_sessions(device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:rotate", "resource": new_device_id, "decision": "ALLOW", "reason_code": "DEVICE_ROTATED", "request_id": rid})
+    return {
+        "device_id": new_device_id,
+        "state": "ACTIVE",
+        "challenge": challenge,
+        "session_token": new_access,
+        "refresh_token": new_refresh,
+        "expires_at": expires_at,
+        "scopes": scopes,
+    }
 
 
 @app.post("/v1/devices/{device_id}/prove", response_model=SessionResponse)

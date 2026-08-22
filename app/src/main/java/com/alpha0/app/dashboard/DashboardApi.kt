@@ -43,7 +43,14 @@ class DashboardApi(private val baseUrl: String) {
         val interactionMode: String
     )
 
-    data class DeviceActionResult(val deviceId: String? = null, val revoked: Boolean = false)
+    data class DeviceActionResult(
+        val deviceId: String? = null,
+        val revoked: Boolean = false,
+        val sessionToken: String? = null,
+        val refreshToken: String? = null,
+        val expiresAt: String? = null,
+        val scopes: List<String> = emptyList()
+    )
 
     sealed interface Result<out T> {
         data class Success<T>(val value: T) : Result<T>
@@ -68,7 +75,15 @@ class DashboardApi(private val baseUrl: String) {
         put("public_key_der_b64", publicKeyDerB64)
         put("fingerprint_sha256", fingerprintSha256)
     }) { json ->
-        DeviceActionResult(deviceId = json.optString("device_id").takeIf { it.isNotBlank() })
+        DeviceActionResult(
+            deviceId = json.optString("device_id").takeIf { it.isNotBlank() },
+            sessionToken = json.optString("session_token").takeIf { it.isNotBlank() },
+            refreshToken = json.optString("refresh_token").takeIf { it.isNotBlank() },
+            expiresAt = json.optString("expires_at").takeIf { it.isNotBlank() },
+            scopes = json.optJSONArray("scopes")?.let { array ->
+                buildList { for (index in 0 until array.length()) add(array.optString(index)) }
+            } ?: emptyList()
+        )
     }
 
     fun revokeDevice(accessToken: String, deviceId: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/revoke", "POST") {

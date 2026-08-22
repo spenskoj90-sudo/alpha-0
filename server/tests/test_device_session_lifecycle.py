@@ -115,7 +115,7 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
     assert payload["session_token"], f"ACTUAL PAYLOAD: {payload}"
     assert "refresh_token" in payload, f"ACTUAL PAYLOAD: {payload}"
     assert payload["refresh_token"], f"ACTUAL PAYLOAD: {payload}"
-    assert store.get_session(owner_access) is None
+    assert store.get_session(owner_access) is None, f"ACTUAL PAYLOAD: {payload}"
 
     new_access = payload["session_token"]
     authorized = client.post(
@@ -155,8 +155,8 @@ def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():
     )
     assert revoked.status_code == 200, f"ACTUAL PAYLOAD: {revoked.json()}"
     assert revoked.json() == {"revoked": True}, f"ACTUAL PAYLOAD: {revoked.json()}"
-    assert store.get_session(owner_access) is None
-    assert store.get_session(second_access) is None
+    assert store.get_session(owner_access) is None, f"ACTUAL PAYLOAD: {revoked.json()}"
+    assert store.get_session(second_access) is None, f"ACTUAL PAYLOAD: {revoked.json()}"
 
     old_session = client.post(
         "/v1/authorize",

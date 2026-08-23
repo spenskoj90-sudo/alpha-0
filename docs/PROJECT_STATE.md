@@ -8,11 +8,11 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `bbe2c03eb4286816950815ce9df94ece0e405af9`
+**Canonical HEAD:** `590623fc5e2d7b31224c1f1dab00119b9aceebdc`
 **Tree:** product tree from PR #46 plus subsequent documentation and onboarding changes.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.
-**Latest accepted documentation change:** PR #51 acceptance/canonical-state follow-up currently recorded by commit `bbe2c03…`.
+**Latest accepted documentation change:** PR #54 — canonical-state reconciliation after PR #51, merged at `590623fc5e2d7b31224c1f1dab00119b9aceebdc`.
 
 ## Exact validation evidence
 
@@ -28,6 +28,7 @@ The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`.
 PR #47 synchronized canonical state documentation.
 PR #49 was a documentation-only follow-up; Build & Test `32629034760` had all product/code/build jobs PASS and only the Firebase Test Lab authentication step failed with the known GCP configuration exception.
 PR #51 added optional Android battery-optimization onboarding and merged as `9f724089fc01d8aeef247166ec9de2fbf54202d3`.
+PR #54 reconciled canonical documentation with the live main lineage and recorded that recommendation authorization regression coverage is present. Merge commit: `590623fc5e2d7b31224c1f1dab00119b9aceebdc`.
 
 ## Current repository facts
 
@@ -99,7 +100,7 @@ Current `.github/workflows/deploy.yml` contains only `release: types: [published
 
 ### Documentation consolidation — IN PROGRESS
 
-Canonical HEAD, PR #49 evidence, PR #51 evidence, and CI governance state are recorded here. Historical documents remain separate until classified.
+Canonical HEAD, PR #49 evidence, PR #51 evidence, PR #54 reconciliation, and CI governance state are recorded here. Historical documents remain separate until classified.
 
 ## Workflow inventory
 

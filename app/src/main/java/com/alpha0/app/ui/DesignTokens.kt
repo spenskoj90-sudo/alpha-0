@@ -32,9 +32,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.text.googlefonts.GoogleFont.Provider
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.googlefonts.R as GoogleFontsR
 
 object SentinelColors {
     val Background = Color(0xFF0D1117)
@@ -47,22 +45,16 @@ object SentinelColors {
     val TextSecondary = Color(0xFF8B949E)
 }
 
-private val GoogleFontsProvider = Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = GoogleFontsR.array.com_google_android_gms_fonts_certs,
-)
-
 val SentinelDisplayFont = FontFamily(
-    Font(GoogleFont("Outfit"), GoogleFontsProvider, weight = FontWeight.Medium),
-    Font(GoogleFont("Outfit"), GoogleFontsProvider, weight = FontWeight.SemiBold),
+    Font(GoogleFont("Outfit"), weight = FontWeight.Medium),
+    Font(GoogleFont("Outfit"), weight = FontWeight.SemiBold),
 )
 val SentinelBodyFont = FontFamily(
-    Font(GoogleFont("Inter"), GoogleFontsProvider, weight = FontWeight.Normal),
-    Font(GoogleFont("Inter"), GoogleFontsProvider, weight = FontWeight.Medium),
+    Font(GoogleFont("Inter"), weight = FontWeight.Normal),
+    Font(GoogleFont("Inter"), weight = FontWeight.Medium),
 )
 val SentinelDataFont = FontFamily(
-    Font(GoogleFont("JetBrains Mono"), GoogleFontsProvider, weight = FontWeight.Normal),
+    Font(GoogleFont("JetBrains Mono"), weight = FontWeight.Normal),
 )
 
 @Composable

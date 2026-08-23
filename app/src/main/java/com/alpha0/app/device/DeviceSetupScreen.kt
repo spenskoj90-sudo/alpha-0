@@ -13,7 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,7 +21,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.PrimaryButton
@@ -39,14 +42,21 @@ fun DeviceSetupScreen(
     onBound: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val identity = remember { deviceIdentity.getIdentityInfo() }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var batteryOptimizationIgnored by remember { mutableStateOf(BatteryOptimization.isIgnored(context)) }
 
-    LaunchedEffect(Unit) {
-        batteryOptimizationIgnored = BatteryOptimization.isIgnored(context)
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                batteryOptimizationIgnored = BatteryOptimization.isIgnored(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
@@ -87,7 +97,6 @@ fun DeviceSetupScreen(
                                         )
                                     }
                                 }
-                                batteryOptimizationIgnored = BatteryOptimization.isIgnored(context)
                             },
                             modifier = Modifier.fillMaxWidth()
                         )

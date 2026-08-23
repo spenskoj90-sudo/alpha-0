@@ -87,26 +87,29 @@ fun SentinelCard(
             .fillMaxWidth()
             .clip(shape)
             .background(SentinelColors.Surface)
-            .border(BorderStroke(1.dp, SentinelColors.Border), shape)
-            .padding(start = 2.dp),
+            .border(BorderStroke(1.dp, SentinelColors.Border), shape),
     ) {
-        Box(modifier = Modifier.padding(16.dp), content = content)
+        Box(modifier = Modifier.padding(start = 10.dp, top = 16.dp, end = 16.dp, bottom = 16.dp), content = content)
+
+        var scanHeightPx by remember { mutableStateOf(0) }
+        var started by remember { mutableStateOf(false) }
+        val progress = remember { Animatable(0f) }
         if (scan) {
-            var heightPx by remember { mutableStateOf(0) }
-            var started by remember { mutableStateOf(false) }
-            val progress = remember { Animatable(0f) }
-            LaunchedEffect(heightPx) {
-                if (heightPx > 0 && !started) {
+            LaunchedEffect(scanHeightPx) {
+                if (scanHeightPx > 0 && !started) {
                     started = true
                     progress.snapTo(0f)
                     progress.animateTo(1f, animationSpec = tween(1000))
                 }
             }
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onSizeChanged { heightPx = it.height },
-            ) {
+        }
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { scanHeightPx = it.height },
+        ) {
+            if (scan && progress.value < 1f) {
                 drawLine(
                     color = SentinelColors.Primary,
                     start = Offset(0f, size.height * progress.value),
@@ -115,6 +118,12 @@ fun SentinelCard(
                     alpha = 0.9f,
                 )
             }
+            drawLine(
+                color = SentinelColors.Primary,
+                start = Offset(1.dp.toPx(), 0f),
+                end = Offset(1.dp.toPx(), size.height),
+                strokeWidth = 2.dp.toPx(),
+            )
         }
     }
 }

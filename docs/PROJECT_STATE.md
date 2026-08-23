@@ -1,6 +1,6 @@
 # SENTINEL — PROJECT STATE
 
-Single source of truth for current release-validation work. Update this file whenever exact HEAD, P0/P1 status, or workflow structure changes.
+Single source of truth for current release-validation work. Update this file whenever exact product HEAD, P0/P1 status, or workflow structure changes.
 
 **Last updated:** 2026-08-23
 
@@ -8,7 +8,8 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `e2f088c40726228e92e6c8ccfa3d9d74c91c7af9`
+**Canonical product HEAD:** `1b4dc15e82b44de2d3fc65004ed2b113e326433c`
+**Current main documentation commits:** follow the canonical product merge without changing product state.
 **Tree:** product tree after PR #57 merge, with PostgreSQL/deployment evidence hardening accepted and FTL policy formalized.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.

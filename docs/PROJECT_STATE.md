@@ -8,21 +8,23 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `590623fc5e2d7b31224c1f1dab00119b9aceebdc`
-**Tree:** product tree from PR #46 plus subsequent documentation and onboarding changes.
+**Canonical HEAD:** `1b4dc15e82b44de2d3fc65004ed2b113e326433c`
+**Tree:** product tree after PR #57 merge, with PostgreSQL/deployment evidence hardening accepted.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.
-**Latest accepted documentation change:** PR #54 — post-PR #51 state reconciliation.
+**Latest accepted CI evidence hardening:** PR #57 — PostgreSQL smoke and deployment schema-readiness evidence.
+
+## ACCEPTED / POLICY
+
+### Firebase Test Lab — OPTIONAL / NON-BLOCKING
+
+FTL/GCP authentication is an infrastructure dependency, not a product-correctness gate at the current project stage. Build & Test product jobs remain authoritative for automated CI acceptance; Firebase Test Lab is informational and may fail without blocking product acceptance. Real-device Android acceptance is intentionally deferred and will be performed by the Human Owner as a cumulative device-validation pass after sufficient functionality has accumulated. FTL integration will be restored as a later hardening block.
+
+### PR #57 — ACCEPTED
+
+PR #57 merged as `1b4dc15e82b44de2d3fc65004ed2b113e326433c`. It strengthened PostgreSQL smoke evidence with device/session/audit-specific assertions, bind/revoke SQL proof, schema migration evidence, and added deployment-smoke schema-readiness validation. Exact-head Build & Test product jobs passed; the only failure was the known FTL/GCP authentication exception.
 
 ## OPEN / NOT ACCEPTED ITEMS
-
-### Postgres/deployment evidence hardening — IN PROGRESS
-
-Branch `test/postgres-deployment-evidence-hardening-2026-08-23` strengthens CI evidence only:
-- postgres smoke: device_bindings ACTIVE, active sessions, device:prove ALLOW audit rows, game_events event_id, schema_migrations versions, bind happy-path + revoke SQL;
-- deployment-smoke: post-healthz schema readiness via `schema_migrations` and `to_regclass` for sessions/device_bindings (image CMD still runs migrate; no second migrate step, no deploy.yml change).
-
-Production SoR, FTL/GCP, required status checks, manual Android acceptance, and deploy historical anomaly remain OPEN.
 
 ### PostgreSQL runtime persistence — OPEN / AUTOMATED EVIDENCE STRENGTHENED
 
@@ -32,13 +34,17 @@ The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set
 
 Live repository metadata documents empty required-check arrays. The owner must configure the intended required status checks/ruleset in GitHub Settings/Rulesets.
 
-### Real-device battery onboarding verification — OPEN MANUAL ACCEPTANCE
+### Real-device Android acceptance — OPEN / BATCHED MANUAL ACCEPTANCE
 
-PR #51 and product CI establish build/test acceptance. Physical device verification remains required.
+Physical-device testing is intentionally accumulated rather than performed after every individual feature. The Human Owner will run one cumulative acceptance pass when the relevant functionality set is sufficiently complete; discovered defects will then be fixed systematically and the acceptance pass repeated.
 
 ### Deploy workflow anomaly — OPEN INVESTIGATION
 
 Current `.github/workflows/deploy.yml` contains only `release: types: [published]`. Do not change the release trigger solely to silence historical runs.
+
+### Repository hygiene — OPEN / DEFERRED
+
+Repository cleanup remains intentionally deferred until the working-core acceptance state is stable. Destructive cleanup remains evidence-gated.
 
 ## Authority
 

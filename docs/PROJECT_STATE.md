@@ -8,11 +8,11 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `9f724089fc01d8aeef247166ec9de2fbf54202d3`
+**Canonical HEAD:** `bbe2c03eb4286816950815ce9df94ece0e405af9`
 **Tree:** product tree from PR #46 plus subsequent documentation and onboarding changes.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.
-**Latest accepted documentation change:** PR #50 — post-PR #49 production-readiness state synchronization.
+**Latest accepted documentation change:** PR #51 acceptance/canonical-state follow-up currently recorded by commit `bbe2c03…`.
 
 ## Exact validation evidence
 
@@ -49,7 +49,7 @@ PR #51 added optional Android battery-optimization onboarding and merged as `9f7
 - Migration order is `001_initial.sql`, `002_p1_rls.sql`, `003_user_auth.sql`.
 - `.github/workflows/p1-evidence.yml` currently uses `push.branches: [main]` and `pull_request.branches: [main]`.
 - `.github/workflows/deploy.yml` currently triggers only on `release.published` in the checked-in file.
-- `POST /v1/recommendations` calls `authorize_request` with action `knowledge:recommend`; a direct unauthorized regression test is present in `server/tests/test_security_negative.py` and expects HTTP 403 without the required `game:read` scope.
+- `POST /v1/recommendations` calls `authorize_request` with action `knowledge:recommend`; a direct unauthorized regression test is present in `server/tests/test_security_negative.py::test_direct_unauthorized_recommendation_call_is_blocked` and expects HTTP 403 without the required `game:read` scope. An independent post-PR #51 audit re-confirmed this test exists; the earlier audit claim that recommendation regression coverage was missing is stale and is not a current gap.
 
 ## P0 / runtime findings
 
@@ -69,7 +69,7 @@ The Android identity implementation uses `AndroidKeyStore`, EC `secp256r1`, and 
 
 ### Required status-check contexts — VERIFIED EMPTY / OPEN GOVERNANCE GAP
 
-Live branch metadata exposes the protection payload: `required_status_checks.enforcement_level = non_admins`, but both `contexts` and `checks` are empty. Therefore no named required status-check context is currently configured for protected `main`.
+Live branch metadata recorded in the canonical project state exposes the protection payload: `required_status_checks.enforcement_level = non_admins`, but both `contexts` and `checks` are empty. Therefore no named required status-check context is currently configured for protected `main`.
 
 This is a real process risk: GitHub branch protection is enabled, but the repository is not currently enforcing the project's intended CI acceptance checks through named required contexts. The internal Evidence Protocol remains mandatory, but it is not equivalent to a GitHub-enforced merge gate.
 

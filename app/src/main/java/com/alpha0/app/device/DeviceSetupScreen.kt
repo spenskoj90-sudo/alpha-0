@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,6 +19,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
+import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelDataStyle
+import com.alpha0.app.ui.SentinelDanger
+import com.alpha0.app.ui.SentinelTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,19 +44,22 @@ fun DeviceSetupScreen(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("DEVICE SETUP", style = MaterialTheme.typography.headlineMedium)
-            Text("Bind this phone to your authenticated SENTINEL account.", style = MaterialTheme.typography.bodyLarge)
+            Text("DEVICE SETUP", style = MaterialTheme.typography.displaySmall)
+            Text("Bind this phone to your authenticated SENTINEL account.", style = MaterialTheme.typography.bodyLarge, color = SentinelTextSecondary)
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            SentinelCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerMarks = true,
+            ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("DEVICE IDENTITY", style = MaterialTheme.typography.labelLarge)
-                    Text(identity.fingerprint, style = MaterialTheme.typography.bodyMedium)
-                    Text(identity.algorithm, style = MaterialTheme.typography.bodySmall)
+                    Text(identity.fingerprint, style = SentinelDataStyle)
+                    Text(identity.algorithm, style = SentinelDataStyle)
                 }
             }
 
             if (error != null) {
-                Text("Binding failed: $error", color = MaterialTheme.colorScheme.error)
+                Text("Binding failed: $error", color = SentinelDanger)
             }
 
             Button(
@@ -81,7 +87,7 @@ fun DeviceSetupScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (busy) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text("Привязать устройство")
                 }

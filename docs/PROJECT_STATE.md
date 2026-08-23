@@ -8,7 +8,7 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `064e02053346b155f99f2637f4daf008a7fd5a90`
+**Canonical HEAD:** `e2f088c40726228e92e6c8ccfa3d9d74c91c7af9`
 **Tree:** product tree after PR #57 merge, with PostgreSQL/deployment evidence hardening accepted and FTL policy formalized.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.

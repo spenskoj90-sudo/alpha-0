@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,6 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.StatusBadge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,26 +38,26 @@ fun GameDetailsScreen(accessToken: String, entitlementId: String, api: Dashboard
         loading = false
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("GAME DETAILS", style = MaterialTheme.typography.headlineMedium)
             when {
-                loading -> CircularProgressIndicator()
-                error != null -> Text("Load failed: $error", color = MaterialTheme.colorScheme.error)
+                loading -> CircularProgressIndicator(color = SentinelColors.Primary)
+                error != null -> Text("Load failed: $error", color = SentinelColors.Danger)
                 game != null -> {
                     val current = game!!
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SentinelCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(current.gameName, style = MaterialTheme.typography.titleLarge)
-                            Text("Access: ${current.status}")
-                            Text("Platform: ${current.platform}")
-                            Text("Family: ${current.family}")
-                            Text("Versioning: ${current.versioning}")
-                            Text("Source: ${current.source}")
-                            Text("Valid from: ${current.validFrom}")
-                            Text("Valid until: ${current.validUntil}")
-                            Text("Launcher supported: ${current.launcherSupported}")
-                            Text("Interaction mode: ${current.interactionMode}")
+                            StatusBadge(current.status, active = current.status.equals("ACTIVE", ignoreCase = true))
+                            Text("Platform: ${current.platform}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Family: ${current.family}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Versioning: ${current.versioning}", style = MaterialTheme.typography.bodyMedium)
+                            DataText("Source: ${current.source}")
+                            DataText("Valid from: ${current.validFrom}")
+                            DataText("Valid until: ${current.validUntil}")
+                            Text("Launcher supported: ${current.launcherSupported}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Interaction mode: ${current.interactionMode}", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }

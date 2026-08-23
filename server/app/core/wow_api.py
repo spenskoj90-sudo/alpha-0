@@ -72,13 +72,6 @@ def my_device(authorization_header: str = Header(..., alias="Authorization")) ->
     return _device_payload(principal.user_id, principal.device_id, store)
 
 
-@router.get("/v1/devices/{device_id}")
-def device_detail(device_id: str, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, Any]:
-    principal_from_token, require_bearer, store = _security_context()
-    principal = principal_from_token(require_bearer(authorization_header))
-    return _device_payload(principal.user_id, device_id, store)
-
-
 def _device_payload(user_id: str, device_id: str, store) -> dict[str, Any]:
     device = store.get_device(device_id)
     if not device or device.get("user_id") != user_id:

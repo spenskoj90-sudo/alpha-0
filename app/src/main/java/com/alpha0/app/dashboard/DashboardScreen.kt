@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,6 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelDanger
+import com.alpha0.app.ui.SentinelSignal
+import com.alpha0.app.ui.SentinelTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,7 +60,7 @@ fun DashboardScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         if (loading) {
             Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = com.alpha0.app.ui.SentinelAmber)
                 Text("Loading SENTINEL status…")
             }
             return@Surface
@@ -69,33 +72,33 @@ fun DashboardScreen(
         ) {
             item {
                 Text("DASHBOARD", style = MaterialTheme.typography.headlineMedium)
-                Text("Device security and game access", style = MaterialTheme.typography.bodyLarge)
+                Text("DEVICE SECURITY / GAME ACCESS", style = MaterialTheme.typography.labelLarge, color = SentinelTextSecondary)
             }
             if (error != null) {
-                item { Text("Load failed: $error", color = MaterialTheme.colorScheme.error) }
+                item { Text("Load failed: $error", color = SentinelDanger) }
             }
             device?.let { current ->
                 item {
-                    Card(modifier = Modifier.fillMaxWidth().clickable { onDeviceClick() }) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SentinelCard(modifier = Modifier.fillMaxWidth().clickable { onDeviceClick() }, scanOnce = true) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Text("DEVICE", style = MaterialTheme.typography.labelLarge)
-                            Text("${current.state} · ${current.securityStatus}", style = MaterialTheme.typography.titleMedium)
-                            Text(current.fingerprint, style = MaterialTheme.typography.bodySmall)
-                            Text("Bound: ${current.boundAt ?: "not reported"}")
+                            Text("${current.state} · ${current.securityStatus}", style = MaterialTheme.typography.titleMedium, color = if (current.state == "ACTIVE") SentinelSignal else SentinelDanger)
+                            DataText(current.fingerprint)
+                            DataText("Bound: ${current.boundAt ?: "not reported"}")
                         }
                     }
                 }
             }
             item { Text("GAME ACCESS", style = MaterialTheme.typography.titleLarge) }
             if (entitlements.isEmpty()) {
-                item { Text("No entitlements are currently assigned to this account.") }
+                item { Text("No entitlements are currently assigned to this account.", color = SentinelTextSecondary) }
             } else {
                 items(entitlements, key = { it.id }) { entitlement ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { onGameClick(entitlement.id) }) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SentinelCard(modifier = Modifier.fillMaxWidth().clickable { onGameClick(entitlement.id) }) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                             Text(entitlement.gameName, style = MaterialTheme.typography.titleMedium)
-                            Text("${entitlement.status} · ${entitlement.platform}")
-                            Text("Valid until: ${entitlement.validUntil}", style = MaterialTheme.typography.bodySmall)
+                            Text("${entitlement.status} · ${entitlement.platform}", color = if (entitlement.status == "ACTIVE") SentinelSignal else SentinelDanger)
+                            DataText("Valid until: ${entitlement.validUntil}")
                         }
                     }
                 }

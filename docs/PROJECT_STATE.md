@@ -33,7 +33,7 @@ The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set
 
 ### CI governance required checks — OPEN
 
-Live repository metadata documents empty required-check arrays. The owner must configure the intended required status checks/ruleset in GitHub Settings/Rulesets.
+Live repository metadata directly records `protected=true`, `enforcement_level=non_admins`, `contexts=[]`, `checks=[]`. The owner must configure the intended required status checks/ruleset in GitHub Settings/Rulesets.
 
 ### Real-device Android acceptance — OPEN / BATCHED MANUAL ACCEPTANCE
 
@@ -43,9 +43,9 @@ Physical-device testing is intentionally accumulated rather than performed after
 
 Current `.github/workflows/deploy.yml` contains only `release: types: [published]`. Do not change the release trigger solely to silence historical runs.
 
-### Repository hygiene — OPEN / DEFERRED
+### Repository hygiene — OPEN / ACTIVE CLASSIFICATION
 
-Repository cleanup remains intentionally deferred until the working-core acceptance state is stable. Destructive cleanup remains evidence-gated.
+The hygiene pass is now active. Current main has 41 branch refs including `main`. Evidence checks against current `main` show `ahead_by=0` for `ui/sentinel-final-design-system-2026-08-23`, `docs/coordination-rules-hygiene-2026-08-22`, `docs/full-state-governance-sync-2026-08-23`, `docs/governance-hygiene-evidence-2026-08-23`, and `docs/reconcile-post-pr51-state-2026-08-23`; these are delete-candidates because they contain no commits unique to the current main lineage. Deletion is not executed in this pass because the available GitHub toolset exposes no branch-delete operation. Other branch refs remain evidence-gated and will not be deleted merely by naming pattern. Ghost workflow records and historical PRs remain separate cleanup categories.
 
 ## Authority
 

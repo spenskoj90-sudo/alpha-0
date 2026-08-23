@@ -11,9 +11,15 @@ pytestmark = pytest.mark.postgres
 
 
 def test_postgres_auth_event_and_audit_flow():
-    from app.main import app
+    from app.main import app, store
+    from app.core.store import PostgresStore
 
+    assert isinstance(store, PostgresStore)
     client = TestClient(app)
+    health = client.get("/healthz")
+    assert health.status_code == 200
+    assert health.json()["status"] == "UP"
+
     key = ec.generate_private_key(ec.SECP256R1())
     public = key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     public64 = base64.b64encode(public).decode()
@@ -47,3 +53,17 @@ def test_postgres_auth_event_and_audit_flow():
     audit = client.get("/v1/audit", headers={"Authorization": "Bearer " + refreshed.json()["session_token"]})
     assert audit.status_code == 200
     assert audit.json()["events"]
+
+    with store.engine.connect() as conn:
+        audit_count = conn.exec_driver_sql("SELECT COUNT(*) FROM audit_events").scalar_one()
+        event_count = conn.exec_driver_sql("SELECT COUNT(*) FROM game_events WHERE event_id='pg-event-1'").scalar_one()
+    assert audit_count >= 1
+    assert event_count == 1
+
+    # Recycle the SQLAlchemy connection pool and prove the application still reads durable state.
+    store.engine.dispose()
+    health_after_recycle = client.get("/healthz")
+    assert health_after_recycle.status_code == 200
+    audit_after_recycle = client.get("/v1/audit", headers={"Authorization": "Bearer " + refreshed.json()["session_token"]})
+    assert audit_after_recycle.status_code == 200
+    assert audit_after_recycle.json()["events"]

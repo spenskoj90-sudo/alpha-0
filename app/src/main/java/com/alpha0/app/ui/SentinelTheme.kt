@@ -8,10 +8,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.text.googlefonts.R
+import androidx.compose.ui.unit.sp
+import com.alpha0.app.R
 
 val SentinelBackground = Color(0xFF0B0E11)
 val SentinelSurface = Color(0xFF14181D)

@@ -28,14 +28,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.googlefonts.GoogleFont.Provider
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.alpha0.app.R
 
 object SentinelColors {
@@ -69,22 +67,13 @@ val SentinelDataFont = FontFamily(
 
 @Composable
 fun DataText(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        modifier = modifier,
-        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
-        color = SentinelColors.TextSecondary,
-    )
+    Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont), color = SentinelColors.TextSecondary)
 }
 
 @Composable
 fun StatusBadge(text: String, active: Boolean = true, modifier: Modifier = Modifier) {
     val color = if (active) SentinelColors.Signal else SentinelColors.Danger
-    Surface(
-        modifier = modifier,
-        color = color.copy(alpha = 0.15f),
-        shape = RoundedCornerShape(50),
-    ) {
+    Surface(modifier = modifier, color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(50)) {
         Text(
             text = text.uppercase(),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -109,7 +98,7 @@ fun SentinelCard(
             .border(BorderStroke(1.dp, SentinelColors.Border), shape)
             .padding(start = 2.dp),
     ) {
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp), content = content)
+        Box(modifier = Modifier.padding(16.dp), content = content)
         if (scan) {
             var heightPx by remember { mutableStateOf(0) }
             var started by remember { mutableStateOf(false) }
@@ -151,10 +140,7 @@ fun PrimaryButton(
         modifier = modifier,
         enabled = enabled,
         shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = SentinelColors.Primary,
-            contentColor = SentinelColors.TextPrimary,
-        ),
+        colors = ButtonDefaults.buttonColors(containerColor = SentinelColors.Primary, contentColor = SentinelColors.TextPrimary),
     ) {
         content?.invoke() ?: Text(text)
     }

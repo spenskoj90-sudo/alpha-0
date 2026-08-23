@@ -77,9 +77,9 @@ Recommended normal merge-gate contexts are the stable non-FTL product/security c
 
 ## OPEN / NOT ACCEPTED ITEMS
 
-### PostgreSQL runtime persistence — OPEN
+### PostgreSQL runtime persistence — OPEN / AUTOMATED EVIDENCE STRENGTHENED
 
-The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set, and production startup rejects a missing `DATABASE_URL`. The `/healthz` path also performs `SELECT 1` when the active store is PostgreSQL. This proves the application-side runtime path and production guard, but not that the currently deployed runtime actually has PostgreSQL configured and authoritative. Runtime proof remains open until an exact-main environment/deployment evidence bundle is captured.
+The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set, and production startup rejects a missing `DATABASE_URL`. The `/healthz` path also performs `SELECT 1` when the active store is PostgreSQL. In the working-core completion pass, `server/tests/test_postgres_smoke.py` was strengthened to assert the active store type, health endpoint, durable `audit_events`/`game_events` rows, and successful reads after disposing the SQLAlchemy connection pool. Commit: `3330bd0be715baef62efae73c095cf07668f4511` on `p0-core-completion-2026-08-23`. This closes an automated runtime-evidence weakness but **does not yet prove the currently deployed production environment uses PostgreSQL as authoritative SoR**.
 
 ### CI governance required checks — OPEN
 
@@ -100,6 +100,10 @@ Current `.github/workflows/deploy.yml` contains only `release: types: [published
 ### Documentation consolidation — IN PROGRESS
 
 Canonical HEAD, PR #49 evidence, PR #51 evidence, and CI governance state are recorded here. Historical documents remain separate until classified.
+
+## Current coordinated completion pass
+
+On 2026-08-23 GPT opened `p0-core-completion-2026-08-23` from canonical `main` to execute the working-core completion sequence as one coordinated pass. The first implementation increment is the PostgreSQL runtime evidence strengthening above. No closure is claimed until CI completes and an independent Grok audit checks the resulting repository state, CI evidence, governance boundaries, deploy anomaly, security coverage and manual-device acceptance boundary.
 
 ## Workflow inventory
 

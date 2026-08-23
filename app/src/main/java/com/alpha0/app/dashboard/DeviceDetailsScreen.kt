@@ -5,11 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
+import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.DangerButton
+import com.alpha0.app.ui.PrimaryButton
+import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.StatusBadge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,31 +52,33 @@ fun DeviceDetailsScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("DEVICE DETAILS", style = MaterialTheme.typography.headlineMedium)
             when {
-                device == null && error == null -> CircularProgressIndicator()
-                error != null -> Text("Load failed: $error", color = MaterialTheme.colorScheme.error)
+                device == null && error == null -> CircularProgressIndicator(color = SentinelColors.Primary)
+                error != null -> Text("Load failed: $error", color = SentinelColors.Danger)
                 else -> {
                     val current = device!!
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("State: ${if (revoked) "REVOKED" else current.state}")
-                            Text("Security: ${if (revoked) "AT_RISK" else current.securityStatus}")
-                            Text("Platform: ${current.platform}")
-                            Text("Algorithm: ${current.algorithm}")
-                            Text("Fingerprint: ${current.fingerprint}")
-                            Text("Bound at: ${current.boundAt ?: "not reported"}")
-                            Text("Last seen: ${current.lastSeenAt ?: "not reported"}")
+                    SentinelCard(scan = true) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("STATE / SECURITY", style = MaterialTheme.typography.labelLarge)
+                            StatusBadge(if (revoked) "REVOKED" else current.state, active = !revoked && current.state.equals("ACTIVE", true))
+                            StatusBadge(if (revoked) "AT_RISK" else current.securityStatus, active = !revoked && current.securityStatus.equals("OK", true))
+                            Text("Platform: ${current.platform}", style = MaterialTheme.typography.bodyMedium)
+                            Text("Algorithm: ${current.algorithm}", style = MaterialTheme.typography.bodyMedium)
+                            DataText("Fingerprint: ${current.fingerprint}")
+                            DataText("Bound at: ${current.boundAt ?: "not reported"}")
+                            DataText("Last seen: ${current.lastSeenAt ?: "not reported"}")
                         }
                     }
 
-                    actionMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    actionMessage?.let { Text(it, color = SentinelColors.Signal) }
+                    error?.let { Text(it, color = SentinelColors.Danger) }
 
                     if (!revoked) {
-                        OutlinedButton(
+                        PrimaryButton(
+                            text = "Rotate key",
                             enabled = !actionInProgress,
                             onClick = {
                                 actionInProgress = true
@@ -100,12 +105,11 @@ fun DeviceDetailsScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Rotate key")
-                        }
+                            modifier = Modifier.fillMaxWidth(),
+                        )
 
-                        Button(
+                        DangerButton(
+                            text = "Revoke device",
                             enabled = !actionInProgress,
                             onClick = {
                                 actionInProgress = true
@@ -126,12 +130,10 @@ fun DeviceDetailsScreen(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Revoke device")
-                        }
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     } else {
-                        Text("This device is revoked. Sign in again to continue.", color = MaterialTheme.colorScheme.error)
+                        Text("This device is revoked. Sign in again to continue.", color = SentinelColors.Danger)
                     }
                 }
             }

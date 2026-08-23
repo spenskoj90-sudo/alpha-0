@@ -8,8 +8,8 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`  
-**Tree:** `08a211e172cc835013194ee9adb6999f33ea2a1c`
+**Canonical HEAD:** `91696ff220bd7089432de54cd7d001f4dda234f5`  
+**Tree:** product tree from PR #46 plus documentation synchronization commits.
 
 **Latest accepted product change:** PR #46 — final Sentinel design system.
 
@@ -23,7 +23,7 @@ Exact-head CI evidence before merge:
 - ALPHA-0 Android CI run `32626297516` / #1022 — PASS.
 - Build & Test run `32626297494` / #250 — all product/code/build jobs PASS; Firebase Test Lab job failed during Google Cloud authentication and did not execute instrumentation. This is the established FTL/GCP infrastructure exception.
 
-The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`. The merge preserves the PR #46 tree. No claim is made that the pre-merge PR checks are separate post-merge runs for the merge SHA.
+The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`. PR #47 then synchronized canonical state documentation; current main is `91696ff220bd7089432de54cd7d001f4dda234f5`.
 
 ## Current repository facts
 
@@ -43,7 +43,8 @@ The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`. The me
 - Final Sentinel design system is merged: centralized colors, Outfit/Inter/JetBrains Mono typography, 4dp cards with 2dp ultraviolet left accent, status badges, primary/destructive controls, and one-shot 1000ms scan-line on the two specified device-status cards.
 - Migration order is `001_initial.sql`, `002_p1_rls.sql`, `003_user_auth.sql`.
 - `.github/workflows/p1-evidence.yml` currently uses `push.branches: [main]` and `pull_request.branches: [main]`.
-- `.github/workflows/deploy.yml` currently triggers only on `release.published`.
+- `.github/workflows/deploy.yml` currently triggers only on `release.published` in the checked-in file.
+- `POST /v1/recommendations` calls `authorize_request` with action `knowledge:recommend`; a direct unauthorized regression test is present in `server/tests/test_security_negative.py` and expects HTTP 403 without the required `game:read` scope.
 
 ## P0 / runtime findings
 
@@ -55,27 +56,39 @@ The local plaintext-server BrokenPipeError was traced to aggressive battery/back
 
 The Android identity implementation uses `AndroidKeyStore`, EC `secp256r1`, and `SHA256withECDSA`. The client derives the SHA-256 fingerprint from the encoded public key. Release fingerprint evidence was previously verified in CI; current product code retains the same Keystore-based identity model.
 
+## CI governance
+
+### Protected main — VERIFIED
+
+`main` is protected according to the live repository branch metadata.
+
+### Required status-check contexts — NOT VERIFIED
+
+The available GitHub connector can confirm protection but does not expose the admin ruleset/branch-protection context list. Therefore the project must not claim that specific required checks are enforced until the owner verifies them directly in GitHub Settings/Rulesets. This is a governance gate, separate from the Evidence Protocol itself.
+
+Recommended required contexts for the normal merge gate are the non-FTL product/security checks that are stable and actionable; FTL remains a documented infrastructure exception and must not be the sole merge blocker.
+
 ## OPEN / NOT ACCEPTED ITEMS
 
 ### PostgreSQL runtime persistence — OPEN
 
-The schema and migration path are validated, but the runtime persistence path must still be demonstrated on current main before PostgreSQL is described as the authoritative runtime system of record.
+The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set, and production startup rejects a missing `DATABASE_URL`. This proves the code path and production guard, but not that the currently deployed runtime actually has PostgreSQL configured and authoritative. Runtime proof remains open until an exact-main environment/deployment evidence bundle is captured.
 
-### Recommendation authorization — OPEN SECURITY GAP
+### CI governance required checks — OPEN
 
-`POST /v1/recommendations` remains an authorization-review item until confirmed to call `policy_engine.authorize` with regression coverage.
+Verify the actual required status-check contexts configured for protected `main` in GitHub Settings/Rulesets. Until directly verified, treat the merge gate as process-controlled rather than GitHub-enforced.
 
 ### Repository hygiene — PARTIAL / OPEN
 
-The explicitly audited stale branches were classified/cleaned to the extent supported by available tooling. Remaining work is classification of historical PRs/branches, ghost workflow records and duplicate state documents; destructive cleanup remains evidence-gated.
+Remaining work is classification of historical PRs/branches, ghost workflow records and duplicate state documents; destructive cleanup remains evidence-gated.
 
 ### Deploy workflow anomaly — OPEN INVESTIGATION
 
-Current `.github/workflows/deploy.yml` contains only `release: types: [published]`. Direct current-file inspection shows no push trigger. The historical observation of push-associated Deploy runs is not yet attributed to a specific old workflow revision.
+Current `.github/workflows/deploy.yml` contains only `release: types: [published]`. Direct current-file inspection shows no push trigger. Historical observation of push-associated Deploy failures is not yet attributed to a specific old workflow revision. Do not change the release trigger solely to silence historical runs.
 
 ### Documentation consolidation — IN PROGRESS
 
-This update synchronizes `TASKS.md`, `PROJECT_STATE.md`, `SENTINEL_CURRENT_STATE.md` and `README.md` with the post-PR #46 main state. Further cleanup of historical documents remains separate from product correctness.
+This commit reconciles canonical HEAD, recommendation authorization status and CI governance state. Historical documents remain separate until classified.
 
 ## Workflow inventory
 
@@ -87,6 +100,10 @@ This update synchronizes `TASKS.md`, `PROJECT_STATE.md`, `SENTINEL_CURRENT_STATE
 - `.github/workflows/p1-evidence.yml`
 - `.github/workflows/release.yml`
 - `.github/workflows/security.yml`
+
+### Historical / ghost workflow names observed in Actions UI
+
+Grok's live audit recorded `fingerprint-diagnostic.yml`, `sentinel-backend-ci.yml`, and `codeql.yml` as visible in Actions despite not being present in the current workflow tree. This remains a hygiene investigation item; no destructive workflow cleanup was performed without direct history verification.
 
 ## Canonical state rules
 

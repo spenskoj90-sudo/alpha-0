@@ -105,3 +105,21 @@ def test_session_revoke_blocks_access():
     assert revoked.status_code == 200
     denied = client.post("/v1/authorize", headers={"Authorization": "Bearer " + token}, json={"action": "character:read", "resource": "character:42"})
     assert denied.status_code == 401
+
+
+def test_device_detail_uses_core_route_ownership_semantics():
+    _, device, session = provision()
+    token = session["session_token"]
+    owned = client.get(f"/v1/devices/{device['device_id']}", headers={"Authorization": "Bearer " + token})
+    assert owned.status_code == 200
+    assert owned.json()["device_id"] == device["device_id"]
+    assert owned.json()["security_status"] == "SECURE"
+
+    other_key = ec.generate_private_key(ec.SECP256R1())
+    other_pub = other_key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    other_pub64 = base64.b64encode(other_pub).decode()
+    other_fingerprint = hashlib.sha256(other_pub).hexdigest()
+    other_reg = client.post("/v1/devices/register", headers={"X-Enrollment-Token": "u1:secret"}, json={"user_id": "u2", "platform": "android", "public_key_der_b64": other_pub64, "fingerprint_sha256": other_fingerprint})
+    assert other_reg.status_code == 403
+
+    assert client.get("/v1/devices/not-owned", headers={"Authorization": "Bearer " + token}).status_code == 404

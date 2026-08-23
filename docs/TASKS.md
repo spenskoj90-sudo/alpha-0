@@ -20,13 +20,14 @@
 - [ ] **CI governance: настроить required status-check contexts для защищённого `main`.** Live branch metadata теперь непосредственно подтверждает: `protected=true`, `enforcement_level=non_admins`, `contexts=[]`, `checks=[]`. Следовательно, защита ветки есть, но named CI checks сейчас GitHub не требует. Это P0 process gate. Настроить стабильные non-FTL product/security checks через GitHub Settings/Rulesets и затем повторно подтвердить live metadata. FTL/GCP exception не должен быть единственным merge blocker.
 - [x] Stale PR cleanup batch #1: PR #25, #26, #27, #35 закрыты 2026-08-23 после compare против current `main`; branches сохранены.
 - [x] Stale PR cleanup batch #2: PR #1, #2, #3, #15, #17, #18, #19 закрыты 2026-08-23 как исторические/obsolete PRs с базами до текущей canonical lineage. История сохранена; ветки не удалялись. Evidence: close events и live PR metadata for each PR.
-- [ ] **Post-PR #49 CI evidence:** основной Build & Test run `32629034760` завершился с единственным failure в `Android instrumentation (Firebase Test Lab)` на шаге `Authenticate to Google Cloud`; `Android build and tests`, Core, PostgreSQL, Web, Container, reproducibility и deployment smoke PASS. Classification: known FTL/GCP infrastructure exception, не product failure.
+- [x] **Post-PR #49 CI evidence:** Build & Test run `32629034760` завершился с единственным failure в `Android instrumentation (Firebase Test Lab)` на шаге `Authenticate to Google Cloud`; `Android build and tests`, Core, PostgreSQL, Web, Container, reproducibility и deployment smoke PASS. Classification: known FTL/GCP infrastructure exception, не product failure.
+- [~] **Battery optimization onboarding:** GPT, 2026-08-23. Добавлен безопасный helper `BatteryOptimization`, permission `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` и необязательный onboarding-блок на Device Setup; состояние перепроверяется при `ON_RESUME`. Ожидает CI и runtime/device verification. Branch: `feat/battery-optimization-onboarding-2026-08-23`.
 
 ## Дальше по плану
 
 - [x] Достроить Android-навигацию: Login/Register → Device Setup → Dashboard → Device Details → Game Details — PR #37, main lineage preserved through later merges.
 - [x] UI/визуальный дизайн — PR #46 merged into main at `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`; exact-head non-FTL CI evidence recorded above.
-- [ ] Добавить в онбординг мягкий запрос на исключение из battery optimization (например `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` или хотя бы инструкцию). Причина обнаружена при P0 диагностике: агрессивные прошивки могут ограничивать сетевую активность приложения. Не блокирует MVP, но важно для качества первого запуска.
+- [~] Добавить в онбординг мягкий запрос на исключение из battery optimization — implementation is in PR branch `feat/battery-optimization-onboarding-2026-08-23`; close only after CI + real-device verification.
 - [ ] Админ-панель для пользователя (статистика, нагрузка, capacity) — после MVP, не параллельно.
 - [ ] PC/WoW-клиент и лаунчер — после стабильного Android MVP.
 - [ ] Инфраструктура/сервер — оставаться на бесплатном/локальном варианте, пока нет реальных внешних пользователей.

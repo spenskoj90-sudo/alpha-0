@@ -8,10 +8,11 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `91696ff220bd7089432de54cd7d001f4dda234f5`  
-**Tree:** product tree from PR #46 plus documentation synchronization commits.
+**Canonical HEAD:** `a4edb49061c4bb0346fd31bc1d5f98aa6f57f010`
+**Tree:** product tree from PR #46 plus subsequent documentation commits.
 
 **Latest accepted product change:** PR #46 — final Sentinel design system.
+**Latest accepted documentation change:** PR #49 — post-merge state/documentation update.
 
 ## Exact validation evidence
 
@@ -23,7 +24,9 @@ Exact-head CI evidence before merge:
 - ALPHA-0 Android CI run `32626297516` / #1022 — PASS.
 - Build & Test run `32626297494` / #250 — all product/code/build jobs PASS; Firebase Test Lab job failed during Google Cloud authentication and did not execute instrumentation. This is the established FTL/GCP infrastructure exception.
 
-The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`. PR #47 then synchronized canonical state documentation; current main is `91696ff220bd7089432de54cd7d001f4dda234f5`.
+The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`.
+PR #47 synchronized canonical state documentation.
+PR #49 was a documentation-only follow-up; its Build & Test run `32629034760` had all product/code/build jobs PASS and only the Firebase Test Lab authentication step failed with the known GCP configuration exception.
 
 ## Current repository facts
 
@@ -62,25 +65,27 @@ The Android identity implementation uses `AndroidKeyStore`, EC `secp256r1`, and 
 
 `main` is protected according to the live repository branch metadata.
 
-### Required status-check contexts — NOT VERIFIED
+### Required status-check contexts — VERIFIED EMPTY / OPEN GOVERNANCE GAP
 
-The available GitHub connector can confirm protection but does not expose the admin ruleset/branch-protection context list. Therefore the project must not claim that specific required checks are enforced until the owner verifies them directly in GitHub Settings/Rulesets. This is a governance gate, separate from the Evidence Protocol itself.
+Live branch metadata now exposes the protection payload: `required_status_checks.enforcement_level = non_admins`, but both `contexts` and `checks` are empty. Therefore no named required status-check context is currently configured for protected `main`.
 
-Recommended required contexts for the normal merge gate are the non-FTL product/security checks that are stable and actionable; FTL remains a documented infrastructure exception and must not be the sole merge blocker.
+This is a real process risk: GitHub branch protection is enabled, but the repository is not currently enforcing the project's intended CI acceptance checks through named required contexts. The internal Evidence Protocol remains mandatory, but it is not equivalent to a GitHub-enforced merge gate.
+
+Recommended normal merge-gate contexts are the stable non-FTL product/security checks. Firebase Test Lab remains a documented infrastructure exception and should not be the sole merge blocker.
 
 ## OPEN / NOT ACCEPTED ITEMS
 
 ### PostgreSQL runtime persistence — OPEN
 
-The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set, and production startup rejects a missing `DATABASE_URL`. This proves the code path and production guard, but not that the currently deployed runtime actually has PostgreSQL configured and authoritative. Runtime proof remains open until an exact-main environment/deployment evidence bundle is captured.
+The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set, and production startup rejects a missing `DATABASE_URL`. The `/healthz` path also performs `SELECT 1` when the active store is PostgreSQL. This proves the application-side runtime path and production guard, but not that the currently deployed runtime actually has PostgreSQL configured and authoritative. Runtime proof remains open until an exact-main environment/deployment evidence bundle is captured.
 
 ### CI governance required checks — OPEN
 
-Verify the actual required status-check contexts configured for protected `main` in GitHub Settings/Rulesets. Until directly verified, treat the merge gate as process-controlled rather than GitHub-enforced.
+Live repository metadata confirms the required-check arrays are empty. The owner must configure the intended required status checks/ruleset in GitHub Settings/Rulesets. Until that administrative change is made and independently verified, the merge gate remains process-controlled rather than GitHub-enforced.
 
 ### Repository hygiene — PARTIAL / OPEN
 
-Remaining work is classification of historical PRs/branches, ghost workflow records and duplicate state documents; destructive cleanup remains evidence-gated.
+Remaining work is classification of historical PRs/branches, ghost workflow records and duplicate state documents; destructive cleanup remains evidence-gated and is intentionally deferred while product readiness is prioritized.
 
 ### Deploy workflow anomaly — OPEN INVESTIGATION
 
@@ -88,7 +93,7 @@ Current `.github/workflows/deploy.yml` contains only `release: types: [published
 
 ### Documentation consolidation — IN PROGRESS
 
-This commit reconciles canonical HEAD, recommendation authorization status and CI governance state. Historical documents remain separate until classified.
+Canonical HEAD and post-PR #49 CI evidence are now recorded here. Historical documents remain separate until classified.
 
 ## Workflow inventory
 
@@ -115,5 +120,5 @@ Grok's live audit recorded `fingerprint-diagnostic.yml`, `sentinel-backend-ci.ym
 
 ## Authority
 
-**Branch-state truth authority:** GPT / Final Integrator.  
+**Branch-state truth authority:** GPT / Final Integrator.
 **Human Owner:** absolute final authority for acceptance, scope, release, and destructive repository cleanup.

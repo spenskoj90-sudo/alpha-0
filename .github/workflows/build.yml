@@ -120,7 +120,6 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test -s "$RUNNER_TEMP/sentinel-release.jks"
           keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
 
       - name: Keystore store password validation
@@ -334,6 +333,14 @@ jobs:
           for i in {1..30}; do curl -fsS http://127.0.0.1:8080/healthz && exit 0; sleep 2; done
           docker logs sentinel-api
           exit 1
+      - name: Verify applied schema readiness
+        run: |
+          set -euo pipefail
+          docker exec sentinel-postgres psql -U sentinel -d sentinel -v ON_ERROR_STOP=1 -c "SELECT version FROM schema_migrations ORDER BY version"
+          docker exec sentinel-postgres psql -U sentinel -d sentinel -v ON_ERROR_STOP=1 -c "SELECT COUNT(*) AS migration_count FROM schema_migrations HAVING COUNT(*) >= 3"
+          docker exec sentinel-postgres psql -U sentinel -d sentinel -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public.sessions') AS sessions, to_regclass('public.device_bindings') AS device_bindings" | tee /tmp/schema-readiness.txt
+          grep -q sessions /tmp/schema-readiness.txt
+          grep -q device_bindings /tmp/schema-readiness.txt
       - name: Cleanup deployment smoke
         if: always()
         run: docker rm -f sentinel-api sentinel-postgres 2>/dev/null || true

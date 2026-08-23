@@ -18,7 +18,8 @@
 - [ ] PostgreSQL runtime persistence: подтвердить exact-main runtime path и authoritative system-of-record отдельно от schema/migration evidence.
 - [x] Security authorization: `POST /v1/recommendations` уже вызывает `authorize_request(principal, "knowledge:recommend", "recommendation", rid)`; прямой regression test без `game:read` scope присутствует в `server/tests/test_security_negative.py::test_direct_unauthorized_recommendation_call_is_blocked` и ожидает HTTP 403. Evidence: main `91696ff220bd7089432de54cd7d001f4dda234f5`, `server/app/main.py`, `server/tests/test_security_negative.py`; product CI evidence retained from PR #46 (Security #170 / run `32626297508` PASS; Build & Test #250 / run `32626297494`, non-FTL product jobs PASS).
 - [ ] CI governance: подтвердить в GitHub Settings/Rulesets фактические required status-check contexts для защищённого `main`. Public/read-only API текущего коннектора не предоставляет admin ruleset payload; до прямой проверки не считать required checks настроенными. Evidence protocol должен оставаться обязательным даже при наличии protection.
-- [x] Stale PR cleanup batch: PR #25 (recommendation authz), #26 (Android debug CI), #27 (server CI) и #35 (P0 docs) закрыты 2026-08-23 после compare против current `main`; каждый имел устаревший baseline и уникальные commits, не являющиеся частью принятого canonical tree. Branches сохранены; удаление веток не выполнялось. Evidence: PR #25/#26/#27/#35 close events + compare against `main` `91696ff220bd7089432de54cd7d001f4dda234f5`.
+- [x] Stale PR cleanup batch #1: PR #25, #26, #27, #35 закрыты 2026-08-23 после compare против current `main`; branches сохранены.
+- [x] Stale PR cleanup batch #2: PR #1, #2, #3, #15, #17, #18, #19 закрыты 2026-08-23 как исторические/obsolete PRs с базами до текущей canonical lineage. История сохранена; ветки не удалялись. Evidence: close events и live PR metadata for each PR.
 
 ## Дальше по плану
 

@@ -8,11 +8,11 @@ Single source of truth for current release-validation work. Update this file whe
 
 **Canonical branch:** `main`
 
-**Canonical HEAD:** `a4edb49061c4bb0346fd31bc1d5f98aa6f57f010`
-**Tree:** product tree from PR #46 plus subsequent documentation commits.
+**Canonical HEAD:** `9f724089fc01d8aeef247166ec9de2fbf54202d3`
+**Tree:** product tree from PR #46 plus subsequent documentation and onboarding changes.
 
-**Latest accepted product change:** PR #46 — final Sentinel design system.
-**Latest accepted documentation change:** PR #49 — post-merge state/documentation update.
+**Latest accepted product change:** PR #51 — battery optimization onboarding.
+**Latest accepted documentation change:** PR #50 — post-PR #49 production-readiness state synchronization.
 
 ## Exact validation evidence
 
@@ -26,7 +26,8 @@ Exact-head CI evidence before merge:
 
 The resulting merge commit is `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`.
 PR #47 synchronized canonical state documentation.
-PR #49 was a documentation-only follow-up; its Build & Test run `32629034760` had all product/code/build jobs PASS and only the Firebase Test Lab authentication step failed with the known GCP configuration exception.
+PR #49 was a documentation-only follow-up; Build & Test `32629034760` had all product/code/build jobs PASS and only the Firebase Test Lab authentication step failed with the known GCP configuration exception.
+PR #51 added optional Android battery-optimization onboarding and merged as `9f724089fc01d8aeef247166ec9de2fbf54202d3`.
 
 ## Current repository facts
 
@@ -44,6 +45,7 @@ PR #49 was a documentation-only follow-up; its Build & Test run `32629034760` ha
 - `/v1/devices/bind` binds the authenticated session to the device.
 - Session/device lifecycle security regression coverage exists in `server/tests/test_device_session_lifecycle.py`.
 - Final Sentinel design system is merged: centralized colors, Outfit/Inter/JetBrains Mono typography, 4dp cards with 2dp ultraviolet left accent, status badges, primary/destructive controls, and one-shot 1000ms scan-line on the two specified device-status cards.
+- Device Setup now contains optional battery-optimization guidance backed by `BatteryOptimization`, with state refresh on lifecycle resume; this addresses the previously verified device-specific background-network failure mode without changing the bind flow.
 - Migration order is `001_initial.sql`, `002_p1_rls.sql`, `003_user_auth.sql`.
 - `.github/workflows/p1-evidence.yml` currently uses `push.branches: [main]` and `pull_request.branches: [main]`.
 - `.github/workflows/deploy.yml` currently triggers only on `release.published` in the checked-in file.
@@ -63,11 +65,11 @@ The Android identity implementation uses `AndroidKeyStore`, EC `secp256r1`, and 
 
 ### Protected main — VERIFIED
 
-`main` is protected according to the live repository branch metadata.
+`main` is protected according to live repository branch metadata.
 
 ### Required status-check contexts — VERIFIED EMPTY / OPEN GOVERNANCE GAP
 
-Live branch metadata now exposes the protection payload: `required_status_checks.enforcement_level = non_admins`, but both `contexts` and `checks` are empty. Therefore no named required status-check context is currently configured for protected `main`.
+Live branch metadata exposes the protection payload: `required_status_checks.enforcement_level = non_admins`, but both `contexts` and `checks` are empty. Therefore no named required status-check context is currently configured for protected `main`.
 
 This is a real process risk: GitHub branch protection is enabled, but the repository is not currently enforcing the project's intended CI acceptance checks through named required contexts. The internal Evidence Protocol remains mandatory, but it is not equivalent to a GitHub-enforced merge gate.
 
@@ -83,6 +85,10 @@ The application selects `PostgresStore(DATABASE_URL)` when `DATABASE_URL` is set
 
 Live repository metadata confirms the required-check arrays are empty. The owner must configure the intended required status checks/ruleset in GitHub Settings/Rulesets. Until that administrative change is made and independently verified, the merge gate remains process-controlled rather than GitHub-enforced.
 
+### Real-device battery onboarding verification — OPEN MANUAL ACCEPTANCE
+
+PR #51 and its product CI evidence establish build/test acceptance. A physical Android device still needs to verify that the Device Setup action opens the appropriate system settings, that returning to the app refreshes the state, and that the onboarding does not interfere with the existing bind flow.
+
 ### Repository hygiene — PARTIAL / OPEN
 
 Remaining work is classification of historical PRs/branches, ghost workflow records and duplicate state documents; destructive cleanup remains evidence-gated and is intentionally deferred while product readiness is prioritized.
@@ -93,7 +99,7 @@ Current `.github/workflows/deploy.yml` contains only `release: types: [published
 
 ### Documentation consolidation — IN PROGRESS
 
-Canonical HEAD and post-PR #49 CI evidence are now recorded here. Historical documents remain separate until classified.
+Canonical HEAD, PR #49 evidence, PR #51 evidence, and CI governance state are recorded here. Historical documents remain separate until classified.
 
 ## Workflow inventory
 

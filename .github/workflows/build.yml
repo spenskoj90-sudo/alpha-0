@@ -120,7 +120,6 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test -s "$RUNNER_TEMP/sentinel-release.jks"
           keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
 
       - name: Keystore store password validation
@@ -216,7 +215,7 @@ jobs:
           "$apksigner" verify --verbose --print-certs "$apk"
           actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
           expected_norm="$(printf '%s' "$expected" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-          actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:upper:]' '[:upper:]')"
+          actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           echo "EXPECTED: $expected"
           echo "ACTUAL:   $actual"
           if [ "$actual_norm" != "$expected_norm" ]; then

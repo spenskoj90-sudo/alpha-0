@@ -25,6 +25,7 @@
 - [x] **Canonical state reconciliation after PR #51:** `docs/PROJECT_STATE.md` canonical HEAD corrected; recommendation authorization regression coverage recorded. Prepared on branch `docs/reconcile-post-pr51-state-2026-08-23`.
 - [~] **Working-core completion pass (2026-08-23):** governance, runtime persistence evidence, deploy anomaly, manual device acceptance, security regression and full CI validation are being closed as one coordinated pass. GPT added stronger PostgreSQL runtime assertions in PR #56 branch. **No claim of closure until CI and independent audit complete.**
 - [~] **Postgres/deployment evidence hardening (2026-08-23):** Grok. Strengthened `server/tests/test_postgres_smoke.py` with device/session/audit action-specific SQL asserts, schema_migrations presence, Postgres bind happy-path + revoke SQL proof; added deployment-smoke schema readiness check (`schema_migrations` + `sessions`/`device_bindings` regclass) in `.github/workflows/build.yml` without changing `deploy.yml` or Dockerfile CMD. Branch: `test/postgres-deployment-evidence-hardening-2026-08-23`. **OPEN gates remain:** production SoR, FTL/GCP, required status checks, manual Android acceptance, deploy historical anomaly.
+- [x] **Independent review false positive — keystore guard:** Claude заподозрил регресс в keystore guard на основе веб-diff; проверка через Git Data API (GPT) не подтвердила — строка присутствует на HEAD `c99fc3b`. False positive, закрыто без изменений.
 
 ## Дальше по плану
 

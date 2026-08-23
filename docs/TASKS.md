@@ -16,7 +16,10 @@
 - [~] Разобраться с аномалией deploy.yml: текущий `.github/workflows/deploy.yml` содержит только `release.published`. На текущем main push-trigger в этом workflow отсутствует; историческая причина старых push-associated runs ещё не установлена по истории Actions/workflow revisions. Изменение deploy.yml не требуется на основании текущего файла.
 - [~] Repository hygiene (расширено): ghost workflow records / duplicate PROJECT_STATE.md / исторические PR и ветки требуют классификации и документированного cleanup. 16-branch cleanup закрыт.
 - [ ] PostgreSQL runtime persistence: подтвердить exact-main runtime path и authoritative system-of-record отдельно от schema/migration evidence.
-- [ ] Security authorization review: проверить `POST /v1/recommendations` на обязательный `policy_engine.authorize` и добавить regression coverage, если отсутствует.
+- [x] Security authorization: `POST /v1/recommendations` уже вызывает `authorize_request(principal, "knowledge:recommend", "recommendation", rid)`; прямой regression test без `game:read` scope присутствует в `server/tests/test_security_negative.py::test_direct_unauthorized_recommendation_call_is_blocked` и ожидает HTTP 403. Evidence: main `91696ff220bd7089432de54cd7d001f4dda234f5`, `server/app/main.py`, `server/tests/test_security_negative.py`; product CI evidence retained from PR #46 (Security #170 / run `32626297508` PASS; Build & Test #250 / run `32626297494`, non-FTL product jobs PASS).
+- [ ] CI governance: подтвердить в GitHub Settings/Rulesets фактические required status-check contexts для защищённого `main`. Public/read-only API текущего коннектора не предоставляет admin ruleset payload; до прямой проверки не считать required checks настроенными. Evidence protocol должен оставаться обязательным даже при наличии protection.
+- [x] Stale PR cleanup batch #1: PR #25, #26, #27, #35 закрыты 2026-08-23 после compare против current `main`; branches сохранены.
+- [x] Stale PR cleanup batch #2: PR #1, #2, #3, #15, #17, #18, #19 закрыты 2026-08-23 как исторические/obsolete PRs с базами до текущей canonical lineage. История сохранена; ветки не удалялись. Evidence: close events и live PR metadata for each PR.
 
 ## Дальше по плану
 
@@ -31,3 +34,4 @@
 ## Правила ведения файла
 - Не отмечать `[x]` без прямой ссылки на SHA/PR/CI run — устные "готово" не считаются (см. Evidence Integrity Protocol).
 - Не добавлять сюда задачи из "Дальше по плану" в работу без явного решения пользователя — история проекта показывает, что параллельный захват лишних задач и есть причина затора.
+- Governance/security acceptance gates не заменяются предположением: если настройка GitHub admin-only и не читается инструментом, она остаётся `[ ]` до прямой проверки.

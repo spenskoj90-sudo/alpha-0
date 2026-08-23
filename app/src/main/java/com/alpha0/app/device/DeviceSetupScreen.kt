@@ -61,7 +61,6 @@ fun DeviceSetupScreen(
             PrimaryButton(
                 text = "Привязать устройство",
                 onClick = {
-                    if (busy) return@PrimaryButton
                     busy = true
                     error = null
                     scope.launch {

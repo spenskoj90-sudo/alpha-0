@@ -34,7 +34,7 @@ import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.googlefonts.GoogleFont.Provider
 import androidx.compose.ui.unit.dp
-import com.alpha0.app.R
+import androidx.compose.ui.text.googlefonts.R as GoogleFontsR
 
 object SentinelColors {
     val Background = Color(0xFF0D1117)
@@ -50,7 +50,7 @@ object SentinelColors {
 private val GoogleFontsProvider = Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs,
+    certificates = GoogleFontsR.array.com_google_android_gms_fonts_certs,
 )
 
 val SentinelDisplayFont = FontFamily(

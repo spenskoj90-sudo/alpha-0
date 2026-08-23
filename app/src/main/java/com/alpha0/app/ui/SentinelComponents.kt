@@ -6,8 +6,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -42,7 +42,7 @@ fun SentinelCard(
                         scanProgress.animateTo(1f, animationSpec = tween(380))
                     }
                 }
-                Canvas(modifier = Modifier.matchParentSize()) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
                     val mark = 12.dp.toPx()
                     val stroke = 1.dp.toPx()
                     val inset = 1.dp.toPx()

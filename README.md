@@ -5,7 +5,7 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 ## Canonical repository state
 
 - Canonical branch: `main`.
-- Current canonical HEAD: `4a0fd8255e4b7beb065e73a254ebb72d3b8b4d11`.
+- Current canonical HEAD: `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`.
 - Branch/PR work is not accepted as product state until merged into `main` and revalidated at the resulting main SHA.
 - Architecture documents describe the target/contract and must not be treated as proof of runtime implementation.
 - The authoritative current-state record is `docs/SENTINEL_CURRENT_STATE.md`.
@@ -18,9 +18,10 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 - Login/Register.
 - Device Setup with authenticated device binding.
 - Dashboard with authenticated device/security and entitlement data.
-- Device Details with fingerprint, algorithm, state, binding/last-seen data, plus existing backend rotate/revoke actions.
+- Device Details with fingerprint, algorithm, state, binding/last-seen data, plus backend rotate/revoke actions.
 - Game Details backed by authenticated entitlement APIs and the existing game catalog.
 - Complete Android MVP navigation: `Login/Register → Device Setup → Dashboard → Device Details → Game Details`.
+- Final Sentinel visual system across all five Android MVP screens: centralized final palette, Outfit/Inter/JetBrains Mono typography, 4dp cards with 2dp ultraviolet left accent, status badges, rounded primary/destructive controls and one-shot 1000ms device scan-line.
 - FastAPI SENTINEL CORE with PostgreSQL production architecture and schema; runtime persistence still requires exact-main runtime validation.
 - Default-deny authorization with roles, scopes and policies.
 - User-bound device enrollment and one-time challenge proof.
@@ -41,21 +42,33 @@ Authorization is server-side:
 
 Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.md` and the full architecture reference `docs/ARCHITECTURE_V4.md`.
 
-## Current-state limitations
+## Current validation status
 
-The current GitHub API status query for exact main HEAD `4a0fd8255e4b7beb065e73a254ebb72d3b8b4d11` returned no status records. Exact-head workflow PASS/FAIL and run URLs therefore must not be inferred from older PR runs.
+PR #46, which introduced the final Sentinel design system, was merged into `main` as `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79` after exact-head CI verification.
 
-The known release APK fingerprint previously verified in CI is:
+Evidence on PR #46 head `43f94338df4da82917e615b2e1c9eb79014e9246`:
 
-`2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`
+- Security #170 / run `32626297508` — PASS.
+- P1 Evidence #80 / run `32626297477` — PASS.
+- ALPHA-0 Android CI #1022 / run `32626297516` — PASS.
+- Build & Test #250 / run `32626297494` — all product/code/build jobs PASS; Firebase Test Lab failed at Google Cloud authentication, so instrumentation did not execute. This remains the known FTL/GCP infrastructure exception.
 
-That fingerprint evidence came from an earlier CI run and is not claimed as exact-main-HEAD evidence until `apksigner verify` is run for the current SHA.
+The P1 Evidence workflow currently uses `push.branches: [main]` and `pull_request.branches: [main]`.
 
-The PostgreSQL schema exists, but the current runtime persistence path must still be validated independently before PostgreSQL is described as the authoritative runtime system of record.
+The deploy workflow currently declares only `release.published`. Historical observations of push-associated Deploy runs remain under investigation; the current workflow file itself does not contain a push trigger.
 
-The P1 Evidence workflow currently has a push trigger for the historical branch `sentinel-1.0.0-rc1-final` and a pull-request trigger for `main`; this CI configuration remains an open task and has not been changed here.
+## Runtime findings
 
-The current deploy workflow file declares only `release.published` as its trigger. The historical observation of push-associated Deploy runs remains under investigation and is not treated as evidence that the current file triggers on push.
+The earlier local plaintext-server BrokenPipeError was confirmed as an environmental battery/background-network restriction on the test device, not an Android HTTP/TLS/h2c implementation defect. The client uses `HttpURLConnection`; after battery optimization was disabled, the request completed immediately. PR #34 provided the temporary diagnostic exception reporting used to establish the cause.
+
+The Android device identity remains Keystore-backed: P-256 / `secp256r1` with SHA-256 fingerprinting, with private key material retained in Android Keystore.
+
+## Current-state limitations / open work
+
+- PostgreSQL runtime persistence still requires exact-main runtime evidence before PostgreSQL is declared the authoritative runtime system of record.
+- `POST /v1/recommendations` remains an authorization-review item until its `policy_engine.authorize` enforcement and regression coverage are confirmed.
+- Repository hygiene still includes historical PR/branch classification, ghost workflow records and duplicate state-document cleanup.
+- A soft battery-optimization onboarding prompt remains planned to reduce first-run network failures on aggressive Android/MIUI-like firmware.
 
 ## Repository
 

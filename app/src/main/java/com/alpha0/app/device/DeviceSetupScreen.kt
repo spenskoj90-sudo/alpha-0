@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,6 +18,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
+import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.PrimaryButton
+import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,29 +38,30 @@ fun DeviceSetupScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("DEVICE SETUP", style = MaterialTheme.typography.headlineMedium)
-            Text("Bind this phone to your authenticated SENTINEL account.", style = MaterialTheme.typography.bodyLarge)
+            Text("Bind this phone to your authenticated SENTINEL account.", style = MaterialTheme.typography.bodyLarge, color = SentinelColors.TextSecondary)
 
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("DEVICE IDENTITY", style = MaterialTheme.typography.labelLarge)
-                    Text(identity.fingerprint, style = MaterialTheme.typography.bodyMedium)
-                    Text(identity.algorithm, style = MaterialTheme.typography.bodySmall)
+            SentinelCard {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("DEVICE IDENTITY", style = MaterialTheme.typography.labelLarge, color = SentinelColors.TextPrimary)
+                    DataText(identity.fingerprint)
+                    DataText(identity.algorithm)
                 }
             }
 
             if (error != null) {
-                Text("Binding failed: $error", color = MaterialTheme.colorScheme.error)
+                Text("Binding failed: $error", color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
             }
 
-            Button(
+            PrimaryButton(
+                text = "Привязать устройство",
                 onClick = {
-                    if (busy) return@Button
+                    if (busy) return@PrimaryButton
                     busy = true
                     error = null
                     scope.launch {
@@ -80,11 +83,7 @@ fun DeviceSetupScreen(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (busy) {
-                    CircularProgressIndicator()
-                } else {
-                    Text("Привязать устройство")
-                }
+                if (busy) CircularProgressIndicator() else Text("Привязать устройство")
             }
         }
     }

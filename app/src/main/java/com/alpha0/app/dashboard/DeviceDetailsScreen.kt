@@ -1,5 +1,6 @@
 package com.alpha0.app.dashboard
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +11,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -109,7 +109,7 @@ fun DeviceDetailsScreen(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            border = OutlinedButtonDefaults.outlinedButtonBorder(enabled = !actionInProgress),
+                            border = BorderStroke(1.dp, SentinelAmber),
                         ) {
                             Text("Rotate key", color = SentinelAmber)
                         }

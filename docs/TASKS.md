@@ -21,13 +21,13 @@
 - [x] Stale PR cleanup batch #1: PR #25, #26, #27, #35 закрыты 2026-08-23 после compare против current `main`; branches сохранены.
 - [x] Stale PR cleanup batch #2: PR #1, #2, #3, #15, #17, #18, #19 закрыты 2026-08-23 как исторические/obsolete PRs с базами до текущей canonical lineage. История сохранена; ветки не удалялись. Evidence: close events и live PR metadata for each PR.
 - [x] **Post-PR #49 CI evidence:** Build & Test run `32629034760` завершился с единственным failure в `Android instrumentation (Firebase Test Lab)` на шаге `Authenticate to Google Cloud`; `Android build and tests`, Core, PostgreSQL, Web, Container, reproducibility и deployment smoke PASS. Classification: known FTL/GCP infrastructure exception, не product failure.
-- [~] **Battery optimization onboarding:** GPT, 2026-08-23. Добавлен безопасный helper `BatteryOptimization`, permission `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` и необязательный onboarding-блок на Device Setup; состояние перепроверяется при `ON_RESUME`. Ожидает CI и runtime/device verification. Branch: `feat/battery-optimization-onboarding-2026-08-23`.
+- [x] **Battery optimization onboarding:** PR #51, merge SHA `9f724089fc01d8aeef247166ec9de2fbf54202d3`. Добавлен `BatteryOptimization`, permission `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` и необязательный onboarding-блок на Device Setup; состояние перепроверяется при `ON_RESUME`. CI: Build & Test #268 (`32632012503`) — all product/code/build jobs PASS; FTL authentication failure only; Security #188 (`32632012490`) PASS; P1 Evidence #98 (`32632012530`) PASS; ALPHA-0 Android CI #1062 (`32632012513`) PASS. **Real-device UX verification remains required.**
 
 ## Дальше по плану
 
 - [x] Достроить Android-навигацию: Login/Register → Device Setup → Dashboard → Device Details → Game Details — PR #37, main lineage preserved through later merges.
 - [x] UI/визуальный дизайн — PR #46 merged into main at `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`; exact-head non-FTL CI evidence recorded above.
-- [~] Добавить в онбординг мягкий запрос на исключение из battery optimization — implementation is in PR branch `feat/battery-optimization-onboarding-2026-08-23`; close only after CI + real-device verification.
+- [x] Добавить в онбординг мягкий запрос на исключение из battery optimization — PR #51 merged at `9f724089fc01d8aeef247166ec9de2fbf54202d3`; code/CI acceptance complete, real-device UX verification remains as a manual acceptance item.
 - [ ] Админ-панель для пользователя (статистика, нагрузка, capacity) — после MVP, не параллельно.
 - [ ] PC/WoW-клиент и лаунчер — после стабильного Android MVP.
 - [ ] Инфраструктура/сервер — оставаться на бесплатном/локальном варианте, пока нет реальных внешних пользователей.

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.ui.SentinelColors
 
 @Composable
 fun LoginScreen(
@@ -68,7 +70,7 @@ fun LoginScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -80,7 +82,8 @@ fun LoginScreen(
             )
             Text(
                 "Your account is separate from this device identity. Device enrollment follows after authentication.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
+                color = SentinelColors.TextSecondary,
             )
 
             OutlinedTextField(
@@ -91,6 +94,7 @@ fun LoginScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !busy,
+                shape = RoundedCornerShape(12.dp),
             )
 
             OutlinedTextField(
@@ -110,16 +114,22 @@ fun LoginScreen(
                     }
                 },
                 enabled = !busy,
+                shape = RoundedCornerShape(12.dp),
             )
 
             if (error != null) {
-                Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                Text(error!!, color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
             }
 
             Button(
                 onClick = ::submit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
+                shape = RoundedCornerShape(14.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = SentinelColors.Primary,
+                    contentColor = SentinelColors.TextPrimary,
+                ),
             ) {
                 if (busy) CircularProgressIndicator(strokeWidth = 2.dp) else Text(if (registerMode) "Create account" else "Sign in")
             }
@@ -128,6 +138,7 @@ fun LoginScreen(
                 onClick = { registerMode = !registerMode; error = null },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
+                shape = RoundedCornerShape(14.dp),
             ) {
                 Text(if (registerMode) "I already have an account" else "Create a new account")
             }

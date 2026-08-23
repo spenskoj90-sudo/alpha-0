@@ -1,5 +1,7 @@
 package com.alpha0.app.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -8,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -22,22 +23,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.text.googlefonts.GoogleFont.Provider
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.alpha0.app.R
 
 object SentinelColors {
@@ -57,50 +55,26 @@ private val GoogleFontsProvider = Provider(
     certificates = R.array.com_google_android_gms_fonts_certs,
 )
 
-private val Outfit = FontFamily(
+val SentinelDisplayFont = FontFamily(
     Font(GoogleFont("Outfit"), GoogleFontsProvider, weight = FontWeight.Medium),
     Font(GoogleFont("Outfit"), GoogleFontsProvider, weight = FontWeight.SemiBold),
 )
-private val Inter = FontFamily(
+val SentinelBodyFont = FontFamily(
     Font(GoogleFont("Inter"), GoogleFontsProvider, weight = FontWeight.Normal),
     Font(GoogleFont("Inter"), GoogleFontsProvider, weight = FontWeight.Medium),
 )
-private val JetBrainsMono = FontFamily(
+val SentinelDataFont = FontFamily(
     Font(GoogleFont("JetBrains Mono"), GoogleFontsProvider, weight = FontWeight.Normal),
 )
 
 @Composable
-fun SentinelTheme(content: @Composable () -> Unit) {
-    val colors = androidx.compose.material3.darkColorScheme(
-        primary = SentinelColors.Primary,
-        onPrimary = SentinelColors.TextPrimary,
-        secondary = SentinelColors.Signal,
-        background = SentinelColors.Background,
-        surface = SentinelColors.Surface,
-        surfaceVariant = SentinelColors.Surface,
-        onBackground = SentinelColors.TextPrimary,
-        onSurface = SentinelColors.TextPrimary,
-        outline = SentinelColors.Border,
-        error = SentinelColors.Danger,
-        onError = SentinelColors.TextPrimary,
-    )
-    val typography = androidx.compose.material3.Typography(
-        headlineLarge = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, letterSpacing = 1.5.sp),
-        headlineMedium = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, letterSpacing = 1.2.sp),
-        headlineSmall = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Medium, fontSize = 20.sp, letterSpacing = 0.8.sp),
-        titleLarge = TextStyle(fontFamily = Outfit, fontWeight = FontWeight.Medium, fontSize = 20.sp),
-        titleMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 16.sp),
-        bodyLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 16.sp, color = SentinelColors.TextPrimary),
-        bodyMedium = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 14.sp, color = SentinelColors.TextPrimary),
-        bodySmall = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 12.sp, color = SentinelColors.TextSecondary),
-        labelLarge = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp, letterSpacing = 0.6.sp),
-    )
-    androidx.compose.material3.MaterialTheme(colorScheme = colors, typography = typography, content = content)
-}
-
-@Composable
 fun DataText(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = JetBrainsMono), color = SentinelColors.TextSecondary)
+    Text(
+        text = text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+        color = SentinelColors.TextSecondary,
+    )
 }
 
 @Composable

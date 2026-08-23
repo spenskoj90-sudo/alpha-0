@@ -32,8 +32,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
-import androidx.compose.ui.text.googlefonts.R
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.fonts.R
 
 object SentinelColors {
     val Background = Color(0xFF0D1117)

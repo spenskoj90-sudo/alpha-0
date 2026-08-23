@@ -1,5 +1,8 @@
 package com.alpha0.app.device
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,12 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.ui.DataText
@@ -33,10 +38,16 @@ fun DeviceSetupScreen(
     api: DeviceApi,
     onBound: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val identity = remember { deviceIdentity.getIdentityInfo() }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var batteryOptimizationIgnored by remember { mutableStateOf(BatteryOptimization.isIgnored(context)) }
+
+    LaunchedEffect(Unit) {
+        batteryOptimizationIgnored = BatteryOptimization.isIgnored(context)
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         Column(
@@ -51,6 +62,36 @@ fun DeviceSetupScreen(
                     Text("DEVICE IDENTITY", style = MaterialTheme.typography.labelLarge, color = SentinelColors.TextPrimary)
                     DataText(identity.fingerprint)
                     DataText(identity.algorithm)
+                }
+            }
+
+            if (!batteryOptimizationIgnored) {
+                SentinelCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("BACKGROUND NETWORK", style = MaterialTheme.typography.labelLarge, color = SentinelColors.TextPrimary)
+                        Text(
+                            "Some Android devices restrict background network activity. Allowing SENTINEL to ignore battery optimization helps prevent delayed first requests and session timeouts.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SentinelColors.TextSecondary
+                        )
+                        PrimaryButton(
+                            text = "Allow background operation",
+                            onClick = {
+                                val opened = BatteryOptimization.request(context)
+                                if (!opened) {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = Uri.parse("package:${context.packageName}")
+                                            }
+                                        )
+                                    }
+                                }
+                                batteryOptimizationIgnored = BatteryOptimization.isIgnored(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.ui.SentinelDanger
+import com.alpha0.app.ui.SentinelTextSecondary
 
 @Composable
 fun LoginScreen(
@@ -73,14 +76,15 @@ fun LoginScreen(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("SENTINEL", style = MaterialTheme.typography.headlineLarge)
+            Text("SENTINEL", style = MaterialTheme.typography.displayMedium)
             Text(
-                if (registerMode) "Create your account" else "Sign in to your account",
+                if (registerMode) "CREATE YOUR ACCOUNT" else "SIGN IN TO YOUR ACCOUNT",
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
                 "Your account is separate from this device identity. Device enrollment follows after authentication.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = SentinelTextSecondary,
             )
 
             OutlinedTextField(
@@ -113,13 +117,17 @@ fun LoginScreen(
             )
 
             if (error != null) {
-                Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                Text(error!!, color = SentinelDanger, style = MaterialTheme.typography.bodyMedium)
             }
 
             Button(
                 onClick = ::submit,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
             ) {
                 if (busy) CircularProgressIndicator(strokeWidth = 2.dp) else Text(if (registerMode) "Create account" else "Sign in")
             }

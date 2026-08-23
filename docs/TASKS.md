@@ -19,7 +19,7 @@
 ## Дальше по плану (не начинать без явного решения пользователя)
 
 - [x] Достроить Android-навигацию: Login/Register (готово) → Device Setup (PR #36) → Dashboard → Device Details → Game Details — реализовано в PR #37, head `530e476421e0bcc4d42b5908ce63483234edd83f`; Security #126 PASS, P1 Evidence #37 PASS, ALPHA-0 Android CI #893 PASS, Build & Test #206 PASS по всем code/build jobs; известный FTL/GCP job остаётся инфраструктурным blocker.
-- [~] UI/визуальный дизайн — реализация визуальной системы «Пункт наблюдения» начата в `ui/sentinel-observation-point-2026-08-23`; CI/PR evidence pending.
+- [~] UI/визуальный дизайн — реализация визуальной системы «Пункт наблюдения» в PR #45, текущий head `8c65da63ce6cbb5c47d2497a8159f53e5705035b`; предыдущий Android CI #977 был сломан только диагностическими compile errors, исправления запушены; текущие Security #157, P1 Evidence #67, Android CI #987, Build & Test #237 запущены, evidence pending.
 - [ ] Админ-панель для пользователя (статистика, нагрузка, capacity) — после MVP, не параллельно
 - [ ] PC/WoW-клиент и лаунчер — не начинать, пока Android MVP не протестирован вручную пользователем
 - [ ] Инфраструктура/сервер — оставаться на бесплатном/локальном варианте, пока нет реальных внешних пользователей

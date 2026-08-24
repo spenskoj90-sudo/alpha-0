@@ -2,15 +2,15 @@
 
 Single source of truth for current release-validation work. Update this file whenever exact product HEAD, P0/P1 status, or workflow structure changes.
 
-**Last updated:** 2026-08-23
+**Last updated:** 2026-08-24
 
 ## Canonical branch
 
 **Canonical branch:** `main`
 
-**Canonical product HEAD:** `1b4dc15e82b44de2d3fc65004ed2b113e326433c`
+**Canonical product HEAD:** `bcb9200b9f5e2d7c2fa7ded438e0088e41ca2566`
 **Current main documentation commits:** follow the canonical product merge without changing product state.
-**Tree:** product tree after PR #57 merge, with PostgreSQL/deployment evidence hardening accepted and FTL policy formalized.
+**Tree:** current main tree after PR #57 merge plus subsequent documentation/evidence/hygiene commits.
 
 **Latest accepted product change:** PR #51 — battery optimization onboarding.
 **Latest accepted CI evidence hardening:** PR #57 — PostgreSQL smoke and deployment schema-readiness evidence.

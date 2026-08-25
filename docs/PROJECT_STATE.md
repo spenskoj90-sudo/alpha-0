@@ -2,7 +2,7 @@
 
 Single source of truth for current release-validation work. Update this file whenever exact product HEAD, P0/P1 status, or workflow structure changes.
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-08-25
 
 ## Canonical branch
 
@@ -20,6 +20,14 @@ Single source of truth for current release-validation work. Update this file whe
 ### Firebase Test Lab — OPTIONAL / NON-BLOCKING
 
 FTL/GCP authentication is an infrastructure dependency, not a product-correctness gate at the current project stage. Build & Test product jobs remain authoritative for automated CI acceptance; Firebase Test Lab is informational and may fail without blocking product acceptance. Real-device Android acceptance is intentionally deferred and will be performed by the Human Owner as a cumulative device-validation pass after sufficient functionality has accumulated. FTL integration will be restored as a later hardening block.
+
+### Firebase Test Lab — ACCESS RESTORED / EXECUTION CONFIGURED (2026-08-25)
+
+GitHub Actions FTL authentication and Test Lab environment discovery are now operational for project `sentinel-21ca9` using the repository secrets `FIREBASE_SERVICE_ACCOUNT_JSON` and `FIREBASE_GCP_PROJECT_ID`. The Service Account `firebase-adminsdk-fbsvc@sentinel-21ca9.iam.gserviceaccount.com` has the `Firebase Test Lab Admin` role. In Build & Test run `32818319982`, Google authentication passed and `gcloud firebase test android models list` passed. The subsequent instrumentation execution reached the FTL API but was blocked because the Cloud Tool Results API was disabled in the project. Therefore credentials and Test Lab IAM are validated; the remaining infrastructure prerequisite is enabling `toolresults.googleapis.com`. Do not classify this as an APK/product test failure.
+
+### FTL usage-control policy
+
+FTL is a cumulative validation resource and must not be triggered indiscriminately. Test Lab quotas are project-level and shared across instrumentation, Robo, Game Loop, and test matrices. Current documented no-cost limits are 15 test runs/day on Spark (10 virtual + 5 physical). Blaze begins with 60 minutes/day of virtual-device test time and 30 minutes/day of physical-device test time; usage above those limits is billable. Test runs and shards count toward quota, and deflake retries also consume quota. Prefer a single targeted device/matrix for routine regression validation, batch broader device coverage into deliberate acceptance passes, avoid unnecessary reruns, and check current project quota/billing before launching a large matrix. Source: Firebase Test Lab usage/quotas documentation, last updated 2026-08-19.
 
 ### PR #57 — ACCEPTED
 

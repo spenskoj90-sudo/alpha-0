@@ -105,3 +105,20 @@ def test_session_revoke_blocks_access():
     assert revoked.status_code == 200
     denied = client.post("/v1/authorize", headers={"Authorization": "Bearer " + token}, json={"action": "character:read", "resource": "character:42"})
     assert denied.status_code == 401
+
+
+def test_device_detail_uses_core_route_ownership_semantics():
+    _, device, session = provision()
+    token = session["session_token"]
+    owned = client.get(f"/v1/devices/{device['device_id']}", headers={"Authorization": "Bearer " + token})
+    assert owned.status_code == 200
+    assert owned.json()["device_id"] == device["device_id"]
+    assert owned.json()["security_status"] == "SECURE"
+
+    other_access, _, _, _ = store.issue_session(None, "u2", 3600, 86400)
+    foreign = client.get(f"/v1/devices/{device['device_id']}", headers={"Authorization": "Bearer " + other_access})
+    assert foreign.status_code == 403
+    assert foreign.json()["code"] == "DEVICE_SCOPE_MISMATCH"
+
+    missing = client.get("/v1/devices/not-owned", headers={"Authorization": "Bearer " + token})
+    assert missing.status_code == 404

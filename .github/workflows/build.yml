@@ -271,8 +271,8 @@ jobs:
           gcloud firebase test android run \
             --project "$GCP_PROJECT_ID" \
             --type instrumentation \
-            --app android-artifacts/app/build/outputs/apk/debug/app-debug.apk \
-            --test android-artifacts/app/build/outputs/apk/debug/app-debug-androidTest.apk \
+            --app android-artifacts/debug/app-debug.apk \
+            --test android-artifacts/androidTest/debug/app-debug-androidTest.apk \
             --device model=redfin,version=35,locale=en,orientation=portrait \
             --timeout 10m \
             --results-history-name "alpha-0-${GITHUB_SHA}" \

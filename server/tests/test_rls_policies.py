@@ -3,6 +3,8 @@ import os
 import psycopg
 import pytest
 
+from app.core.store import PostgresStore
+
 
 @pytest.mark.postgres
 def test_required_rls_policies_exist():
@@ -18,7 +20,19 @@ def test_required_rls_policies_exist():
     }
     with psycopg.connect(database_url) as conn:
         for table, policy in expected.items():
-            enabled = conn.execute("SELECT relrowsecurity FROM pg_class WHERE oid = %s::regclass", (table,)).fetchone()[0]
+            enabled, forced = conn.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = %s::regclass",
+                (table,),
+            ).fetchone()
             assert enabled is True, table
+            assert forced is True, table
             found = conn.execute("SELECT 1 FROM pg_policies WHERE tablename=%s AND policyname=%s", (table, policy)).fetchone()
             assert found == (1,), (table, policy)
+
+
+@pytest.mark.postgres
+def test_application_postgres_connections_opt_into_rls_service_policy():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    with store.engine.connect() as conn:
+        assert conn.exec_driver_sql("SHOW app.service_role").scalar() == "true"
+    store.engine.dispose()

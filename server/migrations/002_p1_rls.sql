@@ -1,14 +1,21 @@
 -- P1: explicit RLS policies. The API persistence role must opt into the
--- service policy with PGOPTIONS=-c app.service_role=true. Without that
--- setting PostgreSQL fails closed at the row-policy layer.
+-- service policy with app.service_role=true. Without that setting PostgreSQL
+-- fails closed at the row-policy layer.
 
 ALTER TABLE identities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE identities FORCE ROW LEVEL SECURITY;
 ALTER TABLE device_bindings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE device_bindings FORCE ROW LEVEL SECURITY;
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions FORCE ROW LEVEL SECURITY;
 ALTER TABLE entitlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entitlements FORCE ROW LEVEL SECURITY;
 ALTER TABLE characters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE characters FORCE ROW LEVEL SECURITY;
 ALTER TABLE game_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_events FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS identities_service_policy ON identities;
 CREATE POLICY identities_service_policy ON identities
@@ -45,7 +52,7 @@ CREATE POLICY audit_events_service_policy ON audit_events
   USING (current_setting('app.service_role', true) = 'true')
   WITH CHECK (current_setting('app.service_role', true) = 'true');
 
-COMMENT ON POLICY identities_service_policy ON identities IS 'P1 explicit fail-closed service policy; application must opt in via app.service_role';
+COMMENT ON POLICY identities_service_policy ON identities IS 'P1 explicit fail-closed service policy; application opts in via app.service_role';
 COMMENT ON POLICY device_bindings_service_policy ON device_bindings IS 'P1 explicit fail-closed service policy';
 COMMENT ON POLICY sessions_service_policy ON sessions IS 'P1 explicit fail-closed service policy';
 COMMENT ON POLICY entitlements_service_policy ON entitlements IS 'P1 explicit fail-closed service policy';

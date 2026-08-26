@@ -129,6 +129,7 @@ class MemoryStore(Store):
             if not record or record.get("revoked") or record["refresh_expires_at"] <= time.time() or record.get("refresh_used"):
                 return None
             record["refresh_used"] = True
+            record["revoked"] = True
             old = record.copy()
         access, refresh, exp, scopes = self.issue_session(old["device_id"], old["user_id"], access_ttl, refresh_ttl)
         return access, refresh, exp, scopes, old
@@ -191,7 +192,13 @@ class MemoryStore(Store):
 
 class PostgresStore(Store):
     def __init__(self, database_url: str) -> None:
-        self.engine = create_engine(database_url, pool_pre_ping=True, pool_size=10, max_overflow=20)
+        self.engine = create_engine(
+            database_url,
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            connect_args={"options": "-c app.service_role=true"},
+        )
         self.lock = Lock()
 
     def register_device(self, user_id, platform, public_key_b64, fingerprint, challenge):

@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 import psycopg
 import pytest
@@ -50,6 +51,8 @@ def test_rls_denies_access_without_service_role():
     isolation boundary for this regression.
     """
     database_url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://", 1)
+    parsed = urlparse(database_url)
+    db_name = parsed.path.lstrip("/") or "sentinel_test"
     store = PostgresStore(os.environ["DATABASE_URL"])
     device_id = store.register_device("rls-user-a", "android", "cHVibGlj", "a" * 64, "challenge-a")
     access, _, _, _ = store.issue_session(device_id, "rls-user-a", 3600, 7200)
@@ -66,7 +69,7 @@ def test_rls_denies_access_without_service_role():
             END $$;
             """
         )
-        admin.execute("GRANT CONNECT ON DATABASE current_database() TO rls_probe")
+        admin.execute(f'GRANT CONNECT ON DATABASE "{db_name}" TO rls_probe')
         admin.execute("GRANT USAGE ON SCHEMA public TO rls_probe")
         for table in (
             "identities",
@@ -80,13 +83,11 @@ def test_rls_denies_access_without_service_role():
             admin.execute(f"GRANT SELECT, INSERT ON {table} TO rls_probe")
         admin.commit()
 
-    # Connect as non-owner; do not set app.service_role (fail-closed).
+    # Connect as non-owner; do not opt into service_role (fail-closed).
     probe_url = database_url.replace("://sentinel:", "://rls_probe:").replace(
         ":testpass@", ":rls-probe-pass@"
     )
-    # Strip any inherited PGOPTIONS for this process connection.
     with psycopg.connect(probe_url, options="-c app.service_role=") as conn:
-        # Explicit deny path.
         conn.execute("SELECT set_config('app.service_role', 'false', false)")
         sessions = conn.execute("SELECT count(*) FROM sessions").fetchone()[0]
         identities = conn.execute("SELECT count(*) FROM identities").fetchone()[0]

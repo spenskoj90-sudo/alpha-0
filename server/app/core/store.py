@@ -302,7 +302,7 @@ class PostgresStore(Store):
                     "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
                     "refresh_token_hash,refresh_expires_at) VALUES ("
                     ":identity_id,"
-                    "CASE WHEN :device_id IS NULL THEN NULL ELSE CAST(:device_id AS uuid) END,"
+                    "CAST(:device_id AS uuid),"
                     ":sh,:scopes,now(),:exp,:rh,:rexp)"
                 ),
                 {

@@ -252,6 +252,8 @@ jobs:
           java-version: "17"
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Make gradlew executable
+        run: chmod +x gradlew
       - name: Enable KVM
         run: |
           sudo groupadd -f kvm
@@ -268,7 +270,7 @@ jobs:
           force-avd-creation: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
-          script: ./gradlew --no-daemon connectedDebugAndroidTest
+          script: chmod +x ./gradlew && ./gradlew --no-daemon connectedDebugAndroidTest
 
   web:
     name: Web build

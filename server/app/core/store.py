@@ -133,8 +133,23 @@ class MemoryStore(Store):
             record["refresh_used"] = True
             record["revoked"] = True
             old = record.copy()
-        access, refresh, exp, scopes = self.issue_session(old["device_id"], old["user_id"], access_ttl, refresh_ttl)
-        return access, refresh, exp, scopes, old
+            access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+            now = datetime.now(UTC)
+            exp = now + timedelta(seconds=access_ttl)
+            new_record = {
+                "user_id": old["user_id"],
+                "device_id": old["device_id"],
+                "scopes": SCOPES,
+                "roles": ["user"],
+                "issued_at": now.timestamp(),
+                "expires_at": exp.timestamp(),
+                "refresh_hash": session_hash(refresh),
+                "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
+                "refresh_used": False,
+                "revoked": False,
+            }
+            self.sessions[session_hash(access)] = new_record
+        return access, refresh, exp, SCOPES, old
 
     def revoke_session(self, access_token):
         with self.lock:
@@ -256,13 +271,51 @@ class PostgresStore(Store):
         return {"user_id": row["user_handle"], "device_id": row["device_id"], "scopes": scopes, "roles": ["user"], "expires_at": row["expires_at"].timestamp(), "revoked": False}
 
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
+        """Atomic rotation: lock, validate, revoke, insert replacement — single transaction.
+
+        If issuance fails, the whole transaction rolls back and the old refresh remains valid.
+        """
+        access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=access_ttl)
+        refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
-            row = conn.execute(text("SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,s.refresh_expires_at,s.refresh_used_at,s.revoked_at FROM sessions s JOIN identities i ON i.id=s.identity_id WHERE s.refresh_token_hash=:rh FOR UPDATE"), {"rh": session_hash(refresh_token)}).mappings().first()
+            row = conn.execute(
+                text(
+                    "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"
+                    "s.refresh_expires_at,s.refresh_used_at,s.revoked_at,i.id identity_id "
+                    "FROM sessions s JOIN identities i ON i.id=s.identity_id "
+                    "WHERE s.refresh_token_hash=:rh FOR UPDATE"
+                ),
+                {"rh": session_hash(refresh_token)},
+            ).mappings().first()
             if not row or row["revoked_at"] or row["refresh_used_at"] or not row["refresh_expires_at"] or row["refresh_expires_at"] <= datetime.now(UTC):
                 return None
-            conn.execute(text("UPDATE sessions SET refresh_used_at=now(),revoked_at=now() WHERE id=:id"), {"id": row["session_id"]})
-        access, refresh, exp, scopes = self.issue_session(row["device_id"], row["user_id"], access_ttl, refresh_ttl)
-        return access, refresh, exp, scopes, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": scopes}
+            conn.execute(
+                text("UPDATE sessions SET refresh_used_at=now(),revoked_at=now() WHERE id=:id"),
+                {"id": row["session_id"]},
+            )
+            device_id = row["device_id"]
+            # device_id may be NULL for pure account sessions
+            conn.execute(
+                text(
+                    "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
+                    "refresh_token_hash,refresh_expires_at) VALUES ("
+                    ":identity_id,"
+                    "CASE WHEN :device_id IS NULL THEN NULL ELSE CAST(:device_id AS uuid) END,"
+                    ":sh,:scopes,now(),:exp,:rh,:rexp)"
+                ),
+                {
+                    "identity_id": row["identity_id"],
+                    "device_id": device_id,
+                    "sh": session_hash(access),
+                    "scopes": json.dumps(SCOPES),
+                    "exp": exp,
+                    "rh": session_hash(refresh),
+                    "rexp": refexp,
+                },
+            )
+        return access, refresh, exp, SCOPES, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": SCOPES}
 
     def revoke_session(self, access_token):
         with self.engine.begin() as conn:

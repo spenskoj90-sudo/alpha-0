@@ -12,8 +12,8 @@ android {
         applicationId = "com.alpha0.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10001
-        versionName = "1.0.0-RC1"
+        versionCode = 10002
+        versionName = "1.0.0-RC2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
     }
@@ -30,14 +30,17 @@ android {
     buildTypes {
         debug { }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("ciRelease")
         }
     }
 
     // Keep release signing secrets out of ordinary debug/unit-test configuration.
-    // For release tasks they are read during project evaluation, before the Android
-    // plugin has finalized the signing config; this avoids late mutation errors.
     val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
     val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
     val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
@@ -78,6 +81,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
+    implementation("com.google.android.play:integrity:1.4.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -150,7 +150,7 @@ class PlayIntegrityVerifier:
         self.max_token_age_seconds = max_token_age_seconds
 
     def configured(self) -> bool:
-        return bool(self.audience)
+        return bool(self.audience and self.package_name and self.cert_digest)
 
     def verify(self, integrity_token: str, expected_nonce: str) -> IntegrityVerificationResult:
         if not self.configured():
@@ -242,11 +242,7 @@ class PlayIntegrityVerifier:
                 )
 
         app_recognition = str(app_integrity.get("appRecognitionVerdict") or "")
-        if app_recognition and app_recognition not in {"PLAY_RECOGNIZED", "UNRECOGNIZED_VERSION"}:
-            # UNEVALUATED / other → fail closed for trusted path
-            if app_recognition not in {"PLAY_RECOGNIZED", "UNRECOGNIZED_VERSION"}:
-                pass
-        if app_recognition in {"UNEVALUATED"}:
+        if app_recognition != "PLAY_RECOGNIZED":
             return IntegrityVerificationResult(
                 tier=IntegrityTier.FAILED,
                 reason="INTEGRITY_APP_UNEVALUATED",

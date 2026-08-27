@@ -40,7 +40,7 @@
 
 **Date:** 2026-08-17  
 **Decision:** Security findings must reference the actual current backend stack and exact source paths.  
-**Reason:** A red-team report cited Go-style paths such as `internal/store/memory/store.go`, `internal/auth/policy.go`, and `internal/challenge/*`, while the canonical backend is Python/FastAPI under `server/`. Those claims cannot be treated as direct repository evidence without reproduction against the actual tree.
+**Reason:** A red-team report cited Go-style paths while the canonical backend is Python/FastAPI under `server/`.
 
 ## D-008 — Product work may proceed independently from backend reconciliation
 
@@ -48,28 +48,41 @@
 **Decision:** UX/design exploration may proceed in parallel, but implementation against backend endpoints waits for canonical-state reconciliation.  
 **Reason:** Design does not require speculative backend changes; integration does.
 
-## D-009 — Current main contains real recommendation authorization gap
+## D-009 — Recommendation authorization (historical)
 
 **Date:** 2026-08-17  
-**Decision:** `/v1/recommendations` is an active security/authorization work item because the current `main` handler authenticates the session but does not call `policy_engine.authorize` before returning a recommendation.  
-**Evidence:** `server/app/main.py` at the current canonical line.  
-**Reason:** This finding is directly reproducible in the actual Python/FastAPI code and is therefore distinct from stack-incompatible red-team claims.
+**Decision (superseded by later main):** Original gap on `/v1/recommendations` was remediated in main lineage; negative regression present.
 
-## D-010 — Challenge lifecycle finding from DeepSeek is rejected against main
+## D-010 — Challenge lifecycle finding from DeepSeek rejected against main
 
 **Date:** 2026-08-17  
-**Decision:** Do not implement DeepSeek's proposed nonce/expiration fix as a new feature. The current `main` code already generates a nonce, stores its hashed form, sets a 120-second expiry, tracks `consumed`, and rejects consumed/expired challenges.  
-**Evidence:** `server/app/main.py` at the current canonical line.  
-**Reason:** The proposed Go-path finding describes a different codebase and would create duplicate/conflicting work.
+**Decision:** Do not implement DeepSeek's proposed nonce/expiration fix as a new feature; main already implements consume/expiry.
 
 ## D-011 — Idempotency finding must be narrowed
 
 **Date:** 2026-08-17  
-**Decision:** Do not accept the claim that the repository has no idempotency storage. `server/migrations/001_initial.sql` contains `idempotency_keys`. The remaining question is runtime enforcement, which must be audited separately.  
-**Reason:** Schema presence and runtime behavior are different claims; neither should be inferred from the other.
+**Decision:** Schema presence (`idempotency_keys`) and runtime enforcement are different claims.
 
 ## D-012 — RLS finding must distinguish enabled from policy-protected
 
 **Date:** 2026-08-17  
-**Decision:** Current migration enables RLS on `characters`, `entitlements`, and `audit_events`, but contains no `CREATE POLICY` statements. This is a real schema-hardening gap, not evidence that RLS is entirely absent.  
-**Reason:** The distinction prevents both under-reporting and over-reporting the security state.
+**Decision:** RLS enablement and CREATE POLICY / FORCE RLS are distinct; both later remediated via 002 + 004.
+
+## D-013 — Emulator replaces blocking FTL for routine CI
+
+**Date:** 2026-08-27  
+**Decision:** Build & Test instrumentation uses GitHub-hosted Android Emulator (API 35) as the product CI gate. FTL remains optional infra restoration when Cloud Tool Results API is enabled.  
+**Evidence:** PR #68, Owner-approved design from PR #67, Build & Test run `33069908061` emulator job PASS.  
+**Reason:** FTL was blocking green CI on GCP API configuration; emulator provides deterministic instrumentation without external GCP dependency.
+
+## D-014 — Play Integrity remains fail-closed without audience
+
+**Date:** 2026-08-27  
+**Decision:** Do not mock live Google verification as production proof. Keep fail-closed / UNKNOWN when `SENTINEL_PLAY_INTEGRITY_AUDIENCE` is unset. Server nonce + tier policy + replay rejection are implemented and tested.  
+**Reason:** Fake credentials or insecure fallbacks would undermine attestation trust.
+
+## D-015 — PR #68 merge gate
+
+**Date:** 2026-08-27  
+**Decision:** PR #68 may merge only after exact-head product CI green **and** explicit Owner / Final Integrator accept. Agents must not merge.  
+**Evidence:** HEAD `5439e715175eb8444c12aa85b81cbb0e9385b2b3`, Build & Test `33069908061` SUCCESS.

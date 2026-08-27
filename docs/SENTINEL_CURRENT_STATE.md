@@ -1,12 +1,14 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-26  
+**State record:** 2026-08-27  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD at audit start:** `5e241a2f3d55453bf255a316ca6e31b5f59e7ccf`  
-**Remediation branch:** `sentinel/final-audit-remediation-2026-08-26`
+**Canonical HEAD (main):** `6ea5af7ffa931826733ad87637959e983d7d05c1`  
+**Hardening branch:** `sentinel/release-hardening-2026-08-27`  
+**Hardening HEAD:** `5439e715175eb8444c12aa85b81cbb0e9385b2b3`  
+**PR:** #68 (open; not product state until merge + Owner accept)
 
-> This document is repository-grounded. `main`/Git are authoritative for implementation state; this document records evidence and decisions, not assumptions from AI reports.
+> This document is repository-grounded. `main`/Git are authoritative for product state; branch evidence is not accepted until merged.
 
 ## 1. Binding evidence policy
 
@@ -17,58 +19,67 @@
 - Android client exists under `app/`.
 - FastAPI backend exists under `server/`.
 - Web control-plane source exists under `web/`.
-- Device identity uses Android Keystore / EC P-256 with SHA-256 public-key fingerprinting.
+- Device identity uses Android Keystore / EC P-256 with SHA-256 public-key fingerprinting; StrongBox preferred, TEE fallback.
 - Sessions use opaque tokens with hashed persistence and one-time refresh rotation; JWT is not the primary session mechanism.
 - Authorization is server-authoritative and default-deny.
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; production startup rejects a missing `DATABASE_URL`.
-- `/v1/recommendations` is explicitly authorized through `knowledge:recommend`; a negative regression test expects HTTP 403 without the required scope.
-- Android backup is disabled and security response headers are implemented in Core.
+- PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS applied by migration `004_p1_rls_force.sql`.
+- `/v1/recommendations` is authorized through `knowledge:recommend`.
+- Android backup disabled; `usesCleartextTraffic=false`; network security config present.
+- Admin endpoints enforce rate limit and failed-attempt lockout (5 failures / 15 min window).
 
-## 3. 2026-08-26 independent audit reconciliation
+## 3. PR #66 (merged on main)
 
-Two clean-room audits were compared: Grok and DeepSeek. Direct repository evidence takes precedence over README/state claims and over audit claims that were not inspected at implementation level.
+Merge SHA: `6ea5af7ffa931826733ad87637959e983d7d05c1`
 
-### Confirmed / accepted
+- Wire `app.service_role=true` into PostgresStore connections
+- `004_p1_rls_force.sql` (FORCE RLS without mutating 002 checksum)
+- RLS regression coverage
+- MemoryStore refresh rotation parity with PostgresStore
+- Refresh-rotation regression coverage
+- Canonical state / audit documentation reconciliation
 
-- Current `main` HEAD at the start of this pass is `5e241a2f3d55453bf255a316ca6e31b5f59e7ccf`.
-- Backend is FastAPI/Python 3.12, not Kotlin/Ktor.
-- Sessions are opaque tokens, not JWT sessions.
-- RLS policies exist in `server/migrations/002_p1_rls.sql`.
-- `POST /v1/recommendations` authorization is already implemented and regression-tested.
-- No P0 security vulnerability is confirmed by the two repository audits.
-- FTL is an infrastructure/test execution blocker, not evidence of a product-security P0.
+## 4. PR #68 release hardening (branch evidence; not product until merge)
 
-### Remediated in this pass
+Branch HEAD: `5439e715175eb8444c12aa85b81cbb0e9385b2b3`
 
-1. **RLS application connection contract:** `PostgresStore` now sets `app.service_role=true` on every SQLAlchemy/psycopg connection through `connect_args`.
-2. **RLS owner-role hardening:** migration `004_p1_rls_force.sql` applies `FORCE ROW LEVEL SECURITY` without mutating the checksum of migration `002_p1_rls.sql`.
-3. **RLS regression evidence:** `server/tests/test_rls_policies.py` now verifies both forced RLS and the application connection GUC.
-4. **Memory/Postgres refresh parity:** `MemoryStore.rotate_refresh()` now marks the previous access session revoked before issuing the replacement session, matching Postgres semantics.
-5. **Refresh regression evidence:** `server/tests/test_store_session_contract.py` verifies old access invalidation and one-time refresh use.
-6. **Canonical state documentation:** this file is reconciled to the actual repository HEAD used for the pass and explicitly records the audit reconciliation.
+### Implemented
 
-## 4. Governance evidence
+1. Admin lockout / rate limiting on admin endpoints; token never echoed.
+2. RLS negative proof via dedicated non-owner role `rls_probe` (no BYPASSRLS).
+3. Concurrent refresh rotation: MemoryStore + **PostgresStore** ThreadPool tests assert exactly one successful rotation.
+4. Integrity tier policy + one-time server nonce; client verdicts untrusted; live Google verification fail-closed without audience.
+5. Android StrongBox with TEE fallback; cleartext disabled.
+6. Build & Test instrumentation: GitHub Emulator (Owner-approved design from PR #67).
 
-At the beginning of this pass, live GitHub branch metadata for `main` reported:
+### Exact-head CI evidence (Build & Test run 33069908061)
 
-- `protected=true`
-- `enforcement_level=non_admins`
-- required checks: `Android build and tests`, `Secret and image scan`, `Core tests and coverage`
+| Job | Result |
+|-----|--------|
+| Repository verification | PASS |
+| Core tests and coverage | PASS |
+| PostgreSQL integration and recovery | PASS |
+| Web build | PASS |
+| Container build | PASS |
+| Reproducible container comparison | PASS |
+| Deployment smoke and health | PASS |
+| Android build and tests (incl. signed release + fingerprint) | PASS |
+| Android instrumentation (GitHub Emulator API 35) | PASS |
+| Security | PASS |
+| P1 Evidence | PASS |
+| ALPHA-0 Android CI | PASS |
 
-Therefore the previous TASKS entry claiming `contexts=[]` / `checks=[]` was stale and must not be treated as current truth.
+Deploy push-ghost runs remain FAIL and are classified non-product (workflow trigger is `release.published` only).
 
-## 5. FTL status
+## 5. Remaining open evidence
 
-FTL remains a separate infrastructure acceptance item. The repository/application code is not declared broken solely because instrumentation could not execute. The known blocker remains the Google Cloud Tool Results API configuration described in the task board. No additional paid FTL run is justified until that infrastructure prerequisite is confirmed.
+- **Play Integrity live Google token verification:** BLOCKED until `SENTINEL_PLAY_INTEGRITY_AUDIENCE` (and related Google credentials) are configured. Policy engine + nonce replay protection exist; mode is fail-closed / UNKNOWN.
+- **Production SoR / external deployment configuration:** UNVERIFIED. CI PostgreSQL is not production evidence.
+- **Real-device Android acceptance:** Owner manual gate.
+- **Required status-check contexts on protected main:** process/governance item (settings not changed by agents).
+- **Multi-instance rate limiting:** intentionally process-local until horizontal scale is required.
 
-## 6. Remaining open evidence
-
-- Exact-main production-equivalent PostgreSQL runtime evidence remains open; repository code and CI PostgreSQL evidence do not prove the actual external deployment configuration.
-- Multi-instance rate limiting remains intentionally process-local until horizontal deployment is actually required; this is an architectural scale gate, not a current P0.
-- Real-device Android acceptance remains separate from repository QA.
-- FTL infrastructure restoration remains separate from application-code correctness.
-
-## 7. Explicit non-actions
+## 6. Explicit non-actions
 
 Do not silently change:
 
@@ -78,11 +89,10 @@ Do not silently change:
 - production `DATABASE_URL` / enrollment-token requirements;
 - migration checksum enforcement;
 - modular-monolith architecture;
-- single-instance rate limiter before there is evidence that horizontal scaling is required.
+- single-instance rate limiter before horizontal scaling evidence;
+- signing secrets, production credentials, or CI governance settings without Owner approval.
 
-Do not classify README SHA values as Git HEAD. Always verify `git rev-parse HEAD` / live branch metadata.
-
-## 8. Authority
+## 7. Authority
 
 **Branch-state truth authority:** GPT / Final Integrator.  
-**Human Owner:** absolute final authority for acceptance, scope, release, and destructive repository cleanup.
+**Human Owner:** absolute final authority for acceptance, scope, release, merge, and destructive repository cleanup.

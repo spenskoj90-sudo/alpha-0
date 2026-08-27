@@ -56,6 +56,8 @@ class Store(ABC):
     @abstractmethod
     def record_security_failure(self, subject: str, source: str) -> int: ...
     @abstractmethod
+    def security_failure_count(self, subject: str) -> int: ...
+    @abstractmethod
     def list_entitlements(self, user_id: str | None = None) -> list[dict[str, Any]]: ...
     @abstractmethod
     def create_entitlement(self, item: dict[str, Any]) -> dict[str, Any]: ...
@@ -178,6 +180,12 @@ class MemoryStore(Store):
         with self.lock:
             self.failures = [(s, t) for s, t in self.failures if t >= cutoff]
             self.failures.append((subject, time.time()))
+            return sum(1 for s, _ in self.failures if s == subject)
+
+    def security_failure_count(self, subject):
+        cutoff = time.time() - 900
+        with self.lock:
+            self.failures = [(s, t) for s, t in self.failures if t >= cutoff]
             return sum(1 for s, _ in self.failures if s == subject)
 
     def list_entitlements(self, user_id=None):
@@ -303,6 +311,10 @@ class PostgresStore(Store):
     def record_security_failure(self, subject, source):
         with self.engine.begin() as conn:
             conn.execute(text("INSERT INTO security_failures(subject,source) VALUES (:s,:src)"), {"s": subject, "src": source})
+            return int(conn.execute(text("SELECT count(*) FROM security_failures WHERE subject=:s AND failed_at>now()-interval '15 minutes'"), {"s": subject}).scalar_one())
+
+    def security_failure_count(self, subject):
+        with self.engine.begin() as conn:
             return int(conn.execute(text("SELECT count(*) FROM security_failures WHERE subject=:s AND failed_at>now()-interval '15 minutes'"), {"s": subject}).scalar_one())
 
     def list_entitlements(self, user_id=None):

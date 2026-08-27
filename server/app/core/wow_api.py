@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.core.admin import require_admin
@@ -49,8 +49,9 @@ def realm(realm_id: str) -> dict[str, object]:
 
 
 @router.post("/v1/wow/realms/{realm_id}/observations")
-def observe(realm_id: str, payload: RealmObservation, x_sentinel_admin_token: str | None = Header(default=None)) -> dict[str, object]:
-    require_admin(x_sentinel_admin_token)
+def observe(realm_id: str, payload: RealmObservation, request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict[str, object]:
+    from app.main import store
+    require_admin(x_sentinel_admin_token, request, store)
     item = get_realm(realm_id)
     if item is None:
         raise HTTPException(status_code=404, detail="WOW_REALM_NOT_FOUND")

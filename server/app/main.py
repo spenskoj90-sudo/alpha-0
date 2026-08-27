@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.admin import require_admin
+from app.core.integrity import IntegrityNonceStore, IntegrityTier
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
 from app.core.models import (
@@ -117,6 +118,7 @@ class RateLimiter:
 
 
 rate_limiter = RateLimiter(int(os.getenv("RATE_LIMIT_PER_MINUTE", "120")))
+integrity_nonces = IntegrityNonceStore()
 
 
 def request_id(request: Request, supplied: str | None = None) -> str:
@@ -498,20 +500,23 @@ def audit(authorization_header: str = Header(..., alias="Authorization")):
 
 
 @app.get("/v1/admin/games")
-def admin_games(x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
-    require_admin(x_sentinel_admin_token)
+def admin_games(request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
     return {"games": [game.__dict__ for game in DIABLO_CATALOG]}
 
 
 @app.get("/v1/admin/entitlements")
-def admin_entitlements(x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
-    require_admin(x_sentinel_admin_token)
+def admin_entitlements(request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
     return {"entitlements": store.list_entitlements()}
 
 
 @app.post("/v1/admin/entitlements")
-def admin_create_entitlement(payload: AdminEntitlementRequest, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
-    require_admin(x_sentinel_admin_token)
+def admin_create_entitlement(payload: AdminEntitlementRequest, request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
     if get_game(payload.game_id) is None:
         raise HTTPException(status_code=404, detail="GAME_NOT_FOUND")
     if payload.valid_until < payload.valid_from:
@@ -521,6 +526,45 @@ def admin_create_entitlement(payload: AdminEntitlementRequest, x_sentinel_admin_
     store.add_audit({"actor_user_id": payload.user_id, "actor_device_id": None, "action": "admin:entitlement:create", "resource": payload.game_id, "decision": "ALLOW", "reason_code": "ADMIN_GRANT", "request_id": None})
     return item
 
+
+
+
+@app.post("/v1/integrity/nonce")
+def issue_integrity_nonce(request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, str]:
+    rate_limit(request, "integrity-nonce")
+    principal_from_token(require_bearer(authorization_header))
+    nonce = integrity_nonces.issue()
+    return {"nonce": nonce, "ttl_seconds": str(integrity_nonces.ttl_seconds)}
+
+
+@app.post("/v1/integrity/attest")
+def attest_integrity(payload: dict[str, object], request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, object]:
+    """Bind a server nonce. Client-supplied verdicts are never trusted.
+
+    Google Play Integrity token verification requires configured server
+    credentials. Absent those credentials the attested tier remains UNKNOWN
+    and does not upgrade authorization.
+    """
+    rate_limit(request, "integrity-attest")
+    principal_from_token(require_bearer(authorization_header))
+    nonce = str(payload.get("nonce") or "")
+    if not integrity_nonces.consume(nonce):
+        raise HTTPException(status_code=401, detail="INTEGRITY_NONCE_INVALID")
+    # Client verdict lists are informational only and cannot raise the tier.
+    _ = payload.get("client_verdicts")
+    google_audience = os.getenv("SENTINEL_PLAY_INTEGRITY_AUDIENCE")
+    if not google_audience:
+        tier = IntegrityTier.UNKNOWN
+        reason = "PLAY_INTEGRITY_NOT_CONFIGURED"
+    else:
+        # Token verification against Google is required before any upgrade.
+        # Without a verified token the policy remains fail-closed.
+        token = str(payload.get("integrity_token") or "")
+        if not token:
+            raise HTTPException(status_code=401, detail="INTEGRITY_TOKEN_REQUIRED")
+        tier = IntegrityTier.UNKNOWN
+        reason = "PLAY_INTEGRITY_TOKEN_UNVERIFIED"
+    return {"tier": tier.value, "reason": reason, "trusted": False}
 
 @app.post("/v1/recommendations", response_model=RecommendationResponse)
 def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):

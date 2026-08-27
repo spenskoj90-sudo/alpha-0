@@ -33,3 +33,21 @@ The reference rate limiter is process-local. A multi-replica production deployme
 ## Security testing
 
 CI runs Python security tests, API regression tests, CodeQL, Trivy and dependency audits. Runtime penetration testing (OWASP ZAP/Burp) remains an environment-level release gate rather than a claim of completion from source inspection alone.
+
+
+## Integrity access policy
+
+Device integrity tiers are evaluated server-side. Client-supplied Play Integrity verdicts are never trusted.
+
+| Tier | Access |
+| --- | --- |
+| `MEETS_STRONG_INTEGRITY` | Full access to security-critical operations |
+| `MEETS_DEVICE_INTEGRITY` | Normal authenticated access; rotate/revoke, event write, admin grant and recommendations are denied |
+| `MEETS_BASIC_INTEGRITY` | Read-only basic access (`character:read`, `game:read`, `audit:read`) |
+| `FAILED` / `UNKNOWN` | Protected operations denied |
+
+Server-issued attestation nonces are one-time and TTL-bound. Google Play Integrity token verification is fail-closed until `SENTINEL_PLAY_INTEGRITY_AUDIENCE` and a verified token path are configured. Absent that configuration the attested tier remains `UNKNOWN` and does not upgrade authorization.
+
+## Admin control plane
+
+Admin endpoints require `SENTINEL_ADMIN_TOKEN`, are rate-limited, record failed attempts, and lock out the source after 5 failures in 15 minutes. Error bodies do not echo the presented token.

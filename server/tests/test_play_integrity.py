@@ -33,8 +33,7 @@ def _payload(
                 "certificateSha256Digest": [cert],
             },
             "deviceIntegrity": {
-                "deviceRecognitionVerdict": verdicts
-                or ["MEETS_STRONG_INTEGRITY", "MEETS_DEVICE_INTEGRITY", "MEETS_BASIC_INTEGRITY"]
+                "deviceRecognitionVerdict": verdicts if verdicts is not None else ["MEETS_STRONG_INTEGRITY", "MEETS_DEVICE_INTEGRITY", "MEETS_BASIC_INTEGRITY"]
             },
         }
     }

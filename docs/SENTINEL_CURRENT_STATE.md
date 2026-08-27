@@ -4,6 +4,8 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Canonical HEAD at audit start:** `5e241a2f3d55453bf255a316ca6e31b5f59e7ccf`  
+**Canonical HEAD after PR #66:** `6ea5af7ffa931826733ad87637959e983d7d05c1`  
+**This branch is not accepted product state until merged.**  
 **Remediation branch:** `sentinel/final-audit-remediation-2026-08-26`
 
 > This document is repository-grounded. `main`/Git are authoritative for implementation state; this document records evidence and decisions, not assumptions from AI reports.
@@ -62,6 +64,12 @@ Therefore the previous TASKS entry claiming `contexts=[]` / `checks=[]` was stal
 FTL remains a separate infrastructure acceptance item. The repository/application code is not declared broken solely because instrumentation could not execute. The known blocker remains the Google Cloud Tool Results API configuration described in the task board. No additional paid FTL run is justified until that infrastructure prerequisite is confirmed.
 
 ## 6. Remaining open evidence
+
+- Admin lockout, concurrent refresh tests, RLS negative tests, integrity nonce/policy, StrongBox TEE fallback, and emulator CI are implemented on `sentinel/release-hardening-2026-08-27` and are not product state until merged.
+- Google Play Integrity *token verification against Google* remains unconfigured (`SENTINEL_PLAY_INTEGRITY_AUDIENCE` unset). The policy engine and nonce replay protection exist; live Google attestation is fail-closed/UNKNOWN.
+
+## 6b. Remaining open evidence (pre-existing)
+
 
 - Exact-main production-equivalent PostgreSQL runtime evidence remains open; repository code and CI PostgreSQL evidence do not prove the actual external deployment configuration.
 - Multi-instance rate limiting remains intentionally process-local until horizontal deployment is actually required; this is an architectural scale gate, not a current P0.

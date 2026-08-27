@@ -6,6 +6,9 @@
 
 ## Сейчас в фокусе
 
+- [~] **Grok**, 2026-08-27. Release-hardening pass on `sentinel/release-hardening-2026-08-27`: admin lockout, RLS negatives, concurrent refresh, integrity policy/nonce, StrongBox TEE fallback, emulator CI (from Owner-approved PR #67). Not `[x]` until PR CI + merge SHA.
+
+
 - [x] Слияние canonical-ветки sentinel-ftl-2026-08-13 в main без потери данных — исторически закрыто; последующие main commits являются каноническим состоянием.
 - [x] P0 TCP-баг с обрывом TCP-соединения при получении ответа от локального тестового сервера — причина установлена не в HTTP-клиенте: Android использует HttpURLConnection, а агрессивное battery/background-network ограничение прошивки устройства задерживало первый сетевой запрос до readTimeout (15 s), после чего сервер видел BrokenPipeError при записи в уже закрытый сокет. Подтверждено на реальном устройстве: после отключения battery optimization для приложения запрос прошёл мгновенно и flow продолжился до `Account authenticated — device flow next`. Диагностическая раскрывающая правка AuthApi закреплена PR #34. Evidence: PR #34 + ручной runtime/device test 2026-08-20; кодовую причину в клиенте не меняли.
 - [x] Repository hygiene (16 целевых веток): **Grok**, 2026-08-22. Все 16 имён отсутствовали в branch list; удаления через API не потребовалось. Evidence: аудит Grok + branch list.

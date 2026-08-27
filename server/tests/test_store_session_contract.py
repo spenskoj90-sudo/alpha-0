@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from app.core.store import MemoryStore
 
 
@@ -17,4 +19,22 @@ def test_memory_store_refresh_rotation_revokes_previous_access_session():
     assert store.get_session(new_access) is not None
 
     # One-time refresh rotation remains enforced after the old session is revoked.
+    assert store.rotate_refresh(old_refresh, 3600, 7200) is None
+
+
+def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():
+    store = MemoryStore()
+    old_access, old_refresh, _, _ = store.issue_session("device-1", "user-1", 3600, 7200)
+
+    def attempt(_):
+        return store.rotate_refresh(old_refresh, 3600, 7200)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(attempt, range(8)))
+
+    successes = [item for item in results if item is not None]
+    assert len(successes) == 1
+    new_access = successes[0][0]
+    assert store.get_session(old_access) is None
+    assert store.get_session(new_access) is not None
     assert store.rotate_refresh(old_refresh, 3600, 7200) is None

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — 2026-08-27 (Grok / sentinel/release-hardening-2026-08-27)
+
+- Admin brute-force lockout and rate limiting on admin endpoints.
+- RLS negative tests proving access without `app.service_role=true` cannot SELECT/INSERT protected rows.
+- Concurrent refresh-rotation regression: one refresh token cannot mint multiple valid session pairs.
+- Integrity tier policy + server-issued attestation nonce with replay rejection. Client verdicts are not trusted.
+- Android Keystore generation prefers StrongBox and falls back to TEE when StrongBox is unavailable.
+- Android `usesCleartextTraffic=false` (loopback cleartext remains domain-scoped in network security config).
+- Build & Test instrumentation job replaced with GitHub-hosted Android Emulator (Owner-approved FTL replacement).
+
+# Changelog
+
 ## 1.0.0-RC1 — 2026-08-13
 
 ### P1 pass continuation

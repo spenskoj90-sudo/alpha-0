@@ -1,7 +1,9 @@
 package com.alpha0.app.security
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.security.keystore.StrongBoxUnavailableException
 import android.util.Base64
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -46,7 +48,7 @@ private fun ensureKeyExists() {
         KEYSTORE_PROVIDER
     )
 
-    val spec = KeyGenParameterSpec.Builder(
+    val builder = KeyGenParameterSpec.Builder(
         KEY_ALIAS,
         KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
     )
@@ -56,10 +58,42 @@ private fun ensureKeyExists() {
         .setDigests(
             KeyProperties.DIGEST_SHA256
         )
-        .build()
+        .setUserAuthenticationRequired(false)
 
-    generator.initialize(spec)
-    generator.generateKeyPair()
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            builder.setIsStrongBoxBacked(true)
+        }
+        generator.initialize(builder.build())
+        generator.generateKeyPair()
+    } catch (_: StrongBoxUnavailableException) {
+        val teeBuilder = KeyGenParameterSpec.Builder(
+            KEY_ALIAS,
+            KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+        )
+            .setAlgorithmParameterSpec(
+                ECGenParameterSpec(CURVE)
+            )
+            .setDigests(
+                KeyProperties.DIGEST_SHA256
+            )
+            .setUserAuthenticationRequired(false)
+        generator.initialize(teeBuilder.build())
+        generator.generateKeyPair()
+    } catch (_: Exception) {
+        val teeBuilder = KeyGenParameterSpec.Builder(
+            KEY_ALIAS,
+            KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+        )
+            .setAlgorithmParameterSpec(
+                ECGenParameterSpec(CURVE)
+            )
+            .setDigests(
+                KeyProperties.DIGEST_SHA256
+            )
+        generator.initialize(teeBuilder.build())
+        generator.generateKeyPair()
+    }
 }
 
 private fun getPrivateKey(): PrivateKey {

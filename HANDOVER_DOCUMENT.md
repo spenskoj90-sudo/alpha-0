@@ -7,9 +7,9 @@ Repository: `spenskoj90-sudo/alpha-0`
 ## 0. Canonical live state (SOURCE OF TRUTH)
 
 **Live `origin/main` HEAD (verified 2026-08-28):**  
-`7a32ceff2a7b58e0254b7a777335287c581eca81`
+`8e09e6835647792258713b572011f17ba9acdd0a`
 
-Commit: `chore: remove legacy/obsolete utility files`
+Commit: `chore/docs: remove CI touch artifact + sync HANDOVER to live main`
 
 This document must track live GitHub `main`. Historical recovery notes and prior handover SHAs are not authoritative.
 
@@ -64,33 +64,35 @@ Decryption template:
 
 The release workflow must verify the resulting APK certificate fingerprint against the canonical fingerprint above and reject debug/non-release APKs.
 
-## 6. Live CI status (verified against GitHub Actions on HEAD 7a32ceff)
+**VERIFIED (CI evidence):** On main HEAD `7a32ceff` and post-merge `8e09e683`, Build & Test job successfully decoded the release keystore, validated alias, assembled signed release APK, and verified certificate fingerprint against the canonical value above. Keystore secrets are present in CI.
+
+## 6. Live CI status (verified against GitHub Actions on HEAD 8e09e683)
 
 | Workflow              | Status on current main | Evidence run ID      |
 |-----------------------|------------------------|----------------------|
-| Build & Test          | success                | 33176003577          |
-| Security              | success                | 33176003543          |
-| ALPHA-0 Android CI    | success                | 33176003634          |
-| P1 Evidence           | success                | 33176003631          |
-| Deploy                | failure (expected)     | 33176002437          |
+| Build & Test          | success                | 33186523492          |
+| Security              | success                | 33186523418          |
+| ALPHA-0 Android CI    | success                | 33186523501          |
+| P1 Evidence           | success                | 33186523480          |
+| Deploy                | failure (expected)     | 33186522362          |
 
-Deploy workflow is release-triggered / requires external DEPLOY_* secrets and production host. Failure is EXTERNAL BLOCKER, not a repository defect.
+Deploy workflow requires external DEPLOY_* secrets and production host. Failure is EXTERNAL BLOCKER, not a repository defect.
 
 ## 7. CURRENT ACTIVE TASK
 
-**Priority 1 — External release signing secrets + signed APK production**
+**Priority 1 — Physical device acceptance of signed release APK**
 
-Android keystore secrets (release.keystore.gpg passphrase + keystore) must be available to CI release workflow so a real signed APK can be produced and certificate fingerprint verified.
+Signed APK production + certificate fingerprint verification already SUCCEEDED in CI. Remaining gate: Owner installs the CI-produced signed release APK on a physical device and confirms acceptance.
 
-Until this is complete, project remains **NOT RELEASE READY**.
+Until physical device validation is complete, project remains **NOT RELEASE READY**.
 
 ## 8. Remaining roadmap (priority order)
 
-1. Supply Android release keystore secrets to CI (Owner action).
+1. Physical device acceptance of signed APK (Owner action) — CURRENT ACTIVE TASK.
 2. Supply production DATABASE_URL + C1 role / infrastructure (Owner action).
-3. Supply Play Integrity Google Cloud credentials (Owner action).
-4. Execute physical device acceptance of signed APK (Owner action).
-5. Optional: remote Deploy secrets (DEPLOY_HOST / USER / KEY) if production rollout required.
+3. Supply live Play Integrity Google Cloud credentials for production attestation (Owner action).
+4. Optional: remote Deploy secrets (DEPLOY_HOST / USER / KEY) if production rollout required.
+5. Optional (later): restore real coverage gate once `--cov` package path is corrected and measured ≥ 80%.
 6. Keep HANDOVER_DOCUMENT.md synchronized after every main merge.
 
 ## 9. Definition of Done
@@ -99,13 +101,13 @@ Project is RELEASE READY only when:
 
 - CI green (product workflows).
 - All unit/integration/security tests pass.
-- Coverage >= 80%.
-- Signed APK builds successfully.
-- Play Integrity verified.
-- Release APK certificate verified against canonical fingerprint.
-- Physical device validation PASS.
+- Coverage >= 80% (currently diagnostic-only due to package path).
+- Signed APK builds successfully — **VERIFIED in CI**.
+- Release APK certificate verified against canonical fingerprint — **VERIFIED in CI**.
+- Play Integrity verified (live production path still requires Owner credentials).
+- Physical device validation PASS — **BLOCKED on Owner**.
 
-Current status: **NOT RELEASE READY** (external blockers remain).
+Current status: **NOT RELEASE READY** (physical device + production DB + live Play Integrity remain).
 
 ## 10. Development constraints
 

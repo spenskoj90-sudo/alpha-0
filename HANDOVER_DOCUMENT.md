@@ -4,9 +4,14 @@ Date: 2026-08-28
 Project: SENTINEL / ALPHA-0  
 Repository: `spenskoj90-sudo/alpha-0`
 
-## 0. Canonical live state
+## 0. Canonical live state (SOURCE OF TRUTH)
 
-The previous handover recorded an older `origin/main` SHA. The live GitHub `main` state is authoritative. At recovery time, `main` = `6f75c94f82e4da2e85f723bf1c587cf139cbd89f`.
+**Live `origin/main` HEAD (verified 2026-08-28):**  
+`7a32ceff2a7b58e0254b7a777335287c581eca81`
+
+Commit: `chore: remove legacy/obsolete utility files`
+
+This document must track live GitHub `main`. Historical recovery notes and prior handover SHAs are not authoritative.
 
 ## 1. Purpose and architecture
 
@@ -40,6 +45,8 @@ Target model: Android application, Web interface, game adapters, and system oper
 - `web/` — Next.js web interface.
 - `.github/workflows/` — Android, build, deploy, P1 evidence, release, and security CI/CD workflows.
 - `docs/` — project documentation/artifacts.
+- `launcher/` — Electron launcher.
+- `wow-addon/` — World of Warcraft addons (classic/retail).
 
 ## 5. Release signing / Play Integrity
 
@@ -57,26 +64,52 @@ Decryption template:
 
 The release workflow must verify the resulting APK certificate fingerprint against the canonical fingerprint above and reject debug/non-release APKs.
 
-## 6. Development constraints
+## 6. Live CI status (verified against GitHub Actions on HEAD 7a32ceff)
 
-- Work from GitHub Codespaces / Web Terminal on mobile.
-- AI output for implementation is DIFF/PATCH or changed functions, not large complete files.
-- No screenshots; use textual logs and tracebacks.
-- Development proceeds atomically and each task is fixed by tests.
-- Live `origin/main` is the source of truth over historical handovers.
+| Workflow              | Status on current main | Evidence run ID      |
+|-----------------------|------------------------|----------------------|
+| Build & Test          | success                | 33176003577          |
+| Security              | success                | 33176003543          |
+| ALPHA-0 Android CI    | success                | 33176003634          |
+| P1 Evidence           | success                | 33176003631          |
+| Deploy                | failure (expected)     | 33176002437          |
 
-## 7. Definition of Done
+Deploy workflow is release-triggered / requires external DEPLOY_* secrets and production host. Failure is EXTERNAL BLOCKER, not a repository defect.
 
-Project is ready only when:
+## 7. CURRENT ACTIVE TASK
 
-- CI is green.
+**Priority 1 — External release signing secrets + signed APK production**
+
+Android keystore secrets (release.keystore.gpg passphrase + keystore) must be available to CI release workflow so a real signed APK can be produced and certificate fingerprint verified.
+
+Until this is complete, project remains **NOT RELEASE READY**.
+
+## 8. Remaining roadmap (priority order)
+
+1. Supply Android release keystore secrets to CI (Owner action).
+2. Supply production DATABASE_URL + C1 role / infrastructure (Owner action).
+3. Supply Play Integrity Google Cloud credentials (Owner action).
+4. Execute physical device acceptance of signed APK (Owner action).
+5. Optional: remote Deploy secrets (DEPLOY_HOST / USER / KEY) if production rollout required.
+6. Keep HANDOVER_DOCUMENT.md synchronized after every main merge.
+
+## 9. Definition of Done
+
+Project is RELEASE READY only when:
+
+- CI green (product workflows).
 - All unit/integration/security tests pass.
+- Coverage >= 80%.
 - Signed APK builds successfully.
-- Play Integrity is verified.
-- Release APK is confirmed on a physical device.
+- Play Integrity verified.
+- Release APK certificate verified against canonical fingerprint.
+- Physical device validation PASS.
 
-## 8. Recovery baseline
+Current status: **NOT RELEASE READY** (external blockers remain).
 
-Current live main commit message: `Merge SENTINEL final integrator corrections`.
+## 10. Development constraints
 
-The commit states that final repository corrections followed green product CI, security, P1 evidence, Android CI, and emulator instrumentation. Any current CI regression must be diagnosed from the live workflow/run state rather than from this document.
+- Do not change `main` directly; use PR branches.
+- Live `origin/main` is the sole source of truth.
+- Never commit secrets, keystores, or plaintext credentials.
+- AI has no authorization authority.

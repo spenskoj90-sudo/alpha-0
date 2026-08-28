@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.admin import require_admin
-from app.core.integrity import IntegrityNonceStore, IntegrityTier
+from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
 from app.core.models import (
@@ -119,6 +119,7 @@ class RateLimiter:
 
 rate_limiter = RateLimiter(int(os.getenv("RATE_LIMIT_PER_MINUTE", "120")))
 integrity_nonces = IntegrityNonceStore()
+play_integrity = PlayIntegrityVerifier()
 
 
 def request_id(request: Request, supplied: str | None = None) -> str:
@@ -268,8 +269,14 @@ def register_user(payload: RegisterRequest, request: Request):
 @app.post("/v1/auth/login", response_model=SessionResponse)
 def login_user(payload: LoginRequest, request: Request):
     rate_limit(request, "auth-login")
+    subject = payload.email.strip().lower()
+    threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
+    if subject and store.security_failure_count(subject) >= threshold:
+        raise HTTPException(status_code=429, detail="AUTH_LOCKOUT")
     user_id = user_store.authenticate(payload.email, payload.password)
     if not user_id:
+        if subject:
+            store.record_security_failure(subject, "auth-login")
         raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
     access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
     user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
@@ -539,32 +546,22 @@ def issue_integrity_nonce(request: Request, authorization_header: str = Header(.
 
 @app.post("/v1/integrity/attest")
 def attest_integrity(payload: dict[str, object], request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, object]:
-    """Bind a server nonce. Client-supplied verdicts are never trusted.
-
-    Google Play Integrity token verification requires configured server
-    credentials. Absent those credentials the attested tier remains UNKNOWN
-    and does not upgrade authorization.
-    """
     rate_limit(request, "integrity-attest")
     principal_from_token(require_bearer(authorization_header))
     nonce = str(payload.get("nonce") or "")
     if not integrity_nonces.consume(nonce):
         raise HTTPException(status_code=401, detail="INTEGRITY_NONCE_INVALID")
-    # Client verdict lists are informational only and cannot raise the tier.
-    _ = payload.get("client_verdicts")
-    google_audience = os.getenv("SENTINEL_PLAY_INTEGRITY_AUDIENCE")
-    if not google_audience:
-        tier = IntegrityTier.UNKNOWN
-        reason = "PLAY_INTEGRITY_NOT_CONFIGURED"
-    else:
-        # Token verification against Google is required before any upgrade.
-        # Without a verified token the policy remains fail-closed.
-        token = str(payload.get("integrity_token") or "")
-        if not token:
-            raise HTTPException(status_code=401, detail="INTEGRITY_TOKEN_REQUIRED")
-        tier = IntegrityTier.UNKNOWN
-        reason = "PLAY_INTEGRITY_TOKEN_UNVERIFIED"
-    return {"tier": tier.value, "reason": reason, "trusted": False}
+    token = str(payload.get("integrity_token") or "")
+    if not token:
+        raise HTTPException(status_code=401, detail="INTEGRITY_TOKEN_REQUIRED")
+    # Client verdicts are deliberately ignored; only the server verifier may establish trust.
+    result = play_integrity.verify(token, nonce)
+    return {
+        "tier": result.tier.value,
+        "reason": result.reason,
+        "trusted": result.trusted,
+        "package_name": result.package_name,
+    }
 
 @app.post("/v1/recommendations", response_model=RecommendationResponse)
 def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):

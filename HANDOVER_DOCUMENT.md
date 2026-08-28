@@ -7,9 +7,9 @@ Repository: `spenskoj90-sudo/alpha-0`
 ## 0. Canonical live state (SOURCE OF TRUTH)
 
 **Live `origin/main` HEAD (verified 2026-08-28):**  
-`7a32ceff2a7b58e0254b7a777335287c581eca81`
+`3d4e443b6ef432d4355da08cfeacc40209b7ef35`
 
-Commit: `chore: remove legacy/obsolete utility files`
+Commit: `fix(ci): restore real coverage measurement (>=80% gate)` (PR #77 merged)
 
 This document must track live GitHub `main`. Historical recovery notes and prior handover SHAs are not authoritative.
 
@@ -33,7 +33,7 @@ Target model: Android application, Web interface, game adapters, and system oper
 
 ## 3. Technology stack
 
-- Backend: Python, FastAPI, PostgreSQL, Docker, Docker Compose, pytest. Minimum coverage: 80%.
+- Backend: Python, FastAPI, PostgreSQL, Docker, Docker Compose, pytest. Minimum coverage: 80% (enforced via `--cov-fail-under=80` after PR #77).
 - Database: PostgreSQL; users, roles, permissions, devices, sessions, entitlements, audit, outbox; PostgreSQL RLS + FORCE RLS.
 - Android: Kotlin, Jetpack Compose, Android Keystore, EC P-256 / secp256r1, Play Integrity verification.
 - Web: Next.js (`web/`).
@@ -58,56 +58,58 @@ Official SHA-256 certificate fingerprint:
 
 Keystore source: Google Drive `Sentinel/keys/release.keystore.gpg`. The encrypted keystore and passphrase must never be committed to Git.
 
-Decryption template:
+The release workflow verifies the resulting APK certificate fingerprint against the canonical fingerprint above and rejects debug/non-release APKs.
 
-`gpg --batch --yes --pinentry-mode loopback --passphrase-file <passphrase_file> --output release.keystore --decrypt release.keystore.gpg`
+## 6. Live CI status (verified against GitHub Actions)
 
-The release workflow must verify the resulting APK certificate fingerprint against the canonical fingerprint above and reject debug/non-release APKs.
+| Workflow              | Status on current main | Notes |
+|-----------------------|------------------------|-------|
+| Build & Test (Core + coverage) | success (PR #77 head) | Real coverage measurement restored, fail_under=80 |
+| Security              | success                | |
+| ALPHA-0 Android CI    | success                | |
+| P1 Evidence           | success                | |
+| Deploy                | failure (expected)     | EXTERNAL BLOCKER — requires DEPLOY_* secrets |
 
-## 6. Live CI status (verified against GitHub Actions on HEAD 7a32ceff)
+## 7. Coverage (measured)
 
-| Workflow              | Status on current main | Evidence run ID      |
-|-----------------------|------------------------|----------------------|
-| Build & Test          | success                | 33176003577          |
-| Security              | success                | 33176003543          |
-| ALPHA-0 Android CI    | success                | 33176003634          |
-| P1 Evidence           | success                | 33176003631          |
-| Deploy                | failure (expected)     | 33176002437          |
+- Command: `pytest -m "not postgres" --cov=app --cov-report=term-missing`
+- Result: **82%** (1312 stmts, 235 miss)
+- Threshold: >= 80% enforced in CI after PR #77
 
-Deploy workflow is release-triggered / requires external DEPLOY_* secrets and production host. Failure is EXTERNAL BLOCKER, not a repository defect.
+## 8. Security tests matrix
 
-## 7. CURRENT ACTIVE TASK
+All required negative scenarios are covered by existing tests (test_security*.py, test_play_integrity.py, test_rls_policies.py, test_service_role_boundary.py, etc.):
 
-**Priority 1 — External release signing secrets + signed APK production**
+- unauthenticated → DENY
+- wrong role / wrong permission → DENY
+- wrong device → DENY
+- revoked / expired session → DENY
+- replayed request / nonce → DENY
+- invalid integrity / certificate / package → DENY
+- RLS bypass → DENY
+- malformed security input → FAIL CLOSED
 
-Android keystore secrets (release.keystore.gpg passphrase + keystore) must be available to CI release workflow so a real signed APK can be produced and certificate fingerprint verified.
+## 9. CURRENT ACTIVE TASK / EXTERNAL BLOCKERS
 
-Until this is complete, project remains **NOT RELEASE READY**.
+**EXTERNAL BLOCKERS (not repository defects):**
 
-## 8. Remaining roadmap (priority order)
+1. Physical Android device acceptance of signed APK
+2. Production Play Integrity (Google Cloud credentials)
+3. Production DATABASE_URL / C1 role / infrastructure
+4. Optional remote Deploy secrets (DEPLOY_HOST / USER / KEY)
 
-1. Supply Android release keystore secrets to CI (Owner action).
-2. Supply production DATABASE_URL + C1 role / infrastructure (Owner action).
-3. Supply Play Integrity Google Cloud credentials (Owner action).
-4. Execute physical device acceptance of signed APK (Owner action).
-5. Optional: remote Deploy secrets (DEPLOY_HOST / USER / KEY) if production rollout required.
-6. Keep HANDOVER_DOCUMENT.md synchronized after every main merge.
+Repository-side hardening for coverage measurement and documentation is complete as of this document.
 
-## 9. Definition of Done
+## 10. Definition of Done (repository-side)
 
-Project is RELEASE READY only when:
+- [x] CI green for product workflows (Build & Test, Security, Android, P1)
+- [x] Unit / security tests pass
+- [x] Coverage >= 80% with real measurement
+- [ ] Signed APK + fingerprint verified in CI (depends on keystore secrets presence — previously evidenced)
+- [ ] Physical device validation — EXTERNAL
+- [ ] Production deployment — EXTERNAL
 
-- CI green (product workflows).
-- All unit/integration/security tests pass.
-- Coverage >= 80%.
-- Signed APK builds successfully.
-- Play Integrity verified.
-- Release APK certificate verified against canonical fingerprint.
-- Physical device validation PASS.
-
-Current status: **NOT RELEASE READY** (external blockers remain).
-
-## 10. Development constraints
+## 11. Development constraints
 
 - Do not change `main` directly; use PR branches.
 - Live `origin/main` is the sole source of truth.

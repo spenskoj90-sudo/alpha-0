@@ -33,3 +33,7 @@ addopts = "-q --strict-markers"
 markers = [
   "postgres: requires a live PostgreSQL database",
 ]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

@@ -2,7 +2,7 @@ name: Security
 
 on:
   push:
-    branches: [main, sentinel-1.0.0-rc1-final]
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:
@@ -10,19 +10,20 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
 
 jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
         language: [python, javascript]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
@@ -31,9 +32,11 @@ jobs:
   dependencies:
     name: Dependency audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: "3.12"
       - working-directory: server
@@ -41,19 +44,21 @@ jobs:
           python -m pip install --upgrade pip pip-audit
           python -m pip install .
           pip-audit
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
         with:
           node-version: "20"
       - working-directory: web
-        run: npm install
+        run: npm ci
       - working-directory: web
         run: npm audit --audit-level=high
 
   filesystem:
     name: Secret and image scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 0
       - uses: aquasecurity/trivy-action@v0.36.0

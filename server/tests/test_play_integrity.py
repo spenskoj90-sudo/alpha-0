@@ -143,7 +143,12 @@ def test_verifier_insufficient_device():
 
 
 def test_verifier_malformed_and_missing_token():
-    v = PlayIntegrityVerifier(audience="1", decoder=lambda t: (_ for _ in ()).throw(ValueError("bad")))
+    v = PlayIntegrityVerifier(
+        audience="1",
+        package_name="com.alpha0.app",
+        cert_digest="2ACD1CFFF4F34DB1250D3F6C81F0887493C4602D3CFA65310993C058089DB88E",
+        decoder=lambda t: (_ for _ in ()).throw(ValueError("bad")),
+    )
     assert v.verify("", "n").reason == "INTEGRITY_TOKEN_REQUIRED"
     assert v.verify("x" * 10, "n").reason == "INTEGRITY_TOKEN_INVALID"
 

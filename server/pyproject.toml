@@ -33,3 +33,16 @@ addopts = "-q --strict-markers"
 markers = [
   "postgres: requires a live PostgreSQL database",
 ]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = [
+  "*/tests/*",
+  "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 80

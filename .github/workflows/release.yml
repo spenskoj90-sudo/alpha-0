@@ -16,16 +16,16 @@ jobs:
     name: Build and publish verified release APK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v4
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@3a4a8e7e8e1f8b5b8c7c7c0d7a1c8b2c6e5d4f3a # v4
+      - uses: actions/setup-java@b36c23c0d998641eff8610086f374ee103c25ac73 # v4.4.0
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@d156388eb19639ec20ade50009f3d199ce1e2808 # v4
 
       - name: Decode release keystore
         env:
@@ -87,7 +87,7 @@ jobs:
           esac
           echo "Release APK verification: PASS"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c # v5.0.0
         with:
           python-version: "3.12"
 

@@ -1,18 +1,18 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-27  
+**State record:** 2026-08-28  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `6ea5af7ffa931826733ad87637959e983d7d05c1`  
-**Hardening branch:** `sentinel/release-hardening-2026-08-27`  
-**Hardening HEAD:** `5439e715175eb8444c12aa85b81cbb0e9385b2b3`  
-**PR:** #68 (open; not product state until merge + Owner accept)
+**Canonical HEAD (main):** `39bfef81aeb05581a664837260864bc2fd41cd66`  
+**Final correction branch:** `sentinel/final-zero-gap-2026-08-28`  
+**Merged PR:** #70  
+**Merged head:** `19a1ded90b0b68a60f07dd7efaf725a164b360b0`  
 
-> This document is repository-grounded. `main`/Git are authoritative for product state; branch evidence is not accepted until merged.
+> Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
 ## 1. Binding evidence policy
 
-`docs/SENTINEL_EVIDENCE_PROTOCOL.md` v2 is binding. A claim is not accepted as verified merely because it appears in an audit, README, branch, PR, or historical state document.
+`docs/SENTINEL_EVIDENCE_PROTOCOL.md` v2 is binding. A claim is not accepted as verified merely because it appears in an audit, README, PR, or historical state document.
 
 ## 2. Current repository facts
 
@@ -23,63 +23,63 @@
 - Sessions use opaque tokens with hashed persistence and one-time refresh rotation; JWT is not the primary session mechanism.
 - Authorization is server-authoritative and default-deny.
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; production startup rejects a missing `DATABASE_URL`.
-- PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS applied by migration `004_p1_rls_force.sql`.
+- PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
+- Postgres refresh rotation is transactional and row-locked (`FOR UPDATE`) with revoke + replacement issuance in one transaction.
 - `/v1/recommendations` is authorized through `knowledge:recommend`.
-- Android backup disabled; `usesCleartextTraffic=false`; network security config present.
-- Admin endpoints enforce rate limit and failed-attempt lockout (5 failures / 15 min window).
+- `/v1/integrity/attest` performs server-side Play Integrity verification; client verdict lists are ignored.
+- Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
+- Android backup is disabled; cleartext traffic is disabled; network security config is present.
+- Release APK is minified/shrunk and CI verifies signing certificate fingerprint and rejects debuggable/debug artifacts.
 
-## 3. PR #66 (merged on main)
+## 3. Final security completion — PR #70
 
-Merge SHA: `6ea5af7ffa931826733ad87637959e983d7d05c1`
+Merge SHA: `39bfef81aeb05581a664837260864bc2fd41cd66`
 
-- Wire `app.service_role=true` into PostgresStore connections
-- `004_p1_rls_force.sql` (FORCE RLS without mutating 002 checksum)
-- RLS regression coverage
-- MemoryStore refresh rotation parity with PostgresStore
-- Refresh-rotation regression coverage
-- Canonical state / audit documentation reconciliation
+Implemented:
 
-## 4. PR #68 release hardening (branch evidence; not product until merge)
+1. Server-side Play Integrity verifier with package/certificate/nonce/freshness checks and `PLAY_RECOGNIZED` requirement.
+2. Fail-closed Play Integrity behavior when production verification configuration is absent.
+3. `/v1/integrity/attest` wired to the verifier; client-supplied verdicts cannot establish trust.
+4. Atomic Postgres refresh rotation and adversarial concurrency coverage.
+5. Login lockout and security-failure tracking.
+6. Android release minification/shrinking and Play Integrity client attestation path.
+7. Release workflow uses `assembleRelease`, validates the signing certificate, rejects debug APKs, and publishes only the release APK.
+8. Play Integrity regression test corrected for the full verifier configuration contract.
 
-Branch HEAD: `5439e715175eb8444c12aa85b81cbb0e9385b2b3`
+## 4. CI evidence for the merged product tree
 
-### Implemented
+Pre-merge exact-head CI for `19a1ded90b0b68a60f07dd7efaf725a164b360b0`:
 
-1. Admin lockout / rate limiting on admin endpoints; token never echoed.
-2. RLS negative proof via dedicated non-owner role `rls_probe` (no BYPASSRLS).
-3. Concurrent refresh rotation: MemoryStore + **PostgresStore** ThreadPool tests assert exactly one successful rotation.
-4. Integrity tier policy + one-time server nonce; client verdicts untrusted; live Google verification fail-closed without audience.
-5. Android StrongBox with TEE fallback; cleartext disabled.
-6. Build & Test instrumentation: GitHub Emulator (Owner-approved design from PR #67).
-
-### Exact-head CI evidence (Build & Test run 33069908061)
-
-| Job | Result |
-|-----|--------|
-| Repository verification | PASS |
+| Workflow | Result |
+|---|---|
+| Build & Test #317 | PASS |
 | Core tests and coverage | PASS |
 | PostgreSQL integration and recovery | PASS |
 | Web build | PASS |
 | Container build | PASS |
 | Reproducible container comparison | PASS |
 | Deployment smoke and health | PASS |
-| Android build and tests (incl. signed release + fingerprint) | PASS |
-| Android instrumentation (GitHub Emulator API 35) | PASS |
-| Security | PASS |
-| P1 Evidence | PASS |
-| ALPHA-0 Android CI | PASS |
+| Android build and tests | PASS |
+| Signed release APK + fingerprint verification | PASS |
+| Android instrumentation — GitHub Emulator API 35 | PASS |
+| Security #237 | PASS |
+| P1 Evidence #146 | PASS |
+| ALPHA-0 Android CI #1186 | PASS |
 
-Deploy push-ghost runs remain FAIL and are classified non-product (workflow trigger is `release.published` only).
+The merged `main` tree is the exact product tree represented by the verified PR head, with only the merge commit added.
 
-## 5. Remaining open evidence
+## 5. External activation state
 
-- **Play Integrity live Google token verification:** BLOCKED until `SENTINEL_PLAY_INTEGRITY_AUDIENCE` (and related Google credentials) are configured. Policy engine + nonce replay protection exist; mode is fail-closed / UNKNOWN.
-- **Production SoR / external deployment configuration:** UNVERIFIED. CI PostgreSQL is not production evidence.
-- **Real-device Android acceptance:** Owner manual gate.
-- **Required status-check contexts on protected main:** process/governance item (settings not changed by agents).
-- **Multi-instance rate limiting:** intentionally process-local until horizontal scale is required.
+The repository is production-activation ready, but live external services still require their real operator configuration:
 
-## 6. Explicit non-actions
+- Google Play Integrity audience/package/certificate and Google API authorization credentials.
+- Production `DATABASE_URL` and deployment secrets.
+- A real-device acceptance pass before public distribution.
+- A release tag and GitHub Release publication when the operator chooses the release channel.
+
+These are deployment credentials/configuration, not missing repository implementation.
+
+## 6. Explicit security invariants
 
 Do not silently change:
 
@@ -88,11 +88,11 @@ Do not silently change:
 - default-deny authorization semantics;
 - production `DATABASE_URL` / enrollment-token requirements;
 - migration checksum enforcement;
-- modular-monolith architecture;
-- single-instance rate limiter before horizontal scaling evidence;
-- signing secrets, production credentials, or CI governance settings without Owner approval.
+- service-role/RLS boundary;
+- transactional refresh rotation;
+- signing secrets or production credentials.
 
 ## 7. Authority
 
-**Branch-state truth authority:** GPT / Final Integrator.  
-**Human Owner:** absolute final authority for acceptance, scope, release, merge, and destructive repository cleanup.
+**Final Integrator:** GPT / ChatGPT.  
+**Human Owner:** absolute final authority for acceptance, scope, release, credentials, and destructive repository cleanup.

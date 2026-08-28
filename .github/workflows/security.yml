@@ -47,9 +47,11 @@ jobs:
       - uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
         with:
           node-version: "20"
-      - working-directory: web
-        run: npm ci
-      - working-directory: web
+      - name: Install web dependencies without executing lifecycle scripts
+        working-directory: web
+        run: npm install --ignore-scripts --no-audit
+      - name: Audit web dependencies
+        working-directory: web
         run: npm audit --audit-level=high
 
   filesystem:

@@ -2,7 +2,7 @@ name: Build & Test
 
 on:
   push:
-    branches: [main, sentinel-1.0.0-rc1-final, p1-close-2026-08-13, sentinel-ftl-2026-08-13]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -31,9 +31,11 @@ jobs:
           cache: pip
           cache-dependency-path: server/pyproject.toml
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install '.[test]'
+      # Editable install so pytest-cov measures the source tree under server/app
+      # (non-editable install previously produced 0% / no-data-collected).
+      - run: python -m pip install -e '.[test]'
       - run: python -m compileall -q app migrate.py
-      - run: pytest -m 'not postgres' --cov=app --cov-report=term-missing
+      - run: pytest -m 'not postgres' --cov=app --cov-report=term-missing --cov-fail-under=80
 
   postgres:
     name: PostgreSQL integration and recovery
@@ -67,7 +69,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install '.[test]'
+      - run: python -m pip install -e '.[test]'
       - run: python migrate.py
       - run: pytest -m postgres
       - name: Backup and restore smoke test

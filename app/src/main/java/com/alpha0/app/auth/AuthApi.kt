@@ -1,5 +1,7 @@
 package com.alpha0.app.auth
 
+import android.content.Context
+import com.alpha0.app.diagnostics.DiagnosticLogger
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -17,11 +19,19 @@ class AuthApi(private val baseUrl: String) {
         data class Failure(val message: String) : Result
     }
 
-    fun register(email: String, password: String): Result = request("/v1/auth/register", email, password)
+    @Volatile
+    private var diag: DiagnosticLogger? = null
 
-    fun login(email: String, password: String): Result = request("/v1/auth/login", email, password)
+    fun attachDiagnostics(context: Context) {
+        diag = DiagnosticLogger.get(context)
+    }
 
-    private fun request(path: String, email: String, password: String): Result {
+    fun register(email: String, password: String): Result = request("/v1/auth/register", email, password, "REGISTER")
+
+    fun login(email: String, password: String): Result = request("/v1/auth/login", email, password, "LOGIN")
+
+    private fun request(path: String, email: String, password: String, op: String): Result {
+        val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         val connection = (URL("$normalizedBase$path").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -40,6 +50,7 @@ class AuthApi(private val baseUrl: String) {
             val body = (if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             val json = runCatching { JSONObject(body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
             if (connection.responseCode in 200..299 && json != null) {
                 val scopesJson = json.optJSONArray("scopes")
                 val scopes = buildList {
@@ -48,16 +59,24 @@ class AuthApi(private val baseUrl: String) {
                 val access = json.optString("session_token")
                 val refresh = json.optString("refresh_token")
                 if (access.isBlank() || refresh.isBlank()) {
+                    diag?.warn("AUTH", op, "FAILURE", errorCode = "AUTH_RESPONSE_INVALID", durationMs = duration)
                     Result.Failure("AUTH_RESPONSE_INVALID")
                 } else {
+                    diag?.info("AUTH", op, "SUCCESS", durationMs = duration, details = mapOf("scopes_count" to scopes.size))
                     Result.Success(Session(access, refresh, scopes))
                 }
             } else {
-                Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${connection.responseCode}")
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${connection.responseCode}"
+                diag?.warn("AUTH", op, "FAILURE", errorCode = code, durationMs = duration)
+                Result.Failure(code)
             }
         } catch (e: IOException) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.error("AUTH", op, "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
             Result.Failure("NETWORK_ERROR: ${e.javaClass.simpleName}: ${e.message}")
         } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             Result.Failure("UNEXPECTED_ERROR: ${e.javaClass.simpleName}: ${e.message}")
         } finally {
             connection.disconnect()

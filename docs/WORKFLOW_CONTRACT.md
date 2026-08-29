@@ -126,6 +126,7 @@ Before requesting merge, the following checklist must be satisfied and evidenced
 - [ ] All required CI gates from `docs/RELEASE_GATES.md` are green on the **exact PR head SHA**, with run IDs recorded.
 - [ ] Evidence Protocol rules observed; no bare `PASS` claims.
 - [ ] Documentation updated if public behavior, deployment, or contracts changed.
+- [ ] **Blocking rule:** PR is not merge-ready until `README.md` and `docs/SENTINEL_CURRENT_STATE.md` are updated in this PR (or in a linked PR merged before/with it) with the current HEAD and the corresponding changes. This applies to **any** PR that changes code or process — not only documentation tasks.
 - [ ] No secrets, credentials, or production configuration introduced or modified.
 - [ ] Human Owner has been informed that the PR is ready for review/merge (agent does not merge).
 

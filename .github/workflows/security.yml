@@ -2,7 +2,7 @@ name: Security
 
 on:
   push:
-    branches: [main, sentinel-1.0.0-rc1-final]
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:

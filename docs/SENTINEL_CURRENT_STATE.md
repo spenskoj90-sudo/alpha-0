@@ -1,12 +1,13 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-28  
+**State record:** 2026-08-29  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `39bfef81aeb05581a664837260864bc2fd41cd66`  
+**Canonical HEAD (main):** `ba3c310cf79701ad812c36b3bfc32354b51b23d6`  
 **Final correction branch:** `sentinel/final-zero-gap-2026-08-28`  
 **Merged PR:** #70  
 **Merged head:** `19a1ded90b0b68a60f07dd7efaf725a164b360b0`  
+**Workflow contract:** issue #14 completed via PR #83; `docs/WORKFLOW_CONTRACT.md` is on main  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -96,3 +97,8 @@ Do not silently change:
 
 **Final Integrator:** GPT / ChatGPT.  
 **Human Owner:** absolute final authority for acceptance, scope, release, credentials, and destructive repository cleanup.
+
+## 8. Workflow contract — issue #14
+
+Issue #14 is complete. PR #83 merged at `ba3c310cf79701ad812c36b3bfc32354b51b23d6`.  
+`docs/WORKFLOW_CONTRACT.md` is present on `main` and defines the machine-operable task-to-PR workflow contract (issue intake, branch naming, implementation boundaries, CI gates, review evidence, regression handling, PR acceptance, human approval points).

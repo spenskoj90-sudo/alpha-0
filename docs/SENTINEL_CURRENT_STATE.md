@@ -3,11 +3,9 @@
 **State record:** 2026-08-29  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`  
-**Prior product SHA (full CI green):** `00de9f972e67895557d2198965637728ac0a75a4` (PR #85)  
-**Final correction branch:** `sentinel/final-zero-gap-2026-08-28`  
-**Merged PR (security completion baseline):** #70  
-**Merged head:** `19a1ded90b0b68a60f07dd7efaf725a164b360b0`  
+**Canonical HEAD (main):** `77c42069956c5103c6065c108c6aaff4f61b1341`  
+**Prior documented product SHA:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`  
+**Current product change:** PR #82 — physical-device diagnostic logging for acceptance chain  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -15,11 +13,15 @@
 
 `docs/SENTINEL_EVIDENCE_PROTOCOL.md` v2 is binding. A claim is not accepted as verified merely because it appears in an audit, README, PR, or historical state document.
 
+CI and release claims below are valid only for the exact SHA identified in the corresponding evidence.
+
 ## 2. Current repository facts
 
 - Android client exists under `app/`.
 - FastAPI backend exists under `server/`.
 - Web control-plane source exists under `web/`.
+- Electron launcher exists under `launcher/`.
+- WoW addon sources exist under `wow-addon/` with Classic and Retail implementations.
 - Device identity uses Android Keystore / EC P-256 with SHA-256 public-key fingerprinting; StrongBox preferred, TEE fallback.
 - Sessions use opaque tokens with hashed persistence and one-time refresh rotation; JWT is not the primary session mechanism.
 - Authorization is server-authoritative and default-deny.
@@ -32,57 +34,99 @@
 - Android backup is disabled; cleartext traffic is disabled; network security config is present.
 - Release APK is minified/shrunk and CI verifies signing certificate fingerprint and rejects debuggable/debug artifacts.
 
-## 3. Final security completion — PR #70
+## 3. Current exact-HEAD CI evidence
 
-Merge SHA: `39bfef81aeb05581a664837260864bc2fd41cd66`
-
-Implemented:
-
-1. Server-side Play Integrity verifier with package/certificate/nonce/freshness checks and `PLAY_RECOGNIZED` requirement.
-2. Fail-closed Play Integrity behavior when production verification configuration is absent.
-3. `/v1/integrity/attest` wired to the verifier; client-supplied verdicts cannot establish trust.
-4. Atomic Postgres refresh rotation and adversarial concurrency coverage.
-5. Login lockout and security-failure tracking.
-6. Android release minification/shrinking and Play Integrity client attestation path.
-7. Release workflow uses `assembleRelease`, validates the signing certificate, rejects debug APKs, and publishes only the release APK.
-8. Play Integrity regression test corrected for the full verifier configuration contract.
-
-## 4. CI evidence for the merged product tree
-
-### Last completed full product CI (SHA `00de9f972e67895557d2198965637728ac0a75a4`, PR #85)
+Current `main` HEAD: `77c42069956c5103c6065c108c6aaff4f61b1341`.
 
 | Workflow | Run ID | Result |
 |---|---|---|
-| Build & Test #352 | 33253833147 | success |
-| Security #270 | 33253833094 | success |
-| ALPHA-0 Android CI #1273 | 33253833092 | success |
-| P1 Evidence #179 | 33253833099 | success |
-| Release Candidate Artifact #4 | 33253833088 | success |
-| Deploy | 33253832643 | failure (expected: `release.published` only; 0 jobs) |
+| Build & Test | 33257152909 | success |
+| Security | 33257152815 | success |
+| ALPHA-0 Android CI | 33257152889 | success |
+| P1 Evidence | 33257152841 | success |
+| Release Candidate Artifact | 33257152850 | success |
+| Deploy | 33257152376 | failure (expected external pattern: `release.published` only / 0 jobs) |
 
-Core unit coverage on that run: **82.09%** (78 passed, gate ≥80%).
+### Build & Test evidence
 
-### Current main HEAD `596f10b8…` (PR #86 docs-only merge)
+Exact-head jobs passed:
 
-| Workflow | Run ID | Result |
-|---|---|---|
-| Security #272 | 33256189402 | success |
-| Build & Test #354 | 33256189396 | in_progress at state-record time |
-| ALPHA-0 Android CI #1277 | 33256189409 | in_progress at state-record time |
-| P1 Evidence #181 | 33256189431 | in_progress at state-record time |
-| Deploy | 33256189041 | failure (expected external pattern) |
+- Web build.
+- PostgreSQL integration and recovery (`migrate.py` + `pytest -m postgres`).
+- Core tests and coverage: `pytest -m 'not postgres' --cov=app --cov-report=term-missing --cov-fail-under=80`.
+- Android build/tests, release assembly and fingerprint verification.
+- Repository verification.
+- Container build.
+- Reproducible container build comparison.
+- Deployment smoke and health.
+- Android instrumentation on GitHub Emulator.
+
+### Security evidence
+
+Exact-head jobs passed:
+
+- Dependency audit.
+- CodeQL Python.
+- CodeQL JavaScript.
+- Secret and image scan (Trivy).
+
+### P1 / release evidence
+
+- P1 evidence artifact generation passed in Run `33257152841`.
+- Release Candidate Artifact Run `33257152850` successfully built, verified and uploaded the signed release APK.
+
+### Coverage
+
+Exact-head core coverage: **82.09%**.
+
+- Statements: 1,312.
+- Missed: 235.
+- Tests passed: 78.
+- Deselects: 5.
+- Gate: `--cov-fail-under=80` passed.
+
+Lower-covered core components on this exact HEAD include:
+
+- `app/core/store.py`: 61%.
+- `app/core/user_store.py`: 77%.
+- `app/core/wow_api.py`: 62%.
+
+Coverage figures above refer to the backend/core coverage command and must not be interpreted as readiness percentages for other product modules.
+
+## 4. Module verification state
+
+### `server/`
+
+Verified on exact HEAD: core tests, 82.09% coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health.
+
+### `app/`
+
+Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. No separate numeric Android coverage was extracted.
+
+### `web/`
+
+Verified on exact HEAD: lint and production build. No separate numeric web coverage was extracted.
+
+### `launcher/`
+
+Source tree exists. No dedicated test/coverage evidence was established in the current exact-head audit. Readiness is therefore **UNVERIFIED**.
+
+### `wow-addon/`
+
+Classic and Retail source trees exist. No dedicated test/coverage evidence was established in the current exact-head audit. Readiness is therefore **UNVERIFIED**.
 
 ## 5. External activation state
 
-The repository is production-activation ready, but live external services still require their real operator configuration:
+The repository passes the automated product/security gates above, but live external services still require operator configuration or acceptance:
 
 - Google Play Integrity audience/package/certificate and Google API authorization credentials.
 - Production `DATABASE_URL` and deployment secrets.
-- A real-device acceptance pass before public distribution (PR #82 open: physical-device diagnostics).
+- A real-device acceptance pass before public distribution.
 - A release tag and GitHub Release publication when the operator chooses the release channel.
-- Firebase Test Lab GCS object-create permission (issues #59 / #62).
+- Firebase Test Lab GCS `storage.objects.create` permission (issues #59 / #62 remain open).
+- Branch-protection required-status-check configuration is not asserted here because current protection metadata was not independently verified in this state sync.
 
-These are deployment credentials/configuration, not missing repository implementation.
+These are deployment credentials/configuration or operator acceptance items, not missing repository implementation unless separately demonstrated by current evidence.
 
 ## 6. Explicit security invariants
 
@@ -102,16 +146,36 @@ Do not silently change:
 **Final Integrator:** GPT / ChatGPT.  
 **Human Owner:** absolute final authority for acceptance, scope, release, credentials, and destructive repository cleanup.
 
-## 8. Closed workflow / security process issues
+## 8. Current workflow state
 
 ### Issue #14 — task-to-PR workflow contract — COMPLETE
 
-- PR #83 merged: `docs/WORKFLOW_CONTRACT.md` introduced (`ba3c310cf79701ad812c36b3bfc32354b51b23d6`).
-- PR #84: CURRENT_STATE note for #14.
-- PR #86: blocking rule requiring README + CURRENT_STATE sync before merge (`596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`).
+- PR #83 merged: `docs/WORKFLOW_CONTRACT.md` introduced.
+- PR #84 and PR #86 synchronized the state/README governance requirements.
 
 ### Issue #9 — least-privilege / secrets boundary audit — COMPLETE
 
-- PR #85 merged at `00de9f972e67895557d2198965637728ac0a75a4`.
+- PR #85 merged.
 - Removed secret length metadata echoes from Build & Test.
 - Audit record: `docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md`.
+
+### PR #82 — physical-device diagnostic logging — MERGED
+
+- Merged into current `main`.
+- Current exact-head commit message identifies the diagnostic logging change.
+- Automated Android build/instrumentation/release verification passes on current HEAD.
+- Real physical-device acceptance remains an external operator gate.
+
+## 9. Open-work state at last reconciliation
+
+Open issues must be treated as backlog candidates, not automatic implementation instructions. Historical issues require reconciliation against the current exact HEAD before execution.
+
+Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
+
+No open PRs were present at the audit timestamp.
+
+## 10. Evidence discipline
+
+For CI, tests, coverage, release artifacts and security claims, use exact commit SHA + workflow Run ID as evidence. Do not treat historical green runs on another SHA as evidence for current `main`.
+
+For unresolved facts, record `UNVERIFIED` rather than infer a state from source-tree presence or historical documentation.

@@ -5,12 +5,13 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 ## Canonical repository state
 
 - Canonical branch: `main`.
-- Current canonical HEAD: `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79`.
+- Current canonical HEAD: `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`.
 - Branch/PR work is not accepted as product state until merged into `main` and revalidated at the resulting main SHA.
 - Architecture documents describe the target/contract and must not be treated as proof of runtime implementation.
 - The authoritative current-state record is `docs/SENTINEL_CURRENT_STATE.md`.
 - Evidence/acceptance rules are `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
 - Engineering decisions are recorded in `docs/SENTINEL_DECISION_LOG.md`.
+- Workflow contract: `docs/WORKFLOW_CONTRACT.md` (issue #14 complete).
 
 ## MVP scope currently implemented on main
 
@@ -44,18 +45,26 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 
 ## Current validation status
 
-PR #46, which introduced the final Sentinel design system, was merged into `main` as `ebd344f5f42adab3f4b0dea7ee26f3af90b81c79` after exact-head CI verification.
+**Canonical HEAD:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada` (PR #86: workflow-contract strict docs sync).
 
-Evidence on PR #46 head `43f94338df4da82917e615b2e1c9eb79014e9246`:
+**Last completed full product CI** (SHA `00de9f972e67895557d2198965637728ac0a75a4`, PR #85 — least-privilege secrets audit):
 
-- Security #170 / run `32626297508` — PASS.
-- P1 Evidence #80 / run `32626297477` — PASS.
-- ALPHA-0 Android CI #1022 / run `32626297516` — PASS.
-- Build & Test #250 / run `32626297494` — all product/code/build jobs PASS; Firebase Test Lab failed at Google Cloud authentication, so instrumentation did not execute. This remains the known FTL/GCP infrastructure exception.
+| Workflow | Run ID | Result |
+|----------|--------|--------|
+| Build & Test #352 | [33253833147](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833147) | success |
+| Security #270 | [33253833094](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833094) | success |
+| ALPHA-0 Android CI #1273 | [33253833092](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833092) | success |
+| P1 Evidence #179 | [33253833099](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833099) | success |
 
-The P1 Evidence workflow currently uses `push.branches: [main]` and `pull_request.branches: [main]`.
+Core unit coverage on that SHA: **82.09%** (78 tests passed, gate ≥80%). GitHub Emulator instrumentation: success. Signed release APK + fingerprint verify: success.
 
-The deploy workflow currently declares only `release.published`. Historical observations of push-associated Deploy runs remain under investigation; the current workflow file itself does not contain a push trigger.
+**On current HEAD `596f10b8…` (docs-only):** Security #272 / run `33256189402` — success. Deploy remains expected-failure without `release.published`.
+
+Known external blockers (not repository defects):
+
+- Firebase Test Lab / GCS object-create (issues #59, #62).
+- Production `DATABASE_URL`, Play Integrity Google credentials, `DEPLOY_*` secrets.
+- Physical device acceptance (open PR #82).
 
 ## Runtime findings
 
@@ -66,8 +75,7 @@ The Android device identity remains Keystore-backed: P-256 / `secp256r1` with SH
 ## Current-state limitations / open work
 
 - PostgreSQL runtime persistence still requires exact-main runtime evidence before PostgreSQL is declared the authoritative runtime system of record.
-- `POST /v1/recommendations` remains an authorization-review item until its `policy_engine.authorize` enforcement and regression coverage are confirmed.
-- Repository hygiene still includes historical PR/branch classification, ghost workflow records and duplicate state-document cleanup.
+- Repository hygiene: historical branch cleanup (Owner-only deletes).
 - A soft battery-optimization onboarding prompt remains planned to reduce first-run network failures on aggressive Android/MIUI-like firmware.
 
 ## Repository
@@ -165,7 +173,7 @@ See `docs/API.md` for the endpoint contract.
 
 ## Contributing
 
-See `docs/CONTRIBUTING.md`. Every security-sensitive behavior change requires a regression test and passing CI.
+See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. PRs that change code or process must update `README.md` and `docs/SENTINEL_CURRENT_STATE.md` with the current HEAD.
 
 ## License
 

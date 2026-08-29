@@ -100,7 +100,6 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          echo "ANDROID_KEYSTORE_BASE64 length: ${#ANDROID_KEYSTORE_BASE64}"
           test -n "$ANDROID_KEYSTORE_BASE64"
           python - <<'PY'
           import base64, os, pathlib
@@ -202,8 +201,6 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "ANDROID_KEYSTORE_PASSWORD length: ${#ANDROID_KEYSTORE_PASSWORD}"
-          echo "ANDROID_KEY_PASSWORD length: ${#ANDROID_KEY_PASSWORD}"
           ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK signature and fingerprint

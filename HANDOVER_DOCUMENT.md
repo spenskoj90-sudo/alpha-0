@@ -7,9 +7,9 @@ Repository: `spenskoj90-sudo/alpha-0`
 ## 0. Canonical live state (SOURCE OF TRUTH)
 
 **Live `origin/main` HEAD (verified 2026-08-29):**  
-`9008c12180e48a3143295980037d48b9c76dcb45`
+`306c1f1f5b735cebe59d809d70fd22387488f625`
 
-Commit: docs sync after PR #77 coverage gate (PR #79).
+Commit: `docs+ci: HANDOVER sync to 9008c121 + simplify workflow triggers` (PR #80).
 
 This document must track live GitHub `main`. Historical recovery notes and prior handover SHAs are not authoritative.
 
@@ -57,25 +57,30 @@ Official SHA-256 certificate fingerprint:
 
 Keystore material is supplied only via GitHub Actions Secrets (`ANDROID_KEYSTORE_BASE64`, passwords, alias). Never committed to Git.
 
-## 6. Live CI status (main @ 9008c121)
+## 6. Live CI status (main @ 306c1f1f — all required checks success)
 
-| Workflow | Status | Notes |
-|----------|--------|-------|
-| Build & Test | success | Core coverage + PostgreSQL |
-| Security | success | CodeQL, audit, secret scan |
-| ALPHA-0 Android CI | success | Debug APK + unit tests |
-| P1 Evidence | success | |
-| Deploy | failure | EXTERNAL — requires DEPLOY_* secrets |
+| Workflow / Check | Status | Run / Notes |
+|------------------|--------|-------------|
+| Build & Test | success | run 33235721861 |
+| Core tests and coverage | success | required |
+| PostgreSQL integration and recovery | success | |
+| Android build and tests | success | required |
+| Android instrumentation (GitHub Emulator) | success | |
+| Secret and image scan | success | required |
+| Security (CodeQL, dependency audit) | success | run 33235721847 |
+| ALPHA-0 Android CI | success | run 33235721860 |
+| P1 Evidence | success | run 33235721846 |
+| Deploy | failure | EXTERNAL — DEPLOY_* secrets |
 
 ## 7. Coverage
 
 - Measured: **82%** (`pytest -m "not postgres" --cov=app`)
-- Threshold: >= 80% enforced in CI
-- Install mode: editable (`pip install -e '.[test]'`) so coverage maps to source tree
+- Threshold: >= 80% enforced in CI (`--cov-fail-under=80`)
+- Install mode: editable (`pip install -e '.[test]'`)
 
 ## 8. Security tests matrix
 
-All required negative scenarios are present in the test suite:
+All required negative scenarios are present and exercised by green CI:
 
 - unauthenticated → DENY
 - wrong role / wrong permission → DENY
@@ -86,10 +91,13 @@ All required negative scenarios are present in the test suite:
 - RLS bypass → DENY
 - malformed security input → FAIL CLOSED
 
-## 9. Branch hygiene (2026-08-29)
+## 9. Open PRs (unique work remaining)
 
-Deleted 40 fully-merged / superseded temporary branches (ahead_by=0 or squash-merged content already on main).  
-Open PRs retained for unique unfinished work: #67, #71, #74. Closed obsolete #61.
+| PR | Classification | Notes |
+|----|----------------|-------|
+| #67 | SUPERSEDED | Emulator instrumentation already on main |
+| #71 | UNIQUE | Hardening of release.yml + security.yml |
+| #74 | UNIQUE | Adds release-candidate.yml for signed APK artifact |
 
 ## 10. EXTERNAL BLOCKERS
 
@@ -100,11 +108,11 @@ Open PRs retained for unique unfinished work: #67, #71, #74. Closed obsolete #61
 
 ## 11. Definition of Done (repository-side)
 
-- [x] CI green for product workflows on main  
-- [x] Unit / security / PostgreSQL tests pass  
+- [x] CI green for product workflows on current main HEAD  
+- [x] Unit / security / PostgreSQL / Android instrumentation pass  
 - [x] Coverage >= 80% with real measurement  
 - [x] No plaintext secrets in tree  
-- [x] Documentation synchronized to live main  
+- [x] Documentation synchronized to live main (this document)  
 - [ ] Physical device validation — EXTERNAL  
 - [ ] Production deployment — EXTERNAL  
 

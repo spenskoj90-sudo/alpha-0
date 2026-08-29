@@ -48,8 +48,9 @@ describe('POST /api/admin/entitlements', () => {
     }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true });
-    expect(await response.text()).not.toContain('test-token');
+    const responseBody = await response.text();
+    expect(responseBody).toBe('{"ok":true}');
+    expect(responseBody).not.toContain('test-token');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];

@@ -4,7 +4,7 @@ import os
 import secrets
 import time
 import uuid
-from collections import OrderedDict, defaultdict, deque
+from collections import defaultdict, deque
 from datetime import UTC, datetime
 from threading import Lock
 from typing import Any
@@ -100,42 +100,24 @@ policy_engine = AuthorizationEngine([
 
 
 class RateLimiter:
-    def __init__(self, limit: int = 120, window: int = 60, max_buckets: int = 10000) -> None:
-        if limit <= 0 or window <= 0 or max_buckets <= 0:
-            raise ValueError("limit, window, and max_buckets must be positive")
-        self.limit, self.window, self.max_buckets = limit, window, max_buckets
-        self._hits: dict[str, deque[float]] = OrderedDict()
+    def __init__(self, limit: int = 120, window: int = 60) -> None:
+        self.limit, self.window = limit, window
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = Lock()
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()
-        cutoff = now - self.window
         with self._lock:
-            expired_keys = [bucket for bucket, q in self._hits.items() if not q or q[-1] <= cutoff]
-            for bucket in expired_keys:
-                self._hits.pop(bucket, None)
-
-            q = self._hits.get(key)
-            if q is None:
-                if len(self._hits) >= self.max_buckets:
-                    return False
-                q = deque()
-                self._hits[key] = q
-            else:
-                while q and q[0] <= cutoff:
-                    q.popleft()
-                if not q:
-                    self._hits.pop(key, None)
-                    q = deque()
-                    self._hits[key] = q
-
+            q = self._hits[key]
+            while q and q[0] <= now - self.window:
+                q.popleft()
             if len(q) >= self.limit:
                 return False
             q.append(now)
             return True
 
 
-rate_limiter = RateLimiter(int(os.getenv("RATE_LIMIT_PER_MINUTE", "120")), max_buckets=int(os.getenv("RATE_LIMIT_MAX_BUCKETS", "10000")))
+rate_limiter = RateLimiter(int(os.getenv("RATE_LIMIT_PER_MINUTE", "120")))
 integrity_nonces = IntegrityNonceStore()
 play_integrity = PlayIntegrityVerifier()
 
@@ -239,3 +221,352 @@ def set_device_state(device_id: str, state: str) -> None:
             ),
             {"device_id": device_id, "state": state},
         )
+
+
+def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str) -> bool:
+    return principal.device_id == device_id or device.get("user_id") == principal.user_id
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return error_response("VALIDATION_ERROR", "Invalid request", request_id(request), 422)
+
+
+@app.exception_handler(HTTPException)
+def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    rid = request_id(request)
+    code = str(exc.detail)
+    return error_response(code, "Request rejected", rid, exc.status_code)
+
+
+@app.get("/healthz")
+def healthz() -> dict[str, Any]:
+    if isinstance(store, PostgresStore):
+        try:
+            with store.engine.connect() as conn:
+                conn.exec_driver_sql("SELECT 1")
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="DATABASE_UNAVAILABLE") from exc
+    return {"status": "UP", "version": APP_VERSION}
+
+
+@app.post("/v1/auth/register", response_model=SessionResponse)
+def register_user(payload: RegisterRequest, request: Request):
+    rate_limit(request, "auth-register")
+    try:
+        user_id = user_store.register(payload.email, payload.password)
+    except Exception as exc:
+        if "EMAIL_ALREADY_REGISTERED" in str(exc) or "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
+        raise
+    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
+    scopes = ["character:read", "game:read", "audit:read"]
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/auth/login", response_model=SessionResponse)
+def login_user(payload: LoginRequest, request: Request):
+    rate_limit(request, "auth-login")
+    subject = payload.email.strip().lower()
+    threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
+    if subject and store.security_failure_count(subject) >= threshold:
+        raise HTTPException(status_code=429, detail="AUTH_LOCKOUT")
+    user_id = user_store.authenticate(payload.email, payload.password)
+    if not user_id:
+        if subject:
+            store.record_security_failure(subject, "auth-login")
+        raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
+    scopes = ["character:read", "game:read", "audit:read"]
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:login", "resource": "session", "decision": "ALLOW", "reason_code": "CREDENTIALS_VALID", "request_id": request_id(request)})
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/devices/register", response_model=DeviceRegisterResponse)
+def register_device(
+    payload: DeviceRegisterRequest,
+    request: Request,
+    authorization_header: str | None = Header(default=None, alias="Authorization"),
+    x_enrollment_token: str | None = Header(default=None, alias="X-Enrollment-Token"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-register")
+    if authorization_header:
+        principal = principal_from_token(require_bearer(authorization_header))
+        user_id = principal.user_id
+        if payload.user_id != user_id:
+            raise HTTPException(status_code=403, detail="USER_SCOPE_MISMATCH")
+    else:
+        user_id = payload.user_id
+        require_enrollment(x_enrollment_token, user_id)
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    challenge = secrets.token_urlsafe(32)
+    device_id = store.register_device(user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
+
+
+@app.post("/v1/devices/bind", response_model=DeviceRegisterResponse)
+def bind_device(
+    payload: DeviceBindRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-bind")
+    token = require_bearer(authorization_header)
+    principal = principal_from_token(token)
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    challenge = secrets.token_urlsafe(32)
+    device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    bind_session_to_device(token, device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND_SESSION_LINKED", "request_id": rid})
+    return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
+
+
+@app.get("/v1/devices/{device_id}")
+def get_device(device_id: str, authorization_header: str = Header(..., alias="Authorization")):
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if device.get("user_id") != principal.user_id:
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    return {
+        "device_id": device_id,
+        "state": device.get("state"),
+        "platform": device.get("platform"),
+        "fingerprint_sha256": device.get("fingerprint"),
+        "algorithm": "EC / secp256r1 / SHA256withECDSA",
+        "bound_at": None,
+        "last_seen_at": None,
+        "security_status": "SECURE" if device.get("state") == "ACTIVE" else "AT_RISK",
+    }
+
+
+@app.post("/v1/devices/{device_id}/revoke")
+def revoke_device(device_id: str, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if not device_owned_by(principal, device, device_id):
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if device.get("state") == "REVOKED":
+        raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
+    set_device_state(device_id, "REVOKED")
+    revoke_device_sessions(device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:revoke", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
+    return {"revoked": True}
+
+
+@app.post("/v1/devices/{device_id}/rotate")
+def rotate_device(
+    device_id: str,
+    payload: DeviceBindRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    token = require_bearer(authorization_header)
+    principal = principal_from_token(token)
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if not device_owned_by(principal, device, device_id):
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if device.get("state") != "ACTIVE":
+        raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    if fingerprint.lower() == str(device.get("fingerprint", "")).lower():
+        raise HTTPException(status_code=409, detail="KEY_UNCHANGED")
+
+    challenge = secrets.token_urlsafe(32)
+    new_device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    new_access, new_refresh, expires_at, scopes = store.issue_session(new_device_id, principal.user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    set_device_state(device_id, "REVOKED")
+    revoke_device_sessions(device_id)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:rotate", "resource": new_device_id, "decision": "ALLOW", "reason_code": "DEVICE_ROTATED", "request_id": rid})
+    return {
+        "device_id": new_device_id,
+        "state": "ACTIVE",
+        "challenge": challenge,
+        "session_token": new_access,
+        "refresh_token": new_refresh,
+        "expires_at": expires_at,
+        "scopes": scopes,
+    }
+
+
+@app.post("/v1/devices/{device_id}/prove", response_model=SessionResponse)
+def prove_device(device_id: str, payload: DeviceProofRequest, request: Request):
+    rid = request_id(request, payload.request_id)
+    device = store.get_device(device_id)
+    if not device or device["state"] != "ACTIVE":
+        raise HTTPException(status_code=401, detail="DEVICE_NOT_ACTIVE")
+    if not fresh_request_timestamp(payload.timestamp, int(time.time()), MAX_REQUEST_SKEW_SECONDS):
+        raise HTTPException(status_code=401, detail="STALE_REQUEST")
+    if not store.consume_challenge(payload.challenge, device_id):
+        raise HTTPException(status_code=401, detail="INVALID_OR_REPLAYED_CHALLENGE")
+    proof_payload = canonical_json({"challenge": payload.challenge, "timestamp": payload.timestamp, "request_id": rid})
+    if not verify_p256_signature(device["public_key"], payload.signature_b64, proof_payload):
+        store.add_audit({"actor_user_id": device["user_id"], "actor_device_id": device_id, "action": "device:prove", "resource": "session", "decision": "DENY", "reason_code": "BAD_SIGNATURE", "request_id": rid})
+        raise HTTPException(status_code=401, detail="BAD_SIGNATURE")
+    if not store.consume_proof_request(device_id, rid):
+        raise HTTPException(status_code=409, detail="REPLAY_DETECTED")
+    access, refresh, expires_at, scopes = store.issue_session(device_id, device["user_id"], SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    store.add_audit({"actor_user_id": device["user_id"], "actor_device_id": device_id, "action": "device:prove", "resource": "session", "decision": "ALLOW", "reason_code": "PROOF_VALID", "request_id": rid})
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/sessions/refresh", response_model=SessionResponse)
+def refresh_session(payload: RefreshRequest):
+    result = store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    if not result:
+        raise HTTPException(status_code=401, detail="INVALID_REFRESH")
+    access, refresh, expires_at, scopes, previous = result
+    if previous.get("device_id") is None:
+        user_scopes = {"character:read", "game:read", "audit:read"}
+        user_store.restrict_session_scopes(store, access, user_scopes)
+        scopes = sorted(user_scopes)
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/sessions/revoke")
+def revoke_session(authorization_header: str = Header(..., alias="Authorization")):
+    token = require_bearer(authorization_header)
+    principal = principal_from_token(token)
+    if not store.revoke_session(token):
+        raise HTTPException(status_code=401, detail="INVALID_SESSION")
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "session:revoke", "resource": "session", "decision": "ALLOW", "reason_code": "REVOKED", "request_id": None})
+    return {"revoked": True}
+
+
+@app.post("/v1/authorize", response_model=AuthorizeResponse)
+def authorize_endpoint(
+    payload: AuthorizeRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    decision, reason = policy_engine.authorize(principal, payload.action, payload.resource)
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": payload.action, "resource": payload.resource, "decision": decision.value, "reason_code": reason, "request_id": rid})
+    return AuthorizeResponse(decision=decision.value, reason_code=reason)
+
+
+@app.post("/v1/events:batch")
+def ingest_events(
+    payload: EventBatchRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> dict[str, int]:
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "event:write", "game:event", rid)
+    events = [event.model_dump(mode="json") for event in payload.events]
+    for event in events:
+        event["request_id"] = rid
+    try:
+        return store.save_event_batch({"user_id": principal.user_id, "device_id": principal.device_id}, events, x_idempotency_key)
+    except ValueError as exc:
+        code = str(exc)
+        status = 409 if code in {"SEQUENCE_REPLAY", "IDEMPOTENCY_KEY_REUSE"} else 403
+        raise HTTPException(status_code=status, detail=code) from exc
+
+
+@app.get("/v1/audit")
+def audit(authorization_header: str = Header(..., alias="Authorization")):
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "audit:read", "audit", str(uuid.uuid4()))
+    return {"events": store.get_audit(principal.user_id)}
+
+
+@app.get("/v1/admin/games")
+def admin_games(request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
+    return {"games": [game.__dict__ for game in DIABLO_CATALOG]}
+
+
+@app.get("/v1/admin/entitlements")
+def admin_entitlements(request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
+    return {"entitlements": store.list_entitlements()}
+
+
+@app.post("/v1/admin/entitlements")
+def admin_create_entitlement(payload: AdminEntitlementRequest, request: Request, x_sentinel_admin_token: str | None = Header(default=None)) -> dict:
+    rate_limit(request, "admin")
+    require_admin(x_sentinel_admin_token, request, store)
+    if get_game(payload.game_id) is None:
+        raise HTTPException(status_code=404, detail="GAME_NOT_FOUND")
+    if payload.valid_until < payload.valid_from:
+        raise HTTPException(status_code=400, detail="INVALID_ENTITLEMENT_WINDOW")
+    item = {"id": str(uuid.uuid4()), "user_id": payload.user_id, "game_id": payload.game_id, "source": payload.source, "status": EntitlementStatus.ACTIVE, "valid_from": payload.valid_from, "valid_until": payload.valid_until}
+    store.create_entitlement(item)
+    store.add_audit({"actor_user_id": payload.user_id, "actor_device_id": None, "action": "admin:entitlement:create", "resource": payload.game_id, "decision": "ALLOW", "reason_code": "ADMIN_GRANT", "request_id": None})
+    return item
+
+
+
+
+@app.post("/v1/integrity/nonce")
+def issue_integrity_nonce(request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, str]:
+    rate_limit(request, "integrity-nonce")
+    principal_from_token(require_bearer(authorization_header))
+    nonce = integrity_nonces.issue()
+    return {"nonce": nonce, "ttl_seconds": str(integrity_nonces.ttl_seconds)}
+
+
+@app.post("/v1/integrity/attest")
+def attest_integrity(payload: dict[str, object], request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, object]:
+    rate_limit(request, "integrity-attest")
+    principal_from_token(require_bearer(authorization_header))
+    nonce = str(payload.get("nonce") or "")
+    if not integrity_nonces.consume(nonce):
+        raise HTTPException(status_code=401, detail="INTEGRITY_NONCE_INVALID")
+    token = str(payload.get("integrity_token") or "")
+    if not token:
+        raise HTTPException(status_code=401, detail="INTEGRITY_TOKEN_REQUIRED")
+    # Client verdicts are deliberately ignored; only the server verifier may establish trust.
+    result = play_integrity.verify(token, nonce)
+    return {
+        "tier": result.tier.value,
+        "reason": result.reason,
+        "trusted": result.trusted,
+        "package_name": result.package_name,
+    }
+
+@app.post("/v1/recommendations", response_model=RecommendationResponse)
+def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "knowledge:recommend", "recommendation", rid)
+    result = [Recommendation(kind="recommendation", text="Review the most recent character events before making a progression decision.", confidence=0.72, provenance=["sentinel-core:context-baseline"])]
+    return RecommendationResponse(recommendations=result)

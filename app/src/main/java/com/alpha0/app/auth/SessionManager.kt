@@ -4,7 +4,7 @@ import android.content.Context
 import com.alpha0.app.security.SecureSessionStore
 
 class SessionManager(
-    private val api: AuthApi,
+    private val api: RefreshClient,
     private val store: SecureSessionStore,
 ) {
     private val refreshLock = Any()

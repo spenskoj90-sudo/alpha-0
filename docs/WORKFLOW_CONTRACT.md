@@ -148,6 +148,39 @@ The following actions are **never** performed by an agent. The agent may only de
 
 ---
 
+## 9. Executor assignment
+
+Each issue is assigned to **exactly one executor** — **Grok** or **GPT** — and the executor must be explicitly named in the task text.
+
+Default assignment:
+
+- **Grok** — large, multi-file, or architecturally significant tasks.
+- **GPT** — focused, point changes and documentation synchronization (`docs-sync`).
+
+An executor must not continue, take over, or modify the same branch after another executor has worked on it. If ownership of the work must change, the work must move to a new branch and follow a new task assignment.
+
+The Human Owner applies the same strict verification to reports from either executor: before merge, independently run `gh pr checks <number> -R spenskoj90-sudo/alpha-0` and verify the exact PR head SHA and required checks. A textual claim of completion or passing tests is never sufficient evidence.
+
+---
+
+## 10. Standard task template
+
+Use this template for task handoff between agents and the Human Owner:
+
+```text
+ЗАДАНИЕ — Issue #<номер>
+Исполнитель: <Grok / GPT>
+Цель: <узкая формулировка>
+Границы файлов: <конкретный список>
+Запрещено: merge в main, deploy, изменение/чтение credentials и secrets
+Обязательно по завершении:
+1. Обновить docs/SENTINEL_CURRENT_STATE.md — новый HEAD, статус issue
+2. Прислать отчёт: номер PR, точный SHA, ссылки на CI run ID для каждой обязательной проверки
+Критерий приёмки: <конкретно, проверяемо>
+```
+
+---
+
 ## References (do not duplicate)
 
 - Evidence rules and status vocabulary: `docs/SENTINEL_EVIDENCE_PROTOCOL.md`

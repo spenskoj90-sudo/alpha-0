@@ -7,7 +7,11 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-class AuthApi(private val baseUrl: String) {
+interface RefreshClient {
+    fun refresh(refreshToken: String): AuthApi.Result
+}
+
+class AuthApi(private val baseUrl: String) : RefreshClient {
     data class Session(
         val accessToken: String,
         val refreshToken: String,
@@ -30,7 +34,7 @@ class AuthApi(private val baseUrl: String) {
 
     fun login(email: String, password: String): Result = requestCredentials("/v1/auth/login", email, password, "LOGIN")
 
-    fun refresh(refreshToken: String): Result {
+    override fun refresh(refreshToken: String): Result {
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         val connection = (URL("$normalizedBase/v1/sessions/refresh").openConnection() as HttpURLConnection).apply {

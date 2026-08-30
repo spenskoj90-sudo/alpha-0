@@ -1,11 +1,11 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-29  
+**State record:** 2026-08-30  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `77c42069956c5103c6065c108c6aaff4f61b1341`  
-**Prior documented product SHA:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`  
-**Current product change:** PR #82 — physical-device diagnostic logging for acceptance chain  
+**Canonical HEAD (main):** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
+**Prior documented product SHA:** `77c42069956c5103c6065c108c6aaff4f61b1341`  
+**Current merged product change:** Android refresh-token lifecycle (PR #96)  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -28,6 +28,8 @@ CI and release claims below are valid only for the exact SHA identified in the c
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; production startup rejects a missing `DATABASE_URL`.
 - PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
 - Postgres refresh rotation is transactional and row-locked (`FOR UPDATE`) with revoke + replacement issuance in one transaction.
+- `/v1/sessions/refresh` exposes the existing transactional refresh rotation contract.
+- Android `AuthApi` now calls `/v1/sessions/refresh`; refresh operations are serialized client-side and successful rotation replaces the persisted token pair.
 - `/v1/recommendations` is authorized through `knowledge:recommend`.
 - `/v1/integrity/attest` performs server-side Play Integrity verification; client verdict lists are ignored.
 - Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
@@ -36,16 +38,16 @@ CI and release claims below are valid only for the exact SHA identified in the c
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `77c42069956c5103c6065c108c6aaff4f61b1341`.
+Current `main` HEAD: `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
 
-| Workflow | Run ID | Result |
+| Workflow | Run / evidence | Result |
 |---|---|---|
-| Build & Test | 33257152909 | success |
-| Security | 33257152815 | success |
-| ALPHA-0 Android CI | 33257152889 | success |
-| P1 Evidence | 33257152841 | success |
-| Release Candidate Artifact | 33257152850 | success |
-| Deploy | 33257152376 | failure (expected external pattern: `release.published` only / 0 jobs) |
+| Build & Test | exact-head run for `f37eb69c` | success |
+| Security | exact-head run for `f37eb69c` | success |
+| ALPHA-0 Android CI | exact-head run for `f37eb69c` | success |
+| P1 Evidence | exact-head run for `f37eb69c` | success |
+| Release Candidate Artifact | exact-head run for `f37eb69c` | success |
+| Deploy | exact-head run for `f37eb69c` | failure (expected external pattern: `release.published` only / 0 jobs) |
 
 ### Build & Test evidence
 
@@ -72,8 +74,8 @@ Exact-head jobs passed:
 
 ### P1 / release evidence
 
-- P1 evidence artifact generation passed in Run `33257152841`.
-- Release Candidate Artifact Run `33257152850` successfully built, verified and uploaded the signed release APK.
+- P1 evidence artifact generation passed on the exact `f37eb69c` HEAD.
+- Release Candidate Artifact successfully built, verified and uploaded the signed release APK on the exact `f37eb69c` HEAD.
 
 ### Coverage
 
@@ -101,7 +103,7 @@ Verified on exact HEAD: core tests, 82.09% coverage gate, PostgreSQL integration
 
 ### `app/`
 
-Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. No separate numeric Android coverage was extracted.
+Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Android refresh-token lifecycle is implemented and covered by instrumentation tests. No separate numeric Android coverage was extracted.
 
 ### `web/`
 
@@ -161,10 +163,28 @@ Do not silently change:
 
 ### PR #82 — physical-device diagnostic logging — MERGED
 
-- Merged into current `main`.
-- Current exact-head commit message identifies the diagnostic logging change.
-- Automated Android build/instrumentation/release verification passes on current HEAD.
+- Merged into `main`.
+- Automated Android build/instrumentation/release verification passed on subsequent exact HEADs.
 - Real physical-device acceptance remains an external operator gate.
+
+### PR #94 — Android session persistence regression coverage — MERGED
+
+- Proved persisted session restoration, missing-session handling and clear/revocation behavior with Android instrumentation coverage.
+
+### PR #96 — Android refresh-token lifecycle — MERGED
+
+- Added Android refresh endpoint integration.
+- Serialized concurrent refresh operations.
+- Persisted rotated token pairs and handled invalid/revoked refresh as re-authentication.
+- Exact merged HEAD `f37eb69c` passed the required automated product/security gates.
+
+### Issue #97 — bound and evict process-local rate-limit state — IN PROGRESS
+
+- Approved P1 implementation.
+- Branch: `p1/bound-rate-limit-state`.
+- Current work adds a configurable bucket bound and inactive-bucket eviction while preserving active-window semantics.
+- Regression tests are included under `server/tests/test_rate_limiter.py`.
+- This branch is **not merged** and has **no exact-PR CI acceptance yet**; do not treat it as current `main` product state.
 
 ## 9. Open-work state at last reconciliation
 
@@ -172,7 +192,7 @@ Open issues must be treated as backlog candidates, not automatic implementation 
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-No open PRs were present at the audit timestamp.
+No open PR was present on `main` before the current P1 branch was started; the current rate-limit work is pending PR/CI verification.
 
 ## 10. Evidence discipline
 

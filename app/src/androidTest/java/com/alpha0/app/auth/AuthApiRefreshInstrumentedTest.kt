@@ -19,8 +19,23 @@ class AuthApiRefreshInstrumentedTest {
             val requestSeen = arrayOfNulls<String>(1)
             val worker = thread {
                 server.accept().use { socket ->
-                    val request = socket.getInputStream().bufferedReader().readText()
-                    requestSeen[0] = request
+                    val reader = socket.getInputStream().bufferedReader()
+                    val request = StringBuilder()
+                    var contentLength = 0
+                    while (true) {
+                        val line = reader.readLine() ?: break
+                        if (line.isEmpty()) break
+                        request.append(line).append('\n')
+                        if (line.startsWith("Content-Length:", ignoreCase = true)) {
+                            contentLength = line.substringAfter(':').trim().toInt()
+                        }
+                    }
+                    if (contentLength > 0) {
+                        val body = CharArray(contentLength)
+                        reader.read(body)
+                        request.append(body)
+                    }
+                    requestSeen[0] = request.toString()
                     val bytes = response.toByteArray(Charsets.UTF_8)
                     socket.getOutputStream().bufferedWriter().use { writer ->
                         writer.write("HTTP/1.1 200 OK\r\n")
@@ -44,6 +59,7 @@ class AuthApiRefreshInstrumentedTest {
             assertEquals(listOf("account:read"), session.scopes)
             assertTrue(requestSeen[0]?.contains("POST /v1/sessions/refresh HTTP/1.1") == true)
             assertTrue(requestSeen[0]?.contains("refresh_token") == true)
+            assertTrue(requestSeen[0]?.contains("refresh-token") == true)
         }
     }
 }

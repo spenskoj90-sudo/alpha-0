@@ -1,11 +1,11 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-29  
+**State record:** 2026-08-30  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `77c42069956c5103c6065c108c6aaff4f61b1341`  
-**Prior documented product SHA:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`  
-**Current product change:** PR #82 — physical-device diagnostic logging for acceptance chain  
+**Canonical HEAD (main):** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
+**Prior documented product SHA:** `77c42069956c5103c6065c108c6aaff4f61b1341`  
+**Current product change:** PR #96 — Android refresh-token lifecycle (merged)  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -36,56 +36,34 @@ CI and release claims below are valid only for the exact SHA identified in the c
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `77c42069956c5103c6065c108c6aaff4f61b1341`.
+Current `main` HEAD: `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
 
 | Workflow | Run ID | Result |
 |---|---|---|
-| Build & Test | 33257152909 | success |
-| Security | 33257152815 | success |
-| ALPHA-0 Android CI | 33257152889 | success |
-| P1 Evidence | 33257152841 | success |
-| Release Candidate Artifact | 33257152850 | success |
-| Deploy | 33257152376 | failure (expected external pattern: `release.published` only / 0 jobs) |
+| Deploy | 33320881527 | failure (expected external pattern: `release.published` only / 0 jobs) |
+| Build & Test | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
+| Security | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
+| ALPHA-0 Android CI | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
+| P1 Evidence | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
+| Release Candidate Artifact | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
 
 ### Build & Test evidence
 
-Exact-head jobs passed:
-
-- Web build.
-- PostgreSQL integration and recovery (`migrate.py` + `pytest -m postgres`).
-- Core tests and coverage: `pytest -m 'not postgres' --cov=app --cov-report=term-missing --cov-fail-under=80`.
-- Android build/tests, release assembly and fingerprint verification.
-- Repository verification.
-- Container build.
-- Reproducible container build comparison.
-- Deployment smoke and health.
-- Android instrumentation on GitHub Emulator.
+The previous exact-head audit for `f37eb69c...` reported the core Android/Web/PostgreSQL/container/instrumentation gates as passing, but the corresponding run IDs were not independently re-extracted during this state sync. Treat those historical claims as **UNVERIFIED** until refreshed against the exact SHA.
 
 ### Security evidence
 
-Exact-head jobs passed:
-
-- Dependency audit.
-- CodeQL Python.
-- CodeQL JavaScript.
-- Secret and image scan (Trivy).
+The previous exact-head audit reported Security passing on `f37eb69c...`, but the corresponding run ID was not independently re-extracted during this state sync. Treat the claim as **UNVERIFIED** until refreshed against the exact SHA.
 
 ### P1 / release evidence
 
-- P1 evidence artifact generation passed in Run `33257152841`.
-- Release Candidate Artifact Run `33257152850` successfully built, verified and uploaded the signed release APK.
+Previous audit evidence reported P1 and Release Candidate Artifact success on `f37eb69c...`; exact run IDs were not independently re-extracted during this state sync. Treat those claims as **UNVERIFIED** until refreshed against the exact SHA.
 
 ### Coverage
 
-Exact-head core coverage: **82.09%**.
+Previous exact-head audit reported core coverage **82.09%** (1,312 statements, 235 missed, 78 tests passed), but the numeric report was not independently re-extracted in this state sync. Treat it as historical evidence for `f37eb69c...`, not as a newly verified claim.
 
-- Statements: 1,312.
-- Missed: 235.
-- Tests passed: 78.
-- Deselects: 5.
-- Gate: `--cov-fail-under=80` passed.
-
-Lower-covered core components on this exact HEAD include:
+Lower-covered core components previously reported include:
 
 - `app/core/store.py`: 61%.
 - `app/core/user_store.py`: 77%.
@@ -97,15 +75,15 @@ Coverage figures above refer to the backend/core coverage command and must not b
 
 ### `server/`
 
-Verified on exact HEAD: core tests, 82.09% coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health.
+Previous exact-head verification reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `app/`
 
-Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. No separate numeric Android coverage was extracted.
+Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `web/`
 
-Verified on exact HEAD: lint and production build. No separate numeric web coverage was extracted.
+Previous exact-head verification reported lint and production build passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `launcher/`
 
@@ -161,10 +139,22 @@ Do not silently change:
 
 ### PR #82 — physical-device diagnostic logging — MERGED
 
-- Merged into current `main`.
-- Current exact-head commit message identifies the diagnostic logging change.
-- Automated Android build/instrumentation/release verification passes on current HEAD.
+- Merged into `main`.
+- Automated Android build/instrumentation/release verification was reported passing on its exact HEAD.
 - Real physical-device acceptance remains an external operator gate.
+
+### PR #96 — Android refresh-token lifecycle — MERGED
+
+- Merged into `main` at `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
+- Added Android refresh auth client, serialized/persisted refresh lifecycle, session-manager integration and refresh lifecycle tests.
+- Current exact-head CI evidence must be independently refreshed before treating the merge as fully verified.
+
+### PR #99 — workflow contract executor assignment and task template — OPEN
+
+- Branch: `docs/workflow-contract-executor-assignment`.
+- Head: `8dde3998ce6fa55f4e5dd4b42e1745384a44e3fc`.
+- Changes are limited to workflow/task-governance documentation plus this state synchronization.
+- PR #99 is not merged.
 
 ## 9. Open-work state at last reconciliation
 
@@ -172,7 +162,7 @@ Open issues must be treated as backlog candidates, not automatic implementation 
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-No open PRs were present at the audit timestamp.
+PR #99 is the only known open PR created by the current workflow cycle; it must not be treated as merged until independently verified.
 
 ## 10. Evidence discipline
 

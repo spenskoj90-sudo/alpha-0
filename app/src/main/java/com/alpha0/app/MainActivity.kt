@@ -7,7 +7,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,6 +20,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.alpha0.app.auth.AuthApi
 import com.alpha0.app.auth.LoginScreen
+import com.alpha0.app.auth.SessionManager
 import com.alpha0.app.dashboard.DashboardApi
 import com.alpha0.app.dashboard.DashboardScreen
 import com.alpha0.app.dashboard.DeviceDetailsScreen
@@ -25,6 +31,8 @@ import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.security.SecureSessionStore
 import com.alpha0.app.ui.SentinelTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
@@ -56,131 +64,153 @@ class MainActivity : ComponentActivity() {
         )
 
         val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
+        val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
         val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL)
 
         setContent {
             SentinelTheme {
                 val navController = rememberNavController()
-                val startDestination = remember(session) {
-                    when {
-                        session == null -> "login"
-                        session.deviceId.isNullOrBlank() -> "device-setup"
-                        else -> "dashboard/${Uri.encode(session.deviceId)}"
+                var activeSession by remember { mutableStateOf(session) }
+                var refreshComplete by remember { mutableStateOf(session == null) }
+
+                LaunchedEffect(session?.refreshToken) {
+                    if (session == null) {
+                        refreshComplete = true
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            sessionManager.refreshStoredSession(this@MainActivity)
+                        }
+                        activeSession = sessionStore.load(this@MainActivity)
+                        refreshComplete = true
                     }
                 }
 
-                NavHost(
-                    navController = navController,
-                    startDestination = startDestination,
-                    enterTransition = { fadeIn(animationSpec = tween(150)) },
-                    exitTransition = { fadeOut(animationSpec = tween(150)) },
-                    popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-                    popExitTransition = { fadeOut(animationSpec = tween(150)) },
-                ) {
-                    composable("login") {
-                        LoginScreen(api = authApi) { authenticatedSession ->
-                            diag.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")
-                            sessionStore.save(this@MainActivity, authenticatedSession.accessToken, authenticatedSession.refreshToken)
-                            diag.info("SESSION", "SESSION_SAVE", "SUCCESS", details = mapOf("has_device_id" to false))
-                            navController.navigate("device-setup") {
-                                popUpTo("login") { inclusive = true }
-                            }
-                        }
+                if (!refreshComplete) {
+                    CircularProgressIndicator()
+                } else {
+                    val startDestination = when {
+                        activeSession == null -> "login"
+                        activeSession?.deviceId.isNullOrBlank() -> "device-setup"
+                        else -> "dashboard/${Uri.encode(activeSession?.deviceId)}"
                     }
-                    composable("device-setup") {
-                        val currentSession = sessionStore.load(this@MainActivity)
-                        if (currentSession == null) {
-                            diag.warn("SESSION", "SESSION_MISSING_ON_SETUP", "FAILURE")
-                            navController.navigate("login") {
-                                popUpTo("device-setup") { inclusive = true }
-                            }
-                        } else {
-                            DeviceSetupScreen(
-                                accessToken = currentSession.accessToken,
-                                deviceIdentity = deviceIdentity,
-                                api = deviceApi,
-                                onBound = { deviceId ->
-                                    diag.info("DEVICE", "BIND_SUCCESS", "SUCCESS", details = mapOf("device_id_prefix" to deviceId.take(12)))
-                                    sessionStore.save(
-                                        this@MainActivity,
-                                        currentSession.accessToken,
-                                        currentSession.refreshToken,
-                                        deviceId
-                                    )
-                                    diag.info("SESSION", "SESSION_SAVE", "SUCCESS", details = mapOf("has_device_id" to true))
-                                    navController.navigate("dashboard/${Uri.encode(deviceId)}") {
-                                        popUpTo("device-setup") { inclusive = true }
-                                    }
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = startDestination,
+                        enterTransition = { fadeIn(animationSpec = tween(150)) },
+                        exitTransition = { fadeOut(animationSpec = tween(150)) },
+                        popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+                        popExitTransition = { fadeOut(animationSpec = tween(150)) },
+                    ) {
+                        composable("login") {
+                            LoginScreen(api = authApi) { authenticatedSession ->
+                                diag.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")
+                                sessionStore.save(this@MainActivity, authenticatedSession.accessToken, authenticatedSession.refreshToken)
+                                activeSession = sessionStore.load(this@MainActivity)
+                                diag.info("SESSION", "SESSION_SAVE", "SUCCESS", details = mapOf("has_device_id" to false))
+                                navController.navigate("device-setup") {
+                                    popUpTo("login") { inclusive = true }
                                 }
-                            )
+                            }
                         }
-                    }
-                    composable(
-                        route = "dashboard/{deviceId}",
-                        arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-                    ) { entry ->
-                        val currentSession = sessionStore.load(this@MainActivity)
-                        val deviceId = entry.arguments?.getString("deviceId")
-                        if (currentSession == null || deviceId.isNullOrBlank()) {
-                            diag.warn("SESSION", "SESSION_MISSING_ON_DASHBOARD", "FAILURE")
-                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
-                        } else {
-                            DashboardScreen(
-                                accessToken = currentSession.accessToken,
-                                deviceId = deviceId,
-                                api = dashboardApi,
-                                onDeviceClick = { navController.navigate("device-details/${Uri.encode(deviceId)}") },
-                                onGameClick = { entitlementId -> navController.navigate("game-details/${Uri.encode(entitlementId)}") }
-                            )
-                        }
-                    }
-                    composable(
-                        route = "device-details/{deviceId}",
-                        arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
-                    ) { entry ->
-                        val currentSession = sessionStore.load(this@MainActivity)
-                        val deviceId = entry.arguments?.getString("deviceId")
-                        if (currentSession == null || deviceId.isNullOrBlank()) {
-                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
-                        } else {
-                            DeviceDetailsScreen(
-                                accessToken = currentSession.accessToken,
-                                deviceId = deviceId,
-                                api = dashboardApi,
-                                onRevoked = {
-                                    diag.info("DEVICE", "REVOKE", "SUCCESS")
-                                    sessionStore.clear(this@MainActivity)
-                                    diag.info("SESSION", "SESSION_CLEAR", "SUCCESS")
-                                    navController.navigate("login") {
-                                        popUpTo("login") { inclusive = true }
-                                    }
-                                },
-                                onRotated = { rotated ->
-                                    val newDeviceId = rotated.deviceId
-                                    val newAccessToken = rotated.sessionToken
-                                    val newRefreshToken = rotated.refreshToken
-                                    if (!newDeviceId.isNullOrBlank() && !newAccessToken.isNullOrBlank() && !newRefreshToken.isNullOrBlank()) {
-                                        diag.info("DEVICE", "ROTATE", "SUCCESS", details = mapOf("device_id_prefix" to newDeviceId.take(12)))
-                                        sessionStore.save(this@MainActivity, newAccessToken, newRefreshToken, newDeviceId)
-                                        navController.navigate("dashboard/${Uri.encode(newDeviceId)}") {
-                                            popUpTo("device-details/${Uri.encode(deviceId)}") { inclusive = true }
+                        composable("device-setup") {
+                            val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
+                            if (currentSession == null) {
+                                diag.warn("SESSION", "SESSION_MISSING_ON_SETUP", "FAILURE")
+                                navController.navigate("login") {
+                                    popUpTo("device-setup") { inclusive = true }
+                                }
+                            } else {
+                                DeviceSetupScreen(
+                                    accessToken = currentSession.accessToken,
+                                    deviceIdentity = deviceIdentity,
+                                    api = deviceApi,
+                                    onBound = { deviceId ->
+                                        diag.info("DEVICE", "BIND_SUCCESS", "SUCCESS", details = mapOf("device_id_prefix" to deviceId.take(12)))
+                                        sessionStore.save(
+                                            this@MainActivity,
+                                            currentSession.accessToken,
+                                            currentSession.refreshToken,
+                                            deviceId
+                                        )
+                                        activeSession = sessionStore.load(this@MainActivity)
+                                        diag.info("SESSION", "SESSION_SAVE", "SUCCESS", details = mapOf("has_device_id" to true))
+                                        navController.navigate("dashboard/${Uri.encode(deviceId)}") {
+                                            popUpTo("device-setup") { inclusive = true }
                                         }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
-                    }
-                    composable(
-                        route = "game-details/{entitlementId}",
-                        arguments = listOf(navArgument("entitlementId") { type = NavType.StringType })
-                    ) { entry ->
-                        val currentSession = sessionStore.load(this@MainActivity)
-                        val entitlementId = entry.arguments?.getString("entitlementId")
-                        if (currentSession == null || entitlementId.isNullOrBlank()) {
-                            navController.navigate("login") { popUpTo("login") { inclusive = true } }
-                        } else {
-                            GameDetailsScreen(accessToken = currentSession.accessToken, entitlementId = entitlementId, api = dashboardApi)
+                        composable(
+                            route = "dashboard/{deviceId}",
+                            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+                        ) { entry ->
+                            val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
+                            val deviceId = entry.arguments?.getString("deviceId")
+                            if (currentSession == null || deviceId.isNullOrBlank()) {
+                                diag.warn("SESSION", "SESSION_MISSING_ON_DASHBOARD", "FAILURE")
+                                navController.navigate("login") { popUpTo("login") { inclusive = true } }
+                            } else {
+                                DashboardScreen(
+                                    accessToken = currentSession.accessToken,
+                                    deviceId = deviceId,
+                                    api = dashboardApi,
+                                    onDeviceClick = { navController.navigate("device-details/${Uri.encode(deviceId)}") },
+                                    onGameClick = { entitlementId -> navController.navigate("game-details/${Uri.encode(entitlementId)}") }
+                                )
+                            }
+                        }
+                        composable(
+                            route = "device-details/{deviceId}",
+                            arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
+                        ) { entry ->
+                            val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
+                            val deviceId = entry.arguments?.getString("deviceId")
+                            if (currentSession == null || deviceId.isNullOrBlank()) {
+                                navController.navigate("login") { popUpTo("login") { inclusive = true } }
+                            } else {
+                                DeviceDetailsScreen(
+                                    accessToken = currentSession.accessToken,
+                                    deviceId = deviceId,
+                                    api = dashboardApi,
+                                    onRevoked = {
+                                        diag.info("DEVICE", "REVOKE", "SUCCESS")
+                                        sessionStore.clear(this@MainActivity)
+                                        activeSession = null
+                                        diag.info("SESSION", "SESSION_CLEAR", "SUCCESS")
+                                        navController.navigate("login") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
+                                    },
+                                    onRotated = { rotated ->
+                                        val newDeviceId = rotated.deviceId
+                                        val newAccessToken = rotated.sessionToken
+                                        val newRefreshToken = rotated.refreshToken
+                                        if (!newDeviceId.isNullOrBlank() && !newAccessToken.isNullOrBlank() && !newRefreshToken.isNullOrBlank()) {
+                                            diag.info("DEVICE", "ROTATE", "SUCCESS", details = mapOf("device_id_prefix" to newDeviceId.take(12)))
+                                            sessionStore.save(this@MainActivity, newAccessToken, newRefreshToken, newDeviceId)
+                                            activeSession = sessionStore.load(this@MainActivity)
+                                            navController.navigate("dashboard/${Uri.encode(newDeviceId)}") {
+                                                popUpTo("device-details/${Uri.encode(deviceId)}") { inclusive = true }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        composable(
+                            route = "game-details/{entitlementId}",
+                            arguments = listOf(navArgument("entitlementId") { type = NavType.StringType })
+                        ) { entry ->
+                            val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
+                            val entitlementId = entry.arguments?.getString("entitlementId")
+                            if (currentSession == null || entitlementId.isNullOrBlank()) {
+                                navController.navigate("login") { popUpTo("login") { inclusive = true } }
+                            } else {
+                                GameDetailsScreen(accessToken = currentSession.accessToken, entitlementId = entitlementId, api = dashboardApi)
+                            }
                         }
                     }
                 }

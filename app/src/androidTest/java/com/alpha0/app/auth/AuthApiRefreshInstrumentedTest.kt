@@ -32,20 +32,24 @@ class AuthApiRefreshInstrumentedTest {
                     }
                     if (contentLength > 0) {
                         val body = CharArray(contentLength)
-                        reader.read(body)
-                        request.append(body)
+                        var offset = 0
+                        while (offset < contentLength) {
+                            val read = reader.read(body, offset, contentLength - offset)
+                            if (read < 0) break
+                            offset += read
+                        }
+                        request.append(body.concatToString(0, offset))
                     }
                     requestSeen[0] = request.toString()
                     val bytes = response.toByteArray(Charsets.UTF_8)
-                    socket.getOutputStream().bufferedWriter().use { writer ->
-                        writer.write("HTTP/1.1 200 OK\r\n")
-                        writer.write("Content-Type: application/json\r\n")
-                        writer.write("Content-Length: ${bytes.size}\r\n")
-                        writer.write("Connection: close\r\n\r\n")
-                        writer.flush()
-                        socket.getOutputStream().write(bytes)
-                        socket.getOutputStream().flush()
-                    }
+                    val writer = socket.getOutputStream().bufferedWriter()
+                    writer.write("HTTP/1.1 200 OK\r\n")
+                    writer.write("Content-Type: application/json\r\n")
+                    writer.write("Content-Length: ${bytes.size}\r\n")
+                    writer.write("Connection: close\r\n\r\n")
+                    writer.write(response)
+                    writer.flush()
+                    socket.shutdownOutput()
                 }
             }
 

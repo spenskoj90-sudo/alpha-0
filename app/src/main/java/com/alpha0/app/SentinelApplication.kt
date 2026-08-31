@@ -58,7 +58,7 @@ class SentinelApplication : Application() {
                     }
                 }
             }
-            event.extras.keys.toList().forEach { key ->
+            event.extras?.keys?.toList()?.forEach { key ->
                 val lower = key.lowercase()
                 if (lower.contains("email") ||
                     lower.contains("token") ||

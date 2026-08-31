@@ -71,8 +71,9 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 7. Open work
 
-Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #63, #59, #22, #13, #12, #11, #10 and #8.
+Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #63, #59, #22, #13, #12, #11, #10, #8 and #107.
 
+- **#107 — Backend: implement characters/game-state domain (per ARCHITECTURE_V4): OPEN / planning.** The architectural target describes the character/game-state domain and candidate endpoints, but current runtime does not implement that domain. Implementation scope is intentionally tracked in #107 rather than inferred from `docs/API.md`.
 - #59 is the external Firebase Test Lab IAM blocker.
 - #22 is governance/administrative work.
 - #63, #13, #12, #11, #10 and #8 remain planning/backlog items unless separately approved.

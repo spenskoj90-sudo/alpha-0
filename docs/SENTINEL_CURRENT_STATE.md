@@ -5,7 +5,7 @@
 **Canonical branch:** `main`  
 **Canonical HEAD (main):** `1df91de661c8bb0946d68f1671cbabf5f9714455`  
 **Current branch:** `feature/sentry-android-observability-7`  
-**Current branch HEAD:** `82c01ab7c801b4272f244c9ba6ee7fae788d3fa7`  
+**Current branch HEAD:** `fabaead06d740ceefb771bf17858f7f3b6578769`  
 **Prior documented product SHA:** `ab64505bb35d32006aa2c98940e807f3f9d87508`  
 **Current product change on main:** PR #100 state-sync gate + emulator pin (merged as `1df91de…`)
 
@@ -33,7 +33,7 @@
 - Authentication has configurable failure tracking and lockout.
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets. This implementation is merged in PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
-- **Sentry Android SDK (issue #7)** is integrated on branch `feature/sentry-android-observability-7`: DSN via BuildConfig from CI secret only, privacy scrubbing enabled, documented in `docs/OBSERVABILITY.md`. The Kotlin BuildConfig SENTRY_DSN expression has been corrected in commit `82c01ab…`; this branch change is not merged to main.
+- **Sentry Android SDK (issue #7)** is integrated on branch `feature/sentry-android-observability-7`: DSN via BuildConfig from CI secret only, privacy scrubbing enabled, documented in `docs/OBSERVABILITY.md`. The Kotlin BuildConfig expressions have been corrected to use ordinary Kotlin quotes inside `${...}`; this branch change is not merged to main.
 
 ## 3. Current exact-HEAD CI evidence
 
@@ -56,7 +56,7 @@ Historical green runs on other SHAs are not current evidence.
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. PR #104 added bounded rate-limit state and deterministic regression tests.
 
 ### `app/`
-Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. Sentry integration lives on open branch for issue #7; the latest branch commit fixes the Kotlin script syntax for `SENTRY_DSN`.
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. Sentry integration lives on open branch for issue #7; the latest branch commit fixes the Kotlin DSL syntax for both BuildConfig provider expressions.
 
 ### `web/`
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
@@ -101,7 +101,7 @@ Merged into `main` as `ab64505bb35d32006aa2c98940e807f3f9d87508`. Added bounded 
 Merged into `main` as `1df91de661c8bb0946d68f1671cbabf5f9714455`. State-sync gate + emulator runner pin.
 
 ### Issue #7 — Sentry Android observability — IN PROGRESS
-Branch `feature/sentry-android-observability-7`, HEAD `82c01ab7c801b4272f244c9ba6ee7fae788d3fa7`. The branch contains the Sentry Android SDK integration, privacy scrubbing, observability documentation, release-only `SENTRY_DSN` injection, and the Kotlin DSL syntax correction for `SENTRY_DSN`. No merge performed by this work.
+Branch `feature/sentry-android-observability-7`, HEAD `fabaead06d740ceefb771bf17858f7f3b6578769`. The branch contains the Sentry Android SDK integration, privacy scrubbing, observability documentation, release-only `SENTRY_DSN` injection, and the Kotlin DSL syntax corrections for `SENTINEL_API_BASE_URL` and `SENTRY_DSN`. No merge performed by this work.
 
 ## 9. Open-work state
 

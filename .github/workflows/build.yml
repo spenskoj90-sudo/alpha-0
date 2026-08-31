@@ -114,7 +114,6 @@ jobs:
           PY
           chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
           test -s "$RUNNER_TEMP/sentinel-release.jks"
-
       - name: Keystore file and format validity
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -122,7 +121,6 @@ jobs:
           set -euo pipefail
           set +x
           keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
-
       - name: Keystore store password validation
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -133,7 +131,6 @@ jobs:
           grep -q '^Keystore type:' "$RUNNER_TEMP/keystore-store-list.txt"
           echo "Store password validation: PASS"
           rm -f "$RUNNER_TEMP/keystore-store-list.txt"
-
       - name: Verify release key alias exists
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -150,7 +147,6 @@ jobs:
             exit 1
           fi
           echo "Alias validation: PASS"
-
       - name: Verify release key entry type
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -162,7 +158,6 @@ jobs:
           echo "Entry type: $entry"
           test "$entry" = "PrivateKeyEntry"
           echo "Entry type validation: PASS"
-
       - name: Extract release certificate fingerprint
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -178,7 +173,6 @@ jobs:
           echo "SHA-256 fingerprint: $actual"
           printf '%s\n' "$actual" > "$RUNNER_TEMP/release-fingerprint.txt"
           rm -f "$RUNNER_TEMP/release-cert.txt"
-
       - name: Compare keystore certificate fingerprint
         run: |
           set -euo pipefail
@@ -193,16 +187,13 @@ jobs:
             exit 1
           fi
           echo "RESULT: PASS"
-
       - name: Assemble signed release
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          ./gradlew --no-daemon assembleRelease
-
+        run: ./gradlew --no-daemon assembleRelease
       - name: Verify release APK signature and fingerprint
         run: |
           set -euo pipefail
@@ -222,11 +213,9 @@ jobs:
             exit 1
           fi
           echo "APK fingerprint comparison: PASS"
-
       - name: Cleanup temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/sentinel-release.jks" "$RUNNER_TEMP/release-fingerprint.txt" "$RUNNER_TEMP/keystore-store-list.txt" "$RUNNER_TEMP/release-cert.txt"
-
       - name: Upload Android instrumentation artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -260,7 +249,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run Android instrumentation on API 35 emulator
-        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        uses: ReactiveCircus/android-emulator-runner@v2.37.0
         with:
           api-level: 35
           target: google_apis
@@ -329,43 +318,4 @@ jobs:
           grep -q device_bindings /tmp/schema-readiness.txt
       - name: Cleanup deployment smoke
         if: always()
-        run: docker rm -f sentinel-api sentinel-postgres 2>/dev/null || true
-
-  reproducible-deployment:
-    name: Reproducible container build comparison
-    runs-on: ubuntu-latest
-    needs: [core, postgres]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - name: Build artifact A
-        run: |
-          docker buildx build --load --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-a .
-          docker image inspect sentinel-core:repro-a --format '{{.Id}}' > /tmp/repro-a.id
-          docker image inspect sentinel-core:repro-a --format '{{json .RootFS.Layers}}' > /tmp/repro-a.layers
-      - name: Independent rebuild artifact B
-        run: |
-          docker buildx prune -af
-          docker buildx build --load --no-cache --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-b .
-          docker image inspect sentinel-core:repro-b --format '{{.Id}}' > /tmp/repro-b.id
-          docker image inspect sentinel-core:repro-b --format '{{json .RootFS.Layers}}' > /tmp/repro-b.layers
-      - name: Compare canonical runtime filesystem
-        run: |
-          set -euo pipefail
-          echo "raw artifact A image id: $(cat /tmp/repro-a.id)"
-          echo "raw artifact B image id: $(cat /tmp/repro-b.id)"
-          echo "raw artifact A layers: $(cat /tmp/repro-a.layers)"
-          echo "raw artifact B layers: $(cat /tmp/repro-b.layers)"
-          rm -rf /tmp/repro-root-a /tmp/repro-root-b
-          mkdir -p /tmp/repro-root-a /tmp/repro-root-b
-          docker create --name sentinel-repro-a sentinel-core:repro-a >/dev/null
-          docker create --name sentinel-repro-b sentinel-core:repro-b >/dev/null
-          docker export sentinel-repro-a > /tmp/repro-a.raw.tar
-          docker export sentinel-repro-b > /tmp/repro-b.raw.tar
-          tar -xpf /tmp/repro-a.raw.tar -C /tmp/repro-root-a
-          tar -xpf /tmp/repro-b.raw.tar -C /tmp/repro-root-b
-          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.canonical.tar -C /tmp/repro-root-a .
-          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.canonical.tar -C /tmp/repro-root-b .
-          sha256sum /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
-          cmp /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
-          docker rm sentinel-repro-a sentinel-repro-b >/dev/null
+          

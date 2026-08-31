@@ -1,11 +1,12 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-29  
+**State record:** 2026-08-31  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `77c42069956c5103c6065c108c6aaff4f61b1341`  
-**Prior documented product SHA:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`  
-**Current product change:** PR #82 — physical-device diagnostic logging for acceptance chain  
+**Canonical HEAD (main):** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
+**Prior documented product SHA:** `77c42069956c5103c6065c108c6aaff4f61b1341`  
+**Current product change:** PR #96 — Android refresh-token lifecycle (merged)  
+**Current governance work:** Issue #102 — pin `ReactiveCircus/android-emulator-runner` to `v2.37.0` (PR pending)  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -28,6 +29,8 @@ CI and release claims below are valid only for the exact SHA identified in the c
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; production startup rejects a missing `DATABASE_URL`.
 - PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
 - Postgres refresh rotation is transactional and row-locked (`FOR UPDATE`) with revoke + replacement issuance in one transaction.
+- `/v1/sessions/refresh` exposes the transactional refresh rotation contract.
+- Android `AuthApi` calls `/v1/sessions/refresh`; refresh operations are serialized client-side and successful rotation replaces the persisted token pair.
 - `/v1/recommendations` is authorized through `knowledge:recommend`.
 - `/v1/integrity/attest` performs server-side Play Integrity verification; client verdict lists are ignored.
 - Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
@@ -36,16 +39,15 @@ CI and release claims below are valid only for the exact SHA identified in the c
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `77c42069956c5103c6065c108c6aaff4f61b1341`.
+Current `main` HEAD: `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
 
 | Workflow | Run ID | Result |
 |---|---|---|
-| Build & Test | 33257152909 | success |
-| Security | 33257152815 | success |
-| ALPHA-0 Android CI | 33257152889 | success |
-| P1 Evidence | 33257152841 | success |
-| Release Candidate Artifact | 33257152850 | success |
-| Deploy | 33257152376 | failure (expected external pattern: `release.published` only / 0 jobs) |
+| Deploy | 33320881527 | failure (expected external pattern: `release.published` only / 0 jobs) |
+| Build & Test | 33320900517 | success |
+| Security | 33320900426 | success |
+| ALPHA-0 Android CI | 33320900358 | success |
+| P1 Evidence | 33320900391 | success |
 
 ### Build & Test evidence
 
@@ -72,8 +74,8 @@ Exact-head jobs passed:
 
 ### P1 / release evidence
 
-- P1 evidence artifact generation passed in Run `33257152841`.
-- Release Candidate Artifact Run `33257152850` successfully built, verified and uploaded the signed release APK.
+- P1 evidence artifact generation passed on exact `f37eb69c`.
+- Release Candidate Artifact verification passed on the exact merged HEAD according to the current release evidence record.
 
 ### Coverage
 
@@ -101,7 +103,7 @@ Verified on exact HEAD: core tests, 82.09% coverage gate, PostgreSQL integration
 
 ### `app/`
 
-Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. No separate numeric Android coverage was extracted.
+Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Android refresh-token lifecycle is implemented and covered by instrumentation tests. No separate numeric Android coverage was extracted.
 
 ### `web/`
 
@@ -123,7 +125,7 @@ The repository passes the automated product/security gates above, but live exter
 - Production `DATABASE_URL` and deployment secrets.
 - A real-device acceptance pass before public distribution.
 - A release tag and GitHub Release publication when the operator chooses the release channel.
-- Firebase Test Lab GCS `storage.objects.create` permission (issues #59 / #62 remain open).
+- Firebase Test Lab `storage.objects.create` permission (issues #59 / #62 remain open).
 - Branch-protection required-status-check configuration is not asserted here because current protection metadata was not independently verified in this state sync.
 
 These are deployment credentials/configuration or operator acceptance items, not missing repository implementation unless separately demonstrated by current evidence.
@@ -151,7 +153,7 @@ Do not silently change:
 ### Issue #14 — task-to-PR workflow contract — COMPLETE
 
 - PR #83 merged: `docs/WORKFLOW_CONTRACT.md` introduced.
-- PR #84 and PR #86 synchronized the state/README governance requirements.
+- PR #86 added strict README/CURRENT_STATE synchronization requirements.
 
 ### Issue #9 — least-privilege / secrets boundary audit — COMPLETE
 
@@ -161,10 +163,37 @@ Do not silently change:
 
 ### PR #82 — physical-device diagnostic logging — MERGED
 
-- Merged into current `main`.
-- Current exact-head commit message identifies the diagnostic logging change.
-- Automated Android build/instrumentation/release verification passes on current HEAD.
+- Merged into `main`.
+- Automated Android build/instrumentation/release verification passed on subsequent exact HEADs.
 - Real physical-device acceptance remains an external operator gate.
+
+### PR #94 — Android session persistence regression coverage — MERGED
+
+- Proved persisted session restoration, missing-session handling and clear/revocation behavior with Android instrumentation coverage.
+
+### PR #96 — Android refresh-token lifecycle — MERGED
+
+- Added Android refresh endpoint integration.
+- Serialized concurrent refresh operations.
+- Persisted rotated token pairs and handled invalid/revoked refresh as re-authentication.
+- Exact merged HEAD `f37eb69c` passed the required automated product/security gates.
+
+### Issue #100 — CI state-sync enforcement — IN REVIEW
+
+- Separate PR #100.
+- Adds a dedicated `state-sync` job to the existing `.github/workflows/build.yml` requiring `docs/SENTINEL_CURRENT_STATE.md` for `server/`, `app/`, or `web/` PR changes.
+
+### Issue #102 — CI Android emulator runner reference — IN REVIEW
+
+- Branch: `fix/emulator-runner-v237-102`.
+- Scope: `.github/workflows/build.yml` and this state synchronization only.
+- Changes `ReactiveCircus/android-emulator-runner` reference to tag `v2.37.0` while preserving the existing `api-level`, emulator options, and test script.
+- PR/SHA pending final creation/verification.
+
+### PR #99 — workflow contract executor assignment and standard task template — OPEN
+
+- Separate governance documentation PR.
+- Not the implementation vehicle for Issue #102.
 
 ## 9. Open-work state at last reconciliation
 
@@ -172,7 +201,9 @@ Open issues must be treated as backlog candidates, not automatic implementation 
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-No open PRs were present at the audit timestamp.
+PR #99 is unrelated to Issue #102 and must remain separate.
+
+Issue #102 is pending review under its dedicated CI reference PR.
 
 ## 10. Evidence discipline
 

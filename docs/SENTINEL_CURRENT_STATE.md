@@ -94,16 +94,17 @@ Merged into `main` as `2098279cd7cdb9185e8f8ca24a2c95ef27719468`; historical doc
 Merged into `main` as `ab64505bb35d32006aa2c98940e807f3f9d87508`. Added bounded rate-limit state, inactive-bucket eviction and deterministic regression tests.
 
 ### Issue #100 — CI state-sync enforcement — IN REVIEW
-Branch: `ci/state-sync-gate-100`. Adds a dedicated `state-sync` job to `.github/workflows/build.yml` that fails a PR changing `server/`, `app/`, or `web/` without changing `docs/SENTINEL_CURRENT_STATE.md`. Existing product jobs are otherwise preserved.
+PR #100, branch `ci/state-sync-gate-100`. Adds a dedicated `state-sync` job to `.github/workflows/build.yml` that fails a PR changing `server/`, `app/`, or `web/` without changing `docs/SENTINEL_CURRENT_STATE.md`. Existing product jobs are otherwise preserved.
 
-### Issue #102 — Android emulator runner reference fix — IN REVIEW
-PR #103, branch `fix/emulator-runner-v237-102`. Uses `ReactiveCircus/android-emulator-runner@v2.37.0` and preserves the emulator parameters/script. Cleanup deployment smoke syntax fix is retained.
+Current branch HEAD after the emulator-runner correction: `35169a700f23452a6a727e00165c7f196b14e2f2`.
+
+The branch now uses `ReactiveCircus/android-emulator-runner@v2.37.0`; the remaining workflow parameters and existing jobs are preserved.
 
 ## 9. Open-work state
 
 Open issues are backlog candidates, not automatic implementation instructions. Known external blockers include Firebase Test Lab IAM issues #59/#62.
 
-PR #100 and PR #103 remain unmerged and pending Owner review and exact-head CI verification. No merge or deploy was performed by this reconciliation.
+PR #100 remains unmerged and pending Owner review and exact-head CI verification. No merge or deploy was performed by this reconciliation.
 
 ## 10. Evidence discipline
 

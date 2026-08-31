@@ -10,6 +10,31 @@ permissions:
   contents: read
 
 jobs:
+  state-sync:
+    name: State sync governance
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require CURRENT_STATE update for product changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          if printf '%s\n' "$changed" | grep -Eq '^(server/|app/|web/)'; then
+            if ! printf '%s\n' "$changed" | grep -Fxq 'docs/SENTINEL_CURRENT_STATE.md'; then
+              echo 'FAIL: PR changes files under server/, app/, or web/ but does not update docs/SENTINEL_CURRENT_STATE.md.'
+              echo 'Update docs/SENTINEL_CURRENT_STATE.md in this PR and rerun CI.'
+              exit 1
+            fi
+          fi
+          echo 'State sync governance: PASS'
+
   verify:
     name: Repository verification
     runs-on: ubuntu-latest
@@ -193,7 +218,8 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon assembleRelease
+        run: |
+          ./gradlew --no-daemon assembleRelease
       - name: Verify release APK signature and fingerprint
         run: |
           set -euo pipefail

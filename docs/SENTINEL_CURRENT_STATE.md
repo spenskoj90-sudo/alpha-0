@@ -96,6 +96,10 @@ Merged into `main` as `ab64505bb35d32006aa2c98940e807f3f9d87508`. Added bounded 
 ### Issue #100 — CI state-sync enforcement — IN REVIEW
 PR #100, branch `ci/state-sync-gate-100`. Adds a dedicated `state-sync` job to `.github/workflows/build.yml` that fails a PR changing `server/`, `app/`, or `web/` without changing `docs/SENTINEL_CURRENT_STATE.md`. Existing product jobs are otherwise preserved.
 
+Current branch HEAD after the emulator-runner correction: `35169a700f23452a6a727e00165c7f196b14e2f2`.
+
+The branch now uses `ReactiveCircus/android-emulator-runner@v2.37.0`; the remaining workflow parameters and existing jobs are preserved.
+
 ## 9. Open-work state
 
 Open issues are backlog candidates, not automatic implementation instructions. Known external blockers include Firebase Test Lab IAM issues #59/#62.

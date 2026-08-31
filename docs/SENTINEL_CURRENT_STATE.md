@@ -8,11 +8,11 @@
 **Current product change on main:** PR #104 — bound and evict process-local rate-limit buckets (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.  
-> This file is the sole source of truth for current repository state. README, HANDOVER, PROJECT_STATE and audit snapshots must not be treated as current HEAD evidence.
+> This file is the sole source of truth for current repository state.
 
 ## 1. Binding evidence policy
 
-`docs/SENTINEL_EVIDENCE_PROTOCOL.md` v2 is binding. Claims are verified only against the exact SHA and corresponding evidence.
+`docs/SENTINEL_EVIDENCE_PROTOCOL.md` v2 is binding. CI and release claims are valid only for the exact SHA identified in the corresponding evidence.
 
 ## 2. Current repository facts
 
@@ -24,8 +24,7 @@
 - Device identity uses Android Keystore / EC P-256 with SHA-256 public-key fingerprinting.
 - Sessions use opaque tokens with hashed persistence and one-time refresh rotation.
 - Authorization is server-authoritative and default-deny.
-- PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured.
-- PostgresStore sets `app.service_role=true`; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
+- PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
 - Refresh rotation is transactional and row-locked.
 - `/v1/recommendations` requires `knowledge:recommend`.
 - `/v1/integrity/attest` performs server-side Play Integrity verification.
@@ -51,19 +50,19 @@ Historical green runs on other SHAs are not current evidence.
 ## 4. Module verification state
 
 ### `server/`
-Core tests, PostgreSQL integration, migrations, security and coverage gates were established on prior exact SHAs. Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. PR #104 added bounded rate-limit state and deterministic regression tests.
 
 ### `app/`
-Android unit/JVM tests, builds, instrumentation and signing verification were established on prior exact SHAs. Exact current-HEAD verification is **UNVERIFIED**.
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
 
 ### `web/`
-Lint and production build were established on prior exact SHAs. Exact current-HEAD verification is **UNVERIFIED**.
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
 
 ### `launcher/`
-Source tree exists; dedicated test/coverage evidence is **UNVERIFIED**.
+Dedicated test/coverage evidence is **UNVERIFIED**.
 
 ### `wow-addon/`
-Classic and Retail source trees exist; dedicated test/coverage evidence is **UNVERIFIED**.
+Dedicated test/coverage evidence is **UNVERIFIED**.
 
 ## 5. External activation state
 
@@ -73,8 +72,6 @@ Classic and Retail source trees exist; dedicated test/coverage evidence is **UNV
 - Release tag and GitHub Release publication when chosen by Owner.
 - Firebase Test Lab GCS `storage.objects.create` permission (issues #59/#62).
 - Branch-protection required-status configuration remains an operator/governance concern unless independently verified.
-
-These are external configuration/operator gates, not credentials to be handled in this workflow.
 
 ## 6. Explicit security invariants
 
@@ -106,7 +103,7 @@ PR #103, branch `fix/emulator-runner-v237-102`. Uses `ReactiveCircus/android-emu
 
 Open issues are backlog candidates, not automatic implementation instructions. Known external blockers include Firebase Test Lab IAM issues #59/#62.
 
-PR #100 and PR #103 remain unmerged and pending Owner review/CI verification. No merge or deploy was performed by this reconciliation.
+PR #100 and PR #103 remain unmerged and pending Owner review and exact-head CI verification. No merge or deploy was performed by this reconciliation.
 
 ## 10. Evidence discipline
 

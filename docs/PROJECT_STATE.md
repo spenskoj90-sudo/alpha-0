@@ -1,3 +1,5 @@
+ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+
 # SENTINEL — PROJECT STATE
 
 Single source of truth for current release-validation work. Update this file whenever exact product HEAD, P0/P1 status, or workflow structure changes.

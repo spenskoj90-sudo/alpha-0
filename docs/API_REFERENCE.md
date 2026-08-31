@@ -1,3 +1,5 @@
+ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+
 # SENTINEL API Reference v1
 
 Base URL: `/v1`

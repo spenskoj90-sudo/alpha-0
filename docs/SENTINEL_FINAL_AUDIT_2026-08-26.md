@@ -1,3 +1,5 @@
+ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+
 # SENTINEL — FINAL CLEAN-ROOM AUDIT RECONCILIATION
 
 **Date:** 2026-08-26  

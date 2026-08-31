@@ -4,8 +4,10 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Canonical HEAD (main):** `1df91de661c8bb0946d68f1671cbabf5f9714455`  
+**Current branch:** `feature/sentry-android-observability-7`  
+**Current branch HEAD:** `82c01ab7c801b4272f244c9ba6ee7fae788d3fa7`  
 **Prior documented product SHA:** `ab64505bb35d32006aa2c98940e807f3f9d87508`  
-**Current product change on main:** PR #100 state-sync gate + emulator pin (merged as 1df91de…)
+**Current product change on main:** PR #100 state-sync gate + emulator pin (merged as `1df91de…`)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.  
 > This file is the sole source of truth for current repository state.
@@ -31,7 +33,7 @@
 - Authentication has configurable failure tracking and lockout.
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets. This implementation is merged in PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
-- **Sentry Android SDK (issue #7)** is integrated on branch `feature/sentry-android-observability-7`: DSN via BuildConfig from CI secret only, privacy scrubbing enabled, documented in `docs/OBSERVABILITY.md`. Not yet merged to main.
+- **Sentry Android SDK (issue #7)** is integrated on branch `feature/sentry-android-observability-7`: DSN via BuildConfig from CI secret only, privacy scrubbing enabled, documented in `docs/OBSERVABILITY.md`. The Kotlin BuildConfig SENTRY_DSN expression has been corrected in commit `82c01ab…`; this branch change is not merged to main.
 
 ## 3. Current exact-HEAD CI evidence
 
@@ -54,7 +56,7 @@ Historical green runs on other SHAs are not current evidence.
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. PR #104 added bounded rate-limit state and deterministic regression tests.
 
 ### `app/`
-Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. Sentry integration lives on open PR (issue #7).
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. Sentry integration lives on open branch for issue #7; the latest branch commit fixes the Kotlin script syntax for `SENTRY_DSN`.
 
 ### `web/`
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
@@ -99,14 +101,14 @@ Merged into `main` as `ab64505bb35d32006aa2c98940e807f3f9d87508`. Added bounded 
 Merged into `main` as `1df91de661c8bb0946d68f1671cbabf5f9714455`. State-sync gate + emulator runner pin.
 
 ### Issue #7 — Sentry Android observability — IN PROGRESS
-Branch `feature/sentry-android-observability-7`. Adds Sentry SDK, privacy scrubbing, OBSERVABILITY.md, and secret injection for release builds only. Awaiting CI and Owner review; no merge performed by this work.
+Branch `feature/sentry-android-observability-7`, HEAD `82c01ab7c801b4272f244c9ba6ee7fae788d3fa7`. The branch contains the Sentry Android SDK integration, privacy scrubbing, observability documentation, release-only `SENTRY_DSN` injection, and the Kotlin DSL syntax correction for `SENTRY_DSN`. No merge performed by this work.
 
 ## 9. Open-work state
 
 Open issues are backlog candidates, not automatic implementation instructions. Known external blockers include Firebase Test Lab IAM issues #59/#62.
 
-No merge or deploy was performed by this reconciliation.
+Issue #7 remains in progress on the feature branch and requires CI/executor verification before Owner review. No merge or deploy was performed by this work.
 
 ## 10. Evidence discipline
 
-For CI, tests, coverage and release claims use exact commit SHA + workflow Run ID. For unresolved facts record **UNVERIFIED** rather than infer state from historical evidence.
+For CI, tests and release claims use exact commit SHA + workflow Run ID. For unresolved facts record **UNVERIFIED** rather than infer state from historical evidence.

@@ -4,14 +4,7 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 
 ## Canonical repository state
 
-- Canonical branch: `main`.
-- Current canonical HEAD: `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada`.
-- Branch/PR work is not accepted as product state until merged into `main` and revalidated at the resulting main SHA.
-- Architecture documents describe the target/contract and must not be treated as proof of runtime implementation.
-- The authoritative current-state record is `docs/SENTINEL_CURRENT_STATE.md`.
-- Evidence/acceptance rules are `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
-- Engineering decisions are recorded in `docs/SENTINEL_DECISION_LOG.md`.
-- Workflow contract: `docs/WORKFLOW_CONTRACT.md` (issue #14 complete).
+Актуальное состояние: см. `docs/SENTINEL_CURRENT_STATE.md`.
 
 ## MVP scope currently implemented on main
 
@@ -42,29 +35,6 @@ Authorization is server-side:
 `Identity + Role + Scope + Entitlement + Policy + Context -> ALLOW/DENY -> Audit`
 
 Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.md` and the full architecture reference `docs/ARCHITECTURE_V4.md`.
-
-## Current validation status
-
-**Canonical HEAD:** `596f10b8cc0395b31f1af6e6e343b1d52d3f7ada` (PR #86: workflow-contract strict docs sync).
-
-**Last completed full product CI** (SHA `00de9f972e67895557d2198965637728ac0a75a4`, PR #85 — least-privilege secrets audit):
-
-| Workflow | Run ID | Result |
-|----------|--------|--------|
-| Build & Test #352 | [33253833147](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833147) | success |
-| Security #270 | [33253833094](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833094) | success |
-| ALPHA-0 Android CI #1273 | [33253833092](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833092) | success |
-| P1 Evidence #179 | [33253833099](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33253833099) | success |
-
-Core unit coverage on that SHA: **82.09%** (78 tests passed, gate ≥80%). GitHub Emulator instrumentation: success. Signed release APK + fingerprint verify: success.
-
-**On current HEAD `596f10b8…` (docs-only):** Security #272 / run `33256189402` — success. Deploy remains expected-failure without `release.published`.
-
-Known external blockers (not repository defects):
-
-- Firebase Test Lab / GCS object-create (issues #59, #62).
-- Production `DATABASE_URL`, Play Integrity Google credentials, `DEPLOY_*` secrets.
-- Physical device acceptance (open PR #82).
 
 ## Runtime findings
 

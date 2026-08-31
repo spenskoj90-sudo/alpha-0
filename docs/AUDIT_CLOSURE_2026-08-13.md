@@ -1,3 +1,5 @@
+ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+
 # SENTINEL audit closure evidence — 2026-08-13
 
 ## Gate A — external secrets / keystore
@@ -16,6 +18,8 @@ Active release certificate SHA-256 fingerprint:
 `43:5A:F3:E5:7E:0B:0D:1F:AE:38:6B:B4:52:C3:45:F9:3A:4F:FD:83:56:AE:E9:D8:63:F5:EF:69:DD:26:BD:C1`
 
 The superseded fingerprint `1D:22:78:D0:BE:AB:77:7F:66:E1:96:15:47:F5:76:ED:51:6D:59:82:6D:75:81:B4:67:27:15:90:01:70:76:08` is no longer valid and must not be used as release evidence.
+
+Note: the fingerprint recorded above is historical for this 2026-08-13 snapshot. The current authoritative release fingerprint is maintained in `docs/SENTINEL_CURRENT_STATE.md` and CI workflows.
 
 ## External boundary — not part of CI closure
 

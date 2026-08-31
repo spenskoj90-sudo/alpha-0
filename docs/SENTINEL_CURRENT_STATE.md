@@ -1,13 +1,14 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-30  
+**State record:** 2026-08-31  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
-**Prior documented product SHA:** `77c42069956c5103c6065c108c6aaff4f61b1341`  
-**Current product change:** PR #96 — Android refresh-token lifecycle (merged)  
+**Canonical HEAD (main):** `df05742ec609fd8e73576dc83ff10e86b2a82319`  
+**Prior documented product SHA:** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
+**Current product change:** PR #99 — docs: define executor assignment and standard task template (merged)
 
-> Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
+> Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.  
+> This file is the **sole source of truth** for current repository state. README, HANDOVER, PROJECT_STATE and audit snapshots must not be treated as current HEAD evidence.
 
 ## 1. Binding evidence policy
 
@@ -33,76 +34,53 @@ CI and release claims below are valid only for the exact SHA identified in the c
 - Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
 - Android backup is disabled; cleartext traffic is disabled; network security config is present.
 - Release APK is minified/shrunk and CI verifies signing certificate fingerprint and rejects debuggable/debug artifacts.
+- Authoritative release certificate fingerprint: `2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`.
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
+Current `main` HEAD: `df05742ec609fd8e73576dc83ff10e86b2a82319` (docs-only merge of PR #99).
 
 | Workflow | Run ID | Result |
 |---|---|---|
-| Deploy | 33320881527 | failure (expected external pattern: `release.published` only / 0 jobs) |
-| Build & Test | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| Security | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| ALPHA-0 Android CI | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| P1 Evidence | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| Release Candidate Artifact | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
+| Deploy | UNVERIFIED at this SHA | expected external pattern when no `release.published` |
+| Build & Test | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
+| Security | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
+| ALPHA-0 Android CI | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
+| P1 Evidence | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
+| Release Candidate Artifact | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
 
-### Build & Test evidence
-
-The previous exact-head audit for `f37eb69c...` reported the core Android/Web/PostgreSQL/container/instrumentation gates as passing, but the corresponding run IDs were not independently re-extracted during this state sync. Treat those historical claims as **UNVERIFIED** until refreshed against the exact SHA.
-
-### Security evidence
-
-The previous exact-head audit reported Security passing on `f37eb69c...`, but the corresponding run ID was not independently re-extracted during this state sync. Treat the claim as **UNVERIFIED** until refreshed against the exact SHA.
-
-### P1 / release evidence
-
-Previous audit evidence reported P1 and Release Candidate Artifact success on `f37eb69c...`; exact run IDs were not independently re-extracted during this state sync. Treat those claims as **UNVERIFIED** until refreshed against the exact SHA.
-
-### Coverage
-
-Previous exact-head audit reported core coverage **82.09%** (1,312 statements, 235 missed, 78 tests passed), but the numeric report was not independently re-extracted in this state sync. Treat it as historical evidence for `f37eb69c...`, not as a newly verified claim.
-
-Lower-covered core components previously reported include:
-
-- `app/core/store.py`: 61%.
-- `app/core/user_store.py`: 77%.
-- `app/core/wow_api.py`: 62%.
-
-Coverage figures above refer to the backend/core coverage command and must not be interpreted as readiness percentages for other product modules.
+Historical product evidence on prior SHA `f37eb69c…` (PR #96) and earlier remains historical only. Treat any numeric coverage/run claims as **UNVERIFIED** for current HEAD until re-extracted against `df05742…`.
 
 ## 4. Module verification state
 
 ### `server/`
 
-Previous exact-head verification reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification on prior product SHAs reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `app/`
 
-Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `web/`
 
-Previous exact-head verification reported lint and production build passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification reported lint and production build. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `launcher/`
 
-Source tree exists. No dedicated test/coverage evidence was established in the current exact-head audit. Readiness is therefore **UNVERIFIED**.
+Source tree exists. No dedicated test/coverage evidence established. Readiness **UNVERIFIED**.
 
 ### `wow-addon/`
 
-Classic and Retail source trees exist. No dedicated test/coverage evidence was established in the current exact-head audit. Readiness is therefore **UNVERIFIED**.
+Classic and Retail source trees exist. No dedicated test/coverage evidence established. Readiness **UNVERIFIED**.
 
 ## 5. External activation state
 
-The repository passes the automated product/security gates above, but live external services still require operator configuration or acceptance:
-
 - Google Play Integrity audience/package/certificate and Google API authorization credentials.
 - Production `DATABASE_URL` and deployment secrets.
-- A real-device acceptance pass before public distribution.
-- A release tag and GitHub Release publication when the operator chooses the release channel.
+- Real-device acceptance pass before public distribution.
+- Release tag and GitHub Release publication when the operator chooses the release channel.
 - Firebase Test Lab GCS `storage.objects.create` permission (issues #59 / #62 remain open).
-- Branch-protection required-status-check configuration is not asserted here because current protection metadata was not independently verified in this state sync.
+- Branch-protection required-status-check configuration is not re-asserted in this state sync.
 
 These are deployment credentials/configuration or operator acceptance items, not missing repository implementation unless separately demonstrated by current evidence.
 
@@ -130,6 +108,7 @@ Do not silently change:
 
 - PR #83 merged: `docs/WORKFLOW_CONTRACT.md` introduced.
 - PR #84 and PR #86 synchronized the state/README governance requirements.
+- PR #99 merged: executor assignment and standard task template.
 
 ### Issue #9 — least-privilege / secrets boundary audit — COMPLETE
 
@@ -140,32 +119,37 @@ Do not silently change:
 ### PR #82 — physical-device diagnostic logging — MERGED
 
 - Merged into `main`.
-- Automated Android build/instrumentation/release verification was reported passing on its exact HEAD.
 - Real physical-device acceptance remains an external operator gate.
 
 ### PR #96 — Android refresh-token lifecycle — MERGED
 
 - Merged into `main` at `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
-- Added Android refresh auth client, serialized/persisted refresh lifecycle, session-manager integration and refresh lifecycle tests.
-- Current exact-head CI evidence must be independently refreshed before treating the merge as fully verified.
+- Current HEAD is subsequent docs merge `df05742…` (PR #99).
 
-### PR #99 — workflow contract executor assignment and task template — OPEN
+### PR #99 — workflow contract executor assignment — MERGED
 
-- Branch: `docs/workflow-contract-executor-assignment`.
-- Head: `8dde3998ce6fa55f4e5dd4b42e1745384a44e3fc`.
-- Changes are limited to workflow/task-governance documentation plus this state synchronization.
-- PR #99 is not merged.
+- Merged 2026-08-31T04:51:01Z into `main` as `df05742ec609fd8e73576dc83ff10e86b2a82319`.
+
+### Open PR (as of this state sync)
+
+- PR #100 (`ci/state-sync-gate-100`): CI governance — fail PR if code changes without CURRENT_STATE.md update. Head `2288fa5a6fe610b7793e61b135e8b44b5331c8aa`. Not merged.
 
 ## 9. Open-work state at last reconciliation
 
-Open issues must be treated as backlog candidates, not automatic implementation instructions. Historical issues require reconciliation against the current exact HEAD before execution.
+Open issues are backlog candidates, not automatic implementation instructions. Historical issues require reconciliation against the current exact HEAD before execution.
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-PR #99 is the only known open PR created by the current workflow cycle; it must not be treated as merged until independently verified.
+Open product-oriented issues include (non-exhaustive): #97 (bound rate-limit state), #89 (PostgreSQL refresh concurrency tests — PR #90 merged but issue remains open), #63, #60, #24, #22, and older lane issues #4–#13.
 
 ## 10. Evidence discipline
 
 For CI, tests, coverage, release artifacts and security claims, use exact commit SHA + workflow Run ID as evidence. Do not treat historical green runs on another SHA as evidence for current `main`.
 
 For unresolved facts, record `UNVERIFIED` rather than infer a state from source-tree presence or historical documentation.
+
+## 11. Documentation hygiene (this pass)
+
+- `README.md` no longer embeds canonical HEAD/SHA tables; it points here.
+- `HANDOVER_DOCUMENT.md` and selected historical docs are marked ARCHIVED.
+- `docs/CI_VALIDATION_NOTE.md` removed (25-byte placeholder).

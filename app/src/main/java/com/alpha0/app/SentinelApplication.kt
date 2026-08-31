@@ -58,7 +58,7 @@ class SentinelApplication : Application() {
                     }
                 }
             }
-            event.extra?.keys?.toList()?.forEach { key ->
+            event.extras.keys.toList().forEach { key ->
                 val lower = key.lowercase()
                 if (lower.contains("email") ||
                     lower.contains("token") ||
@@ -69,7 +69,7 @@ class SentinelApplication : Application() {
                     lower.contains("device_id") ||
                     lower.contains("fingerprint")
                 ) {
-                    event.extra?.remove(key)
+                    event.removeExtra(key)
                 }
             }
             // Drop any user object that might have been set later

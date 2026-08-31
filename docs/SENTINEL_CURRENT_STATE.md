@@ -5,7 +5,7 @@
 **Canonical branch:** `main`  
 **Canonical HEAD (main):** `1df91de661c8bb0946d68f1671cbabf5f9714455`  
 **Current branch:** `feature/sentry-android-observability-7`  
-**Current branch HEAD:** `da8cb06fe58d7b33c835e397a042d503e07abbd8`  
+**Current branch HEAD:** `85695dd2409030e49f428766e88b75d1bee47d12`  
 **Current product change on main:** PR #100 state-sync gate + emulator pin (merged as `1df91de…`)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
@@ -14,7 +14,7 @@
 
 ### Issue #7 — Sentry Android observability — IN PROGRESS
 
-Branch `feature/sentry-android-observability-7`. The branch contains the Sentry Android SDK integration, privacy scrubbing, observability documentation, release-only `SENTRY_DSN` injection, and Kotlin DSL BuildConfig interpolation fixes. `SentinelApplication.kt` uses the public Sentry `event.extras` collection with a nullable safe-call chain and `event.removeExtra(key)` for extra-data scrubbing. No merge performed.
+Branch `feature/sentry-android-observability-7`. The branch contains the Sentry Android SDK integration, privacy scrubbing, observability documentation, release-only `SENTRY_DSN` injection, Kotlin DSL BuildConfig interpolation fixes, and AndroidManifest Sentry auto-init disabled so initialization is controlled by `SentinelApplication.onCreate()`. No merge performed.
 
 ## Evidence discipline
 

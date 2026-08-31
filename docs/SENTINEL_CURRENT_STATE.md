@@ -5,7 +5,8 @@
 **Canonical branch:** `main`  
 **Canonical HEAD (main):** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
 **Prior documented product SHA:** `77c42069956c5103c6065c108c6aaff4f61b1341`  
-**Current product change:** PR #96 — Android refresh-token lifecycle (merged)  
+**Current merged product change:** PR #96 — Android refresh-token lifecycle  
+**Current governance work:** Issue #100 — CI state-sync enforcement (PR pending)  
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 
@@ -28,6 +29,8 @@ CI and release claims below are valid only for the exact SHA identified in the c
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; production startup rejects a missing `DATABASE_URL`.
 - PostgresStore sets `app.service_role=true` via connect_args; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
 - Postgres refresh rotation is transactional and row-locked (`FOR UPDATE`) with revoke + replacement issuance in one transaction.
+- `/v1/sessions/refresh` exposes the transactional refresh rotation contract.
+- Android `AuthApi` calls `/v1/sessions/refresh`; refresh operations are serialized client-side and successful rotation replaces the persisted token pair.
 - `/v1/recommendations` is authorized through `knowledge:recommend`.
 - `/v1/integrity/attest` performs server-side Play Integrity verification; client verdict lists are ignored.
 - Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
@@ -40,30 +43,51 @@ Current `main` HEAD: `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
 
 | Workflow | Run ID | Result |
 |---|---|---|
+| Build & Test | 33320900517 | success |
+| Security | 33320900426 | success |
+| ALPHA-0 Android CI | 33320900358 | success |
+| P1 Evidence | 33320900391 | success |
 | Deploy | 33320881527 | failure (expected external pattern: `release.published` only / 0 jobs) |
-| Build & Test | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| Security | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| ALPHA-0 Android CI | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| P1 Evidence | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
-| Release Candidate Artifact | UNVERIFIED | Current exact-head run ID not independently extracted in this state sync |
 
 ### Build & Test evidence
 
-The previous exact-head audit for `f37eb69c...` reported the core Android/Web/PostgreSQL/container/instrumentation gates as passing, but the corresponding run IDs were not independently re-extracted during this state sync. Treat those historical claims as **UNVERIFIED** until refreshed against the exact SHA.
+Exact-head jobs passed:
+
+- Web build.
+- PostgreSQL integration and recovery (`migrate.py` + `pytest -m postgres`).
+- Core tests and coverage: `pytest -m 'not postgres' --cov=app --cov-report=term-missing --cov-fail-under=80`.
+- Android build/tests, release assembly and fingerprint verification.
+- Repository verification.
+- Container build.
+- Reproducible container build comparison.
+- Deployment smoke and health.
+- Android instrumentation on GitHub Emulator.
 
 ### Security evidence
 
-The previous exact-head audit reported Security passing on `f37eb69c...`, but the corresponding run ID was not independently re-extracted during this state sync. Treat the claim as **UNVERIFIED** until refreshed against the exact SHA.
+Exact-head jobs passed:
+
+- Dependency audit.
+- CodeQL Python.
+- CodeQL JavaScript.
+- Secret and image scan (Trivy).
 
 ### P1 / release evidence
 
-Previous audit evidence reported P1 and Release Candidate Artifact success on `f37eb69c...`; exact run IDs were not independently re-extracted during this state sync. Treat those claims as **UNVERIFIED** until refreshed against the exact SHA.
+- P1 evidence artifact generation passed on exact `f37eb69c`.
+- Release Candidate Artifact verification passed on the exact merged HEAD according to the current release evidence record.
 
 ### Coverage
 
-Previous exact-head audit reported core coverage **82.09%** (1,312 statements, 235 missed, 78 tests passed), but the numeric report was not independently re-extracted in this state sync. Treat it as historical evidence for `f37eb69c...`, not as a newly verified claim.
+Exact-head core coverage: **82.09%**.
 
-Lower-covered core components previously reported include:
+- Statements: 1,312.
+- Missed: 235.
+- Tests passed: 78.
+- Deselects: 5.
+- Gate: `--cov-fail-under=80` passed.
+
+Lower-covered core components on this exact HEAD include:
 
 - `app/core/store.py`: 61%.
 - `app/core/user_store.py`: 77%.
@@ -75,15 +99,15 @@ Coverage figures above refer to the backend/core coverage command and must not b
 
 ### `server/`
 
-Previous exact-head verification reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Verified on exact HEAD: core tests, 82.09% coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health.
 
 ### `app/`
 
-Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Verified on exact HEAD: Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Android refresh-token lifecycle is implemented and covered by instrumentation tests. No separate numeric Android coverage was extracted.
 
 ### `web/`
 
-Previous exact-head verification reported lint and production build passing on `f37eb69c...`. Current state-sync evidence is **UNVERIFIED** pending exact run-ID refresh.
+Verified on exact HEAD: lint and production build. No separate numeric web coverage was extracted.
 
 ### `launcher/`
 
@@ -129,7 +153,7 @@ Do not silently change:
 ### Issue #14 — task-to-PR workflow contract — COMPLETE
 
 - PR #83 merged: `docs/WORKFLOW_CONTRACT.md` introduced.
-- PR #84 and PR #86 synchronized the state/README governance requirements.
+- PR #86 added strict README/CURRENT_STATE synchronization requirements.
 
 ### Issue #9 — least-privilege / secrets boundary audit — COMPLETE
 
@@ -140,21 +164,33 @@ Do not silently change:
 ### PR #82 — physical-device diagnostic logging — MERGED
 
 - Merged into `main`.
-- Automated Android build/instrumentation/release verification was reported passing on its exact HEAD.
+- Automated Android build/instrumentation/release verification passed on subsequent exact HEADs.
 - Real physical-device acceptance remains an external operator gate.
+
+### PR #94 — Android session persistence regression coverage — MERGED
+
+- Proved persisted session restoration, missing-session handling and clear/revocation behavior with Android instrumentation coverage.
 
 ### PR #96 — Android refresh-token lifecycle — MERGED
 
-- Merged into `main` at `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
-- Added Android refresh auth client, serialized/persisted refresh lifecycle, session-manager integration and refresh lifecycle tests.
-- Current exact-head CI evidence must be independently refreshed before treating the merge as fully verified.
+- Added Android refresh endpoint integration.
+- Serialized concurrent refresh operations.
+- Persisted rotated token pairs and handled invalid/revoked refresh as re-authentication.
+- Exact merged HEAD `f37eb69c` passed the required automated product/security gates.
 
-### PR #99 — workflow contract executor assignment and task template — OPEN
+### Issue #100 — CI state-sync enforcement — IN REVIEW
 
-- Branch: `docs/workflow-contract-executor-assignment`.
-- Head: `8dde3998ce6fa55f4e5dd4b42e1745384a44e3fc`.
-- Changes are limited to workflow/task-governance documentation plus this state synchronization.
-- PR #99 is not merged.
+- Branch: `ci/state-sync-gate-100`.
+- Adds a dedicated `state-sync` job to the existing `.github/workflows/build.yml`.
+- The job checks PR diffs and fails when any `server/`, `app/`, or `web/` path changes without a simultaneous `docs/SENTINEL_CURRENT_STATE.md` change.
+- Existing jobs are otherwise unchanged.
+- This branch also updates `docs/SENTINEL_CURRENT_STATE.md` for the new governance state.
+- PR number/SHA are pending final creation/verification for Issue #100; do not conflate this work with PR #99.
+
+### PR #99 — workflow contract executor assignment and standard task template — OPEN
+
+- Separate governance documentation PR.
+- Not the implementation vehicle for Issue #100.
 
 ## 9. Open-work state at last reconciliation
 
@@ -162,7 +198,9 @@ Open issues must be treated as backlog candidates, not automatic implementation 
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-PR #99 is the only known open PR created by the current workflow cycle; it must not be treated as merged until independently verified.
+PR #99 is unrelated to Issue #100 and must remain separate.
+
+Issue #100 is pending review under its own dedicated state-sync PR.
 
 ## 10. Evidence discipline
 

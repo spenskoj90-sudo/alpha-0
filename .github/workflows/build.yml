@@ -10,6 +10,31 @@ permissions:
   contents: read
 
 jobs:
+  state-sync:
+    name: State sync governance
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require CURRENT_STATE update for product changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          if printf '%s\n' "$changed" | grep -Eq '^(server/|app/|web/)'; then
+            if ! printf '%s\n' "$changed" | grep -Fxq 'docs/SENTINEL_CURRENT_STATE.md'; then
+              echo 'FAIL: PR changes files under server/, app/, or web/ but does not update docs/SENTINEL_CURRENT_STATE.md.'
+              echo 'Update docs/SENTINEL_CURRENT_STATE.md in this PR and rerun CI.'
+              exit 1
+            fi
+          fi
+          echo 'State sync governance: PASS'
+
   verify:
     name: Repository verification
     runs-on: ubuntu-latest
@@ -114,7 +139,6 @@ jobs:
           PY
           chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
           test -s "$RUNNER_TEMP/sentinel-release.jks"
-
       - name: Keystore file and format validity
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -122,7 +146,6 @@ jobs:
           set -euo pipefail
           set +x
           keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
-
       - name: Keystore store password validation
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -133,7 +156,6 @@ jobs:
           grep -q '^Keystore type:' "$RUNNER_TEMP/keystore-store-list.txt"
           echo "Store password validation: PASS"
           rm -f "$RUNNER_TEMP/keystore-store-list.txt"
-
       - name: Verify release key alias exists
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -150,7 +172,6 @@ jobs:
             exit 1
           fi
           echo "Alias validation: PASS"
-
       - name: Verify release key entry type
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -162,7 +183,6 @@ jobs:
           echo "Entry type: $entry"
           test "$entry" = "PrivateKeyEntry"
           echo "Entry type validation: PASS"
-
       - name: Extract release certificate fingerprint
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -178,7 +198,6 @@ jobs:
           echo "SHA-256 fingerprint: $actual"
           printf '%s\n' "$actual" > "$RUNNER_TEMP/release-fingerprint.txt"
           rm -f "$RUNNER_TEMP/release-cert.txt"
-
       - name: Compare keystore certificate fingerprint
         run: |
           set -euo pipefail
@@ -193,7 +212,6 @@ jobs:
             exit 1
           fi
           echo "RESULT: PASS"
-
       - name: Assemble signed release
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
@@ -202,7 +220,6 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           ./gradlew --no-daemon assembleRelease
-
       - name: Verify release APK signature and fingerprint
         run: |
           set -euo pipefail
@@ -222,11 +239,9 @@ jobs:
             exit 1
           fi
           echo "APK fingerprint comparison: PASS"
-
       - name: Cleanup temporary keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/sentinel-release.jks" "$RUNNER_TEMP/release-fingerprint.txt" "$RUNNER_TEMP/keystore-store-list.txt" "$RUNNER_TEMP/release-cert.txt"
-
       - name: Upload Android instrumentation artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -260,7 +275,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run Android instrumentation on API 35 emulator
-        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        uses: ReactiveCircus/android-emulator-runner@a421a43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 35
           target: google_apis

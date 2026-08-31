@@ -4,7 +4,7 @@ import os
 import secrets
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import deque
 from datetime import UTC, datetime
 from threading import Lock
 from typing import Any
@@ -100,17 +100,45 @@ policy_engine = AuthorizationEngine([
 
 
 class RateLimiter:
-    def __init__(self, limit: int = 120, window: int = 60) -> None:
-        self.limit, self.window = limit, window
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
+    """Process-local sliding-window rate limiter with bounded bucket count.
+
+    Inactive buckets (no hits inside the active window) are evicted before a
+    capacity check. Active buckets are never displaced to free capacity.
+    """
+
+    def __init__(self, limit: int = 120, window: int = 60, max_buckets: int | None = None) -> None:
+        self.limit = limit
+        self.window = window
+        if max_buckets is None:
+            max_buckets = int(os.getenv("RATE_LIMIT_MAX_BUCKETS", "10000"))
+        self.max_buckets = max(1, max_buckets)
+        self._hits: dict[str, deque[float]] = {}
         self._lock = Lock()
+
+    def _prune_inactive(self, now: float) -> None:
+        inactive = [key for key, q in self._hits.items() if not q or q[-1] <= now - self.window]
+        for key in inactive:
+            del self._hits[key]
 
     def allow(self, key: str) -> bool:
         now = time.monotonic()
         with self._lock:
-            q = self._hits[key]
-            while q and q[0] <= now - self.window:
-                q.popleft()
+            q = self._hits.get(key)
+            if q is not None:
+                while q and q[0] <= now - self.window:
+                    q.popleft()
+                if not q:
+                    del self._hits[key]
+                    q = None
+
+            if q is None:
+                if len(self._hits) >= self.max_buckets:
+                    self._prune_inactive(now)
+                if key not in self._hits and len(self._hits) >= self.max_buckets:
+                    # Capacity reached; active buckets are preserved.
+                    return False
+                q = self._hits.setdefault(key, deque())
+
             if len(q) >= self.limit:
                 return False
             q.append(now)

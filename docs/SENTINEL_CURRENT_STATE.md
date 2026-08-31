@@ -3,9 +3,9 @@
 **State record:** 2026-08-31  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `df05742ec609fd8e73576dc83ff10e86b2a82319`  
-**Prior documented product SHA:** `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`  
-**Current product change:** PR #99 — docs: define executor assignment and standard task template (merged)
+**Canonical HEAD (main):** `2098279cd7cdb9185e8f8ca24a2c95ef27719468`  
+**Prior documented product SHA:** `df05742ec609fd8e73576dc83ff10e86b2a82319`  
+**Current product change on main:** PR #101 — docs: sync CURRENT_STATE to main HEAD; archive historical docs
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.  
 > This file is the **sole source of truth** for current repository state. README, HANDOVER, PROJECT_STATE and audit snapshots must not be treated as current HEAD evidence.
@@ -32,13 +32,14 @@ CI and release claims below are valid only for the exact SHA identified in the c
 - `/v1/recommendations` is authorized through `knowledge:recommend`.
 - `/v1/integrity/attest` performs server-side Play Integrity verification; client verdict lists are ignored.
 - Authentication login has failure tracking and configurable lockout (`SENTINEL_AUTH_LOCKOUT_THRESHOLD`, default 8).
+- In-process `RateLimiter` is bounded (`RATE_LIMIT_MAX_BUCKETS`, default 10000) and evicts inactive buckets outside the active window; active buckets are never displaced for capacity. **Implementation is on branch `p1/bound-rate-limit-state-97` (issue #97); not yet merged to main.**
 - Android backup is disabled; cleartext traffic is disabled; network security config is present.
 - Release APK is minified/shrunk and CI verifies signing certificate fingerprint and rejects debuggable/debug artifacts.
 - Authoritative release certificate fingerprint: `2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E`.
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `df05742ec609fd8e73576dc83ff10e86b2a82319` (docs-only merge of PR #99).
+Current `main` HEAD: `2098279cd7cdb9185e8f8ca24a2c95ef27719468` (docs merge of PR #101).
 
 | Workflow | Run ID | Result |
 |---|---|---|
@@ -49,21 +50,21 @@ Current `main` HEAD: `df05742ec609fd8e73576dc83ff10e86b2a82319` (docs-only merge
 | P1 Evidence | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
 | Release Candidate Artifact | UNVERIFIED | exact-head run ID not independently extracted in this state sync |
 
-Historical product evidence on prior SHA `f37eb69c…` (PR #96) and earlier remains historical only. Treat any numeric coverage/run claims as **UNVERIFIED** for current HEAD until re-extracted against `df05742…`.
+Historical product evidence on prior SHAs remains historical only. Treat any numeric coverage/run claims as **UNVERIFIED** for current HEAD until re-extracted against `2098279…`.
 
 ## 4. Module verification state
 
 ### `server/`
 
-Previous exact-head verification on prior product SHAs reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification on prior product SHAs reported core tests, coverage gate, PostgreSQL integration/recovery, migrations, security, container build and runtime smoke/health. Current state-sync evidence for `2098279…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `app/`
 
-Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification reported Android unit/JVM tests, debug/release builds, instrumentation on GitHub Emulator, signing fingerprint verification and release artifact generation. Current state-sync evidence for `2098279…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `web/`
 
-Previous exact-head verification reported lint and production build. Current state-sync evidence for `df05742…` is **UNVERIFIED** pending exact run-ID refresh.
+Previous exact-head verification reported lint and production build. Current state-sync evidence for `2098279…` is **UNVERIFIED** pending exact run-ID refresh.
 
 ### `launcher/`
 
@@ -124,15 +125,26 @@ Do not silently change:
 ### PR #96 — Android refresh-token lifecycle — MERGED
 
 - Merged into `main` at `f37eb69c85aca7bb7ba143fd570ff19c495dcf03`.
-- Current HEAD is subsequent docs merge `df05742…` (PR #99).
 
 ### PR #99 — workflow contract executor assignment — MERGED
 
 - Merged 2026-08-31T04:51:01Z into `main` as `df05742ec609fd8e73576dc83ff10e86b2a82319`.
 
+### PR #101 — docs hygiene / CURRENT_STATE sync — MERGED
+
+- Merged into `main` as `2098279cd7cdb9185e8f8ca24a2c95ef27719468`.
+
+### Issue #97 — bound and evict process-local rate-limit state — IMPLEMENTATION ON BRANCH
+
+- Branch: `p1/bound-rate-limit-state-97` (fresh from main `2098279…`; do **not** reuse closed PR #98 / old `p1/bound-rate-limit-state`).
+- Changes: `server/app/main.py` (`RateLimiter` + `RATE_LIMIT_MAX_BUCKETS`), `server/tests/test_rate_limiter.py`, this state file.
+- Semantics: configurable max buckets (default 10000); inactive buckets outside the active window are evicted before capacity enforcement; active buckets are never displaced; existing Lock and sliding-window behaviour preserved.
+- Status: **not merged**; awaiting exact-head CI green and Final Integrator / Owner acceptance.
+
 ### Open PR (as of this state sync)
 
 - PR #100 (`ci/state-sync-gate-100`): CI governance — fail PR if code changes without CURRENT_STATE.md update. Head `2288fa5a6fe610b7793e61b135e8b44b5331c8aa`. Not merged.
+- PR for issue #97 will be opened from `p1/bound-rate-limit-state-97`.
 
 ## 9. Open-work state at last reconciliation
 
@@ -140,7 +152,7 @@ Open issues are backlog candidates, not automatic implementation instructions. H
 
 Known open external blocker: Firebase Test Lab GCS IAM issues #59 / #62.
 
-Open product-oriented issues include (non-exhaustive): #97 (bound rate-limit state), #89 (PostgreSQL refresh concurrency tests — PR #90 merged but issue remains open), #63, #60, #24, #22, and older lane issues #4–#13.
+Open product-oriented issues include (non-exhaustive): #97 (bound rate-limit state — implementation on branch), #89 (PostgreSQL refresh concurrency tests — PR #90 merged but issue remains open), #63, #60, #24, #22, and older lane issues #4–#13.
 
 ## 10. Evidence discipline
 

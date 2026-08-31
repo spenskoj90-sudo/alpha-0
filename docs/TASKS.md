@@ -1,42 +1,38 @@
 # Sentinel — Task Board
 
-Формат: `[ ]` открыта, `[~]` в работе (укажи кто и с какого момента), `[x]` закрыта (укажи SHA/PR подтверждения).
-Любой ИИ перед началом работы читает этот файл и берёт в работу только то, что здесь открыто.
-После завершения — сам обновляет статус здесь же, в том же коммите/PR, где сделана работа.
+Формат: `[ ]` открыта, `[~]` в работе, `[x]` закрыта (указывай SHA/PR подтверждения).
+Любой ИИ перед началом работы читает этот файл и берёт в работу только то, что здесь открыто. После завершения статус обновляется в том же PR.
 
-## Сейчас в фокусе
+## Закрыто на текущем main
 
-- [x] **Grok**, 2026-08-27. Release-hardening pass on `sentinel/release-hardening-2026-08-27` HEAD `5439e715175eb8444c12aa85b81cbb0e9385b2b3` (PR #68). Admin lockout, RLS negatives (non-owner probe), concurrent refresh (Memory + Postgres), integrity policy/nonce, StrongBox TEE fallback, emulator CI. **Exact-head CI:** Build & Test run `33069908061` SUCCESS (all product jobs including emulator + signed release APK). Security, P1 Evidence, ALPHA-0 Android CI PASS. **Not product state until merge + Owner/Final Integrator accept.**
+- [x] Issue #7 / PR #105 — Sentry Android runtime observability — merged at `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
+- [x] Issue #97 / PR #104 — bounded/evicted process-local rate-limit state — merged.
+- [x] PR #100 — CI state-sync governance gate — merged as `1df91de661c8bb0946d68f1671cbabf5f9714455`.
+- [x] PR #101 — repository hygiene / CURRENT_STATE synchronization — merged.
+- [x] PR #103 — ReactiveCircus Android emulator runner pin to `v2.37.0` — merged.
 
-- [x] Слияние canonical-ветки sentinel-ftl-2026-08-13 в main без потери данных — исторически закрыто; последующие main commits являются каноническим состоянием.
-- [x] P0 TCP-баг с обрывом TCP-соединения — закрыто PR #34 + real-device evidence.
-- [x] Repository hygiene (16 целевых веток) — 2026-08-22.
-- [x] p1-evidence.yml push-триггер — `3188aebeb0b717e06a18cf8c42fb50c4fad82f59`.
-- [x] Дублирующаяся нумерация миграций — `003_user_auth.sql`.
-- [x] Device Details revoke/rotate — PR #40 lineage.
-- [x] UI / финальная Sentinel design system — PR #46.
-- [~] Аномалия deploy.yml: файл содержит только `release.published`. Push-associated FAIL runs are non-product ghost records; origin of historical registration remains open but does not block product release.
-- [~] Repository hygiene — delete-candidates with `ahead_by=0` documented; deletion deferred (no branch-delete without Owner).
-- [~] PostgreSQL runtime persistence: CI path covered; **live/deployment SoR evidence remains open.**
-- [x] Security authorization: `POST /v1/recommendations` — main lineage + negative regression.
-- [ ] **CI governance: required status-check contexts for protected `main`.** Live metadata shows protection but empty named required checks. Owner/settings action; agents must not change governance without approval.
-- [x] Stale PR cleanup batches #1 and #2 — 2026-08-23.
-- [x] Battery optimization onboarding — PR #51; real-device UX still manual.
-- [x] Postgres/deployment evidence hardening — PR #57.
-- [~] **Firebase Test Lab / Tool Results API:** still blocked on GCP API enablement. Emulator path is the active CI instrumentation gate (PR #68).
+## Текущие открытые items
+
+- [ ] #63 — P1 preventive hardening after audit reconciliation: PostgreSQL security-negative coverage, Android lifecycle/session tests, FTL expansion, web/admin security regressions and schema-domain reconciliation. Requires separate issue-level approval before implementation.
+- [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker.**
+- [ ] #22 — repository governance: branch protection, CI secrets and historical branch cleanup. **Administrative/operator work.**
+- [ ] #13 — define PostHog telemetry contract.
+- [ ] #12 — define Supabase integration boundary and authorization model.
+- [ ] #11 — synchronize Figma design system with implementation.
+- [ ] #10 — establish measurable build/runtime performance baseline.
+- [ ] #8 — SENTINEL baseline consistency audit.
 
 ## Дальше по плану
 
-- [x] Android-навигация — PR #37 lineage.
-- [x] UI/визуальный дизайн — PR #46.
-- [x] Battery optimization onboarding — PR #51.
 - [ ] Админ-панель для пользователя — после MVP.
 - [ ] PC/WoW-клиент и лаунчер — после стабильного Android MVP.
 - [ ] Инфраструктура/сервер — локальный/бесплатный пока нет внешних пользователей.
 - [ ] Система приёма фидбека — GitHub Issues.
 
 ## Правила ведения файла
+
 - Не отмечать `[x]` без прямой ссылки на SHA/PR/CI run.
-- Не добавлять задачи из "Дальше по плану" без явного решения Owner.
+- Не добавлять новые задачи без явного решения Owner.
 - Governance/security acceptance gates не заменяются предположением.
-- FTL usage must be quota-aware; prefer emulator for routine CI.
+- FTL usage must be quota-aware; prefer the GitHub-hosted emulator for routine CI.
+- Current repository state is governed by `docs/SENTINEL_CURRENT_STATE.md`; historical documents are not current HEAD evidence.

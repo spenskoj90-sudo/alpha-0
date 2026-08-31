@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — 2026-08-31
+
+- **Sentry observability (#7 / PR #105):** integrated Sentry Android runtime crash reporting with release-only `SENTRY_DSN` injection, privacy scrubbing, and controlled initialization.
+- **Bounded rate-limit state (#97 / PR #104):** bounded and evicted inactive process-local rate-limit buckets while preserving active buckets and existing semantics.
+- **CI governance state-sync gate (#100) / repository hygiene (#101):** added enforcement that product-code PRs update `docs/SENTINEL_CURRENT_STATE.md` and synchronized repository documentation/state.
+- **Emulator runner fix (PR #103):** pinned `ReactiveCircus/android-emulator-runner` to `v2.37.0`.
+- **Repository hygiene cleanup:** reconciled current-state documentation and removed obsolete/historical ambiguity from active task tracking.
+
 ## Unreleased — 2026-08-27 (Grok / sentinel/release-hardening-2026-08-27)
 
 - Admin brute-force lockout and rate limiting on admin endpoints.

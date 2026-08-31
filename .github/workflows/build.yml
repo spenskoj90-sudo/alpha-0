@@ -318,4 +318,43 @@ jobs:
           grep -q device_bindings /tmp/schema-readiness.txt
       - name: Cleanup deployment smoke
         if: always()
-          
+        run: docker rm -f sentinel-api sentinel-postgres 2>/dev/null || true
+
+  reproducible-deployment:
+    name: Reproducible container build comparison
+    runs-on: ubuntu-latest
+    needs: [core, postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build artifact A
+        run: |
+          docker buildx build --load --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-a .
+          docker image inspect sentinel-core:repro-a --format '{{.Id}}' > /tmp/repro-a.id
+          docker image inspect sentinel-core:repro-a --format '{{json .RootFS.Layers}}' > /tmp/repro-a.layers
+      - name: Independent rebuild artifact B
+        run: |
+          docker buildx prune -af
+          docker buildx build --load --no-cache --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-b .
+          docker image inspect sentinel-core:repro-b --format '{{.Id}}' > /tmp/repro-b.id
+          docker image inspect sentinel-core:repro-b --format '{{json .RootFS.Layers}}' > /tmp/repro-b.layers
+      - name: Compare canonical runtime filesystem
+        run: |
+          set -euo pipefail
+          echo "raw artifact A image id: $(cat /tmp/repro-a.id)"
+          echo "raw artifact B image id: $(cat /tmp/repro-b.id)"
+          echo "raw artifact A layers: $(cat /tmp/repro-a.layers)"
+          echo "raw artifact B layers: $(cat /tmp/repro-b.layers)"
+          rm -rf /tmp/repro-root-a /tmp/repro-root-b
+          mkdir -p /tmp/repro-root-a /tmp/repro-root-b
+          docker create --name sentinel-repro-a sentinel-core:repro-a >/dev/null
+          docker create --name sentinel-repro-b sentinel-core:repro-b >/dev/null
+          docker export sentinel-repro-a > /tmp/repro-a.raw.tar
+          docker export sentinel-repro-b > /tmp/repro-b.raw.tar
+          tar -xpf /tmp/repro-a.raw.tar -C /tmp/repro-root-a
+          tar -xpf /tmp/repro-b.raw.tar -C /tmp/repro-root-b
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-a.canonical.tar -C /tmp/repro-root-a .
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner -cf /tmp/repro-b.canonical.tar -C /tmp/repro-root-b .
+          sha256sum /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
+          cmp /tmp/repro-a.canonical.tar /tmp/repro-b.canonical.tar
+          docker rm sentinel-repro-a sentinel-repro-b >/dev/null

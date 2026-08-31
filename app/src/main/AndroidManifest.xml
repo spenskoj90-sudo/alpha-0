@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
+        android:name=".SentinelApplication"
         android:allowBackup="false"
         android:label="ALPHA-0"
         android:supportsRtl="true"

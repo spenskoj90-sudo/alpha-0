@@ -3,9 +3,9 @@
 **State record:** 2026-08-31  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `ab64505bb35d32006aa2c98940e807f3f9d87508`  
-**Prior documented product SHA:** `2098279cd7cdb9185e8f8ca24a2c95ef27719468`  
-**Current product change on main:** PR #104 — bound and evict process-local rate-limit buckets (merged)
+**Canonical HEAD (main):** `1df91de661c8bb0946d68f1671cbabf5f9714455`  
+**Prior documented product SHA:** `ab64505bb35d32006aa2c98940e807f3f9d87508`  
+**Current product change on main:** PR #100 state-sync gate + emulator pin (merged as 1df91de…)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.  
 > This file is the sole source of truth for current repository state.
@@ -31,10 +31,11 @@
 - Authentication has configurable failure tracking and lockout.
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets. This implementation is merged in PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
+- **Sentry Android SDK (issue #7)** is integrated on branch `feature/sentry-android-observability-7`: DSN via BuildConfig from CI secret only, privacy scrubbing enabled, documented in `docs/OBSERVABILITY.md`. Not yet merged to main.
 
 ## 3. Current exact-HEAD CI evidence
 
-Current `main` HEAD: `ab64505bb35d32006aa2c98940e807f3f9d87508`.
+Current `main` HEAD: `1df91de661c8bb0946d68f1671cbabf5f9714455`.
 
 | Workflow | Result |
 |---|---|
@@ -53,7 +54,7 @@ Historical green runs on other SHAs are not current evidence.
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. PR #104 added bounded rate-limit state and deterministic regression tests.
 
 ### `app/`
-Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
+Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence. Sentry integration lives on open PR (issue #7).
 
 ### `web/`
 Exact current-HEAD verification is **UNVERIFIED** pending fresh CI evidence.
@@ -72,6 +73,7 @@ Dedicated test/coverage evidence is **UNVERIFIED**.
 - Release tag and GitHub Release publication when chosen by Owner.
 - Firebase Test Lab GCS `storage.objects.create` permission (issues #59/#62).
 - Branch-protection required-status configuration remains an operator/governance concern unless independently verified.
+- GitHub secret `SENTRY_DSN` (Owner must create before release builds emit Sentry events).
 
 ## 6. Explicit security invariants
 
@@ -93,18 +95,17 @@ Merged into `main` as `2098279cd7cdb9185e8f8ca24a2c95ef27719468`; historical doc
 ### PR #104 — bound and evict process-local rate-limit state — MERGED
 Merged into `main` as `ab64505bb35d32006aa2c98940e807f3f9d87508`. Added bounded rate-limit state, inactive-bucket eviction and deterministic regression tests.
 
-### Issue #100 — CI state-sync enforcement — IN REVIEW
-PR #100, branch `ci/state-sync-gate-100`. Adds a dedicated `state-sync` job to `.github/workflows/build.yml` that fails a PR changing `server/`, `app/`, or `web/` without changing `docs/SENTINEL_CURRENT_STATE.md`. Existing product jobs are otherwise preserved.
+### PR #100 — CI state-sync enforcement — MERGED
+Merged into `main` as `1df91de661c8bb0946d68f1671cbabf5f9714455`. State-sync gate + emulator runner pin.
 
-Current branch HEAD after the emulator-runner correction: `35169a700f23452a6a727e00165c7f196b14e2f2`.
-
-The branch now uses `ReactiveCircus/android-emulator-runner@v2.37.0`; the remaining workflow parameters and existing jobs are preserved.
+### Issue #7 — Sentry Android observability — IN PROGRESS
+Branch `feature/sentry-android-observability-7`. Adds Sentry SDK, privacy scrubbing, OBSERVABILITY.md, and secret injection for release builds only. Awaiting CI and Owner review; no merge performed by this work.
 
 ## 9. Open-work state
 
 Open issues are backlog candidates, not automatic implementation instructions. Known external blockers include Firebase Test Lab IAM issues #59/#62.
 
-PR #100 remains unmerged and pending Owner review and exact-head CI verification. No merge or deploy was performed by this reconciliation.
+No merge or deploy was performed by this reconciliation.
 
 ## 10. Evidence discipline
 

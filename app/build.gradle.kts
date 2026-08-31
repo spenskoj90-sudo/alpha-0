@@ -18,7 +18,8 @@ android {
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable(\"SENTINEL_API_BASE_URL\").orElse(\"http://127.0.0.1:8000\").get().trimEnd('/')}\"")
         // Sentry DSN: empty by default. CI release jobs inject secrets.SENTRY_DSN.
         // Never hardcode a real DSN in source or debug builds.
-        buildConfigField("String", "SENTRY_DSN", "\"${providers.environmentVariable(\"SENTRY_DSN\").orElse(\"\").get()}\"")
+        val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("")
+        buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
     }
 
     buildFeatures {

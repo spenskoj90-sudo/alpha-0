@@ -16,6 +16,10 @@ android {
         versionName = "1.0.0-RC2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
+        // Sentry DSN: empty by default. CI release jobs inject secrets.SENTRY_DSN.
+        // Never hardcode a real DSN in source or debug builds.
+        val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("")
+        buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
     }
 
     buildFeatures {
@@ -82,6 +86,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.play:integrity:1.4.0")
+    // Sentry Android SDK — runtime crash / error reporting (issue #7).
+    // Initialized only when BuildConfig.SENTRY_DSN is non-empty (release CI).
+    implementation("io.sentry:sentry-android:8.54.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

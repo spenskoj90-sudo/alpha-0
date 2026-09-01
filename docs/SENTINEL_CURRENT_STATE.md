@@ -1,10 +1,10 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-08-31  
+**State record:** 2026-09-01  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `38184d3cb8b81c1ff2470327de104e1cc57e50a9`  
-**Current product change on main:** PR #105 — Sentry Android runtime observability (merged)
+**Canonical HEAD (main):** `8af71e183f802fd156384268d128bef952100e07`  
+**Current product change on main:** PR #108 — docs(api): align API index with runtime (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -20,13 +20,14 @@
 - Sessions use opaque tokens with hashed persistence and one-time refresh rotation.
 - Authorization is server-authoritative and default-deny.
 - PostgreSQL is the production persistence implementation when `DATABASE_URL` is configured; FORCE RLS is applied by migration `004_p1_rls_force.sql`.
+- Production database hosting is Supabase (managed PostgreSQL, free tier) used exclusively via standard `DATABASE_URL`. Supabase Auth, managed RLS-as-service and other managed Supabase features are not used; authorization remains SENTINEL-native (see `docs/DEPLOYMENT.md` § Production database hosting).
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets; implemented by PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
 - Sentry Android SDK 8.54.0 is integrated for release runtime observability by PR #105. `SENTRY_DSN` is supplied only to release assembly jobs; debug/PR builds use an empty default. Privacy scrubbing is implemented in `SentinelApplication`, and Sentry auto-init is disabled so initialization is controlled by application code.
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `38184d3cb8b81c1ff2470327de104e1cc57e50a9`, the merge commit for PR #105.
+Current `main` HEAD is `8af71e183f802fd156384268d128bef952100e07`, the merge commit for PR #108 (API index alignment).
 
 Exact current-HEAD CI status and numeric coverage are **UNVERIFIED** in this state sync until fresh workflow Run IDs are independently extracted for this SHA. Historical green runs are not current evidence.
 
@@ -50,7 +51,7 @@ Dedicated test/coverage evidence: **UNVERIFIED**.
 ## 4. External activation state
 
 - Google Play Integrity audience/package/certificate and Google API authorization credentials.
-- Production `DATABASE_URL` and deployment secrets.
+- Production database: Supabase (secret configured).
 - Real-device acceptance before public distribution.
 - Release tag and GitHub Release publication when chosen by Owner.
 - Firebase Test Lab GCS `storage.objects.create` permission (issues #59/#62).
@@ -63,20 +64,22 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 6. Completed workflow state
 
+- **Issue #12 / docs PR — Supabase production database hosting boundary: COMPLETE (this PR).** Owner narrowed scope to hosting-only; full auth-model redesign is not required. Supabase is documented as Postgres hosting exclusively via `DATABASE_URL`; SENTINEL authorization model is unchanged.
 - **Issue #7 / PR #105 — Sentry Android runtime observability: COMPLETE / MERGED.** Merge commit `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
 - **Issue #97 / PR #104 — bounded and evicted process-local rate-limit state: COMPLETE / MERGED.**
 - **PR #100 — CI state-sync enforcement: COMPLETE / MERGED.** Merge commit `1df91de661c8bb0946d68f1671cbabf5f9714455`.
 - **PR #101 — repository documentation hygiene/state synchronization: COMPLETE / MERGED.**
 - **PR #103 — Android emulator runner pin: COMPLETE / MERGED.**
+- **PR #108 — docs(api): align API index with runtime: COMPLETE / MERGED.** Merge commit `8af71e183f802fd156384268d128bef952100e07`.
 
 ## 7. Open work
 
-Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #63, #59, #22, #13, #12, #11, #10, #8 and #107.
+Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #63, #59, #22, #13, #11, #10, #8 and #107 (issue #12 closed by this PR).
 
 - **#107 — Backend: implement characters/game-state domain (per ARCHITECTURE_V4): OPEN / planning.** The architectural target describes the character/game-state domain and candidate endpoints, but current runtime does not implement that domain. Implementation scope is intentionally tracked in #107 rather than inferred from `docs/API.md`.
 - #59 is the external Firebase Test Lab IAM blocker.
 - #22 is governance/administrative work.
-- #63, #13, #12, #11, #10 and #8 remain planning/backlog items unless separately approved.
+- #63, #13, #11, #10 and #8 remain planning/backlog items unless separately approved.
 
 ## 8. Evidence discipline
 

@@ -3,8 +3,8 @@
 **State record:** 2026-09-01  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `516c53862ee3fbf715f5891495f74d9127b13026`  
-**Current product change on main:** PR #112 — docs: historical branch hygiene complete (merged)
+**Canonical HEAD (main):** `4a2a987873e3c7248d1b18bd6711619c0eb80e80`  
+**Current product change on main:** PR #113 — docs: #22 branch protection complete; #63 backlog reconciled (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -27,7 +27,7 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `516c53862ee3fbf715f5891495f74d9127b13026`, the merge commit for PR #112.
+Current `main` HEAD is `4a2a987873e3c7248d1b18bd6711619c0eb80e80`, the merge commit for PR #113.
 
 Product CI claims for this SHA should be verified independently via Actions for workflows Build & Test, Security, ALPHA-0 Android CI, and P1 Evidence. Deploy remains expected-failure without external DEPLOY_* secrets.
 
@@ -63,8 +63,8 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 ## 6. Completed workflow state
 
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
-- **PR #112 — docs: historical branch hygiene complete: COMPLETE / MERGED.** `516c53862ee3fbf715f5891495f74d9127b13026`.
-- **PR #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as previously recorded.
+- **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019 reconciliation; residual optional work out of scope; schema-domain moved to #107.
+- **PR #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as previously recorded.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -83,7 +83,7 @@ Required status checks on `main` (job names as shown in GitHub UI):
 
 Also enabled: require branches up to date before merging. Deploy is intentionally **not** required.
 
-## 8. Issue #63 reconciliation (2026-09-01)
+## 8. Issue #63 reconciliation (closed 2026-09-01)
 
 | Backlog item | Status | Evidence on main |
 |--------------|--------|------------------|
@@ -95,13 +95,12 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 | 6 Web/admin security regressions | Minimal done | `route.test.ts` entitlements (PR #92 lineage) |
 | 7 Schema-domain reconciliation | Moved | #107 |
 
-Residual under #63 only if Owner wants more IDOR depth or Android process-death/revoke tests; otherwise #63 may be closed as substantially complete.
+**Closed by Owner 2026-09-01.** Residual optional (deeper IDOR, Android process-death/revoke) left out of scope.
 
 ## 9. Open work
 
-- **#107** — characters/game-state domain (planning; needs intake).
+- **#107** — characters/game-state domain **IN PROGRESS** (Phase 1 MVP: store + GET characters/games/access routes + IDOR/auth). Phase 2 event→projection later.
 - **#59** — FTL IAM (external; optional given emulator CI).
-- **#63** — residual optional (see §8).
 - **#13, #11, #10, #8** — backlog unless approved.
 
 ## 10. Evidence discipline

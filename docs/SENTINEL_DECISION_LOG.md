@@ -118,3 +118,9 @@
 - Blocked/optional: FTL expansion → #59 + D-013.
 - Residual optional: deeper IDOR negatives; Android process-death + revoke session tests.  
 **Reason:** Avoid re-implementing work already on main; keep #63 open only for explicit residual Owner chooses.
+
+## D-020 — Issue #63 closed as completed
+
+**Date:** 2026-09-01  
+**Decision:** Owner directed close of #63 after D-019 reconciliation. Residual optional work (deeper IDOR, Android process-death/revoke) explicitly out of scope. Schema-domain continues under #107. FTL remains optional via #59 / D-013.  
+**Effect:** #63 marked COMPLETE in TASKS and CURRENT_STATE; next priority is #107 Phase 1 MVP (characters/game-state read APIs).

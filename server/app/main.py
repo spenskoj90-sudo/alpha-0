@@ -490,7 +490,7 @@ def refresh_session(payload: RefreshRequest):
         user_scopes = {"character:read", "game:read", "audit:read"}
         user_store.restrict_session_scopes(store, access, user_scopes)
         scopes = sorted(user_scopes)
-    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=scopes)
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
 
 
 @app.post("/v1/sessions/revoke")

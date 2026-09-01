@@ -3,8 +3,8 @@
 **State record:** 2026-09-01  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`  
-**Current product change on main:** PR #111 — docs: record #22 branch cleanup decision (merged)
+**Canonical HEAD (main):** `516c53862ee3fbf715f5891495f74d9127b13026`  
+**Current product change on main:** PR #112 — docs: historical branch hygiene complete (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -27,38 +27,24 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`, the merge commit for PR #111.
+Current `main` HEAD is `516c53862ee3fbf715f5891495f74d9127b13026`, the merge commit for PR #112.
 
-Product CI on this exact SHA (as of state record):
+Product CI claims for this SHA should be verified independently via Actions for workflows Build & Test, Security, ALPHA-0 Android CI, and P1 Evidence. Deploy remains expected-failure without external DEPLOY_* secrets.
 
-| Workflow | Run ID | Conclusion |
-|----------|--------|------------|
-| Security | 33522199485 | success |
-| ALPHA-0 Android CI | 33522199687 | success |
-| P1 Evidence | 33522199461 | success |
-| Release Candidate Artifact | 33522199804 | success |
-| Build & Test | 33522199541 | confirm completion independently if still pending |
-| Deploy | 33522197309 | failure (expected — external DEPLOY_* secrets) |
-
-Prior HEAD `cd87d409…` (PR #110): Build & Test run `33517848953` = **success**.
-
-Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID for the current HEAD is independently confirmed.
+Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID for this HEAD is independently confirmed.
 
 ## 3. Module verification state
 
 ### `server/`
-Rate-limit bounding/eviction is merged in PR #104.
+Rate-limit bounding/eviction is merged in PR #104. Security-negative, RLS, and postgres refresh concurrency coverage exist under `server/tests/`.
 
 ### `app/`
-Sentry Android runtime observability is merged in PR #105. Android CI on HEAD `23ee6d2d…`: success (run 33522199687).
+Sentry Android runtime observability is merged in PR #105. Client refresh lifecycle and session persistence tests exist (PR #94/#96 lineage).
 
 ### `web/`
-Follows Build & Test result for current HEAD.
+Admin entitlements route test present (`web/app/api/admin/entitlements/route.test.ts`).
 
-### `launcher/`
-Dedicated test/coverage evidence: **UNVERIFIED**.
-
-### `wow-addon/`
+### `launcher/` / `wow-addon/`
 Dedicated test/coverage evidence: **UNVERIFIED**.
 
 ## 4. External activation state
@@ -67,9 +53,8 @@ Dedicated test/coverage evidence: **UNVERIFIED**.
 - Production database: Supabase (secret configured).
 - Real-device acceptance before public distribution.
 - Release tag and GitHub Release publication when chosen by Owner.
-- Firebase Test Lab GCS `storage.objects.create` permission (issues #59).
+- Firebase Test Lab GCS `storage.objects.create` permission (issue #59).
 - GitHub repository secret `SENTRY_DSN` before release builds emit Sentry events.
-- Branch-protection required-status configuration remains an operator/governance concern unless independently verified.
 
 ## 5. Explicit security invariants
 
@@ -77,44 +62,51 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 6. Completed workflow state
 
-- **PR #111 — docs: record #22 branch cleanup decision: COMPLETE / MERGED.** Merge commit `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
-- **PR #110 — docs sync after #109: COMPLETE / MERGED.** Merge commit `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
-- **Issue #12 / PR #109 — Supabase production database hosting boundary: COMPLETE / MERGED.** Merge commit `7f795596df6d7d0362fa2113aafe74daa167cd81`.
-- **Issue #7 / PR #105 — Sentry Android runtime observability: COMPLETE / MERGED.** Merge commit `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
-- **Issue #97 / PR #104 — bounded and evicted process-local rate-limit state: COMPLETE / MERGED.**
-- **PR #100 — CI state-sync enforcement: COMPLETE / MERGED.** Merge commit `1df91de661c8bb0946d68f1671cbabf5f9714455`.
-- **PR #101 — repository documentation hygiene/state synchronization: COMPLETE / MERGED.**
-- **PR #103 — Android emulator runner pin: COMPLETE / MERGED.**
-- **PR #108 — docs(api): align API index with runtime: COMPLETE / MERGED.** Merge commit `8af71e183f802fd156384268d128bef952100e07`.
+- **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
+- **PR #112 — docs: historical branch hygiene complete: COMPLETE / MERGED.** `516c53862ee3fbf715f5891495f74d9127b13026`.
+- **PR #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as previously recorded.
 
-## 7. Branch hygiene (issue #22) — COMPLETE 2026-09-01
+## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
-**Live branch inventory (verified after Owner deletes):** only `main` exists. No historical feature/docs/ci/p1/ui/security branches remain.
+Required status checks on `main` (job names as shown in GitHub UI):
 
-Classification and Owner execution:
+- Secret and image scan
+- Core tests and coverage
+- Android build and tests
+- Dependency audit
+- Web build
+- CodeQL
+- Build Android APK
+- P1 evidence artifacts
+- PostgreSQL integration and recovery
+- Repository verification
 
-| Group | Action | Count |
-|-------|--------|-------|
-| 1 — tip ancestor of main | Deleted by Owner | 4 |
-| 2 — squash-merged content on main | Deleted by Owner | 6 |
-| 3 — manual comparison (PR #82 / UI tokens on main) | Deleted by Owner after comparison | 3 |
+Also enabled: require branches up to date before merging. Deploy is intentionally **not** required.
 
-Group 3 evidence: `feature/physical-device-diagnostics-2026-08-29` content on main via PR #82 (`DiagnosticLogger` + instrumentation); UI observation branches superseded by `DesignTokens.kt` / `SentinelTheme.kt` on main.
+## 8. Issue #63 reconciliation (2026-09-01)
 
-**Remaining for #22:** configure required status checks / branch protection on `main` (operator-only). Historical branch cleanup is done.
+| Backlog item | Status | Evidence on main |
+|--------------|--------|------------------|
+| 1 PostgreSQL security-negative / concurrent refresh | Mostly done | `test_security_negative.py`, `test_rls_policies.py`, `test_postgres_refresh_concurrency.py`, `test_service_role_boundary.py` |
+| 2 Android lifecycle/session tests | Partial | `SecureSessionStorePersistenceTest`, `SessionManagerInstrumentedTest`, `AuthApiRefreshInstrumentedTest`; deeper process-death + revoke residual |
+| 3 Client refresh-token lifecycle | Done | PR #96 |
+| 4 Bound/evict rate-limit | Done | PR #104 |
+| 5 FTL instrumentation expansion | Blocked | #59; routine CI uses emulator (D-013) |
+| 6 Web/admin security regressions | Minimal done | `route.test.ts` entitlements (PR #92 lineage) |
+| 7 Schema-domain reconciliation | Moved | #107 |
 
-## 8. Open work
+Residual under #63 only if Owner wants more IDOR depth or Android process-death/revoke tests; otherwise #63 may be closed as substantially complete.
 
-Current open issues: #107, #63, #59, #22, #13, #11, #10, #8.
+## 9. Open work
 
-- **#107** — Backend characters/game-state domain: OPEN / planning.
-- **#59** — external Firebase Test Lab IAM blocker.
-- **#22** — governance: historical branch cleanup **COMPLETE**; branch-protection required checks still open (operator).
-- #63, #13, #11, #10, #8 — planning/backlog unless separately approved.
+- **#107** — characters/game-state domain (planning; needs intake).
+- **#59** — FTL IAM (external; optional given emulator CI).
+- **#63** — residual optional (see §8).
+- **#13, #11, #10, #8** — backlog unless approved.
 
-## 9. Evidence discipline
+## 10. Evidence discipline
 
-For CI, tests, coverage and release claims use exact commit SHA + workflow Run ID. For unresolved facts record **UNVERIFIED** rather than infer state from historical evidence.
+For CI, tests, coverage and release claims use exact commit SHA + workflow Run ID. For unresolved facts record **UNVERIFIED**.
 
 **Final Integrator:** GPT / ChatGPT.  
 **Human Owner:** absolute final authority for acceptance, scope, release, credentials, and destructive repository cleanup.

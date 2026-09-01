@@ -61,6 +61,12 @@ class Store(ABC):
     def list_entitlements(self, user_id: str | None = None) -> list[dict[str, Any]]: ...
     @abstractmethod
     def create_entitlement(self, item: dict[str, Any]) -> dict[str, Any]: ...
+    @abstractmethod
+    def list_characters(self, user_id: str) -> list[dict[str, Any]]: ...
+    @abstractmethod
+    def get_character(self, character_id: str) -> dict[str, Any] | None: ...
+    @abstractmethod
+    def upsert_character(self, item: dict[str, Any]) -> dict[str, Any]: ...
 
 
 class MemoryStore(Store):
@@ -76,6 +82,7 @@ class MemoryStore(Store):
         self.audit: list[dict[str, Any]] = []
         self.failures: list[tuple[str, float]] = []
         self.entitlements: dict[str, list[dict[str, Any]]] = {}
+        self.characters: dict[str, dict[str, Any]] = {}
         self.lock = Lock()
 
     def register_device(self, user_id, platform, public_key_b64, fingerprint, challenge):
@@ -212,6 +219,43 @@ class MemoryStore(Store):
             self.entitlements.setdefault(item["user_id"], []).append(item)
         return item
 
+    def list_characters(self, user_id: str) -> list[dict[str, Any]]:
+        with self.lock:
+            return [dict(item) for item in self.characters.values() if item["user_id"] == user_id]
+
+    def get_character(self, character_id: str) -> dict[str, Any] | None:
+        with self.lock:
+            item = self.characters.get(character_id)
+            return dict(item) if item else None
+
+    def upsert_character(self, item: dict[str, Any]) -> dict[str, Any]:
+        character_id = item.get("id") or str(uuid.uuid4())
+        record = {
+            "id": character_id,
+            "user_id": item["user_id"],
+            "game_id": item["game_id"],
+            "external_id": item["external_id"],
+            "name": item["name"],
+            "version": int(item.get("version", 0)),
+            "state_json": item.get("state_json") if isinstance(item.get("state_json"), dict) else {},
+            "updated_at": item.get("updated_at") or datetime.now(UTC).isoformat(),
+        }
+        with self.lock:
+            # unique (user_id, game_id, external_id)
+            for existing_id, existing in list(self.characters.items()):
+                if (
+                    existing["user_id"] == record["user_id"]
+                    and existing["game_id"] == record["game_id"]
+                    and existing["external_id"] == record["external_id"]
+                    and existing_id != character_id
+                ):
+                    del self.characters[existing_id]
+                    record["id"] = existing_id
+                    character_id = existing_id
+                    break
+            self.characters[character_id] = record
+        return dict(record)
+
 
 class PostgresStore(Store):
     def __init__(self, database_url: str) -> None:
@@ -271,10 +315,7 @@ class PostgresStore(Store):
         return {"user_id": row["user_handle"], "device_id": row["device_id"], "scopes": scopes, "roles": ["user"], "expires_at": row["expires_at"].timestamp(), "revoked": False}
 
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
-        """Atomic rotation: lock, validate, revoke, insert replacement — single transaction.
-
-        If issuance fails, the whole transaction rolls back and the old refresh remains valid.
-        """
+        """Atomic rotation: lock, validate, revoke, insert replacement — single transaction."""
         access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
         now = datetime.now(UTC)
         exp = now + timedelta(seconds=access_ttl)
@@ -296,7 +337,6 @@ class PostgresStore(Store):
                 {"id": row["session_id"]},
             )
             device_id = row["device_id"]
-            # device_id may be NULL for pure account sessions
             conn.execute(
                 text(
                     "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
@@ -382,3 +422,94 @@ class PostgresStore(Store):
                 identity_id = conn.execute(text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}).scalar_one()
             conn.execute(text("INSERT INTO entitlements(id,identity_id,game_id,source,status,valid_from,valid_until) VALUES (:id,:uid,:gid,:source,:status,:vf,:vu)"), {"id": item["id"], "uid": identity_id, "gid": item["game_id"], "source": item["source"], "status": item["status"], "vf": item["valid_from"], "vu": item["valid_until"]})
         return item
+
+    def list_characters(self, user_id: str) -> list[dict[str, Any]]:
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT c.id::text id, i.user_handle user_id, c.game_id, c.external_id, c.name, "
+                    "c.version, c.state_json, c.updated_at "
+                    "FROM characters c JOIN identities i ON i.id=c.identity_id "
+                    "WHERE i.user_handle=:u ORDER BY c.updated_at DESC"
+                ),
+                {"u": user_id},
+            ).mappings().all()
+        result = []
+        for row in rows:
+            item = dict(row)
+            state = item.get("state_json")
+            if isinstance(state, str):
+                item["state_json"] = json.loads(state)
+            if item.get("updated_at") is not None:
+                item["updated_at"] = item["updated_at"].isoformat()
+            result.append(item)
+        return result
+
+    def get_character(self, character_id: str) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT c.id::text id, i.user_handle user_id, c.game_id, c.external_id, c.name, "
+                    "c.version, c.state_json, c.updated_at "
+                    "FROM characters c JOIN identities i ON i.id=c.identity_id "
+                    "WHERE c.id=:id"
+                ),
+                {"id": character_id},
+            ).mappings().first()
+        if not row:
+            return None
+        item = dict(row)
+        state = item.get("state_json")
+        if isinstance(state, str):
+            item["state_json"] = json.loads(state)
+        if item.get("updated_at") is not None:
+            item["updated_at"] = item["updated_at"].isoformat()
+        return item
+
+    def upsert_character(self, item: dict[str, Any]) -> dict[str, Any]:
+        character_id = item.get("id") or str(uuid.uuid4())
+        state_json = item.get("state_json") if isinstance(item.get("state_json"), dict) else {}
+        version = int(item.get("version", 0))
+        with self.engine.begin() as conn:
+            identity_id = conn.execute(text("SELECT id FROM identities WHERE user_handle=:u"), {"u": item["user_id"]}).scalar_one_or_none()
+            if not identity_id:
+                identity_id = conn.execute(text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}).scalar_one()
+            conn.execute(
+                text(
+                    "INSERT INTO characters(id, identity_id, game_id, external_id, name, version, state_json, updated_at) "
+                    "VALUES (:id, :uid, :gid, :ext, :name, :ver, CAST(:state AS jsonb), now()) "
+                    "ON CONFLICT (identity_id, game_id, external_id) DO UPDATE SET "
+                    "name=EXCLUDED.name, version=EXCLUDED.version, state_json=EXCLUDED.state_json, updated_at=now() "
+                    "RETURNING id::text"
+                ),
+                {
+                    "id": character_id,
+                    "uid": identity_id,
+                    "gid": item["game_id"],
+                    "ext": item["external_id"],
+                    "name": item["name"],
+                    "ver": version,
+                    "state": json.dumps(state_json),
+                },
+            )
+        loaded = self.get_character(character_id)
+        if loaded:
+            return loaded
+        # Conflict path may have kept prior UUID — resolve by natural key
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT c.id::text FROM characters c JOIN identities i ON i.id=c.identity_id "
+                    "WHERE i.user_handle=:u AND c.game_id=:g AND c.external_id=:e"
+                ),
+                {"u": item["user_id"], "g": item["game_id"], "e": item["external_id"]},
+            ).scalar_one()
+        return self.get_character(row) or {
+            "id": row,
+            "user_id": item["user_id"],
+            "game_id": item["game_id"],
+            "external_id": item["external_id"],
+            "name": item["name"],
+            "version": version,
+            "state_json": state_json,
+        }

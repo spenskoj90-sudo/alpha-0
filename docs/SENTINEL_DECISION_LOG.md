@@ -28,7 +28,8 @@
 
 **Date:** 2026-08-17  
 **Decision:** Do not delete/close historical branches or PRs until current AI handoffs are incorporated and each branch is classified.  
-**Reason:** Some branches contain potentially reusable implementation that may be the shortest path to the canonical state.
+**Reason:** Some branches contain potentially reusable implementation that may be the shortest path to the canonical state.  
+**Status:** Partially superseded by **D-016** for classified groups 1+2 only.
 
 ## D-006 — Signing/keystore handling
 
@@ -86,3 +87,14 @@
 **Date:** 2026-08-27  
 **Decision:** PR #68 may merge only after exact-head product CI green **and** explicit Owner / Final Integrator accept. Agents must not merge.  
 **Evidence:** HEAD `5439e715175eb8444c12aa85b81cbb0e9385b2b3`, Build & Test `33069908061` SUCCESS.
+
+## D-016 — Historical branch cleanup groups 1+2 (issue #22)
+
+**Date:** 2026-09-01  
+**Decision:** Human Owner approved deletion of classified historical branches **groups 1+2** (10 branches). **Group 3** (3 branches) is retained until Owner completes manual comparison.  
+**Scope:**
+- Group 1 (tip ancestor of main): `ci/state-sync-gate-100-rebased`, `docs/supabase-hosting-sync`, `docs/workflow-contract-14`, `fix/emulator-runner-tag-102`
+- Group 2 (squash-merged content on main): `p1/android-refresh-lifecycle-95`, `p1/android-session-persistence-93`, `p1/issue-89-refresh-concurrency`, `docs/hygiene-archive-state-sync-2026-08-31`, `docs/workflow-contract-executor-assignment`, `security/least-privilege-secrets-audit-9-clean`
+- Group 3 (retain): `feature/physical-device-diagnostics-2026-08-29`, `ui/sentinel-observation-point-2026-08-23`, `ui/sentinel-observation-visual-system-2026-08-23`
+**Execution:** Deletion is performed only by Human Owner. Agents do not delete refs. Full lists and tip SHAs are recorded in `docs/SENTINEL_CURRENT_STATE.md` §7.  
+**Reason:** Classification complete; unique product work for groups 1+2 is already on `main`. D-005 no longer blocks these specific deletes.

@@ -15,12 +15,13 @@
 - [x] PR #110 — docs sync CURRENT_STATE/TASKS after #109 — merged at `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
 - [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
 - [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
-- [x] **#22 repository governance COMPLETE** — branch cleanup (groups 1–3) + required status checks on `main` (Owner 2026-09-01). Checks: Secret and image scan; Core tests and coverage; Android build and tests; Dependency audit; Web build; CodeQL; Build Android APK; P1 evidence artifacts; PostgreSQL integration and recovery; Repository verification.
+- [x] PR #113 — docs: #22 branch protection complete; #63 backlog reconciled — merged at `4a2a987873e3c7248d1b18bd6711619c0eb80e80`.
+- [x] **#22 repository governance COMPLETE** — branch cleanup (groups 1–3) + required status checks on `main` (Owner 2026-09-01).
+- [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation. Residual optional (deeper IDOR, Android process-death/revoke) out of scope; schema-domain moved to #107; FTL remains optional via #59 / D-013.
 
 ## Текущие открытые items
 
-- [ ] #107 — Backend: implement characters/game-state domain (per ARCHITECTURE_V4). OPEN / planning. Requires issue-level approval and intake before implementation.
-- [~] #63 — P1 preventive hardening: **reconciled 2026-09-01**. Items 3–4 and most of 1/6 done on main; item 7 → #107; item 5 blocked on #59. Residual optional: deeper Postgres IDOR, Android process-death/revoke tests. Owner may close #63 if residual out of scope.
+- [~] **#107** — Backend: implement characters/game-state domain (per ARCHITECTURE_V4). **IN PROGRESS / Phase 1 MVP**. Store methods + read APIs (GET /v1/characters, /v1/games, /v1/games/{id}/access) + IDOR/auth. Phase 2 event→projection later.
 - [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker** (optional given emulator CI / D-013).
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.

@@ -36,6 +36,14 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 - `POST /v1/integrity/nonce` — issue a short-lived server nonce for integrity attestation.
 - `POST /v1/integrity/attest` — consume the nonce and perform server-side Play Integrity verification; client verdicts are not trusted.
 
+## Characters and game catalog (Phase 1 — issue #107)
+
+- `GET /v1/characters` — list characters owned by the authenticated caller.
+- `GET /v1/characters/{character_id}` — return one caller-owned character (IDOR-protected).
+- `GET /v1/games` — list the current game catalog for an authenticated caller with `game:read`.
+- `GET /v1/games/{game_id}` — return a single game definition.
+- `GET /v1/games/{game_id}/access` — return whether the caller has an active entitlement for the game.
+
 ## Current catalog / entitlement administration
 
 - `GET /v1/admin/games` — list the current game catalog for an authorized administrator.
@@ -59,15 +67,13 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 
 ## Planned / not yet implemented
 
-The following routes are architectural/documentation targets, not current runtime APIs:
+The following remain architectural targets (Phase 2+ of #107 or later):
 
-- `GET /v1/games`
-- `GET /v1/games/{id}`
-- `GET /v1/games/{id}/access`
-- `GET /v1/characters`
-- `GET /v1/devices/challenge`
+- Event → character projection pipeline
+- Character write/update via events only (no direct mutable public write in Phase 1)
+- `GET /v1/devices/challenge` (if still required by client flow)
 
-The character/game-state domain is planned but is not implemented in the current runtime. See [Issue #107](https://github.com/spenskoj90-sudo/alpha-0/issues/107) for the backend implementation task. `docs/ARCHITECTURE_V4.md` remains the architectural target and is intentionally not synchronized automatically with runtime state.
+`docs/ARCHITECTURE_V4.md` remains the architectural target and is intentionally not synchronized automatically with runtime state.
 
 ## Authentication notes
 

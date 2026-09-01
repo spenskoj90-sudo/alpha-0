@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app.main import app, store
-from tests.test_api import provision, reset_store
+from test_api import provision, reset_store
 
 client = TestClient(app)
 

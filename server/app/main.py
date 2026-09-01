@@ -18,6 +18,7 @@ from app.core.admin import require_admin
 from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
+from app.core.game_state_routes import install_game_state_routes
 from app.core.models import (
     AdminEntitlementRequest,
     AuthorizeRequest,
@@ -255,6 +256,17 @@ def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str
     return principal.device_id == device_id or device.get("user_id") == principal.user_id
 
 
+# Phase 1 characters/game-state domain (issue #107)
+install_game_state_routes(
+    app,
+    store=store,
+    principal_from_token=principal_from_token,
+    require_bearer=require_bearer,
+    authorize_request=authorize_request,
+    request_id=request_id,
+)
+
+
 @app.exception_handler(RequestValidationError)
 def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     return error_response("VALIDATION_ERROR", "Invalid request", request_id(request), 422)
@@ -478,7 +490,7 @@ def refresh_session(payload: RefreshRequest):
         user_scopes = {"character:read", "game:read", "audit:read"}
         user_store.restrict_session_scopes(store, access, user_scopes)
         scopes = sorted(user_scopes)
-    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=scopes)
 
 
 @app.post("/v1/sessions/revoke")
@@ -562,8 +574,6 @@ def admin_create_entitlement(payload: AdminEntitlementRequest, request: Request,
     return item
 
 
-
-
 @app.post("/v1/integrity/nonce")
 def issue_integrity_nonce(request: Request, authorization_header: str = Header(..., alias="Authorization")) -> dict[str, str]:
     rate_limit(request, "integrity-nonce")
@@ -590,6 +600,7 @@ def attest_integrity(payload: dict[str, object], request: Request, authorization
         "trusted": result.trusted,
         "package_name": result.package_name,
     }
+
 
 @app.post("/v1/recommendations", response_model=RecommendationResponse)
 def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):

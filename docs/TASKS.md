@@ -13,17 +13,15 @@
 - [x] PR #103 — ReactiveCircus Android emulator runner pin to `v2.37.0` — merged.
 - [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f802fd156384268d128bef952100e07`.
 - [x] PR #110 — docs sync CURRENT_STATE/TASKS after #109 — merged at `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
+- [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
+- [x] #22 historical branch cleanup — all non-main branches deleted by Owner 2026-09-01 after classification (groups 1+2+3). Live inventory: only `main`.
 
 ## Текущие открытые items
 
 - [ ] #107 — Backend: implement characters/game-state domain (per ARCHITECTURE_V4). OPEN / planning. Requires issue-level approval and intake before implementation.
 - [ ] #63 — P1 preventive hardening after audit reconciliation. Requires separate issue-level approval before implementation.
 - [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker.**
-- [~] #22 — repository governance: branch protection, CI secrets and historical branch cleanup.
-  - **2026-09-01 Owner decision:** delete groups 1+2 (10 branches); retain group 3 (3 branches) for manual comparison.
-  - Groups 1+2 list and tip SHAs recorded in `docs/SENTINEL_CURRENT_STATE.md` §7.
-  - Deletion executed by Owner (termux/GitHub UI). Agent does not delete refs.
-  - Remaining: execute deletes; decide group 3; configure required status checks on `main`.
+- [~] #22 — repository governance: historical branch cleanup **done**; remaining = branch-protection required status checks on `main` (operator-only).
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.
 - [ ] #10 — establish measurable build/runtime performance baseline.

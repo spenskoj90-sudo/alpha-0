@@ -3,8 +3,8 @@
 **State record:** 2026-09-01  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `cd87d409935c8b59f7d760beab7588c1fbf8cd67`  
-**Current product change on main:** PR #110 — docs: sync CURRENT_STATE and TASKS after PR #109 (merged)
+**Canonical HEAD (main):** `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`  
+**Current product change on main:** PR #111 — docs: record #22 branch cleanup decision (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -27,20 +27,20 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `cd87d409935c8b59f7d760beab7588c1fbf8cd67`, the merge commit for PR #110.
+Current `main` HEAD is `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`, the merge commit for PR #111.
 
 Product CI on this exact SHA (as of state record):
 
 | Workflow | Run ID | Conclusion |
 |----------|--------|------------|
-| Security | 33517849001 | success |
-| ALPHA-0 Android CI | 33517848878 | success |
-| P1 Evidence | 33517848977 | success |
-| Release Candidate Artifact | 33517848917 | success |
-| Build & Test | 33517848953 | was in_progress at earlier record; confirm completion independently |
-| Deploy | 33517846686 | failure (expected — external DEPLOY_* secrets) |
+| Security | 33522199485 | success |
+| ALPHA-0 Android CI | 33522199687 | success |
+| P1 Evidence | 33522199461 | success |
+| Release Candidate Artifact | 33522199804 | success |
+| Build & Test | 33522199541 | confirm completion independently if still pending |
+| Deploy | 33522197309 | failure (expected — external DEPLOY_* secrets) |
 
-Prior HEAD `7f795596…` (PR #109): Build & Test run `33506277514` = **success**.
+Prior HEAD `cd87d409…` (PR #110): Build & Test run `33517848953` = **success**.
 
 Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID for the current HEAD is independently confirmed.
 
@@ -50,7 +50,7 @@ Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID fo
 Rate-limit bounding/eviction is merged in PR #104.
 
 ### `app/`
-Sentry Android runtime observability is merged in PR #105. Android CI on HEAD `cd87d409…`: success (run 33517848878).
+Sentry Android runtime observability is merged in PR #105. Android CI on HEAD `23ee6d2d…`: success (run 33522199687).
 
 ### `web/`
 Follows Build & Test result for current HEAD.
@@ -77,6 +77,7 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 6. Completed workflow state
 
+- **PR #111 — docs: record #22 branch cleanup decision: COMPLETE / MERGED.** Merge commit `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
 - **PR #110 — docs sync after #109: COMPLETE / MERGED.** Merge commit `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
 - **Issue #12 / PR #109 — Supabase production database hosting boundary: COMPLETE / MERGED.** Merge commit `7f795596df6d7d0362fa2113aafe74daa167cd81`.
 - **Issue #7 / PR #105 — Sentry Android runtime observability: COMPLETE / MERGED.** Merge commit `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
@@ -86,39 +87,21 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **PR #103 — Android emulator runner pin: COMPLETE / MERGED.**
 - **PR #108 — docs(api): align API index with runtime: COMPLETE / MERGED.** Merge commit `8af71e183f802fd156384268d128bef952100e07`.
 
-## 7. Branch hygiene (issue #22) — Owner decision 2026-09-01
+## 7. Branch hygiene (issue #22) — COMPLETE 2026-09-01
 
-Classification performed against `main` @ `cd87d409…`. Owner decision: **delete groups 1+2; retain group 3 for manual comparison**.
+**Live branch inventory (verified after Owner deletes):** only `main` exists. No historical feature/docs/ci/p1/ui/security branches remain.
 
-### Group 1 — tip is ancestor of main (ahead = 0) — DELETE
+Classification and Owner execution:
 
-| Branch | Tip SHA |
-|--------|---------|
-| `ci/state-sync-gate-100-rebased` | `f37eb69c85aca7bb7ba143fd570ff19c495dcf03` |
-| `docs/supabase-hosting-sync` | `8af71e183f802fd156384268d128bef952100e07` |
-| `docs/workflow-contract-14` | `997addee27e08624649deb770938108150206c4e` |
-| `fix/emulator-runner-tag-102` | `df05742ec609fd8e73576dc83ff10e86b2a82319` |
+| Group | Action | Count |
+|-------|--------|-------|
+| 1 — tip ancestor of main | Deleted by Owner | 4 |
+| 2 — squash-merged content on main | Deleted by Owner | 6 |
+| 3 — manual comparison (PR #82 / UI tokens on main) | Deleted by Owner after comparison | 3 |
 
-### Group 2 — squash-merged content on main, tip SHA unique — DELETE
+Group 3 evidence: `feature/physical-device-diagnostics-2026-08-29` content on main via PR #82 (`DiagnosticLogger` + instrumentation); UI observation branches superseded by `DesignTokens.kt` / `SentinelTheme.kt` on main.
 
-| Branch | Tip SHA | Delivered via |
-|--------|---------|---------------|
-| `p1/android-refresh-lifecycle-95` | `65df1a84a5ff9673a26176bb9b626de09fb24a55` | PR #96 |
-| `p1/android-session-persistence-93` | `61da525554dcbcc007828356e5747c0fc9ca92c5` | PR #94 |
-| `p1/issue-89-refresh-concurrency` | `272978094141b7dfc53262ab2d0a1b6802ed51ab` | PR #90 |
-| `docs/hygiene-archive-state-sync-2026-08-31` | `3563f5568d4d5d27fa04d4ec70be6d1daf585104` | PR #101 |
-| `docs/workflow-contract-executor-assignment` | `07a48cd5ed20ae07b568398e19c874a10b5de551` | PR #99 |
-| `security/least-privilege-secrets-audit-9-clean` | `679e2d71f9f45771f9daa2a07538d843f98bc71a` | issue #9 lineage |
-
-### Group 3 — RETAIN until Owner manual comparison
-
-| Branch | Tip SHA |
-|--------|---------|
-| `feature/physical-device-diagnostics-2026-08-29` | `b9c8521bb2e5dd0de741df5f1c50d21a03c079b2` |
-| `ui/sentinel-observation-point-2026-08-23` | `49dd5e8bc3c50e891ad031ca9de583b70120adc3` |
-| `ui/sentinel-observation-visual-system-2026-08-23` | `d313e45356795a02b98e163ac59d0c8b0ca14482` |
-
-**Execution note:** Branch deletion is performed by Human Owner (termux / GitHub UI). Agent does not delete refs. After Owner deletes groups 1+2, issue #22 remains open until branch-protection required checks and any remaining group-3 decisions are complete.
+**Remaining for #22:** configure required status checks / branch protection on `main` (operator-only). Historical branch cleanup is done.
 
 ## 8. Open work
 
@@ -126,7 +109,7 @@ Current open issues: #107, #63, #59, #22, #13, #11, #10, #8.
 
 - **#107** — Backend characters/game-state domain: OPEN / planning.
 - **#59** — external Firebase Test Lab IAM blocker.
-- **#22** — governance: partial (classification + Owner delete decision recorded); branch protection / group-3 cleanup still open.
+- **#22** — governance: historical branch cleanup **COMPLETE**; branch-protection required checks still open (operator).
 - #63, #13, #11, #10, #8 — planning/backlog unless separately approved.
 
 ## 9. Evidence discipline

@@ -17,6 +17,25 @@ Required environment is documented in `.env.example`.
 
 Put Core and Web behind a TLS-terminating WAF/load balancer. Keep PostgreSQL private. Store secrets in a secret manager or deployment secret store. Do not commit `.env` files, private keys, database passwords or enrollment secrets.
 
+## Production database hosting
+
+Supabase (managed PostgreSQL, free tier) is used **exclusively** as Postgres hosting via the standard `DATABASE_URL` connection string.
+
+The following Supabase-managed features are **not used** and must not be enabled or relied upon:
+
+- Supabase Auth
+- Supabase RLS policies-as-a-service
+- any other managed Supabase product surface (Realtime, Storage, Edge Functions, etc.)
+
+All authentication and authorization remain on the existing SENTINEL system:
+
+- opaque session tokens with hashed persistence and one-time refresh rotation
+- Android Keystore / EC P-256 device identity
+- server-authoritative default-deny authorization
+- `service_role` (and FORCE RLS) defined and enforced by SENTINEL migrations (see `004_p1_rls_force.sql` and related)
+
+Production Core connects to the hosted Postgres instance solely through `DATABASE_URL`. No Supabase client SDKs or platform-specific auth flows are part of the SENTINEL runtime boundary.
+
 ## Required production configuration
 
 ```text
@@ -35,7 +54,7 @@ Production startup intentionally fails closed if `DATABASE_URL` or enrollment co
 
 ## Database rollout
 
-1. Provision PostgreSQL 17.
+1. Provision PostgreSQL 17 (or compatible managed instance such as Supabase free-tier Postgres).
 2. Run `python server/migrate.py` or start the Core container.
 3. Verify `/healthz`.
 4. Run API/security smoke tests against a disposable database.

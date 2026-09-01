@@ -3,8 +3,8 @@
 **State record:** 2026-09-01  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `8af71e183f802fd156384268d128bef952100e07`  
-**Current product change on main:** PR #108 — docs(api): align API index with runtime (merged)
+**Canonical HEAD (main):** `7f795596df6d7d0362fa2113aafe74daa167cd81`  
+**Current product change on main:** PR #109 — docs: Supabase production database hosting boundary (closes #12) (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -27,20 +27,31 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `8af71e183f802fd156384268d128bef952100e07`, the merge commit for PR #108 (API index alignment).
+Current `main` HEAD is `7f795596df6d7d0362fa2113aafe74daa167cd81`, the merge commit for PR #109.
 
-Exact current-HEAD CI status and numeric coverage are **UNVERIFIED** in this state sync until fresh workflow Run IDs are independently extracted for this SHA. Historical green runs are not current evidence.
+Product CI on this exact SHA (as of state record):
+
+| Workflow | Run ID | Conclusion |
+|----------|--------|------------|
+| Security | 33506277540 | success |
+| ALPHA-0 Android CI | 33506277556 | success |
+| P1 Evidence | 33506277648 | success |
+| Release Candidate Artifact | 33506277511 | success |
+| Build & Test | 33506277514 | in_progress at record time (treat as pending until completion) |
+| Deploy | 33506276063 | failure (expected — external DEPLOY_* secrets) |
+
+Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID for this SHA is independently confirmed.
 
 ## 3. Module verification state
 
 ### `server/`
-Current exact-head CI verification: **UNVERIFIED** pending fresh run-ID evidence. Rate-limit bounding/eviction is merged in PR #104.
+Rate-limit bounding/eviction is merged in PR #104. Exact-head product verification depends on completed Build & Test for this SHA.
 
 ### `app/`
-Sentry Android runtime observability is merged in PR #105. Current exact-head Android CI verification: **UNVERIFIED** pending fresh run-ID evidence.
+Sentry Android runtime observability is merged in PR #105. Android CI on this HEAD: success (run 33506277556).
 
 ### `web/`
-Current exact-head CI verification: **UNVERIFIED** pending fresh run-ID evidence.
+Exact-head verification follows the Build & Test result for this SHA.
 
 ### `launcher/`
 Dedicated test/coverage evidence: **UNVERIFIED**.
@@ -54,7 +65,7 @@ Dedicated test/coverage evidence: **UNVERIFIED**.
 - Production database: Supabase (secret configured).
 - Real-device acceptance before public distribution.
 - Release tag and GitHub Release publication when chosen by Owner.
-- Firebase Test Lab GCS `storage.objects.create` permission (issues #59/#62).
+- Firebase Test Lab GCS `storage.objects.create` permission (issues #59).
 - GitHub repository secret `SENTRY_DSN` before release builds emit Sentry events.
 - Branch-protection required-status configuration remains an operator/governance concern unless independently verified.
 
@@ -64,7 +75,7 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 6. Completed workflow state
 
-- **Issue #12 / docs PR — Supabase production database hosting boundary: COMPLETE (this PR).** Owner narrowed scope to hosting-only; full auth-model redesign is not required. Supabase is documented as Postgres hosting exclusively via `DATABASE_URL`; SENTINEL authorization model is unchanged.
+- **Issue #12 / PR #109 — Supabase production database hosting boundary: COMPLETE / MERGED.** Merge commit `7f795596df6d7d0362fa2113aafe74daa167cd81`. Owner narrowed scope to hosting-only; full auth-model redesign is not required. Supabase is documented as Postgres hosting exclusively via `DATABASE_URL`; SENTINEL authorization model is unchanged.
 - **Issue #7 / PR #105 — Sentry Android runtime observability: COMPLETE / MERGED.** Merge commit `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
 - **Issue #97 / PR #104 — bounded and evicted process-local rate-limit state: COMPLETE / MERGED.**
 - **PR #100 — CI state-sync enforcement: COMPLETE / MERGED.** Merge commit `1df91de661c8bb0946d68f1671cbabf5f9714455`.
@@ -74,11 +85,11 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 
 ## 7. Open work
 
-Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #63, #59, #22, #13, #11, #10, #8 and #107 (issue #12 closed by this PR).
+Open issues remain backlog candidates and require reconciliation before implementation. Current open issues are #107, #63, #59, #22, #13, #11, #10 and #8.
 
 - **#107 — Backend: implement characters/game-state domain (per ARCHITECTURE_V4): OPEN / planning.** The architectural target describes the character/game-state domain and candidate endpoints, but current runtime does not implement that domain. Implementation scope is intentionally tracked in #107 rather than inferred from `docs/API.md`.
 - #59 is the external Firebase Test Lab IAM blocker.
-- #22 is governance/administrative work.
+- #22 is governance/administrative work (branch protection, historical branch cleanup).
 - #63, #13, #11, #10 and #8 remain planning/backlog items unless separately approved.
 
 ## 8. Evidence discipline

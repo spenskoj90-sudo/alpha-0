@@ -16,12 +16,14 @@
 - [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
 - [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
 - [x] PR #113 — docs: #22 branch protection complete; #63 backlog reconciled — merged at `4a2a987873e3c7248d1b18bd6711619c0eb80e80`.
+- [x] PR #114 — docs: close #63 as completed; mark #107 next priority — merged at `657ceb80afc1ddfe7a38e2a3e2e72799ae7c22b8`.
+- [x] **PR #115 / #107 Phase 1** — characters/game-state read domain — merged at `a261389f589c0d281c3f45a772fa6ee17abade42`. Store + GET characters/games/access + IDOR/auth + tests. Product CI green on exact HEAD (Build & Test `33599398555`, Security `33599398765`, Android `33599398549`, P1 Evidence `33599398550`).
 - [x] **#22 repository governance COMPLETE** — branch cleanup (groups 1–3) + required status checks on `main` (Owner 2026-09-01).
-- [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation. Residual optional (deeper IDOR, Android process-death/revoke) out of scope; schema-domain moved to #107; FTL remains optional via #59 / D-013.
+- [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation.
 
 ## Текущие открытые items
 
-- [~] **#107** — Backend: implement characters/game-state domain (per ARCHITECTURE_V4). **IN PROGRESS / Phase 1 MVP**. Store methods + read APIs (GET /v1/characters, /v1/games, /v1/games/{id}/access) + IDOR/auth. Phase 2 event→projection later.
+- [~] **#107 Phase 2** — event → character projection (ARCHITECTURE_V4 §5–6). Project `character.*` events from `/v1/events:batch` into `characters` via store upsert; no public mutable character write API. Phase 1 already on main.
 - [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker** (optional given emulator CI / D-013).
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.

@@ -3,8 +3,8 @@
 **State record:** 2026-09-02  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`  
-**Current product change on main:** PR #118 — #107 Phase 2 event→character projection (merged); PR #120 subsequently fixed Deploy workflow triggering and synchronized docs.
+**Canonical HEAD (main):** `5601e25290d0ac3f342f9f15d4580550fc816888`  
+**Current product change on main:** PR #10 — Issue #10 performance baseline contract (merged); PR #10 merged as `5601e25290d0ac3f342f9f15d4580550fc816888`.
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -31,9 +31,22 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`, the merge commit for PR #120.
+Current `main` HEAD is `5601e25290d0ac3f342f9f15d4580550fc816888`, the merge commit for PR #10.
 
-The available GitHub workflow-run lookup for this merge SHA returned no PR-triggered runs. Therefore exact-HEAD CI status is **UNVERIFIED** in this state record unless a run is independently verified against this exact SHA.
+Issue #10 / PR #10 head SHA was `a60e10854576cb3818546ab30d971c5027e28a93`; PR #10 was merged into `main` as `5601e25290d0ac3f342f9f15d4580550fc816888`.
+
+Verified PR-head CI evidence for `a60e10854576cb3818546ab30d971c5027e28a93`:
+
+| Workflow | Run ID | Conclusion |
+|----------|--------|------------|
+| Build & Test | 33651772178 | success |
+| Security | 33651772164 | success |
+| ALPHA-0 Android CI | 33651772174 | success |
+| P1 Evidence | 33651772328 | success |
+
+The Owner independently verified `gh pr checks 10 -R spenskoj90-sudo/alpha-0`: 18 checks successful, 0 failing, 0 pending, 0 skipped. These checks correspond to the PR-head SHA above. The merge commit itself is the canonical `main` state; no separate numeric performance measurement is claimed here.
+
+Numeric performance measurements remain **UNVERIFIED**; Issue #10 established the reproducible baseline contract and proposed gates without presenting unmeasured thresholds as measured facts.
 
 Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33e15fe10a6` were:
 
@@ -45,9 +58,7 @@ Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33
 | P1 Evidence | #257 on `f5b3423` | success |
 | Release Candidate Artifact | #32 on `f5b3423` | success |
 
-Those predecessor runs are historical evidence only and do not establish CI status for `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
-
-Numeric coverage remains **UNVERIFIED** as a published percent until extracted from the relevant Build & Test artifact for the exact HEAD under review.
+Those predecessor runs are historical evidence only and do not establish CI status for `5601e25290d0ac3f342f9f15d4580550fc816888`.
 
 Prior product HEAD `a261389f589c0d281c3f45a772fa6ee17abade42` (PR #115) CI: Build & Test `33599398555`, Security `33599398765`, Android `33599398549`, P1 Evidence `33599398550` — all success.
 
@@ -84,7 +95,8 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
 - **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
-- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
+- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Historical main HEAD was `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
+- **Issue #10 / PR #10 — performance baseline: COMPLETE (2026-09-02).** PR head `a60e10854576cb3818546ab30d971c5027e28a93`; merged into main as `5601e25290d0ac3f342f9f15d4580550fc816888`; PR-head required CI verified by Run IDs above.
 - **PR #118 / #116 / #115 / #114 / #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as recorded.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
@@ -121,7 +133,6 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.
-- **#10** — establish measurable build/runtime performance baseline.
 
 Issue #8 (SENTINEL baseline consistency audit) is **CLOSED**; its completed audit was recorded through PRs #106/#108. Issue #107 is **CLOSED** as the completed characters/game-state domain.
 

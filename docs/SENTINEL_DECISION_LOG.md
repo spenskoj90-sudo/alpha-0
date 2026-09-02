@@ -28,7 +28,7 @@
 
 **Date:** 2026-08-17  
 **Decision:** Do not delete/close historical branches or PRs until current AI handoffs are incorporated and each branch is classified.  
-**Status:** Superseded by **D-016** and **D-017**. No non-main branches remain as of 2026-09-01 (feature leftovers after #115 cleaned by Owner).
+**Status:** Superseded by **D-016** and **D-017**.
 
 ## D-006 — Signing/keystore handling
 
@@ -106,33 +106,31 @@
 - P1 evidence artifacts
 - PostgreSQL integration and recovery
 - Repository verification  
-**Not required:** Deploy (external secrets).  
-**Effect:** Issue #22 governance scope is complete (cleanup + protection).
+**Not required:** Deploy (external secrets).
 
 ## D-019 — Issue #63 backlog reconciliation
 
 **Date:** 2026-09-01  
-**Decision:** Reconcile #63 against live main without treating historical audit text as incomplete work:
-- Done: client refresh lifecycle (#96), rate-limit bound/evict (#104), most Postgres security-negative / concurrent refresh coverage, minimal web admin entitlements regression.
-- Moved: schema-domain reconciliation → #107.
-- Blocked/optional: FTL expansion → #59 + D-013.
-- Residual optional: deeper IDOR negatives; Android process-death + revoke session tests.  
-**Reason:** Avoid re-implementing work already on main; keep #63 open only for explicit residual Owner chooses.
+**Decision:** Reconcile #63 against live main without treating historical audit text as incomplete work.
 
 ## D-020 — Issue #63 closed as completed
 
 **Date:** 2026-09-01  
-**Decision:** Owner directed close of #63 after D-019 reconciliation. Residual optional work (deeper IDOR, Android process-death/revoke) explicitly out of scope. Schema-domain continues under #107. FTL remains optional via #59 / D-013.  
-**Effect:** #63 marked COMPLETE in TASKS and CURRENT_STATE; next priority is #107 Phase 1 MVP (characters/game-state read APIs).
+**Decision:** Owner directed close of #63 after D-019 reconciliation.
 
 ## D-021 — Issue #107 Phase 1 accepted on main
 
 **Date:** 2026-09-02  
-**Decision:** Phase 1 of #107 (store character methods + GET characters/games/access + IDOR/auth + tests) is merged via PR #115 at `a261389f589c0d281c3f45a772fa6ee17abade42`. Product CI green on exact HEAD. Phase 2 is event → character projection only; no direct public character write API (events remain the write path per ARCHITECTURE_V4).  
-**Effect:** TASKS marks Phase 1 complete; #107 remains open for Phase 2.
+**Decision:** Phase 1 of #107 merged via PR #115 at `a261389f589c0d281c3f45a772fa6ee17abade42`.
 
 ## D-022 — Issue #107 Phase 2 implementation
 
 **Date:** 2026-09-02  
-**Decision:** Phase 2 projects `character.snapshot` / `character.upsert` / `character.state` events from `/v1/events:batch` into the `characters` store via `apply_character_projections` after a successful batch with `accepted > 0`. Required payload fields: `game_id`, `external_id`, `name`. Invalid payloads skip projection without failing the batch. Natural-key upsert reuses Phase 1 `store.upsert_character`. No public mutable character write API.  
-**Effect:** Completes the #107 MVP write path (events → projection → read APIs). After Owner merge and exact-HEAD CI evidence, #107 may be closed.
+**Decision:** Phase 2 projects `character.snapshot` / `character.upsert` / `character.state` events from `/v1/events:batch` into the `characters` store via `apply_character_projections` after a successful batch with `accepted > 0`. Required payload fields: `game_id`, `external_id`, `name`. Invalid payloads skip projection without failing the batch. Natural-key upsert reuses Phase 1 `store.upsert_character`. No public mutable character write API.
+
+## D-023 — Issue #107 closed complete; Deploy workflow validation fixed
+
+**Date:** 2026-09-02  
+**Decision:** #107 is COMPLETE on main after PR #118 merge at `f5b342310a0278b318b434976cc0d33e15fe10a6`.  
+**Deploy noise:** Every push produced a failed run for `.github/workflows/deploy.yml` because job-level `if: ${{ secrets.DEPLOY_* != '' }}` is invalid (GitHub forbids `secrets` context in job `if` expressions). Failure emails were not real deploy failures. Fix: detect DEPLOY_* inside a step and gate the remote rollout step; keep trigger as `release.published` only.  
+**Effect:** Stop invalid-workflow failure spam; #107 closed; open backlog remains #59 and lower-priority items.

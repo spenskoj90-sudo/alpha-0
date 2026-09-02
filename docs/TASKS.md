@@ -17,14 +17,15 @@
 - [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
 - [x] PR #113 — docs: #22 branch protection complete; #63 backlog reconciled — merged at `4a2a987873e3c7248d1b18bd6711619c0eb80e80`.
 - [x] PR #114 — docs: close #63 as completed; mark #107 next priority — merged at `657ceb80afc1ddfe7a38e2a3e2e72799ae7c22b8`.
-- [x] **PR #115 / #107 Phase 1** — characters/game-state read domain — merged at `a261389f589c0d281c3f45a772fa6ee17abade42`. Store + GET characters/games/access + IDOR/auth + tests. Product CI green on exact HEAD (Build & Test `33599398555`, Security `33599398765`, Android `33599398549`, P1 Evidence `33599398550`).
-- [x] **PR #116** — docs sync CURRENT_STATE/TASKS after Phase 1 — merged at `01a8539cb122f9a71f798b6ece3a26173bd2a469`.
+- [x] **PR #115 / #107 Phase 1** — characters/game-state read domain — merged at `a261389f589c0d281c3f45a772fa6ee17abade42`.
+- [x] **PR #116** — docs sync after Phase 1 — merged at `01a8539cb122f9a71f798b6ece3a26173bd2a469`.
+- [x] **PR #118 / #107 Phase 2** — event → character projection — merged at `f5b342310a0278b318b434976cc0d33e15fe10a6`. Product CI green on main (Build & Test / Security / Android / P1 Evidence / Release Candidate). Deploy failure was invalid workflow file (`secrets` in job-level `if`), fixed separately.
+- [x] **#107 characters/game-state domain COMPLETE** — Phase 1 + Phase 2 on main (2026-09-02).
 - [x] **#22 repository governance COMPLETE** — branch cleanup (groups 1–3) + required status checks on `main` (Owner 2026-09-01).
 - [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation.
 
 ## Текущие открытые items
 
-- [~] **#107 Phase 2** — event → character projection (ARCHITECTURE_V4 §5–6). This PR implements projection from `/v1/events:batch` into `characters` via `apply_character_projections` + natural-key upsert. Types: `character.snapshot` / `character.upsert` / `character.state`. No public mutable character write API. After CI green + Owner merge + post-merge evidence sync, close #107.
 - [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker** (optional given emulator CI / D-013).
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.

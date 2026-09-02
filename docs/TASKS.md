@@ -23,6 +23,8 @@
 - [x] **#107 characters/game-state domain COMPLETE** — Phase 1 + Phase 2 on main (2026-09-02).
 - [x] **#22 repository governance COMPLETE** — branch cleanup + required status checks on `main` (Owner 2026-09-01).
 - [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation.
+- [x] **Issue #8 — SENTINEL baseline consistency audit COMPLETE** — completed through PRs #106/#108.
+- [x] **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
 
 ## Текущие открытые items
 
@@ -30,7 +32,6 @@
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.
 - [ ] #10 — establish measurable build/runtime performance baseline.
-- [ ] #8 — SENTINEL baseline consistency audit.
 
 ## Дальше по плану
 

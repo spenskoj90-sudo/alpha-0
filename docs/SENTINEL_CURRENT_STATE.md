@@ -1,10 +1,10 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-09-01  
+**State record:** 2026-09-02  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `4a2a987873e3c7248d1b18bd6711619c0eb80e80`  
-**Current product change on main:** PR #113 — docs: #22 branch protection complete; #63 backlog reconciled (merged)
+**Canonical HEAD (main):** `a261389f589c0d281c3f45a772fa6ee17abade42`  
+**Current product change on main:** PR #115 — feat(api): characters/game-state Phase 1 MVP (merged)
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -24,19 +24,29 @@
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets; implemented by PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
 - Sentry Android SDK 8.54.0 is integrated for release runtime observability by PR #105. `SENTRY_DSN` is supplied only to release assembly jobs; debug/PR builds use an empty default. Privacy scrubbing is implemented in `SentinelApplication`, and Sentry auto-init is disabled so initialization is controlled by application code.
+- **Characters/game-state Phase 1 (PR #115):** store `list_characters` / `get_character` / `upsert_character`; read routes `GET /v1/characters`, `/v1/characters/{id}`, `/v1/games`, `/v1/games/{id}`, `/v1/games/{id}/access` with auth + IDOR. Event→character projection is Phase 2.
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `4a2a987873e3c7248d1b18bd6711619c0eb80e80`, the merge commit for PR #113.
+Current `main` HEAD is `a261389f589c0d281c3f45a772fa6ee17abade42`, the merge commit for PR #115.
 
-Product CI claims for this SHA should be verified independently via Actions for workflows Build & Test, Security, ALPHA-0 Android CI, and P1 Evidence. Deploy remains expected-failure without external DEPLOY_* secrets.
+Product CI for this SHA (push to main):
 
-Numeric coverage remains **UNVERIFIED** until a completed Build & Test run ID for this HEAD is independently confirmed.
+| Workflow | Run ID | Conclusion |
+|----------|--------|------------|
+| Build & Test | [33599398555](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599398555) | success |
+| Security | [33599398765](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599398765) | success |
+| ALPHA-0 Android CI | [33599398549](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599398549) | success |
+| P1 Evidence | [33599398550](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599398550) | success |
+| Release Candidate Artifact | [33599398607](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599398607) | success |
+| Deploy | [33599397558](https://github.com/spenskoj90-sudo/alpha-0/actions/runs/33599397558) | failure (expected without DEPLOY_* secrets) |
+
+Numeric coverage remains **UNVERIFIED** as a published percent until extracted from Build & Test artifacts for this HEAD.
 
 ## 3. Module verification state
 
 ### `server/`
-Rate-limit bounding/eviction is merged in PR #104. Security-negative, RLS, and postgres refresh concurrency coverage exist under `server/tests/`.
+Rate-limit bounding/eviction is merged in PR #104. Security-negative, RLS, and postgres refresh concurrency coverage exist under `server/tests/`. Character store methods and game-state read routes merged in PR #115; tests in `test_game_state.py`.
 
 ### `app/`
 Sentry Android runtime observability is merged in PR #105. Client refresh lifecycle and session persistence tests exist (PR #94/#96 lineage).
@@ -63,8 +73,9 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 ## 6. Completed workflow state
 
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
-- **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019 reconciliation; residual optional work out of scope; schema-domain moved to #107.
-- **PR #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as previously recorded.
+- **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
+- **PR #115 — characters/game-state Phase 1 MVP: COMPLETE / MERGED.** `a261389f589c0d281c3f45a772fa6ee17abade42`.
+- **PR #114 / #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as previously recorded.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -93,13 +104,13 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 | 4 Bound/evict rate-limit | Done | PR #104 |
 | 5 FTL instrumentation expansion | Blocked | #59; routine CI uses emulator (D-013) |
 | 6 Web/admin security regressions | Minimal done | `route.test.ts` entitlements (PR #92 lineage) |
-| 7 Schema-domain reconciliation | Moved | #107 |
+| 7 Schema-domain reconciliation | Phase 1 done | #107 / PR #115; Phase 2 projection remains |
 
 **Closed by Owner 2026-09-01.** Residual optional (deeper IDOR, Android process-death/revoke) left out of scope.
 
 ## 9. Open work
 
-- **#107** — characters/game-state domain, Phase 1 MVP (PR #115): store + GET characters/games/access routes + IDOR/auth. Phase 2 event-projection out of scope.
+- **#107** — characters/game-state domain **Phase 1 COMPLETE** on main (PR #115). **Phase 2** remains: event → character projection (ARCHITECTURE_V4 §5–6); no direct public character write API.
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13, #11, #10, #8** — backlog unless approved.
 

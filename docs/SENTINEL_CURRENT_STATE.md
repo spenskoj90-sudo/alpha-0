@@ -3,8 +3,8 @@
 **State record:** 2026-09-02  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `f5b342310a0278b318b434976cc0d33e15fe10a6`  
-**Current product change on main:** PR #118 — #107 Phase 2 event→character projection (merged)
+**Canonical HEAD (main):** `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`  
+**Current product change on main:** PR #118 — #107 Phase 2 event→character projection (merged); PR #120 subsequently fixed Deploy workflow triggering and synchronized docs.
 
 > Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -27,23 +27,27 @@
 - **Characters/game-state domain (#107) COMPLETE on main:**
   - Phase 1 (PR #115): store `list_characters` / `get_character` / `upsert_character`; read routes `GET /v1/characters`, `/v1/characters/{id}`, `/v1/games`, `/v1/games/{id}`, `/v1/games/{id}/access` with auth + IDOR.
   - Phase 2 (PR #118): `character_projection.py` + `apply_character_projections` after successful `/v1/events:batch`; types `character.snapshot` / `character.upsert` / `character.state`; required payload `game_id`, `external_id`, `name`; invalid payload skips projection. No public mutable character write API.
+- **Deploy workflow:** PR #120 changed `deploy.yml` to run only on published GitHub Releases or manual `workflow_dispatch`. Optional remote rollout is gated by repository variable `DEPLOY_ENABLED=true`; deploy secrets are checked only inside the job when enabled. No routine push-to-main Deploy run is expected.
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `f5b342310a0278b318b434976cc0d33e15fe10a6`, the merge commit for PR #118.
+Current `main` HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`, the merge commit for PR #120.
 
-Product CI for this SHA (push to main after #118):
+The available GitHub workflow-run lookup for this merge SHA returned no PR-triggered runs. Therefore exact-HEAD CI status is **UNVERIFIED** in this state record unless a run is independently verified against this exact SHA.
+
+Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33e15fe10a6` were:
 
 | Workflow | Run | Conclusion |
 |----------|-----|------------|
-| Build & Test | #432 on `f5b3423` | success (verify on Actions) |
+| Build & Test | #432 on `f5b3423` | success |
 | Security | #349 on `f5b3423` | success |
 | ALPHA-0 Android CI | #1498 on `f5b3423` | success |
 | P1 Evidence | #257 on `f5b3423` | success |
 | Release Candidate Artifact | #32 on `f5b3423` | success |
-| Deploy | historically failed on push; fixed to release/workflow_dispatch only (no secrets in job `if`) |
 
-Numeric coverage remains **UNVERIFIED** as a published percent until extracted from Build & Test artifacts for this HEAD.
+Those predecessor runs are historical evidence only and do not establish CI status for `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
+
+Numeric coverage remains **UNVERIFIED** as a published percent until extracted from the relevant Build & Test artifact for the exact HEAD under review.
 
 Prior product HEAD `a261389f589c0d281c3f45a772fa6ee17abade42` (PR #115) CI: Build & Test `33599398555`, Security `33599398765`, Android `33599398549`, P1 Evidence `33599398550` — all success.
 
@@ -80,6 +84,7 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
 - **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
+- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
 - **PR #118 / #116 / #115 / #114 / #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as recorded.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
@@ -114,7 +119,11 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 ## 9. Open work
 
 - **#59** — FTL IAM (external; optional given emulator CI).
-- **#13, #11, #10, #8** — backlog unless approved.
+- **#13** — define PostHog telemetry contract.
+- **#11** — synchronize Figma design system with implementation.
+- **#10** — establish measurable build/runtime performance baseline.
+
+Issue #8 (SENTINEL baseline consistency audit) is **CLOSED**; its completed audit was recorded through PRs #106/#108. Issue #107 is **CLOSED** as the completed characters/game-state domain.
 
 ## 10. Evidence discipline
 

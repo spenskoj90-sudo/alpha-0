@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.admin import require_admin
+from app.core.character_projection import apply_character_projections
 from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
@@ -532,11 +533,17 @@ def ingest_events(
     for event in events:
         event["request_id"] = rid
     try:
-        return store.save_event_batch({"user_id": principal.user_id, "device_id": principal.device_id}, events, x_idempotency_key)
+        result = store.save_event_batch({"user_id": principal.user_id, "device_id": principal.device_id}, events, x_idempotency_key)
     except ValueError as exc:
         code = str(exc)
         status = 409 if code in {"SEQUENCE_REPLAY", "IDEMPOTENCY_KEY_REUSE"} else 403
         raise HTTPException(status_code=status, detail=code) from exc
+    # Phase 2 (#107): project character.* events into characters store.
+    # Projection is best-effort relative to the durable event log; invalid
+    # payloads are skipped without failing the batch.
+    if result.get("accepted", 0) > 0:
+        apply_character_projections(store, principal.user_id, events)
+    return result
 
 
 @app.get("/v1/audit")

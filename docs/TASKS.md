@@ -7,11 +7,11 @@
 
 - [x] Issue #12 / PR #109 — Supabase production database hosting boundary — merged at `7f795596df6d7d0362fa2113aafe74daa167cd81`.
 - [x] Issue #7 / PR #105 — Sentry Android runtime observability — merged at `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
-- [x] Issue #97 / PR #104 — bounded/evicted process-local rate-limit state — merged.
+- [x] Issue #97 — bounded/evicted process-local rate-limit state — merged.
 - [x] PR #100 — CI state-sync governance gate — merged as `1df91de661c8bb0946d68f1671cbabf5f9714455`.
 - [x] PR #101 — repository hygiene / CURRENT_STATE synchronization — merged.
 - [x] PR #103 — ReactiveCircus Android emulator runner pin to `v2.37.0` — merged.
-- [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f802fd156384268d128bef952100e07`.
+- [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f8023561564b1e18eaa3b3a6dff3bca`.
 - [x] PR #110 — docs sync CURRENT_STATE/TASKS after #109 — merged at `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
 - [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
 - [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
@@ -23,6 +23,8 @@
 - [x] **#107 characters/game-state domain COMPLETE** — Phase 1 + Phase 2 on main (2026-09-02).
 - [x] **#22 repository governance COMPLETE** — branch cleanup + required status checks on `main` (Owner 2026-09-01).
 - [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation.
+- [x] **Issue #8 — SENTINEL baseline consistency audit COMPLETE** — completed through PRs #106/#108.
+- [x] **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
 
 ## Текущие открытые items
 
@@ -30,7 +32,6 @@
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.
 - [ ] #10 — establish measurable build/runtime performance baseline.
-- [ ] #8 — SENTINEL baseline consistency audit.
 
 ## Дальше по плану
 

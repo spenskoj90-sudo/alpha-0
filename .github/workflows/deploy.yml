@@ -1,8 +1,18 @@
 name: Deploy
 
+# Runs only on published GitHub Releases (not on every push to main).
+# Remote rollout stays off until Owner configures DEPLOY_* repository variables
+# and secrets — never use secrets.* in job-level `if` (causes false failures / email noise).
+
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. v1.0.0 or latest)"
+        required: true
+        default: "latest"
 
 permissions:
   contents: read
@@ -14,6 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "value=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -26,15 +45,29 @@ jobs:
           file: server/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/sentinel-core:${{ github.event.release.tag_name }}
+            ghcr.io/${{ github.repository_owner }}/sentinel-core:${{ steps.tag.outputs.value }}
             ghcr.io/${{ github.repository_owner }}/sentinel-core:latest
 
+  # Optional remote host rollout. Enable only when Owner has set repository
+  # variables DEPLOY_ENABLED=true and secrets DEPLOY_HOST / DEPLOY_USER / DEPLOY_KEY.
+  # Job is hard-gated on vars (not secrets) so missing secrets never fail the workflow.
   remote:
     name: Optional remote rollout
     runs-on: ubuntu-latest
     needs: publish
-    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_KEY != '' }}
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     steps:
+      - name: Require deploy secrets when enabled
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_HOST:-}" ] || [ -z "${DEPLOY_USER:-}" ] || [ -z "${DEPLOY_KEY:-}" ]; then
+            echo "DEPLOY_ENABLED=true but DEPLOY_HOST/USER/KEY secrets are missing."
+            exit 1
+          fi
       - uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.DEPLOY_HOST }}

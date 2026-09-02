@@ -135,4 +135,16 @@
 
 **Date:** 2026-09-02  
 **Decision:** Phase 2 projects `character.snapshot` / `character.upsert` / `character.state` events from `/v1/events:batch` into the `characters` store via `apply_character_projections` after a successful batch with `accepted > 0`. Required payload fields: `game_id`, `external_id`, `name`. Invalid payloads skip projection without failing the batch. Natural-key upsert reuses Phase 1 `store.upsert_character`. No public mutable character write API.  
-**Effect:** Completes the #107 MVP write path (events → projection → read APIs). After Owner merge and exact-HEAD CI evidence, #107 may be closed.
+**Evidence:** PR #118 merged at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
+
+## D-023 — Issue #107 closed as completed
+
+**Date:** 2026-09-02  
+**Decision:** Owner accepted Phase 1 + Phase 2 on main. #107 characters/game-state domain is COMPLETE.  
+**Effect:** TASKS and CURRENT_STATE mark #107 closed; next backlog items remain #59 (optional) and #13/#11/#10/#8 unless Owner prioritizes otherwise.
+
+## D-024 — Deploy workflow must not email on routine pushes
+
+**Date:** 2026-09-02  
+**Decision:** `deploy.yml` triggers only on `release` (published) and `workflow_dispatch`. Do not use `secrets.*` in job-level `if` (GitHub evaluates that poorly and produced repeated Failure runs + Gmail noise). Optional remote rollout is gated on repository variable `DEPLOY_ENABLED=true`; secrets are checked only inside the job when enabled.  
+**Reason:** Owner reported continuous Deploy failure notifications during development; product CI already covers build/test; Deploy is not a required status check (D-018).

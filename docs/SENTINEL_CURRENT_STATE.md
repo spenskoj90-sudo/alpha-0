@@ -99,7 +99,7 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 
 ## 9. Open work
 
-- **#107** — characters/game-state domain **IN PROGRESS** (Phase 1 MVP: store + GET characters/games/access routes + IDOR/auth). Phase 2 event→projection later.
+- **#107** — characters/game-state domain, Phase 1 MVP (PR #115): store + GET characters/games/access routes + IDOR/auth. Phase 2 event-projection out of scope.
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13, #11, #10, #8** — backlog unless approved.
 

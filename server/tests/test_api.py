@@ -27,6 +27,8 @@ def reset_store():
         store.proof_requests.clear()
         store.entitlements.clear()
         store.failures.clear()
+        if hasattr(store, "characters"):
+            store.characters.clear()
 
 
 def provision():

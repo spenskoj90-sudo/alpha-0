@@ -130,3 +130,9 @@
 **Date:** 2026-09-02  
 **Decision:** Phase 1 of #107 (store character methods + GET characters/games/access + IDOR/auth + tests) is merged via PR #115 at `a261389f589c0d281c3f45a772fa6ee17abade42`. Product CI green on exact HEAD. Phase 2 is event → character projection only; no direct public character write API (events remain the write path per ARCHITECTURE_V4).  
 **Effect:** TASKS marks Phase 1 complete; #107 remains open for Phase 2.
+
+## D-022 — Issue #107 Phase 2 implementation
+
+**Date:** 2026-09-02  
+**Decision:** Phase 2 projects `character.snapshot` / `character.upsert` / `character.state` events from `/v1/events:batch` into the `characters` store via `apply_character_projections` after a successful batch with `accepted > 0`. Required payload fields: `game_id`, `external_id`, `name`. Invalid payloads skip projection without failing the batch. Natural-key upsert reuses Phase 1 `store.upsert_character`. No public mutable character write API.  
+**Effect:** Completes the #107 MVP write path (events → projection → read APIs). After Owner merge and exact-HEAD CI evidence, #107 may be closed.

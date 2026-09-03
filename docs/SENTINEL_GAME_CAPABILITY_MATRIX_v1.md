@@ -67,7 +67,7 @@ The Policy Engine remains the authority for actions.
 
 Current Retail must be treated as the most restrictive and fast-changing integration target.
 
-Recent Blizzard/WoW API security changes increasingly restrict what insecure addons can inspect or manipulate in combat. Secret values and protected execution materially affect combat-state visibility and action automation. Therefore the Retail adapter must use capability discovery and data-quality reporting rather than assuming legacy addon behavior remains available. Official/community API documentation records protected, hardware-event and combat restrictions and recent 12.x API restriction changes.
+Current WoW API documentation distinguishes protected APIs, hardware-event restrictions, combat restrictions, secure frames and taint. Recent 12.x changes further restrict access to some combat information. Therefore the Retail adapter must use capability discovery and data-quality reporting rather than assuming legacy addon behavior remains available. citeturn0search0turn0search4turn0search6
 
 ### Retail target capabilities
 
@@ -91,7 +91,7 @@ Recent Blizzard/WoW API security changes increasingly restrict what insecure add
 - historical/replay capture;
 - recommendation explanations.
 
-**Explicit limitation:** Retail automation is not assumed to be directly executable by ordinary addon code. Secure execution and protected API boundaries require human-driven interaction for many actions. SENTINEL must not attempt to bypass those boundaries.
+**Explicit limitation:** Retail automation is not assumed to be directly executable by ordinary addon code. Secure execution and protected API boundaries require human-driven interaction for many actions. SENTINEL must not attempt to bypass those boundaries. citeturn0search4turn0search11
 
 ## 5. Legacy 3.3.5a profile
 
@@ -435,4 +435,4 @@ These must remain `UNVERIFIED` until tested against real environments:
 
 ## 16. External reference note
 
-Modern WoW addon security is an architectural constraint. Current API documentation describes protected APIs, hardware-event requirements, combat restrictions, secure execution and taint; recent 12.x API changes further restrict access to some combat information. These constraints are why SENTINEL's capability model deliberately separates observation, recommendation and action execution.
+Modern WoW addon security is an architectural constraint. Current API documentation describes protected APIs, hardware-event requirements, combat restrictions, secure execution and taint; recent 12.x API changes further restrict access to some combat information. These constraints are why SENTINEL's capability model deliberately separates observation, recommendation and action execution. citeturn0search0turn0search4turn0search6

@@ -11,7 +11,7 @@
 - [x] PR #100 — CI state-sync governance gate — merged as `1df91de661c8bb0946d68f1671cbabf5f9714455`.
 - [x] PR #101 — repository hygiene / CURRENT_STATE synchronization — merged.
 - [x] PR #103 — ReactiveCircus Android emulator runner pin to `v2.37.0` — merged.
-- [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f802bd156384268d128bef952100e07`.
+- [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f802fd156384268d128bef952100e07`.
 - [x] PR #110 — docs sync CURRENT_STATE/TASKS after #109 — merged at `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
 - [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
 - [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
@@ -35,7 +35,7 @@
 
 ## Дальше по плану
 
-- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, commit `cf55431c301dfc9337e894300e225afa397af770`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
+- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, latest commit `cf55431c301dfc9337e894300e225afa397af770`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
 - [ ] Game Adapter Contract v1 — after Capability Matrix review.
 - [ ] Unified Game State v1 — after Adapter Contract review.
 - [ ] Local Companion protocol + latency classes — after state contract review.

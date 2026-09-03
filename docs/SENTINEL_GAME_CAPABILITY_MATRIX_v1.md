@@ -16,194 +16,117 @@
 | UNAVAILABLE | Not exposed through the permitted integration boundary. |
 | UNVERIFIED | Plausible or historically available, but not yet validated on the exact target build. |
 
-## 2. Architectural rule
+## 2. Core rule
 
-SENTINEL must never infer `AVAILABLE` from the existence of a similarly named API on another client generation.
-
-```text
-Game/Client/Server
-       ↓
-Adapter capability discovery
-       ↓
-Capability profile
-       ↓
-Unified Game State
-       ↓
-Core intelligence
-```
-
-A capability is separate from permission:
+SENTINEL never promotes a capability to `AVAILABLE` merely because another WoW generation exposes a similarly named API. Capability, data quality and authorization are separate concerns.
 
 ```text
-CAPABILITY AVAILABLE
-        ≠
-ACTION AUTHORIZED
+Game/Client/Server → Adapter → Capability Profile → Unified Game State → Core
+Capability available ≠ action authorized
 ```
-
-The Policy Engine remains the authority for actions.
 
 ## 3. High-level matrix
 
-| Capability family | Retail | Legacy 3.3.5a | Private server / WoWCircle | MVP priority |
+| Capability | Retail | Legacy 3.3.5a | Private/WoWCircle | Priority |
 |---|---|---|---|---|
 | Client/version detection | AVAILABLE | AVAILABLE | UNVERIFIED | P0 |
-| Player identity/state | AVAILABLE | AVAILABLE | UNVERIFIED | P0 |
-| Target state | LIMITED/UNVERIFIED by data surface | AVAILABLE/UNVERIFIED | UNVERIFIED | P0 |
-| Combat event stream | LIMITED by current API restrictions | AVAILABLE/UNVERIFIED | UNVERIFIED | P0 |
-| Player resources | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P0 |
-| Cooldowns | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P0 |
-| Auras/buffs/debuffs | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P0 |
-| Threat | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P1 |
-| Party/raid state | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P1 |
-| Boss/mechanic state | LIMITED/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P1 |
-| Position/environment | LIMITED/UNVERIFIED | LIMITED/UNVERIFIED | UNVERIFIED | P1 |
-| Chat/context | AVAILABLE/UNVERIFIED | AVAILABLE/UNVERIFIED | UNVERIFIED | P2 |
+| Player state | AVAILABLE | AVAILABLE | UNVERIFIED | P0 |
+| Target state | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P0 |
+| Combat events | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P0 |
+| Resources | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P0 |
+| Cooldowns | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P0 |
+| Auras | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P0 |
+| Threat | LIMITED / derived | UNVERIFIED | UNVERIFIED | P1 |
+| Party/raid | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P1 |
+| Boss/encounter context | LIMITED / build-dependent | UNVERIFIED | UNVERIFIED | P1 |
+| Position/environment | LIMITED | UNVERIFIED | UNVERIFIED | P1 |
+| Chat/context | AVAILABLE / build-dependent | UNVERIFIED | UNVERIFIED | P2 |
 | Overlay | AVAILABLE | AVAILABLE | UNVERIFIED | P0 |
-| Voice bridge | Companion-level, not game API | Companion-level, not game API | Companion-level, not game API | P2 |
-| Command bridge | LIMITED and policy-gated | LIMITED/UNVERIFIED | UNVERIFIED | P1 |
-| Direct gameplay automation | RESTRICTED / generally not product baseline | Environment-dependent | Environment-dependent | Not MVP |
+| Voice bridge | Companion-level | Companion-level | Companion-level | P2 |
+| Command bridge | LIMITED / policy-gated | UNVERIFIED | UNVERIFIED | P1 |
+| Direct gameplay automation | Restricted | Environment-dependent | Environment-dependent | Not MVP |
 
-## 4. Retail profile
+## 4. Retail
 
-Current Retail must be treated as the most restrictive and fast-changing integration target.
+Retail is the most restrictive and fast-changing target. Current WoW API security documentation distinguishes protected APIs, hardware-event restrictions, combat restrictions, secure frames and taint; recent 12.x changes further restrict some combat information. Therefore the Retail adapter must discover capabilities at runtime and expose data quality instead of assuming legacy addon behavior.
 
-Current WoW API documentation distinguishes protected APIs, hardware-event restrictions, combat restrictions, secure frames and taint. Recent 12.x changes further restrict access to some combat information. Therefore the Retail adapter must use capability discovery and data-quality reporting rather than assuming legacy addon behavior remains available. citeturn0search0turn0search4turn0search6
+P0 target: player/basic target state, permitted combat signals, resources/cooldowns/auras where exposed, overlay, local aggregation, event sequencing and capability reporting.
 
-### Retail target capabilities
+P1 target: group/raid context, threat/context, richer encounter state, replay capture and explanations.
 
-**P0 / target:**
-- player identity;
-- player basic state;
-- target identity/basic state where exposed;
-- available combat events/data;
-- resources where exposed;
-- cooldown information where exposed;
-- aura information where exposed;
-- overlay rendering;
-- local state aggregation;
-- event timestamps/sequence;
-- capability and data-quality reporting.
+Automation is not assumed to be available to ordinary addon code. SENTINEL must not bypass protected APIs or secure-execution boundaries.
 
-**P1:**
-- group/raid context;
-- threat/context signals where exposed;
-- richer encounter state;
-- historical/replay capture;
-- recommendation explanations.
+## 5. Legacy 3.3.5a
 
-**Explicit limitation:** Retail automation is not assumed to be directly executable by ordinary addon code. Secure execution and protected API boundaries require human-driven interaction for many actions. SENTINEL must not attempt to bypass those boundaries. citeturn0search4turn0search11
+Legacy is a separate adapter contract. It may expose a materially different addon surface, but exact availability remains `UNVERIFIED` until tested on the exact 3.3.5a client/build used by the target environment.
 
-## 5. Legacy 3.3.5a profile
+P0 target: player/target state, combat events, resources, cooldowns, auras, basic group state, overlay and normalized event emission.
 
-Legacy 3.3.5a is expected to expose a materially different and, in some areas, richer addon surface than modern Retail. However, the exact client build and distribution must be validated before assigning `AVAILABLE`.
+P1 target: threat, encounter/boss signals, richer unit context, replay fixtures.
 
-### Legacy target capabilities
+P2 target: voice commands, personalization and environment-specific extensions.
 
-**P0 / target:**
-- player state;
-- target state;
-- combat log/events;
-- resources;
-- cooldowns;
-- auras;
-- basic group state;
-- overlay;
-- event recording;
-- normalized state emission.
+## 6. Private server / WoWCircle
 
-**P1:**
-- threat;
-- encounter/boss signals;
-- richer unit context;
-- replay/simulation fixtures derived from real sessions.
+WoWCircle is a first-class validation target, not a universal assumption. The profile must detect client build, server identity, server extensions (if any), addon API behavior, event availability and unit-data availability before publishing capabilities.
 
-**P2:**
-- voice-driven command interaction;
-- advanced player personalization;
-- environment-specific extensions.
-
-All entries remain `UNVERIFIED` until validated on an actual 3.3.5a environment.
-
-## 6. Private-server / WoWCircle profile
-
-WoWCircle is a reference target, not a guarantee of API behavior.
-
-The private-server adapter must first detect:
+Initial profile is intentionally conservative:
 
 ```text
-client build
-server identity
-server API extensions (if any)
-addon API behavior
-available events
-available unit data
+client = 3.3.5a (expected; validate)
+server = WoWCircle
+combat_events = UNVERIFIED
+target_state = UNVERIFIED
+auras = UNVERIFIED
+cooldowns = UNVERIFIED
+resources = UNVERIFIED
+threat = UNVERIFIED
+overlay = UNVERIFIED
+command_bridge = UNVERIFIED
+action_execution = UNVERIFIED
 ```
 
-Then it publishes a capability profile.
+No server-specific behavior may leak into the universal Core model.
 
-### Required private-server states
+## 7. Unified state fields
 
-A server profile may report:
+### Player
 
 ```text
-client = 3.3.5a
-server = wowcircle
-capabilities = {
-  combat_events: UNVERIFIED,
-  target_state: UNVERIFIED,
-  auras: UNVERIFIED,
-  cooldowns: UNVERIFIED,
-  resources: UNVERIFIED,
-  threat: UNVERIFIED,
-  overlay: UNVERIFIED,
-  command_bridge: UNVERIFIED,
-  action_execution: UNVERIFIED
-}
+id, name, realm/server, class/spec?, level?, health, health_max,
+power[], position?, combat_state, alive
 ```
 
-This is intentionally conservative until the actual environment is tested.
-
-## 7. Detailed capability contract
-
-### 7.1 Player state
-
-Minimum normalized fields:
+### Target
 
 ```text
-player.id
-player.name
-player.realm/server
-player.class/spec (if available)
-player.level (if available)
-player.health
-player.health_max
-player.power[]
-player.position (if available)
-player.combat_state
-player.alive
+id, name, type, health, health_max, hostility, level?,
+position?, aura_summary?
 ```
 
-Missing fields are represented as unavailable/unknown, never guessed.
-
-### 7.2 Target state
+### Resource
 
 ```text
-target.id
-target.name
-target.type
-target.health
-target.health_max
-target.hostility
-target.level
-target.position
-target.aura_summary
+type, current, maximum, regen?, timestamp
 ```
 
-Unit visibility and secret-value restrictions can reduce this profile on Retail.
+### Cooldown
 
-### 7.3 Combat events
+```text
+ability_id, available, start, duration, remaining,
+charges_current?, charges_maximum?
+```
 
-Canonical event envelope:
+### Aura
+
+```text
+id, source?, type, stacks?, duration?, remaining?,
+is_helpful?, is_harmful?
+```
+
+Missing data is represented as unknown/unavailable, never guessed.
+
+## 8. Canonical event envelope
 
 ```text
 event_id
@@ -219,103 +142,54 @@ data_quality
 provenance
 ```
 
-The adapter converts source-specific combat events into canonical events without embedding AI reasoning.
+The adapter maps source-specific events to this envelope. AI reasoning does not belong in the adapter.
 
-### 7.4 Resources
+## 9. Action matrix
 
-Normalize resource types rather than assuming one resource model:
-
-```text
-resource.type
-resource.current
-resource.maximum
-resource.regen
-resource.timestamp
-```
-
-### 7.5 Cooldowns
-
-Normalize:
-
-```text
-ability.id
-ability.available
-cooldown.start
-cooldown.duration
-cooldown.remaining
-charges.current
-charges.maximum
-```
-
-Modern APIs change over time, so the adapter owns version-specific extraction.
-
-### 7.6 Auras
-
-Normalize:
-
-```text
-aura.id
-aura.source
-aura.type
-stacks
-duration
-remaining
-is_helpful
-is_harmful
-```
-
-If the client returns opaque/secret values, the adapter reports reduced data quality rather than fabricating values.
-
-### 7.7 Threat
-
-Threat is a derived integration capability. It may be unavailable even if combat events exist.
-
-The Core must distinguish:
-
-```text
-observed threat
-estimated threat
-unavailable threat
-```
-
-### 7.8 Group state
-
-Possible normalized entities:
-
-```text
-party.member[]
-raid.member[]
-role
-health
-resource
-combat_state
-distance/position when available
-```
-
-No Core feature may require party data unless the capability profile says it is available.
-
-## 8. Action capability matrix
-
-Actions are more restricted than observations.
-
-| Action | Retail | Legacy | Private server | SENTINEL policy |
+| Action | Retail | Legacy | Private | Default policy |
 |---|---|---|---|---|
-| Show overlay | AVAILABLE | AVAILABLE | UNVERIFIED | Allow |
-| Show recommendation | AVAILABLE | AVAILABLE | UNVERIFIED | Allow |
+| Overlay | AVAILABLE | AVAILABLE | UNVERIFIED | Allow |
+| Recommendation | AVAILABLE | AVAILABLE | UNVERIFIED | Allow |
 | Voice response | Companion | Companion | Companion | Allow |
-| Highlight UI affordance | AVAILABLE within UI limits | AVAILABLE | UNVERIFIED | Allow |
-| User-clicked secure action | Environment/API dependent | Environment/API dependent | Environment dependent | Confirm/allow only when permitted |
+| UI affordance/highlight | Available within UI limits | Available | UNVERIFIED | Allow |
+| User-clicked permitted action | Environment-dependent | Environment-dependent | Environment-dependent | Confirm/allow only when permitted |
 | Automatic targeting | Restricted | Environment-dependent | Environment-dependent | Deny by default |
 | Automatic spell casting | Restricted | Environment-dependent | Environment-dependent | Deny by default |
-| Autonomous combat loop | Not MVP / not baseline | Not MVP | Not MVP | Deny |
-| Direct memory/process manipulation | Not a supported integration | Not a supported integration | Not a supported integration | Deny |
-| Client security bypass | Never | Never | Never | Deny |
+| Autonomous combat | Not MVP | Not MVP | Not MVP | Deny |
+| Memory/process manipulation | Not supported | Not supported | Not supported | Deny |
+| Security bypass | Never | Never | Never | Deny |
 
-The product can be intelligent without autonomous gameplay. Recommendation and player-controlled interaction remain first-class capabilities.
+## 10. Capability negotiation
 
-## 9. Data-quality contract
+```text
+1. Detect client/build/server.
+2. Load exact or family profile.
+3. Probe only permitted APIs/features.
+4. Validate expected events.
+5. Publish capability profile.
+6. Start state/event pipeline.
+7. Downgrade capability on runtime failure.
+```
 
-Every state snapshot and recommendation receives:
+Capabilities may change during a session; the Core must tolerate transitions.
+
+## 11. Fallback hierarchy
+
+```text
+Exact build profile
+  ↓
+Validated family profile
+  ↓
+Generic compatible profile
+  ↓
+Minimal telemetry
+  ↓
+Offline/local-only
+```
+
+Fallback must never silently claim unavailable data.
+
+## 12. Data quality
 
 ```text
 data_quality = HIGH | MEDIUM | LOW | UNKNOWN
@@ -325,114 +199,64 @@ observed_at
 ingested_at
 ```
 
-This prevents the AI from treating missing Retail data as a fact.
+Recommendations inherit the quality and provenance of their input state.
 
-## 10. Capability negotiation
-
-On adapter startup:
-
-```text
-1. Detect client/build/server.
-2. Load static profile.
-3. Probe only permitted APIs/features.
-4. Validate expected event streams.
-5. Publish capability profile.
-6. Start event/state pipeline.
-7. Downgrade capabilities on runtime failures.
-```
-
-Capabilities can change during a session. Example: entering combat can change what a Retail addon can safely access.
-
-## 11. Adapter fallback hierarchy
-
-```text
-Exact build profile
-      ↓
-Validated family profile
-      ↓
-Generic compatible profile
-      ↓
-Minimal telemetry profile
-      ↓
-Offline/local-only
-```
-
-No fallback may silently claim a capability it cannot validate.
-
-## 12. First vertical slice
-
-The first end-to-end slice should deliberately avoid requiring every game feature.
-
-### Slice A — observation → intelligence → overlay
+## 13. First vertical slice
 
 ```text
 WoW client
-   ↓
+  ↓
 Adapter
-   ↓
-Player/target/combat subset
-   ↓
+  ↓
+Player + target + combat subset
+  ↓
 Unified Game State v1
-   ↓
+  ↓
 State Engine
-   ↓
+  ↓
 Rules/recommendation engine
-   ↓
+  ↓
 Confidence + provenance
-   ↓
+  ↓
 Companion
-   ↓
+  ↓
 SENTINEL Overlay
 ```
 
-Required acceptance evidence:
+Acceptance evidence: exact client/build, capability profile, normalized events, state projection, recommendation, confidence/provenance, overlay result and a replay fixture that reproduces the result without the live game.
 
-- exact client/build recorded;
-- capability profile emitted;
-- normalized events accepted by Core;
-- state projection updated;
-- recommendation generated from observed state;
-- confidence/provenance attached;
-- overlay renders the result;
-- replay fixture created;
-- same fixture reproduces the result without the live game.
+## 14. Test matrix
 
-## 13. Test matrix
-
-| Test layer | Requirement |
+| Test | Required evidence |
 |---|---|
-| Adapter unit tests | source → normalized event/state mapping |
-| Contract tests | schema/version compatibility |
-| Capability tests | correct AVAILABLE/LIMITED/UNAVAILABLE reporting |
-| Replay tests | deterministic reprocessing |
-| Simulation tests | synthetic combat/state scenarios |
-| Security tests | adapter cannot bypass Core authorization |
-| Failure tests | missing API/event/connection causes safe degradation |
-| Performance tests | latency budgets measured per class |
-| Compatibility tests | exact client/build profile |
-| Human acceptance | real client/server validation |
+| Adapter unit | source → normalized mapping |
+| Contract | schema/version compatibility |
+| Capability | correct status reporting |
+| Replay | deterministic reprocessing |
+| Simulation | synthetic combat/state scenarios |
+| Security | adapter cannot bypass Core authorization |
+| Failure | safe degradation on missing API/events/network |
+| Performance | latency budget measurements |
+| Compatibility | exact client/build profile |
+| Human acceptance | real target environment |
 
-## 14. Open validation items
+## 15. Open validation items
 
-These must remain `UNVERIFIED` until tested against real environments:
+1. Exact Retail release-build capability surface.
+2. Exact 3.3.5a client/API used for the reference private-server target.
+3. WoWCircle-specific addon behavior/extensions.
+4. Combat-event coverage per environment.
+5. Target/party/threat/aura visibility per environment.
+6. Permitted action/secure-template behavior per environment.
+7. Real Adapter → Companion → Core latency.
+8. Any private-server API deviations.
 
-1. Exact Retail build capability surface for the release target.
-2. Exact 3.3.5a client/addon API used by the reference private-server profile.
-3. WoWCircle server-specific addon behavior and any extensions.
-4. Exact combat-event coverage available in each target environment.
-5. Exact target/party/threat/aura visibility per environment.
-6. Exact permitted action/secure-template behavior per environment.
-7. Real latency measurements for Adapter → Companion → Core.
-8. Whether a given private server changes or extends addon APIs.
+## 16. Decision
 
-## 15. Design decision
+**APPROVED direction:** SENTINEL Core is built against universal capability/state contracts rather than one WoW API.
 
-**Approved direction:** build the SENTINEL Core against universal capability/state contracts, not against a single WoW API.
+**Evidence rule:** only exact-environment evidence can promote `UNVERIFIED` to `AVAILABLE`.
 
-**Implementation rule:** a capability is promoted from `UNVERIFIED` to `AVAILABLE` only after exact-environment evidence exists.
+**WoWCircle rule:** first-class validation target; never a universal Core assumption.
 
-**Private-server rule:** WoWCircle is a first-class validation target, but no WoWCircle-specific assumption becomes universal Core behavior.
-
-## 16. External reference note
-
-Modern WoW addon security is an architectural constraint. Current API documentation describes protected APIs, hardware-event requirements, combat restrictions, secure execution and taint; recent 12.x API changes further restrict access to some combat information. These constraints are why SENTINEL's capability model deliberately separates observation, recommendation and action execution. citeturn0search0turn0search4turn0search6
+**Security rule:** current WoW protected/taint restrictions are treated as product constraints, not obstacles to bypass.

@@ -25,6 +25,8 @@ Game/Client/Server → Adapter → Capability Profile → Unified Game State →
 Capability available ≠ action authorized
 ```
 
+The Policy Engine remains the authority for actions.
+
 ## 3. High-level matrix
 
 | Capability | Retail | Legacy 3.3.5a | Private/WoWCircle | Priority |
@@ -88,7 +90,7 @@ action_execution = UNVERIFIED
 
 No server-specific behavior may leak into the universal Core model.
 
-## 7. Unified state fields
+## 7. State and event contracts
 
 ### Player
 
@@ -124,9 +126,7 @@ id, source?, type, stacks?, duration?, remaining?,
 is_helpful?, is_harmful?
 ```
 
-Missing data is represented as unknown/unavailable, never guessed.
-
-## 8. Canonical event envelope
+### Event envelope
 
 ```text
 event_id
@@ -142,9 +142,9 @@ data_quality
 provenance
 ```
 
-The adapter maps source-specific events to this envelope. AI reasoning does not belong in the adapter.
+Missing data is represented as unknown/unavailable, never guessed.
 
-## 9. Action matrix
+## 8. Action matrix
 
 | Action | Retail | Legacy | Private | Default policy |
 |---|---|---|---|---|
@@ -159,7 +159,9 @@ The adapter maps source-specific events to this envelope. AI reasoning does not 
 | Memory/process manipulation | Not supported | Not supported | Not supported | Deny |
 | Security bypass | Never | Never | Never | Deny |
 
-## 10. Capability negotiation
+The product can be intelligent without autonomous gameplay. Recommendation and player-controlled interaction remain first-class capabilities.
+
+## 9. Capability negotiation
 
 ```text
 1. Detect client/build/server.
@@ -173,7 +175,7 @@ The adapter maps source-specific events to this envelope. AI reasoning does not 
 
 Capabilities may change during a session; the Core must tolerate transitions.
 
-## 11. Fallback hierarchy
+## 10. Fallback hierarchy
 
 ```text
 Exact build profile
@@ -189,7 +191,7 @@ Offline/local-only
 
 Fallback must never silently claim unavailable data.
 
-## 12. Data quality
+## 11. Data quality
 
 ```text
 data_quality = HIGH | MEDIUM | LOW | UNKNOWN
@@ -201,7 +203,7 @@ ingested_at
 
 Recommendations inherit the quality and provenance of their input state.
 
-## 13. First vertical slice
+## 12. First vertical slice
 
 ```text
 WoW client
@@ -225,7 +227,7 @@ SENTINEL Overlay
 
 Acceptance evidence: exact client/build, capability profile, normalized events, state projection, recommendation, confidence/provenance, overlay result and a replay fixture that reproduces the result without the live game.
 
-## 14. Test matrix
+## 13. Test matrix
 
 | Test | Required evidence |
 |---|---|
@@ -240,7 +242,7 @@ Acceptance evidence: exact client/build, capability profile, normalized events, 
 | Compatibility | exact client/build profile |
 | Human acceptance | real target environment |
 
-## 15. Open validation items
+## 14. Open validation items
 
 1. Exact Retail release-build capability surface.
 2. Exact 3.3.5a client/API used for the reference private-server target.
@@ -251,7 +253,7 @@ Acceptance evidence: exact client/build, capability profile, normalized events, 
 7. Real Adapter → Companion → Core latency.
 8. Any private-server API deviations.
 
-## 16. Decision
+## 15. Decision
 
 **APPROVED direction:** SENTINEL Core is built against universal capability/state contracts rather than one WoW API.
 

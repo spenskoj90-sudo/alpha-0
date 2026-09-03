@@ -35,7 +35,7 @@
 
 ## Дальше по плану
 
-- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, latest commit `cf55431c301dfc9337e894300e225afa397af770`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
+- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, latest commit `c9e12deb93a9d88fccfd762cfd0acf667a5ed43d`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
 - [ ] Game Adapter Contract v1 — after Capability Matrix review.
 - [ ] Unified Game State v1 — after Adapter Contract review.
 - [ ] Local Companion protocol + latency classes — after state contract review.

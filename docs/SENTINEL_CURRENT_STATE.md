@@ -4,8 +4,7 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Canonical HEAD (main):** `5601e25290d0ac3f342f9f15d4580550fc816888`  
-**Current process change under review:** Issue #134 / branch `docs/gpt-primary-workflow-134` — GPT-primary engineering workflow and direct repository inspection. This branch is not merged; `main` remains authoritative for product state.  
-**Issue #134 branch HEAD:** `99a642c3bf3888f8471722309cc737fc0e878ec0`
+**Current process change under review:** Issue #134 / PR #135 / branch `docs/gpt-primary-workflow-134` — GPT-primary engineering workflow and direct repository inspection. PR #135 is open and draft; it is not merged. `main` remains authoritative for product state. The exact current PR head must always be read from PR #135 rather than copied from this state record.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -83,7 +82,7 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
 - **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD subsequently advanced to `5601e25290d0ac3f342f9f15d4580550fc816888` through PR #10.
-- **Issue #134 — GPT-primary engineering workflow: IN PROGRESS.** Documentation-only branch `docs/gpt-primary-workflow-134`; current branch HEAD `99a642c3bf3888f8471722309cc737fc0e878ec0`.
+- **Issue #134 — GPT-primary engineering workflow: IN PROGRESS.** Documentation-only PR #135 is open/draft. The exact PR head is authoritative from GitHub PR metadata.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -116,7 +115,7 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 
 ## 9. Open work
 
-- **#134** — synchronize GPT-primary engineering workflow and direct repository inspection; documentation PR pending Owner review.
+- **#134** — synchronize GPT-primary engineering workflow and direct repository inspection; PR #135 pending Owner review.
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.

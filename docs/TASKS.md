@@ -35,8 +35,9 @@
 
 ## Дальше по плану
 
-- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, latest commit `c9e12deb93a9d88fccfd762cfd0acf667a5ed43d`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
-- [ ] Game Adapter Contract v1 — after Capability Matrix review.
+- [~] **SENTINEL Game Capability Matrix v1** — GPT — PR #133, latest branch work now includes `08f40f258b841ecf4b1e0e11c625e00c8d69331c`; Owner approved architecture direction on 2026-09-03; exact environment validation remains open.
+- [~] **SENTINEL Reference & Failure Audit v1** — GPT — PR #133, commit `08f40f258b841ecf4b1e0e11c625e00c8d69331c`; Owner approved on 2026-09-03. Covers Byster, Hekili, HeroRotation, Azeroth Companion, Wowless and private-server automation patterns, with failure modes and SENTINEL countermeasures.
+- [ ] Game Adapter Contract v1 — after Capability Matrix + Reference/Failure Audit review.
 - [ ] Unified Game State v1 — after Adapter Contract review.
 - [ ] Local Companion protocol + latency classes — after state contract review.
 - [ ] Replay + simulation harness — before expanding combat intelligence.

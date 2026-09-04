@@ -1,10 +1,10 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-09-03  
+**State record:** 2026-09-04  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `5601e25290d0ac3f342f9f15d4580550fc816888`  
-**Current process change under review:** Issue #134 / PR #135 / branch `docs/gpt-primary-workflow-134` — GPT-primary engineering workflow and direct repository inspection. PR #135 is open and draft; it is not merged. `main` remains authoritative for product state. The exact current PR head must always be read from PR #135 rather than copied from this state record.
+**Canonical HEAD (main):** `e1be60e482ea22100f81081c0effbe278b19e21c`  
+**Current process state:** Issue #134 / PR #135 — GPT-primary engineering workflow and direct repository inspection — **MERGED/COMPLETE**. `main` remains authoritative for product and process state.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
@@ -32,7 +32,9 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `5601e25290d0ac3f342f9f15d4580550fc816888`, the merge commit for PR #10 (performance baseline). Exact-HEAD CI/release status remains **UNVERIFIED** unless a required run is independently verified against this exact SHA.
+Current `main` HEAD is `e1be60e482ea22100f81081c0effbe278b19e21c`, the merge commit for PR #135. The available GitHub PR-triggered workflow-run lookup for this exact merge SHA currently returns no runs. Therefore exact-HEAD CI/release status is **UNVERIFIED** unless a required run is independently verified against this exact SHA.
+
+PR #135 was independently checked by the Human Owner before merge; that evidence applied to the exact PR head `a049e08b80ac00378f48116ebf998a54c416a538`, not to the subsequent squash merge SHA.
 
 Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33e15fe10a6` were:
 
@@ -44,7 +46,7 @@ Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33
 | P1 Evidence | #257 on `f5b3423` | success |
 | Release Candidate Artifact | #32 on `f5b3423` | success |
 
-Those predecessor runs are historical evidence only and do not establish CI status for `5601e25290d0ac3f342f9f15d4580550fc816888`.
+Those predecessor runs are historical evidence only and do not establish CI status for `e1be60e482ea22100f81081c0effbe278b19e21c`.
 
 Numeric coverage remains **UNVERIFIED** as a published percent until extracted from the relevant Build & Test artifact for the exact HEAD under review.
 
@@ -81,8 +83,9 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
 - **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
-- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD subsequently advanced to `5601e25290d0ac3f342f9f15d4580550fc816888` through PR #10.
-- **Issue #134 — GPT-primary engineering workflow: IN PROGRESS.** Documentation-only PR #135 is open/draft. The exact PR head is authoritative from GitHub PR metadata.
+- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main subsequently advanced through PR #10 and then PR #135.
+- **Issue #134 — GPT-primary engineering workflow: COMPLETE (2026-09-04).** Documentation-only PR #135 merged as squash commit `e1be60e482ea22100f81081c0effbe278b19e21c`. The workflow and responsibility model are now canonical.
+- **Issue #136 — post-merge current-state synchronization: IN PROGRESS.** This PR updates this file only to reflect the actual post-merge `main` state.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -115,7 +118,6 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 
 ## 9. Open work
 
-- **#134** — synchronize GPT-primary engineering workflow and direct repository inspection; PR #135 pending Owner review.
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.

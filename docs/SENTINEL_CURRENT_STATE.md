@@ -1,13 +1,14 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-09-02  
+**State record:** 2026-09-03  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`  
-**Current product change on main:** PR #118 — #107 Phase 2 event→character projection (merged); PR #120 subsequently fixed Deploy workflow triggering and synchronized docs.
+**Canonical HEAD (main):** `5601e25290d0ac3f342f9f15d4580550fc816888`  
+**Current process change under review:** Issue #134 / PR #135 / branch `docs/gpt-primary-workflow-134` — GPT-primary engineering workflow and direct repository inspection. PR #135 is open and draft; it is not merged. `main` remains authoritative for product state. The exact current PR head must always be read from PR #135 rather than copied from this state record.
 
-> Git/main is authoritative for product state. Historical branch evidence is not current product state unless merged.
+> Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
+> GPT/ChatGPT is the primary SENTINEL executor and final integrator. Grok is a secondary executor for exceptional, genuinely large-scale work. Human Owner remains final authority for protected actions and final acceptance.
 
 ## 1. Current repository facts
 
@@ -31,9 +32,7 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`, the merge commit for PR #120.
-
-The available GitHub workflow-run lookup for this merge SHA returned no PR-triggered runs. Therefore exact-HEAD CI status is **UNVERIFIED** in this state record unless a run is independently verified against this exact SHA.
+Current `main` HEAD is `5601e25290d0ac3f342f9f15d4580550fc816888`, the merge commit for PR #10 (performance baseline). Exact-HEAD CI/release status remains **UNVERIFIED** unless a required run is independently verified against this exact SHA.
 
 Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33e15fe10a6` were:
 
@@ -45,11 +44,9 @@ Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33
 | P1 Evidence | #257 on `f5b3423` | success |
 | Release Candidate Artifact | #32 on `f5b3423` | success |
 
-Those predecessor runs are historical evidence only and do not establish CI status for `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
+Those predecessor runs are historical evidence only and do not establish CI status for `5601e25290d0ac3f342f9f15d4580550fc816888`.
 
 Numeric coverage remains **UNVERIFIED** as a published percent until extracted from the relevant Build & Test artifact for the exact HEAD under review.
-
-Prior product HEAD `a261389f589c0d281c3f45a772fa6ee17abade42` (PR #115) CI: Build & Test `33599398555`, Security `33599398765`, Android `33599398549`, P1 Evidence `33599398550` — all success.
 
 ## 3. Module verification state
 
@@ -79,13 +76,13 @@ Dedicated test/coverage evidence: **UNVERIFIED**.
 
 Do not silently change opaque-token sessions, Android Keystore P-256 identity, default-deny authorization, production `DATABASE_URL` / enrollment-token requirements, migration checksum enforcement, service-role/RLS boundaries, transactional refresh rotation, signing secrets or production credentials.
 
-## 6. Completed workflow state
+## 6. Completed workflow and product state
 
 - **Issue #22 — repository governance: COMPLETE (2026-09-01).** Historical branch cleanup (D-016/D-017) and Owner-configured required status checks on `main` (D-018).
 - **Issue #63 — P1 preventive hardening: COMPLETE (2026-09-01).** Closed by Owner after D-019/D-020.
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
-- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
-- **PR #118 / #116 / #115 / #114 / #113 / #112 / #111 / #110 / #109 / #105 / #104 / #100 / #101 / #103 / #108** — as recorded.
+- **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD subsequently advanced to `5601e25290d0ac3f342f9f15d4580550fc816888` through PR #10.
+- **Issue #134 — GPT-primary engineering workflow: IN PROGRESS.** Documentation-only PR #135 is open/draft. The exact PR head is authoritative from GitHub PR metadata.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -118,6 +115,7 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 
 ## 9. Open work
 
+- **#134** — synchronize GPT-primary engineering workflow and direct repository inspection; PR #135 pending Owner review.
 - **#59** — FTL IAM (external; optional given emulator CI).
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.
@@ -129,5 +127,25 @@ Issue #8 (SENTINEL baseline consistency audit) is **CLOSED**; its completed audi
 
 For CI, tests, coverage and release claims use exact commit SHA + workflow Run ID. For unresolved facts record **UNVERIFIED**.
 
+## 11. Engineering responsibility model
+
+| Responsibility | GPT / ChatGPT | Grok | Human Owner |
+|---|---|---|---|
+| Repository inspection | Primary | When delegated | Final visibility/authority |
+| Normal implementation | Primary | Not default | Scope/acceptance authority |
+| Architecture and technical decisions | Primary | Consulted/implemented when delegated | Final product authority |
+| Large-scale exceptional implementation | May lead; may delegate | Secondary executor | Approves scope/delegation |
+| Tests / CI / evidence analysis | Primary | Required for delegated work | Independently verifies merge gate |
+| Documentation synchronization | Primary | Required when delegated work changes state | Final acceptance |
+| Merge to `main` | Propose only | Propose only | **Exclusive** |
+| Deploy | Propose only | Propose only | **Exclusive** |
+| Credentials / secrets / signing material | No access | No access | **Exclusive** |
+| Release tags/releases | Propose only | Propose only | **Exclusive** |
+| Branch protection | Propose only | Propose only | **Exclusive** |
+
+GPT's direct GitHub connector access is an engineering capability, not an elevation of authority. It permits repository inspection and approved scoped changes but does not permit access to protected secret contents or Owner-only actions.
+
 **Final Integrator:** GPT / ChatGPT.  
-**Human Owner:** absolute final authority for acceptance, scope, release, credentials, and destructive repository cleanup.
+**Primary Executor:** GPT / ChatGPT.  
+**Exceptional Secondary Executor:** Grok.  
+**Human Owner:** absolute final authority for acceptance, scope, release, credentials, protected repository actions, and destructive cleanup.

@@ -1,10 +1,10 @@
 # SENTINEL — Workflow Contract
 
-**Issue:** #14  
-**Purpose:** Machine-operable contract for automated task-to-PR workflow. Prevents autonomous merge, release, credential, and production actions while maximizing routine automation.  
-**Authority:** Human Owner is final authority for merge into `main`, deploy, credential changes, and release. Agents never perform these actions; they only propose them in text.
+**Issue:** #134  
+**Purpose:** Machine-operable contract for the SENTINEL engineering workflow. Defines GPT as the primary executor and final integrator, Grok as an exceptional secondary executor, and Human Owner as final authority for protected repository and production actions.  
+**Authority:** Human Owner is final authority for merge into `main`, deploy, credential changes, releases, and destructive/protected actions. Agents never perform these actions; they only propose them in text.
 
-This contract is binding for engineering agents working on this repository. It does not replace `docs/SENTINEL_EVIDENCE_PROTOCOL.md` or `docs/SENTINEL_CURRENT_STATE.md` — agents must follow those documents and reference them rather than duplicating their content.
+This contract is binding for engineering agents working on this repository. It does not replace `docs/SENTINEL_EVIDENCE_PROTOCOL.md`, `docs/SENTINEL_CURRENT_STATE.md`, or `docs/RELEASE_GATES.md` — agents must follow those documents and reference them rather than duplicating their detailed content.
 
 ---
 
@@ -24,7 +24,28 @@ If an issue lacks these fields, the agent must stop and request clarification ra
 
 ---
 
-## 2. Branch naming
+## 2. Current-state inspection and source of truth
+
+**GitHub repository state is authoritative for the current repository state.** GPT may directly inspect the repository through the authorized GitHub connector and should do so before beginning substantive work.
+
+GPT may independently read, as permitted by the connector:
+
+- the current `main` branch and commit history;
+- repository documentation and relevant source files;
+- Issues and Pull Requests;
+- commit metadata and diffs;
+- GitHub Actions workflow/run metadata and statuses;
+- other public repository metadata required to verify scope, state, or evidence.
+
+The Human Owner does **not** need to manually provide a fresh copy of `docs/SENTINEL_CURRENT_STATE.md` when GPT can retrieve the current file directly from the repository.
+
+Before a new task, GPT must independently reconcile the relevant issue, current `main` HEAD, related PRs/branches, and authoritative governance/evidence documents. Conversation memory is not a substitute for repository state.
+
+Repository inspection through the connector is read-oriented and does not grant GPT access to credentials, secrets, signing material, or other protected secret contents.
+
+---
+
+## 3. Branch naming
 
 All work branches use a single, predictable format:
 
@@ -50,7 +71,7 @@ Rules:
 
 ---
 
-## 3. Implementation boundaries
+## 4. Implementation boundaries
 
 **One issue = one PR = limited file set.**
 
@@ -71,7 +92,7 @@ Agents may propose such changes in text only.
 
 ---
 
-## 4. CI gates
+## 5. CI gates
 
 Required automated checks that must be green on the **exact commit SHA** under review are defined in `docs/RELEASE_GATES.md`. Do not duplicate that list here.
 
@@ -83,7 +104,7 @@ Agents must:
 
 ---
 
-## 5. Review evidence
+## 6. Review evidence
 
 Claims about CI status, test results, or acceptance may only be supported by **concrete GitHub Actions run IDs** (and optionally the run URL) tied to the exact SHA.
 
@@ -103,7 +124,7 @@ Result: success
 
 ---
 
-## 6. Regression handling
+## 7. Regression handling
 
 If CI fails on the exact SHA after a claimed success, or if a previously accepted capability disappears:
 
@@ -116,7 +137,7 @@ A prior green run on an older SHA does not satisfy acceptance for a later SHA.
 
 ---
 
-## 7. PR acceptance
+## 8. PR acceptance
 
 Before requesting merge, the following checklist must be satisfied and evidenced:
 
@@ -132,9 +153,23 @@ Before requesting merge, the following checklist must be satisfied and evidenced
 
 ---
 
-## 8. Human approval points
+## 9. Executor model
 
-The following actions are **never** performed by an agent. The agent may only describe the recommended action in text and wait for explicit Human Owner execution or one-word confirmation where the repository process requires it.
+**GPT / ChatGPT is the primary SENTINEL executor and final integrator.** GPT is responsible for the normal engineering lifecycle, including repository inspection, issue analysis, architecture and technical decisions, normal code and documentation changes, tests, CI/evidence verification, PR preparation and review, documentation synchronization, regression analysis, and final technical acceptance before Human Owner merge.
+
+GPT may directly inspect repository state through the authorized GitHub connector and may perform repository changes that are within the current issue's declared boundaries and are allowed by the connector and this contract. Direct repository access does not authorize protected actions.
+
+**Grok is a secondary executor used only for exceptional, genuinely large-scale work.** Appropriate examples include major multi-stage architectural transformations, exceptionally large multi-file implementation programs, or other tasks explicitly delegated to Grok because of their scale or complexity. Grok is not the default implementation executor.
+
+When Grok is assigned a task, the same issue intake, one-issue/one-PR, exact-SHA evidence, documentation, and protected-action rules apply. GPT resumes orchestration/final integration after Grok returns the required evidence.
+
+**Human Owner remains the final authority** for merge into `main`, production deployment, credentials/secrets/signing material, release tags/releases, branch protection, destructive repository operations, and any other action explicitly reserved to the Owner.
+
+---
+
+## 10. Human approval points
+
+The following actions are never performed by an agent. The agent may only describe the recommended action in text and wait for Human Owner execution:
 
 | Action | Agent role |
 |--------|------------|
@@ -148,28 +183,13 @@ The following actions are **never** performed by an agent. The agent may only de
 
 ---
 
-## 9. Executor assignment
+## 11. Standard task template
 
-Each issue is assigned to **exactly one executor** — **Grok** or **GPT** — and the executor must be explicitly named in the task text.
-
-Default assignment:
-
-- **Grok** — large, multi-file, or architecturally significant tasks.
-- **GPT** — focused, point changes and documentation synchronization (`docs-sync`).
-
-An executor must not continue, take over, or modify the same branch after another executor has worked on it. If ownership of the work must change, the work must move to a new branch and follow a new task assignment.
-
-The Human Owner applies the same strict verification to reports from either executor: before merge, independently run `gh pr checks <number> -R spenskoj90-sudo/alpha-0` and verify the exact PR head SHA and required checks. A textual claim of completion or passing tests is never sufficient evidence.
-
----
-
-## 10. Standard task template
-
-Use this template for task handoff between agents and the Human Owner:
+Use this template for task handoff between agents and the Human Owner when delegation is required:
 
 ```text
 ЗАДАНИЕ — Issue #<номер>
-Исполнитель: <Grok / GPT>
+Исполнитель: <GPT / Grok>
 Цель: <узкая формулировка>
 Границы файлов: <конкретный список>
 Запрещено: merge в main, deploy, изменение/чтение credentials и secrets
@@ -179,11 +199,14 @@ Use this template for task handoff between agents and the Human Owner:
 Критерий приёмки: <конкретно, проверяемо>
 ```
 
+The template is mandatory when work is delegated to Grok. For GPT-led work, the same issue intake and evidence requirements apply, but GPT may inspect the repository and execute the approved change directly within the declared boundaries.
+
 ---
 
-## References (do not duplicate)
+## References
 
 - Evidence rules and status vocabulary: `docs/SENTINEL_EVIDENCE_PROTOCOL.md`
 - Canonical product state and security invariants: `docs/SENTINEL_CURRENT_STATE.md`
 - Release and CI gate definitions: `docs/RELEASE_GATES.md`
+- Operational workflow: `docs/OPERATING_PLAYBOOK.md`
 - High-level contribution notes: `docs/CONTRIBUTING.md`

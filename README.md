@@ -36,6 +36,18 @@ Authorization is server-side:
 
 Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.md` and the full architecture reference `docs/ARCHITECTURE_V4.md`.
 
+## Engineering workflow
+
+GPT / ChatGPT is the **primary SENTINEL executor and final integrator**. GPT independently inspects the current GitHub repository state, issues, PRs, commits, diffs and available CI evidence through the authorized GitHub connector, then performs the normal engineering lifecycle within the declared issue scope.
+
+Grok is a **secondary executor for exceptional, genuinely large-scale work only** — for example major multi-stage architectural transformations or exceptionally large multi-file implementation programs. Grok is not the default implementation path.
+
+The Human Owner remains the final authority for merge into `main`, deployment, credentials/secrets and signing material, releases, branch protection, destructive operations and final product acceptance.
+
+Repository inspection by GPT does not provide access to credentials or secrets. Engineering evidence remains tied to the exact commit SHA and workflow Run ID; a textual claim that tests passed is not sufficient. Before merge, the Human Owner independently verifies the PR with `gh pr checks <PR> -R spenskoj90-sudo/alpha-0`.
+
+See `docs/WORKFLOW_CONTRACT.md` and `docs/OPERATING_PLAYBOOK.md` for the authoritative process.
+
 ## Runtime findings
 
 The earlier local plaintext-server BrokenPipeError was confirmed as an environmental battery/background-network restriction on the test device, not an Android HTTP/TLS/h2c implementation defect. The client uses `HttpURLConnection`; after battery optimization was disabled, the request completed immediately. PR #34 provided the temporary diagnostic exception reporting used to establish the cause.
@@ -143,7 +155,7 @@ See `docs/API.md` for the endpoint contract.
 
 ## Contributing
 
-See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. PRs that change code or process must update `README.md` and `docs/SENTINEL_CURRENT_STATE.md` with the current HEAD.
+See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. PRs that change code or process must update `README.md` and `docs/SENTINEL_CURRENT_STATE.md` with the current HEAD. The operational workflow is documented in `docs/OPERATING_PLAYBOOK.md`.
 
 ## License
 

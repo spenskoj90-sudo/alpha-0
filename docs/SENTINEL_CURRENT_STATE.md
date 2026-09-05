@@ -1,12 +1,13 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-09-04  
+**State record:** 2026-09-05  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Canonical HEAD (main):** `e1be60e482ea22100f81081c0effbe278b19e21c`  
-**Current process state:** Issue #134 / PR #135 — GPT-primary engineering workflow and direct repository inspection — **MERGED/COMPLETE**. `main` remains authoritative for product and process state.
+**Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
+**Current process state:** Issue #134 / PR #135 — GPT-primary engineering workflow and direct repository inspection — **MERGED/COMPLETE**. `main` remains authoritative for product and process state; the observed SHA above is a snapshot and must not be treated as the live HEAD after subsequent merges.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
+> This document records an observed/snapshot `main` SHA; the live `main` HEAD may advance after this snapshot is committed.
 > Exact CI/release claims require the exact SHA plus workflow Run ID; unresolved evidence is recorded as **UNVERIFIED**.
 > GPT/ChatGPT is the primary SENTINEL executor and final integrator. Grok is a secondary executor for exceptional, genuinely large-scale work. Human Owner remains final authority for protected actions and final acceptance.
 
@@ -32,9 +33,11 @@
 
 ## 2. Exact-HEAD evidence
 
-Current `main` HEAD is `e1be60e482ea22100f81081c0effbe278b19e21c`, the merge commit for PR #135. The available GitHub PR-triggered workflow-run lookup for this exact merge SHA currently returns no runs. Therefore exact-HEAD CI/release status is **UNVERIFIED** unless a required run is independently verified against this exact SHA.
+The observed `main` HEAD for this snapshot is `2553270da1c07e82304b232ebc401781920efa64`, the merge commit for PR #147. The available GitHub PR-triggered workflow-run lookup for this exact SHA currently returns no runs. Therefore exact-SHA CI/release status is **UNVERIFIED** unless a required run is independently verified against this exact SHA.
 
 PR #135 was independently checked by the Human Owner before merge; that evidence applied to the exact PR head `a049e08b80ac00378f48116ebf998a54c416a538`, not to the subsequent squash merge SHA.
+
+PR #147 (`ci: auto-sync CURRENT_STATE HEAD via PR (no direct push to main)`) is **MERGED**. It provides a future synchronization mechanism by creating a PR when the recorded CURRENT_STATE HEAD differs from the live push SHA; it does not make the snapshot SHA above a permanent live-HEAD claim.
 
 Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33e15fe10a6` were:
 
@@ -46,7 +49,7 @@ Previously recorded CI runs for predecessor SHA `f5b342310a0278b318b434976cc0d33
 | P1 Evidence | #257 on `f5b3423` | success |
 | Release Candidate Artifact | #32 on `f5b3423` | success |
 
-Those predecessor runs are historical evidence only and do not establish CI status for `e1be60e482ea22100f81081c0effbe278b19e21c`.
+Those predecessor runs are historical evidence only and do not establish CI status for `2553270da1c07e82304b232ebc401781920efa64`.
 
 Numeric coverage remains **UNVERIFIED** as a published percent until extracted from the relevant Build & Test artifact for the exact HEAD under review.
 
@@ -85,7 +88,9 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #107 — characters/game-state domain: COMPLETE (2026-09-02).** Phase 1 PR #115; Phase 2 PR #118 at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
 - **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main subsequently advanced through PR #10 and then PR #135.
 - **Issue #134 — GPT-primary engineering workflow: COMPLETE (2026-09-04).** Documentation-only PR #135 merged as squash commit `e1be60e482ea22100f81081c0effbe278b19e21c`. The workflow and responsibility model are now canonical.
-- **Issue #136 — post-merge current-state synchronization: IN PROGRESS.** This PR updates this file only to reflect the actual post-merge `main` state.
+- **Issue #136 — post-merge current-state synchronization: COMPLETE.** PR #137 merged as commit `10b6c3186d792d9c892e5ca086b40ef99a16640e`.
+- **Issue #146 — CURRENT_STATE self-staleness: IN PROGRESS.** This snapshot records the observed post-PR-#147 main state and explicitly separates that observation from the live `main` HEAD.
+- **PR #147 — auto-sync CURRENT_STATE HEAD via PR: MERGED.** Future synchronization is performed through a PR rather than a direct push to `main`.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 

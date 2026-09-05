@@ -18,7 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Default GITHUB_TOKEN is sufficient with contents: write.
           fetch-depth: 1
 
       - name: Patch Canonical HEAD line
@@ -26,22 +25,21 @@ jobs:
           TARGET_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          FILE="docs/SENTINEL_CURRENT_STATE.md"
-          if [[ ! -f "$FILE" ]]; then
-            echo "ERROR: $FILE not found"
-            exit 1
-          fi
-          # Exact header pattern used in CURRENT_STATE.
-          if ! grep -qE '^\*\*Canonical HEAD \(main\):\*\* `[0-9a-f]{7,40}`' "$FILE"; then
-            echo "ERROR: Canonical HEAD pattern not found in $FILE"
-            exit 1
-          fi
-          # Replace only the SHA. Avoid bash backtick expansion by building the
-          # replacement with printf and a single-quoted sed script.
-          REPLACEMENT=$(printf '**Canonical HEAD (main):** `%s`' "$TARGET_SHA")
-          sed -i -E "s|^\*\*Canonical HEAD \(main\):\*\* `[0-9a-f]{7,40}`|${REPLACEMENT}|" "$FILE"
-          echo "Patched Canonical HEAD to ${TARGET_SHA}"
-          grep -E '^\*\*Canonical HEAD \(main\):\*\*' "$FILE" || true
+          python3 << 'PY'
+          import os, re, sys
+          path = "docs/SENTINEL_CURRENT_STATE.md"
+          sha = os.environ["TARGET_SHA"]
+          with open(path, "r", encoding="utf-8") as f:
+              text = f.read()
+          pattern = r"(\*\*Canonical HEAD \(main\):\*\* `)[0-9a-f]{7,40}(`)"
+          new_text, n = re.subn(pattern, r"\g<1>" + sha + r"\g<2>", text, count=1)
+          if n != 1:
+              print(f"ERROR: expected exactly 1 Canonical HEAD match, got {n}")
+              sys.exit(1)
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(new_text)
+          print(f"Patched Canonical HEAD to {sha}")
+          PY
 
       - name: Commit and push if changed
         run: |

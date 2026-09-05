@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     # Skip re-entrancy: auto-sync merges and [skip ci] commits must not open another PR.
     if: >-
-      ${
+      ${{
         !contains(github.event.head_commit.message, '[skip ci]')
         && !contains(github.event.head_commit.message, 'auto-sync CURRENT_STATE')
-      }
+      }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

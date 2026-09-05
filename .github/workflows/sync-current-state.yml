@@ -100,15 +100,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Branch from the exact commit that triggered this run
-          git checkout -b "$BRANCH"
-          git add docs/SENTINEL_CURRENT_STATE.md
-          git commit -m "chore: auto-sync CURRENT_STATE observed HEAD to ${TARGET_SHA} [skip ci]"
+          # Reuse a branch already created for this exact TARGET_SHA on a rerun.
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch --no-tags origin "$BRANCH"
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            echo "Reusing existing sync branch $BRANCH"
+          else
+            # Branch from the exact commit that triggered this run.
+            git checkout -b "$BRANCH"
+            git add docs/SENTINEL_CURRENT_STATE.md
+            git commit -m "chore: auto-sync CURRENT_STATE observed HEAD to ${TARGET_SHA} [skip ci]"
+            git push -u origin "$BRANCH"
+          fi
 
-          # Push feature branch (not main) — allowed under normal branch protection
-          git push -u origin "$BRANCH"
-
-          # Avoid duplicate open PRs for the same branch
+          # Avoid duplicate open PRs for the same branch.
           if gh pr list --head "$BRANCH" --base main --state open --json number --jq 'length' | grep -qx '0'; then
             gh pr create \
               --base main \

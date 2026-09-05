@@ -4,7 +4,7 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
-**Current process state:** Issue #134 / PR #135 — GPT-primary engineering workflow and direct repository inspection — **MERGED/COMPLETE**. `main` remains authoritative for product and process state; the observed SHA above is a snapshot and must not be treated as the live HEAD after subsequent merges.
+**Current process state:** Issue #154 — fix required CI checks for auto-created CURRENT_STATE sync PRs — **IN PROGRESS (this PR)**. Live `main` HEAD is ahead of the snapshot above; the next auto-sync after merge will advance the observed line.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
 > This document records an observed/snapshot `main` SHA; the live `main` HEAD may advance after this snapshot is committed.
@@ -30,12 +30,13 @@
   - Phase 1 (PR #115): store `list_characters` / `get_character` / `upsert_character`; read routes `GET /v1/characters`, `/v1/characters/{id}`, `/v1/games`, `/v1/games/{id}`, `/v1/games/{id}/access` with auth + IDOR.
   - Phase 2 (PR #118): `character_projection.py` + `apply_character_projections` after successful `/v1/events:batch`; types `character.snapshot` / `character.upsert` / `character.state`; required payload `game_id`, `external_id`, `name`; invalid payload skips projection. No public mutable character write API.
 - **Deploy workflow:** PR #120 changed `deploy.yml` to run only on published GitHub Releases or manual `workflow_dispatch`. Optional remote rollout is gated by repository variable `DEPLOY_ENABLED=true`; deploy secrets are checked only inside the job when enabled. No routine push-to-main Deploy run is expected.
+- **Auto-sync CURRENT_STATE CI (Issue #154):** Required workflows (`build.yml`, `security.yml`, `p1-evidence.yml`) also trigger on `push` to `ci/state-sync-auto-*`. The sync commit no longer uses `[skip ci]`. This allows status checks to report on the auto-sync PR head SHA without manual "Approve workflows" and without any new credentials/secrets. Human `pull_request` triggers are unchanged.
 
 ## 2. Exact-HEAD evidence
 
 The observed `main` HEAD for this snapshot is `2553270da1c07e82304b232ebc401781920efa64`, the merge commit for PR #147. The available GitHub PR-triggered workflow-run lookup for this exact SHA currently returns no runs. Therefore exact-SHA CI/release status is **UNVERIFIED** unless a required run is independently verified against this exact SHA.
 
-PR #135 was independently checked by the Human Owner before merge; that evidence applied to the exact PR head `a049e08b80ac00378f48116ebf998a54c416a538`, not to the subsequent squash merge SHA.
+Live `main` HEAD at the time of Issue #154 work was `2b8c4b40aefc6e99f1ff7ef6a6c3a9fc82693d16` (PR #153 was the pending auto-sync for that SHA and is intentionally left unmerged until #154 is fixed).
 
 PR #147 (`ci: auto-sync CURRENT_STATE HEAD via PR (no direct push to main)`) is **MERGED**. It provides a future synchronization mechanism by creating a PR when the recorded CURRENT_STATE HEAD differs from the live push SHA; it does not make the snapshot SHA above a permanent live-HEAD claim.
 
@@ -91,6 +92,7 @@ Do not silently change opaque-token sessions, Android Keystore P-256 identity, d
 - **Issue #136 — post-merge current-state synchronization: COMPLETE.** PR #137 merged as commit `10b6c3186d792d9c892e5ca086b40ef99a16640e`.
 - **Issue #146 — CURRENT_STATE self-staleness: IN PROGRESS.** This snapshot records the observed post-PR-#147 main state and explicitly separates that observation from the live `main` HEAD.
 - **PR #147 — auto-sync CURRENT_STATE HEAD via PR: MERGED.** Future synchronization is performed through a PR rather than a direct push to `main`.
+- **Issue #154 — auto-sync PR required checks: IN PROGRESS.** Root cause: `GITHUB_TOKEN`-created PRs do not trigger `pull_request` workflows (recursion prevention) and the sync commit used `[skip ci]`. Fix: remove `[skip ci]` from the sync commit and extend required workflow `on.push.branches` with `ci/state-sync-auto-*`. No new secrets, no branch-protection changes, no auto-merge, no direct push to main.
 
 ## 7. Branch protection (issue #22) — Owner configured 2026-09-01
 
@@ -127,6 +129,7 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.
 - **#10** — establish measurable build/runtime performance baseline.
+- **#154** — auto-sync PR required checks (this PR).
 
 Issue #8 (SENTINEL baseline consistency audit) is **CLOSED**; its completed audit was recorded through PRs #106/#108. Issue #107 is **CLOSED** as the completed characters/game-state domain.
 

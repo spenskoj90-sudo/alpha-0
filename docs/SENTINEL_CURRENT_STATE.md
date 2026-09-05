@@ -3,7 +3,7 @@
 **State record:** 2026-09-05  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
+**Observed `main` HEAD (snapshot):** `2b8c4b40aefc6e99f1ff7ef6a6c3a9fc82693d16`  
 **Current process state:** Issue #134 / PR #135 — GPT-primary engineering workflow and direct repository inspection — **MERGED/COMPLETE**. `main` remains authoritative for product and process state; the observed SHA above is a snapshot and must not be treated as the live HEAD after subsequent merges.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.

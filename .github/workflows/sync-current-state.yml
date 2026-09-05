@@ -1,0 +1,56 @@
+name: Sync CURRENT_STATE HEAD
+
+on:
+  push:
+    branches: [main]
+
+# Minimal permissions: only write to contents for the bot commit.
+permissions:
+  contents: write
+
+jobs:
+  sync-head:
+    name: Update Canonical HEAD
+    runs-on: ubuntu-latest
+    # Prevent re-entrancy: do not run on the auto-sync commit itself.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Default GITHUB_TOKEN is sufficient with contents: write.
+          fetch-depth: 1
+
+      - name: Patch Canonical HEAD line
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          FILE="docs/SENTINEL_CURRENT_STATE.md"
+          if [[ ! -f "$FILE" ]]; then
+            echo "ERROR: $FILE not found"
+            exit 1
+          fi
+          # Exact header pattern used in CURRENT_STATE.
+          if ! grep -qE '^\*\*Canonical HEAD \(main\):\*\* `[0-9a-f]{7,40}`' "$FILE"; then
+            echo "ERROR: Canonical HEAD pattern not found in $FILE"
+            exit 1
+          fi
+          # Replace only the SHA in the Canonical HEAD line.
+          sed -i -E "s|^(\*\*Canonical HEAD \(main\):\*\* `)[0-9a-f]{7,40}(`)|\1${TARGET_SHA}\2|" "$FILE"
+          echo "Patched Canonical HEAD to ${TARGET_SHA}"
+          grep -E '^\*\*Canonical HEAD \(main\):\*\*' "$FILE" || true
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/SENTINEL_CURRENT_STATE.md
+          if git diff --staged --quiet; then
+            echo "No change: Canonical HEAD already matches ${{ github.sha }}"
+          else
+            git commit -m "chore: auto-sync CURRENT_STATE HEAD [skip ci]"
+            git push
+            echo "Pushed auto-sync commit"
+          fi

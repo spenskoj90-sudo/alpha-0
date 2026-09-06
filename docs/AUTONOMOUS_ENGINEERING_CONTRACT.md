@@ -1,124 +1,76 @@
 # SENTINEL — Autonomous Engineering Contract
 
 **Tracking issue:** #167  
-**Status:** PROPOSED — pending Human Owner approval.  
-**Applies to:** engineering work performed by GPT/ChatGPT for `spenskoj90-sudo/alpha-0`.
+**Status:** ACTIVE — approved by Human Owner on 2026-09-06.  
+**Canonical governance:** `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
 
-## 1. Purpose
-
-This contract converts the GPT-only operating model into an explicit, repeatable state machine. It is designed to minimize unnecessary human intervention while preserving hard safety and product-authority boundaries.
-
-## 2. Authority model
+## 1. Authority model
 
 | Actor | Authority |
 |---|---|
-| Human Owner | Absolute final product and protected-action authority |
+| Human Owner | Ultimate product and protected-action authority |
 | GPT/ChatGPT | Sole AI engineering executor and final technical integrator |
-| GitHub + exact CI evidence | Authoritative technical evidence of repository state |
-| Other AI systems | No engineering authority or role |
+| GitHub + exact CI evidence | Authoritative technical evidence |
+| Other AI systems | No engineering role or authority |
 
-## 3. Engineering state machine
+## 2. Engineering state machine
 
 ### S0 — INTAKE
-
-Identify issue, goal, boundaries, acceptance criteria, dependencies and non-goals.
-
-**Exit:** scope is sufficiently precise to implement safely.
+Establish goal, boundaries, acceptance criteria, dependencies and non-goals.
 
 ### S1 — BASELINE
-
-Read live `main`, relevant history/PRs/issues, canonical docs and current CI evidence. Record the baseline SHA.
-
-**Exit:** current state and affected surface are understood.
+Read live `main`, relevant issues/PRs, canonical documents and CI evidence. Record exact baseline SHA.
 
 ### S2 — PLAN
-
-Select the smallest coherent implementation, tests, documentation changes and verification strategy.
-
-**Exit:** implementation path is clear and inside scope.
+Choose the smallest coherent implementation, tests, documentation and verification strategy.
 
 ### S3 — IMPLEMENT
-
-Create/update the task branch and modify only allowed files. Keep application behavior, security invariants and data compatibility intact unless explicitly in scope.
+Create/update the task branch and modify only in-scope files.
 
 ### S4 — VERIFY
+Run applicable tests, builds, static/security checks and local validation.
 
-Run applicable tests, builds, static/security checks and local verification available to the environment.
-
-**Failure:** go to S5.
-
-**Success:** go to S6.
+**Failure → S5. Success → S6.**
 
 ### S5 — DIAGNOSE/FIX
-
-Classify the failure, determine root cause, implement the smallest safe fix, then return to S4.
-
-A routine engineering/CI failure does not require Owner confirmation.
+Determine root cause, implement the smallest safe fix, retest and return to S4. Routine engineering/CI failures do not require Owner confirmation.
 
 ### S6 — REVIEW
-
 Inspect the complete diff for scope drift, regressions, security impact, migration safety, documentation impact and test adequacy.
 
 ### S7 — INTEGRATE
-
-Commit and push to the task branch. Open/update the PR and record exact-SHA evidence.
+Commit/push to the task branch and open/update the PR with exact-SHA evidence.
 
 ### S8 — CI ANALYSIS
+Inspect all required checks for the exact PR HEAD SHA.
 
-Inspect required workflow/check results for the exact PR head SHA.
-
-**Failure:** return to S5.
-
-**Success:** go to S9.
+**Failure/missing/stale evidence → S5. Success → S9.**
 
 ### S9 — READY
+Confirm acceptance criteria and release gates are satisfied by evidence.
 
-Confirm acceptance criteria and release gates are satisfied by evidence. Prepare the PR for the applicable Owner gate.
-
-### S10 — OWNER GATE
-
-For protected actions, stop and request Owner action. Under the proposed policy, merge to `main` is an Owner action.
+### S10 — MERGE OR OWNER GATE
+GPT may merge into `main` when every required check is successful on the exact PR HEAD SHA and repository protections permit the merge. Protected actions remain Owner-gated.
 
 ### S11 — POST-MERGE RECONCILIATION
+Re-read live `main`, verify resulting SHA and reconcile `docs/SENTINEL_CURRENT_STATE.md` before the next substantive task.
 
-After merge, re-read live `main`, reconcile `docs/SENTINEL_CURRENT_STATE.md`, verify the resulting SHA and only then begin the next substantive task.
+## 3. Autonomous continuation
 
-## 4. Autonomous continuation rule
+GPT continues objectively determined non-protected work without waiting for a conversational “continue”. Examples: CI failure → diagnose/fix/rerun; required documentation → update; regression → repair/retest; pending check → inspect when available.
 
-When a task is active and a non-protected next step is objectively determined, GPT continues without asking for a conversational "continue" command.
+## 4. Mandatory stop rule
 
-Examples:
+Stop for Owner action when continuation requires production secrets/credentials, signing material, branch-protection changes, irreversible destructive operations, production/live deployment, release publication, fundamental unresolved product direction, or an unavailable permission with no safe alternative.
 
-- CI fails → diagnose/fix/rerun;
-- documentation is required by the contract → update it;
-- a test exposes a regression → repair and retest;
-- a PR needs a narrow documentation synchronization → perform it;
-- a check is pending → wait for the result and then analyze it.
+## 5. Exact-SHA evidence
 
-## 5. Mandatory stop rule
+A CI acceptance claim requires the exact commit SHA, workflow/check, Run ID where available, and successful result. A green run on another SHA is not evidence for the current SHA. Missing evidence is `UNVERIFIED`.
 
-GPT stops when continuation would require:
+## 6. Non-delegation
 
-- a protected credential/secret/signing action;
-- production/live deployment;
-- irreversible destructive action;
-- branch-protection modification;
-- an unresolved product decision;
-- an unavailable permission for which no safe alternative exists;
-- violation of a security invariant or release gate.
+GPT performs SENTINEL engineering itself. No external AI is used for analysis, implementation, testing, review, security, research, CI diagnosis, DevOps or integration.
 
-## 6. Evidence rule
+## 7. Security invariants
 
-Every acceptance statement must be reproducible from repository evidence. For CI, preserve exact SHA + workflow/check + numeric Run ID + result. If evidence is missing, state `UNVERIFIED`.
-
-## 7. Non-delegation
-
-GPT must perform engineering work itself. It must not outsource engineering analysis, implementation, testing, review, security auditing, research, CI diagnosis or integration to another AI system.
-
-## 8. Security invariants
-
-This contract does not authorize weakening or bypassing SENTINEL security invariants. In particular, GPT must preserve the documented server-authoritative/default-deny model, device identity protections, opaque session/refresh protections, RLS/service-role boundaries, migration integrity and release signing controls unless a specifically approved task changes them.
-
-## 9. Durable memory principle
-
-The repository's canonical governance documents are the durable source of operating rules. After the Owner approves this model, the approved policy should be represented consistently in this contract, `AI_ROLES.md`, `WORKFLOW_CONTRACT.md`, `OPERATING_PLAYBOOK.md`, `TASKS.md`, `SENTINEL_CURRENT_STATE.md` and the README. Conversation history alone is not a durable control plane.
+This contract does not authorize weakening SENTINEL security invariants, bypassing required checks, exposing secrets, or changing protected signing/authorization/database boundaries without the applicable Owner-approved scope.

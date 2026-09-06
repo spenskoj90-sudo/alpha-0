@@ -3,7 +3,8 @@
 **State record:** 2026-09-06  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` baseline before Issue #167:** `33934d4d3d9c4655372fa159820f79ba90ed490d`
+**Observed `main` baseline before Issue #167:** `33934d4d3d9c4655372fa159820f79ba90ed490d`  
+**Observed `main` HEAD (snapshot):** `5a6668a46d92254e25bafbe6fe6d089a37733743`
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state.
 > Exact CI/release claims require exact SHA + workflow Run ID where available. Unknown facts remain **UNVERIFIED**.
@@ -65,7 +66,7 @@ Do not silently weaken the documented server-authoritative/default-deny model, d
 
 ## 7. External/open work
 
-- **#167 / #168** — GPT-only autonomous engineering operating system; governance documentation migration is implemented on the task branch and awaiting exact-SHA CI validation/merge.
+- **#167 / #168** — GPT-only autonomous engineering operating system; **implemented and merged to `main` in PR #168 at merge commit `5a6668a46d92254e25bafbe6fe6d089a37733743` after exact-SHA required-check validation on PR HEAD `92e0eef1145541ff7cb55268fe7bb8117f4491c3`.**
 - **#59** — Firebase Test Lab IAM blocker; optional while emulator CI remains available.
 - **#13** — PostHog telemetry contract.
 - **#11** — Figma design-system synchronization.
@@ -88,4 +89,4 @@ Do not silently weaken the documented server-authoritative/default-deny model, d
 - `docs/SENTINEL_EVIDENCE_PROTOCOL.md` — evidence semantics.
 - `docs/RELEASE_GATES.md` — release/CI acceptance gates.
 
-This record describes current repository facts as of the stated state record; after PR #168 merges, the main SHA must be refreshed by the normal state-sync mechanism.
+This record describes current repository facts as of the stated state record. The observed snapshot is maintained by the normal state-sync mechanism and always points to the triggering `main` SHA.

@@ -45,29 +45,16 @@ The DSN value itself is **never** committed. It exists only as a repository secr
 - `app/proguard-rules.pro` (Sentry keep rules)
 - `.github/workflows/build.yml` and `release-candidate.yml` (env injection for release only)
 
-### TEMPORARY: release smoke verify (2026-09-06)
+### Activation evidence (2026-09-06)
 
-**Purpose:** confirm the live path secret → BuildConfig → Sentry init → event in dashboard.
+Owner verified end-to-end path on physical device (Infinix, Android 14, release `1.0.0-RC2` / versionCode 10002):
 
-| Item | Detail |
-|------|--------|
-| Helper | `app/src/main/java/com/alpha0/app/diagnostics/SentrySmoke.kt` |
-| UI (primary) | **LoginScreen** card **OBSERVABILITY (TEMP)** — only when `!DEBUG` and DSN non-empty; **no backend / login required** |
-| UI (secondary) | Dashboard card (same gate) — reachable only after auth |
-| Event message | `SENTINEL_SENTRY_SMOKE` |
-| Method | `Sentry.captureException` (process stays alive) |
+- Event message: `SENTINEL_SENTRY_SMOKE`
+- Stack: `SentrySmoke.captureSmoke` ← LoginScreen TEMP UI (removed after verify)
+- Sentry issue (Owner org): `sentinel-p7.sentry.io` issue `145252132`
+- Environment tag: `production`
 
-**Owner procedure (API-less path)**
-1. Ensure repository secret `SENTRY_DSN` is set (Owner-only).
-2. Produce a **release** APK via CI (`assembleRelease` / Release Candidate Artifact).
-3. Install that APK (not a debug build).
-4. On **Sign in** screen, if the gate is open, tap **Send Sentry smoke** (no credentials needed).
-5. In Sentry project `android`, search for `SENTINEL_SENTRY_SMOKE`.
-6. After confirm: open a follow-up PR that **removes** `SentrySmoke.kt`, Login TEMP card, and Dashboard TEMP card.
-
-Do not leave the smoke UI in a public distribution release.
-
-**Note:** Release CI currently defaults `SENTINEL_API_BASE_URL` to `http://127.0.0.1:8000` when the env is unset. Login against a real Core still requires injecting a reachable base URL; smoke on LoginScreen does not.
+Temporary smoke UI and `SentrySmoke.kt` were **removed** after this confirmation. Ongoing observability is uncaught/selected runtime errors via `SentinelApplication` only.
 
 ---
 
@@ -110,6 +97,5 @@ Do not send CI failure events into Sentry. Do not embed the DSN in debug builds 
 
 ## 4. Operator notes
 
-- Owner must create the GitHub repository secret `SENTRY_DSN` before release builds will emit events.
-- After first successful release assemble with a real DSN, verify a synthetic event appears in the Sentry project dashboard (Owner action only).
+- Owner must keep the GitHub repository secret `SENTRY_DSN` set for release builds to emit events.
 - Changing scrubbing rules requires a code change and review; do not relax PII stripping without explicit Owner approval.

@@ -29,10 +29,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import com.alpha0.app.diagnostics.SentrySmoke
-import com.alpha0.app.ui.DangerButton
-import com.alpha0.app.ui.DataText
-import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 
 @Composable
@@ -46,7 +42,6 @@ fun LoginScreen(
     var registerMode by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    var smokeStatus by remember { mutableStateOf<String?>(null) }
 
     fun submit() {
         val normalizedEmail = email.trim().lowercase()
@@ -146,35 +141,6 @@ fun LoginScreen(
                 shape = RoundedCornerShape(14.dp),
             ) {
                 Text(if (registerMode) "I already have an account" else "Create a new account")
-            }
-
-            // TEMPORARY: Sentry smoke on Sign-in so release DSN path can be verified
-            // without backend / SENTINEL_API_BASE_URL (Owner Variant 3, 2026-09-06).
-            // Remove with SentrySmoke.kt + Dashboard TEMP after dashboard confirm.
-            if (SentrySmoke.isEnabled()) {
-                SentinelCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("OBSERVABILITY (TEMP)", style = MaterialTheme.typography.labelLarge)
-                        Text(
-                            "Sentry smoke — no login required. Remove after dashboard verify.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = SentinelColors.TextSecondary,
-                        )
-                        DangerButton(
-                            text = "Send Sentry smoke",
-                            onClick = {
-                                val ok = SentrySmoke.captureSmoke()
-                                smokeStatus = if (ok) {
-                                    "Sent ${SentrySmoke.MESSAGE}. Check Sentry project android."
-                                } else {
-                                    "Smoke gated off (debug or empty DSN)."
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        smokeStatus?.let { DataText(it) }
-                    }
-                }
             }
         }
     }

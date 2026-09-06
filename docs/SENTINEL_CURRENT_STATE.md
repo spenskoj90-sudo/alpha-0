@@ -3,7 +3,7 @@
 **State record:** 2026-09-06  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
+**Observed `main` HEAD (snapshot):** `0b0c7b7bf15ce3e7345cf00c927f6fb870149c5a`  
 **Current process state:** Temporary Sentry release smoke (PR #159 lineage) for Owner DSN activation verify. Issue #154 required-checks fix is on main via PR #155–#158. Live `main` HEAD is ahead of the observed snapshot above; auto-sync remains responsible for advancing that line.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.

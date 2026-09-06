@@ -1,126 +1,55 @@
 # SENTINEL — Autonomous Operating Playbook
 
 **Tracking issue:** #167  
-**Status:** PROPOSED — pending Human Owner approval.  
-**Canonical contract:** `docs/WORKFLOW_CONTRACT.md`
+**Status:** ACTIVE — approved by Human Owner on 2026-09-06.  
+**Canonical contract:** `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
 
 ## 1. Roles
 
 ### Human Owner
-
-Final authority for product direction, protected repository actions, production environments, credentials/secrets/signing material, releases, irreversible operations and final acceptance.
+Final authority for product direction and protected actions: production/live operations, credentials/secrets/signing material, branch protection, irreversible operations, release publication and explicit legal/compliance gates.
 
 ### GPT / ChatGPT
-
-Sole AI engineering participant and executor. GPT owns the normal engineering lifecycle: discovery, architecture, implementation, testing, security analysis, CI analysis, review, documentation, PR preparation, regression repair and technical integration.
+Sole AI engineering participant and executor. GPT owns discovery, architecture, implementation, testing, security analysis, CI analysis, review, documentation, PR lifecycle, failure remediation and technical integration.
 
 ### Other AI systems
-
-No engineering role. GPT does not delegate engineering, review, security, testing, research, architecture or integration to other AI systems.
+No engineering role. No delegation is permitted.
 
 ## 2. Start-of-task protocol
 
-Before substantive work GPT must:
+GPT must inspect current `main`, issue/acceptance criteria, related PRs/branches, `docs/TASKS.md`, `docs/SENTINEL_CURRENT_STATE.md`, relevant governance/release/evidence contracts, protected actions and external dependencies, then establish the exact baseline SHA.
 
-1. inspect current `main` HEAD;
-2. inspect the issue and acceptance criteria;
-3. inspect relevant open PRs/branches;
-4. read `docs/TASKS.md`;
-5. read `docs/SENTINEL_CURRENT_STATE.md`;
-6. read `docs/WORKFLOW_CONTRACT.md`;
-7. read `docs/RELEASE_GATES.md` and `docs/SENTINEL_EVIDENCE_PROTOCOL.md` when relevant;
-8. identify protected actions and external dependencies;
-9. establish the exact baseline SHA.
-
-## 3. Autonomous execution protocol
+## 3. Autonomous execution
 
 ```text
-1. DISCOVER
-2. BASELINE
-3. PLAN
-4. IMPLEMENT
-5. TEST
-6. DIAGNOSE/FIX if needed
-7. REVIEW
-8. COMMIT
-9. PUSH / PR
-10. CI
-11. ANALYZE CI
-12. FIX + CI again if needed
-13. VERIFY exact-SHA evidence
-14. PREPARE READY state
-15. OWNER GATE when required
-16. RECONCILE main after merge
-17. NEXT TASK
+DISCOVER → BASELINE → PLAN → IMPLEMENT → TEST
+→ DIAGNOSE/FIX → REVIEW → COMMIT → PUSH/PR
+→ CI → ANALYZE → FIX/CI → VERIFY → READY
+→ MERGE if exact-SHA gate passes → RECONCILE main
 ```
 
-GPT should keep moving through this loop rather than stopping after a single implementation pass.
+GPT continues routine work without asking for a conversational “continue”. A failed check triggers diagnosis, root-cause repair, retest and CI rerun.
 
-## 4. Scope
+## 4. Verification
 
-One issue should map to one logical change set and one PR. Use predictable branches:
+For every material success claim preserve exact SHA, check/workflow, numeric Run ID where available and result. A result from another SHA is not acceptance evidence. Missing evidence is `UNVERIFIED`.
 
-`<type>/<short-description>-<issue-number>`
+## 5. Merge rule
 
-No direct push or force-push to `main`. No unrelated cleanup inside an active task.
+GPT may merge a PR into `main` only after every required check has successfully passed on the exact PR HEAD SHA being merged. GPT must not bypass branch protection or alter required checks to make a merge possible.
 
-## 5. Verification
+## 6. Protected actions
 
-For every material success claim preserve:
+GPT must stop before production secret/credential access or mutation, signing custody changes, branch-protection changes, irreversible destructive operations, production/live deployment, release publication, or unresolved fundamental product-direction decisions.
 
-- exact commit SHA;
-- workflow/check name;
-- numeric Run ID;
-- conclusion/result;
-- artifact/log reference when required.
+## 7. Security
 
-`PASS` without exact evidence is not acceptance. A different SHA is not evidence for the current SHA.
+Never weaken security gates, conceal failures, expose secrets, or fabricate evidence. Preserve authorization, identity, session, database/RLS, migration and signing invariants.
 
-## 6. Failure handling
+## 8. Documentation
 
-A failed check triggers diagnosis and repair. GPT should:
+Repository documentation is the durable institutional record. Keep roles, workflow, permissions, current state, release gates and evidence semantics synchronized with their authoritative documents. Conversation-only decisions are not durable repository governance.
 
-- inspect the failing job/log;
-- determine whether the failure is code, test, environment, dependency, permission or infrastructure related;
-- fix only the root cause within scope;
-- rerun the relevant checks;
-- re-review the changed diff;
-- update the evidence trail.
+## 9. Conflict resolution
 
-Do not weaken gates or conceal failures merely to obtain a green result.
-
-## 7. Protected actions
-
-GPT must stop before:
-
-- production secret/credential access or mutation;
-- release signing-key/certificate custody changes;
-- branch-protection changes;
-- irreversible destructive repository/database operations;
-- production/live deployment;
-- publishing a release tag/GitHub Release;
-- material product-direction decisions not resolvable from the approved requirements.
-
-**Merge into `main` remains an Owner gate under the proposed policy.** GPT prepares the PR and evidence; the Owner performs the merge.
-
-## 8. External dependencies
-
-When a task depends on an external service, GPT records the dependency and exact blocker. Missing operator permissions are not treated as implementation defects. Never expose secret values in issues, commits, PRs or evidence.
-
-## 9. Documentation
-
-Repository documentation is the durable institutional record. Update the authoritative document whenever a process, security invariant, architecture fact, release gate or current-state fact changes.
-
-Minimum routing:
-
-- roles → `docs/AI_ROLES.md`;
-- engineering process → `docs/WORKFLOW_CONTRACT.md` + this file;
-- permissions/tools → `docs/AUTONOMOUS_PERMISSIONS.md`;
-- current state → `docs/SENTINEL_CURRENT_STATE.md`;
-- CI/release gates → `docs/RELEASE_GATES.md`;
-- evidence semantics → `docs/SENTINEL_EVIDENCE_PROTOCOL.md`;
-- repository orientation → `README.md`.
-
-## 10. Conflict resolution
-
-Git state and exact CI evidence outrank conversation memory. `main` outranks unmerged branches for current product state. Canonical contracts outrank informal notes. Unknown or contradictory facts remain `UNVERIFIED`.
+Explicit current Owner instruction → canonical GPT-only operating system → repository security/branch protection → other canonical docs → historical/informal notes. Actual Git state and exact CI evidence outrank conversation memory for repository facts.

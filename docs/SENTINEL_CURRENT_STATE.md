@@ -3,7 +3,7 @@
 **State record:** 2026-09-06  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
+**Observed `main` HEAD (snapshot):** `179a889ce9c30d1fc0c1c08963eaf8b8fbda514c`  
 **Current process state:** Temporary Sentry release smoke extended to **LoginScreen** (Owner Variant 3) so DSN path can be verified without backend / `SENTINEL_API_BASE_URL`. Live `main` HEAD may be ahead of the observed snapshot; auto-sync advances that line.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.

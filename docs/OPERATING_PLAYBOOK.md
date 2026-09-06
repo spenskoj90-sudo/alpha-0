@@ -1,156 +1,126 @@
-# SENTINEL — Operating Playbook
+# SENTINEL — Autonomous Operating Playbook
 
-**Issue:** #134  
-**Status:** Canonical workflow reference.  
-**Authority:** Human Owner is the final authority for merge, deploy, credentials/secrets, releases, branch protection, destructive operations, and final product acceptance.
-
-This playbook describes how SENTINEL engineering work is performed under `docs/WORKFLOW_CONTRACT.md`. The repository state on `main` is authoritative; conversation memory is not.
+**Tracking issue:** #167  
+**Status:** PROPOSED — pending Human Owner approval.  
+**Canonical contract:** `docs/WORKFLOW_CONTRACT.md`
 
 ## 1. Roles
 
-### GPT / ChatGPT — primary executor and final integrator
+### Human Owner
 
-GPT performs the normal SENTINEL engineering lifecycle:
+Final authority for product direction, protected repository actions, production environments, credentials/secrets/signing material, releases, irreversible operations and final acceptance.
 
-- inspect the live repository state;
-- read and reconcile issues, PRs, commits, diffs and authoritative documents;
-- define and validate scope;
-- make architecture and technical decisions;
-- implement normal code and documentation changes;
-- write and repair tests;
-- inspect CI and exact-SHA evidence;
-- review PRs and regressions;
-- synchronize documentation and current-state records;
-- prepare changes for Human Owner acceptance/merge.
+### GPT / ChatGPT
 
-GPT has direct repository inspection and, where the connector permits it, repository write capability within the explicit scope of the active issue. This capability does not include access to credentials/secrets or authority over protected Owner actions.
+Sole AI engineering participant and executor. GPT owns the normal engineering lifecycle: discovery, architecture, implementation, testing, security analysis, CI analysis, review, documentation, PR preparation, regression repair and technical integration.
 
-### Grok — exceptional secondary executor
+### Other AI systems
 
-Grok is used only when the task is genuinely large, multi-stage, or architecturally substantial enough that delegation materially improves execution. Grok is not the default executor.
+No engineering role. GPT does not delegate engineering, review, security, testing, research, architecture or integration to other AI systems.
 
-A Grok handoff must use the issue/task contract and must include exact file boundaries, acceptance criteria, protected-action prohibitions, and exact-SHA/CI evidence requirements.
+## 2. Start-of-task protocol
 
-### Human Owner — final authority
+Before substantive work GPT must:
 
-The Owner retains final authority for:
+1. inspect current `main` HEAD;
+2. inspect the issue and acceptance criteria;
+3. inspect relevant open PRs/branches;
+4. read `docs/TASKS.md`;
+5. read `docs/SENTINEL_CURRENT_STATE.md`;
+6. read `docs/WORKFLOW_CONTRACT.md`;
+7. read `docs/RELEASE_GATES.md` and `docs/SENTINEL_EVIDENCE_PROTOCOL.md` when relevant;
+8. identify protected actions and external dependencies;
+9. establish the exact baseline SHA.
 
-- merge into `main`;
-- production deployment;
-- creation/rotation/use of credentials, secrets and signing material;
-- release tags and GitHub Releases;
-- branch protection and required status checks;
-- destructive repository cleanup;
-- final product acceptance.
-
-Agents may recommend these actions but do not perform them.
-
-## 2. Current-state inspection
-
-Before substantive work, GPT independently checks:
-
-1. current `main` HEAD;
-2. the exact issue body and acceptance criteria;
-3. related open/merged PRs and branches;
-4. `docs/WORKFLOW_CONTRACT.md`;
-5. `docs/SENTINEL_CURRENT_STATE.md`;
-6. `docs/RELEASE_GATES.md`;
-7. `docs/SENTINEL_EVIDENCE_PROTOCOL.md`;
-8. other task-relevant repository documentation and source.
-
-The Human Owner does not need to paste a fresh `SENTINEL_CURRENT_STATE.md` when GPT can retrieve it directly. If the repository source cannot be inspected or evidence is unavailable, the affected fact is recorded as **UNVERIFIED** rather than inferred.
-
-## 3. Normal engineering cycle
-
-1. **Intake** — identify Goal, Change boundaries and Acceptance criteria.
-2. **Inspect** — establish the exact current `main` baseline and relevant repository state.
-3. **Plan** — choose the smallest coherent change set and verify non-goals.
-4. **Branch** — work from current `main` using `<type>/<short-description>-<issue-number>`.
-5. **Implement** — change only the declared scope.
-6. **Verify** — run the applicable tests/checks and inspect their exact-SHA evidence.
-7. **Review** — inspect the diff for scope drift, regressions, security issues and documentation impact.
-8. **Synchronize** — update `README.md` and `docs/SENTINEL_CURRENT_STATE.md` when required by the Workflow Contract.
-9. **PR** — open/update the PR with the exact logical change set and evidence.
-10. **Owner gate** — Human Owner independently verifies `gh pr checks <PR> -R spenskoj90-sudo/alpha-0` against the exact PR head SHA and decides whether to merge.
-11. **Post-merge** — re-read `main` and reconcile current-state documentation before starting the next substantive issue.
-
-## 4. Scope discipline
-
-- One issue = one logical change set = one PR.
-- Do not silently expand file boundaries.
-- If new work is discovered, create a separate issue or explicitly amend the current scope before implementation continues.
-- Do not mix unrelated cleanup into an active issue.
-
-## 5. Evidence discipline
-
-Never treat a textual statement such as "done", "tests passed", or "CI green" as proof.
-
-For CI/test acceptance, preserve:
-
-- exact commit SHA;
-- workflow name;
-- numeric GitHub Actions Run ID;
-- result/conclusion;
-- relevant artifact or log evidence where required.
-
-A green run on another SHA is not evidence for the current SHA. Use the status vocabulary from `docs/SENTINEL_EVIDENCE_PROTOCOL.md`, including **UNVERIFIED** where evidence is incomplete.
-
-## 6. Security and protected actions
-
-No agent may:
-
-- read, print, modify, create or rotate credentials/secrets;
-- access decrypted secret contents;
-- alter signing keys/certificates or protected release signing configuration;
-- merge into `main`;
-- deploy to production or another live environment;
-- create a release tag/GitHub Release;
-- change branch protection or required status checks;
-- perform destructive protected-branch operations.
-
-Repository inspection must remain within the public/repository data exposed by the authorized connector. Secret values are never part of normal engineering evidence.
-
-## 7. Grok delegation protocol
-
-Delegate to Grok only when the task is genuinely large-scale. The handoff must state:
+## 3. Autonomous execution protocol
 
 ```text
-ЗАДАНИЕ ДЛЯ GROK — Issue #<номер>
-
-Исполнитель: Grok
-Цель: <узкая формулировка>
-Границы файлов: <конкретный список>
-Запрещено: merge в main, deploy, изменение/чтение credentials и secrets
-Обязательно по завершении:
-1. Обновить docs/SENTINEL_CURRENT_STATE.md — новый HEAD, статус issue
-2. Прислать отчёт: номер PR, точный SHA, ссылки на CI run ID для каждой обязательной проверки
-Критерий приёмки: <конкретно, проверяемо>
+1. DISCOVER
+2. BASELINE
+3. PLAN
+4. IMPLEMENT
+5. TEST
+6. DIAGNOSE/FIX if needed
+7. REVIEW
+8. COMMIT
+9. PUSH / PR
+10. CI
+11. ANALYZE CI
+12. FIX + CI again if needed
+13. VERIFY exact-SHA evidence
+14. PREPARE READY state
+15. OWNER GATE when required
+16. RECONCILE main after merge
+17. NEXT TASK
 ```
 
-After Grok reports completion, GPT independently verifies the reported PR, exact SHA, changed files and CI evidence. A textual completion claim is never sufficient.
+GPT should keep moving through this loop rather than stopping after a single implementation pass.
 
-## 8. Documentation as institutional memory
+## 4. Scope
 
-The repository is the durable record of engineering decisions. When a process, architecture, security invariant, capability, or acceptance rule changes, update the authoritative document rather than relying on conversation history.
+One issue should map to one logical change set and one PR. Use predictable branches:
 
-At minimum:
+`<type>/<short-description>-<issue-number>`
 
-- workflow/process changes → `docs/WORKFLOW_CONTRACT.md` and this playbook;
-- canonical product/repository state → `docs/SENTINEL_CURRENT_STATE.md`;
-- release/CI acceptance changes → `docs/RELEASE_GATES.md`;
+No direct push or force-push to `main`. No unrelated cleanup inside an active task.
+
+## 5. Verification
+
+For every material success claim preserve:
+
+- exact commit SHA;
+- workflow/check name;
+- numeric Run ID;
+- conclusion/result;
+- artifact/log reference when required.
+
+`PASS` without exact evidence is not acceptance. A different SHA is not evidence for the current SHA.
+
+## 6. Failure handling
+
+A failed check triggers diagnosis and repair. GPT should:
+
+- inspect the failing job/log;
+- determine whether the failure is code, test, environment, dependency, permission or infrastructure related;
+- fix only the root cause within scope;
+- rerun the relevant checks;
+- re-review the changed diff;
+- update the evidence trail.
+
+Do not weaken gates or conceal failures merely to obtain a green result.
+
+## 7. Protected actions
+
+GPT must stop before:
+
+- production secret/credential access or mutation;
+- release signing-key/certificate custody changes;
+- branch-protection changes;
+- irreversible destructive repository/database operations;
+- production/live deployment;
+- publishing a release tag/GitHub Release;
+- material product-direction decisions not resolvable from the approved requirements.
+
+**Merge into `main` remains an Owner gate under the proposed policy.** GPT prepares the PR and evidence; the Owner performs the merge.
+
+## 8. External dependencies
+
+When a task depends on an external service, GPT records the dependency and exact blocker. Missing operator permissions are not treated as implementation defects. Never expose secret values in issues, commits, PRs or evidence.
+
+## 9. Documentation
+
+Repository documentation is the durable institutional record. Update the authoritative document whenever a process, security invariant, architecture fact, release gate or current-state fact changes.
+
+Minimum routing:
+
+- roles → `docs/AI_ROLES.md`;
+- engineering process → `docs/WORKFLOW_CONTRACT.md` + this file;
+- permissions/tools → `docs/AUTONOMOUS_PERMISSIONS.md`;
+- current state → `docs/SENTINEL_CURRENT_STATE.md`;
+- CI/release gates → `docs/RELEASE_GATES.md`;
 - evidence semantics → `docs/SENTINEL_EVIDENCE_PROTOCOL.md`;
-- user-facing repository orientation → `README.md`.
+- repository orientation → `README.md`.
 
-## 9. Conflict resolution
+## 10. Conflict resolution
 
-When information conflicts:
-
-1. actual Git state/PR/commit evidence wins over conversation memory;
-2. `main` wins over unmerged historical branches for current product state;
-3. authoritative contracts win over informal notes;
-4. exact-SHA evidence wins over generic status claims;
-5. unresolved facts remain **UNVERIFIED** until independently established.
-
-## 10. Current operating principle
-
-**GPT is the normal engineering path. Grok is the exception for exceptional scale. Human Owner is the final authority. GitHub/main is the current-state source of truth. Evidence is tied to exact SHA. Secrets remain outside agent workflows.**
+Git state and exact CI evidence outrank conversation memory. `main` outranks unmerged branches for current product state. Canonical contracts outrank informal notes. Unknown or contradictory facts remain `UNVERIFIED`.

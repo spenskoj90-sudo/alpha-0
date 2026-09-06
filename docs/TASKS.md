@@ -1,56 +1,65 @@
 # Sentinel — Task Board
 
-Формат: `[ ]` открыта, `[~]` в работе, `[x]` закрыта (указывай SHA/PR подтверждения).
+Формат: `[ ]` открыта, `[~]` в работе, `[x]` закрыта. Для `[x]` указываются SHA/PR/Run ID подтверждения.
 
 ## Governance rule
 
-**ACTIVE under Issue #167:** engineering uses one AI only — GPT/ChatGPT. The Human Owner is the final authority for product direction and protected actions. No other AI system may participate in engineering, analysis, coding, testing, review, security, CI diagnosis, architecture, DevOps, release engineering or integration.
+**ACTIVE:** инженерный контур SENTINEL использует только GPT/ChatGPT как AI-исполнителя. Human Owner остаётся финальным решающим лицом и единственным владельцем защищённых действий. Другие AI-системы не участвуют в инженерии, анализе, кодировании, тестировании, security, CI/CD, архитектуре или интеграции.
 
-GPT may autonomously progress a tracked task through inspection → implementation → verification → PR → CI → diagnosis/fix. Routine CI failures are handled autonomously. GPT may merge into `main` when all required checks have passed on the exact PR HEAD SHA and repository protections permit the merge. Protected Owner gates remain explicit.
+GPT может автономно вести обычную задачу через `DISCOVER → BASELINE → PLAN → IMPLEMENT → TEST → DIAGNOSE/FIX → REVIEW → COMMIT → PR → CI → ANALYZE → READY → INTEGRATE → POST-MERGE VERIFY`. Рутинные CI-сбои не являются остановкой.
 
-## Закрыто на текущем main
+## Закрыто / подтверждено на main
 
-- [x] Issue #12 / PR #109 — Supabase production database hosting boundary — merged at `7f795596df6d7d0362fa2113aafe74daa167cd81`.
-- [x] Issue #7 / PR #105 — Sentry Android runtime observability — merged at `38184d3cb8b81c1ff2470327de104e1cc57e50a9`.
-- [x] Issue #97 / PR #104 — bounded/evicted process-local rate-limit state — merged.
-- [x] PR #100 — CI state-sync governance gate — merged as `1df91de661c8bb0946d68f1671cbabf5f9714455`.
-- [x] PR #101 — repository hygiene / CURRENT_STATE synchronization — merged.
-- [x] PR #103 — ReactiveCircus Android emulator runner pin to `v2.37.0` — merged.
-- [x] PR #108 — docs(api): align API index with runtime — merged at `8af71e183f802fd156384268d128bef952100e07`.
-- [x] PR #110 — docs sync CURRENT_STATE/TASKS after #109 — merged at `cd87d409935c8b59f7d760beab7588c1fbf8cd67`.
-- [x] PR #111 — docs: record #22 branch cleanup decision — merged at `23ee6d2dbe0765159ce2dad9687dbd555c984cb5`.
-- [x] PR #112 — docs: historical branch hygiene complete — merged at `516c53862ee3fbf715f5891495f74d9127b13026`.
-- [x] PR #113 — docs: #22 branch protection complete; #63 backlog reconciled — merged at `4a2a987873e3c7248d1b18bd6711619c0eb80e80`.
-- [x] PR #114 — docs: close #63 as completed; mark #107 next priority — merged at `657ceb80afc1ddfe7a38e2a3e2e72799ae7c22b8`.
-- [x] PR #115 / #107 Phase 1 — characters/game-state read domain — merged at `a261389f589c0d281c3f45a772fa6ee17abade42`.
-- [x] PR #116 — docs sync after Phase 1 — merged at `01a8539cb122f9a71f798b6ece3a26173bd2a469`.
-- [x] PR #118 / #107 Phase 2 — event → character projection — merged at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
-- [x] #107 characters/game-state domain COMPLETE — Phase 1 + Phase 2 on main (2026-09-02).
-- [x] #22 repository governance COMPLETE — branch cleanup + required status checks on `main` (Owner 2026-09-01).
-- [x] #63 P1 preventive hardening COMPLETE — closed 2026-09-01 by Owner after D-019 reconciliation.
-- [x] Issue #8 — SENTINEL baseline consistency audit COMPLETE — completed through PRs #106/#108.
-- [x] PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.
+- [x] #167 / #168 — GPT-only autonomous engineering operating system — merged at `5a6668a46d92254e25bafbe6fe6d089a37733743`; PR HEAD `92e0eef1145541ff7cb55268fe7bb8117f4491c3`.
+- [x] #165 / #171 — dedicated sync identity for CURRENT_STATE automation — merged after exact-SHA CI validation; superseded draft PR #166 closed.
+- [x] #172 — CURRENT_STATE sync for `16d2d16542fa7f0d269af2083ac9282cedd35cc0` — merged as `ff67abcaa2544543fdcd218f56ff81e979801d06`; PR HEAD `613c7085a7131ad09acb0e6dce7933f964382c19`; required workflow Run IDs `34040984036`, `34040984012`, `34040983993`, `34040984006` all successful.
+- [x] PR #170 — obsolete GITHUB_TOKEN-based CURRENT_STATE sync PR — closed as superseded.
+- [x] PR #160/#162/#164 — stale pre-SYNC_PAT CURRENT_STATE sync PRs — closed as obsolete.
+- [x] #12 / #109 — Supabase production database hosting boundary — merged.
+- [x] #7 / #105 — Sentry Android runtime observability — merged; physical-device runtime path verified 2026-09-06.
+- [x] #97 / #104 — bounded/evicted process-local rate-limit state — merged.
+- [x] #100 — CI state-sync governance gate — merged.
+- [x] #101 — repository hygiene / CURRENT_STATE synchronization — merged.
+- [x] #103 — ReactiveCircus Android emulator runner pin — merged.
+- [x] #108 — API documentation/runtime alignment — merged.
+- [x] #107 — characters/game-state domain — Phase 1 + Phase 2 complete on main.
+- [x] #22 — repository governance / branch cleanup / required checks — complete.
+- [x] #63 — P1 preventive hardening — complete.
+- [x] #8 — baseline consistency audit — complete.
+- [x] #120 — deploy workflow trigger fix — merged.
 
-## Текущие открытые items
+## Текущая инженерная очередь
 
-- [~] **#167 — establish GPT-only autonomous engineering operating system.** Governance/documentation migration; Owner approval received 2026-09-06; implementation is being validated in PR #168.
-- [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker** (optional given emulator CI / D-013).
-- [ ] #13 — define PostHog telemetry contract.
-- [ ] #11 — synchronize Figma design system with implementation.
-- [ ] #10 — establish measurable build/runtime performance baseline.
-- [ ] Configure `SENTINEL_API_BASE_URL` for release once a reachable Core environment is available; physical-device production login remains blocked until this is configured and rebuilt.
+- [~] #173 — architecture foundation + Game Adapter Contract v1 + Unified Game State v1. Current HEAD: `e5701a1765706a2b71ff752bcb1febf7880ae54e`.
+- [ ] #13 — define minimal PostHog/telemetry contract: event taxonomy, properties, privacy/retention and measurable engineering/product signals. No dashboard rollout until contract exists.
+- [ ] #10 — establish measured performance baseline from reproducible CI/device evidence; current document is only a measurement contract and must not be marked complete until actual measurements are recorded.
+- [ ] #11 — synchronize Figma design system with implementation; requires explicit design-to-code mapping and reusable tokens/components.
+- [ ] #59 — Firebase Test Lab service-account GCS `storage.objects.create` permission. External/operator blocker; routine CI uses GitHub-hosted emulator instead.
+- [ ] Release `SENTINEL_API_BASE_URL` — configure only when a reachable Core environment exists; production/live endpoint and release publication remain Owner-gated.
 
-## Дальше по плану
+## Архитектурный / продуктовый хвост после #173
 
-- [ ] Админ-панель для пользователя — после MVP.
-- [ ] PC/WoW-клиент и лаунчер — после стабильного Android MVP.
-- [ ] Инфраструктура/сервер — локальный/бесплатный пока нет внешних пользователей.
-- [ ] Система приёма фидбека — GitHub Issues.
+- [ ] Implement Adapter Registry + Capability Registry.
+- [ ] Implement first conservative WoW adapter vertical slice against the new contracts.
+- [ ] Implement deterministic replay fixture format and first replay test.
+- [ ] Implement Unified Game State validation/expiry/idempotency in Core.
+- [ ] Define Companion protocol and latency classes; then measure end-to-end latency.
+- [ ] Define Policy Engine / Action Gateway boundary before any action-capable feature.
+- [ ] Add adapter/companion observability after telemetry contract.
+- [ ] Add simulation harness before expanding recommendation logic.
+- [ ] Validate exact WoW 3.3.5a/private-server environment; keep unverified capabilities unverified until L3 evidence.
 
-## Правила ведения файла
+## Дальше
 
-- Не отмечать `[x]` без прямой ссылки на SHA/PR/CI run.
-- Не добавлять новые продуктовые задачи без явного решения Owner.
-- Governance/security acceptance gates не заменяются предположением.
-- FTL usage must be quota-aware; prefer the GitHub-hosted emulator for routine CI.
-- Current repository state is governed by `docs/SENTINEL_CURRENT_STATE.md`; historical documents are not current HEAD evidence.
+- [ ] User admin panel — after MVP vertical slice.
+- [ ] PC/WoW launcher/companion — implement as the architecture reaches the Companion stage, not as an isolated parallel subsystem.
+- [ ] Production infrastructure — only when external users/production traffic justify it.
+- [ ] Feedback intake — GitHub Issues remains the canonical project feedback channel.
+
+## Правила
+
+- Не отмечать `[x]` без прямого evidence: SHA + PR + CI Run ID/device evidence where applicable.
+- Не превращать proposed thresholds или UNVERIFIED capability into achieved facts.
+- Не ослаблять security gates ради CI.
+- FTL usage must be quota-aware; prefer GitHub-hosted emulator for routine CI.
+- `docs/SENTINEL_CURRENT_STATE.md` is a state snapshot; Git `main` remains authoritative.

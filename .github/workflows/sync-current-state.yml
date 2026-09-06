@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          token: ${{ secrets.SYNC_PAT }}
       - name: Detect and patch observed snapshot HEAD if stale
         id: patch
         env:

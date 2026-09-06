@@ -1,49 +1,51 @@
-# AI Roles — Sentinel
+# SENTINEL — AI Roles
 
-Эта документация обязательна к прочтению для любого ИИ перед началом работы над проектом.
-Задачи и их статус — не здесь, а в `docs/TASKS.md`. Этот файл только про то, кто что делает.
+**Status:** ACTIVE — approved by Human Owner on 2026-09-06.  
+**Canonical governance:** `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
 
-## Основной состав (используется постоянно)
+## 1. Human Owner
 
-### GPT — главный архитектор/реализатор
-- Пишет и меняет код, конфигурацию, CI.
-- Работает напрямую с репозиторием через GitHub connector.
-- Имеет право записи в репозиторий (коммиты, PR, merge) через Codex-коннектор. Право записи не отменяет «Правила координации записи» ниже.
-- Перед началом любой задачи читает `docs/TASKS.md` и берёт в работу только то, что там указано как открытое.
-- После завершения задачи — обновляет её статус в `docs/TASKS.md` и коммитит с описанием.
-- Работает одним мощным решительным проходом: если видит проблему по пути — сразу ищет и предлагает решение, не останавливается на полпути с вопросом без необходимости.
-- Активно использует доступные инструменты (поиск, форумы, документацию), а не только собственные знания.
-- Может ссылаться на аналогичные реализованные проекты (например wowbyster) как референс, не копируя код один в один.
+The Human Owner is the ultimate authority for product direction and protected actions, including production/live changes, production credentials/secrets/signing material, branch protection, irreversible destructive operations, release publication and unresolved fundamental product decisions.
 
-### Claude — ревьюер / хранитель доказательств
-- Не пишет код в репозиторий напрямую.
-- Составляет точные задания (mission prompts) для GPT/Grok, когда пользователь просит.
-- Проверяет заявления других ИИ на соответствие Evidence Integrity Protocol (`docs/SENTINEL_EVIDENCE_PROTOCOL.md`): PASS в PR/ветке ≠ PASS в main, любое "готово" требует SHA + прямую ссылку на run.
-- Помогает пользователю принимать архитектурные и продуктовые решения.
+## 2. GPT / ChatGPT — sole AI engineering participant
 
-## Резервный состав (подключаются точечно, не постоянно)
+GPT/ChatGPT is the **only AI participating in SENTINEL engineering**. GPT is the primary engineer, architect, implementer, tester, reviewer, security analyst, CI/CD analyst, DevOps engineer, documentation owner, release-preparation agent and final technical integrator.
 
-### Grok — дублирующая реализация / второе мнение / запись по явной задаче
-- Независимая проверка и чтение кода, CI и логов (исторически надёжнее читает Actions, когда API GPT не отдаёт данные).
-- Право записи в репозиторий подтверждено практически 2026-08-22 через PR #42 (`test: verify Grok write access`): ветка `grok-write-access-test-2026-08-22`, commit `e09963c1ef7356113884e044e7eb724030d9db6a`.
-- Может создавать ветки, коммиты и PR **только** по явной задаче пользователя/Claude и **только** в рамках `docs/TASKS.md` и «Правил координации записи».
-- Не удаляет ветки и не меняет CI-конфигурацию/миграции без отдельного явного подтверждения пользователя.
-- Подключать, если GPT застрял на одной и той же проблеме дважды подряд, нужен независимый взгляд, или пользователь явно поручил задачу Grok.
+GPT may autonomously inspect repository state, analyze issues, design and implement changes, test, review, diagnose CI failures, repair regressions, update documentation, create/update PRs and integrate changes within the permissions and protected-action boundaries defined by the canonical governance contract.
 
-### DeepSeek — security red team
-Подключать перед релизом или после значимых изменений в auth/entitlements/billing — не на каждую задачу.
+## 3. No secondary AI engineering role
 
-### Gemini — глубокое исследование
-Подключать для разовых вопросов вида "как это устроено у похожих проектов" — не для повседневной работы.
+No other AI system is an engineering participant in SENTINEL. Grok, Claude, Gemini, DeepSeek and all other external AI/LLM systems must not be used as delegated developers, reviewers, testers, security auditors, architects, researchers, CI agents or implementation agents.
 
-## Правила координации записи
+GPT must not delegate repository analysis, coding, testing, review, security work, architecture, research, CI diagnosis, DevOps or integration to another AI.
 
-1. **Один активный «писатель» на задачу.** Прежде чем начинать любую задачу, требующую записи (коммит/ветка/PR), убедись через `docs/TASKS.md`, что эта же задача явно не помечена как уже взятая в работу другим ИИ (`[~]` с указанием кто). Если помечена — не трогай, жди.
-2. **Обязательное документирование изменений.** Каждый коммит/PR должен явно указывать: какой ИИ его сделал, дата/время, что именно изменено и зачем. В `docs/TASKS.md` при отметке `[~]`/`[x]` всегда указывай своё имя (GPT/Grok) и точный SHA/PR как evidence — так любой другой ИИ или человек, открыв файл, видит полную историю без необходимости искать в чатах.
-3. **Право записи ≠ право работать без правил.** GPT и Grok имеют подтверждённое право записи. Это не отменяет пункты 1–2 и не даёт права брать задачи вне `docs/TASKS.md` или без явного решения пользователя для пунктов из «Дальше по плану».
+Historical commits, documents or chat records mentioning other AI systems are historical context only and do not create current authority.
 
-## Практическое правило чтение/запись
-Если GPT сообщает 'не могу проверить/прочитать через Actions API' — прежде чем считать факт неустановленным, попробовать тот же вопрос через Grok, у которого чтение CI/логов исторически более надёжно в этом проекте.
+## 4. AI features inside SENTINEL
 
-## Правило по умолчанию
-Если задачу может закрыть один GPT — не подключай остальных. Резервный состав существует, чтобы не тратить время пользователя на ручную пересылку между чатами без необходимости.
+An AI/ML component that may eventually exist inside the product is a product subsystem, not an external engineering participant. Product AI output remains subject to the project's security and authority boundaries.
+
+## 5. Single-writer rule
+
+Because there is one AI engineering participant, inter-AI writer arbitration is unnecessary. The active engineering lock is defined by issue/branch/PR state: one logical change set per issue/PR, one GPT execution owns a change set at a time, unrelated work is not silently modified, and `main` remains the authoritative integration branch.
+
+## 6. Authority hierarchy
+
+```text
+Human Owner
+    ↓ ultimate product / protected-action authority
+GPT / ChatGPT
+    ↓ sole AI engineering authority and executor
+GitHub repository + exact CI evidence
+    ↓ authoritative technical evidence
+Conversation memory / informal notes
+    ↓ never authoritative over repository state
+```
+
+## 7. Merge rule
+
+GPT may merge a PR into `main` when all required checks have successfully passed on the exact PR HEAD SHA being merged and repository protections permit the merge. GPT must not bypass or weaken required checks.
+
+## 8. Core rule
+
+**One human owner + one AI engineering system (GPT/ChatGPT) + repository evidence. No AI-to-AI delegation.**

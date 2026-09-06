@@ -15,8 +15,8 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 - Device Details with fingerprint, algorithm, state, binding/last-seen data, plus backend rotate/revoke actions.
 - Game Details backed by authenticated entitlement APIs and the existing game catalog.
 - Complete Android MVP navigation: `Login/Register → Device Setup → Dashboard → Device Details → Game Details`.
-- Final Sentinel visual system across all five Android MVP screens: centralized final palette, Outfit/Inter/JetBrains Mono typography, 4dp cards with 2dp ultraviolet left accent, status badges, rounded primary/destructive controls and one-shot 1000ms device scan-line.
-- FastAPI SENTINEL CORE with PostgreSQL production architecture and schema; runtime persistence still requires exact-main runtime validation.
+- Final Sentinel visual system across all five Android MVP screens.
+- FastAPI SENTINEL CORE with PostgreSQL production architecture and schema.
 - Default-deny authorization with roles, scopes and policies.
 - User-bound device enrollment and one-time challenge proof.
 - Opaque access sessions and one-time refresh rotation/session-security primitives.
@@ -36,17 +36,26 @@ Authorization is server-side:
 
 Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.md` and the full architecture reference `docs/ARCHITECTURE_V4.md`.
 
-## Engineering workflow
+## Engineering operating model
 
-GPT / ChatGPT is the **primary SENTINEL executor and final integrator**. GPT independently inspects the current GitHub repository state, issues, PRs, commits, diffs and available CI evidence through the authorized GitHub connector, then performs the normal engineering lifecycle within the declared issue scope.
+**ACTIVE under Issue #167:** SENTINEL uses a GPT-only autonomous engineering organization:
 
-Grok is a **secondary executor for exceptional, genuinely large-scale work only** — for example major multi-stage architectural transformations or exceptionally large multi-file implementation programs. Grok is not the default implementation path.
+- **Human Owner** — ultimate authority for product direction and protected actions.
+- **GPT / ChatGPT** — the **sole AI engineering participant**, responsible for architecture, implementation, testing, security analysis, CI/CD, review, documentation, PR lifecycle, failure remediation and final technical integration.
 
-The Human Owner remains the final authority for merge into `main`, deployment, credentials/secrets and signing material, releases, branch protection, destructive operations and final product acceptance.
+No other AI system has an engineering role. GPT does not delegate engineering, review, testing, security, research, architecture, CI diagnosis, DevOps or integration to another AI.
 
-Repository inspection by GPT does not provide access to credentials or secrets. Engineering evidence remains tied to the exact commit SHA and workflow Run ID; a textual claim that tests passed is not sufficient. Before merge, the Human Owner independently verifies the PR with `gh pr checks <PR> -R spenskoj90-sudo/alpha-0`.
+The normal autonomous loop is:
 
-See `docs/WORKFLOW_CONTRACT.md` and `docs/OPERATING_PLAYBOOK.md` for the authoritative process.
+`DISCOVER → BASELINE → PLAN → IMPLEMENT → TEST → DIAGNOSE/FIX → REVIEW → COMMIT → PR → CI → ANALYZE → FIX/CI → READY → MERGE → POST-MERGE VERIFY`
+
+Routine CI failures are worked through autonomously. GPT may merge a PR into `main` only when all required checks have successfully passed on the exact PR HEAD SHA being merged. GPT must never bypass or weaken branch protection or required checks.
+
+Protected Owner gates remain: production secrets/credentials, signing material, branch-protection changes, irreversible destructive operations, production/live deployment, release publication and unresolved fundamental product-direction decisions.
+
+Exact CI/test claims require exact commit SHA plus workflow/check evidence and Run ID where available. Repository state is authoritative over conversation memory.
+
+Canonical governance: `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`, `docs/AI_ROLES.md`, `docs/AUTONOMOUS_ENGINEERING_CONTRACT.md`, `docs/AUTONOMOUS_PERMISSIONS.md`, `docs/WORKFLOW_CONTRACT.md` and `docs/OPERATING_PLAYBOOK.md`.
 
 ## Runtime findings
 
@@ -129,7 +138,7 @@ The authoritative rule is:
 
 `FAIL → root cause → FIX → regression → MAIN PASS → ACCEPTED`
 
-The RC workflow scope includes Core coverage (minimum 80%), Android build/tests, web lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact `main` SHA being claimed.
+The RC workflow scope includes Core coverage (minimum 80%), Android build/tests, web lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed.
 
 See `docs/RELEASE_GATES.md` for the RC acceptance matrix.
 

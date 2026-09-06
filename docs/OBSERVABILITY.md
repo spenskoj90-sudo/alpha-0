@@ -52,19 +52,22 @@ The DSN value itself is **never** committed. It exists only as a repository secr
 | Item | Detail |
 |------|--------|
 | Helper | `app/src/main/java/com/alpha0/app/diagnostics/SentrySmoke.kt` |
-| UI | Dashboard card **OBSERVABILITY (TEMP)** — only when `!DEBUG` and DSN non-empty |
+| UI (primary) | **LoginScreen** card **OBSERVABILITY (TEMP)** — only when `!DEBUG` and DSN non-empty; **no backend / login required** |
+| UI (secondary) | Dashboard card (same gate) — reachable only after auth |
 | Event message | `SENTINEL_SENTRY_SMOKE` |
 | Method | `Sentry.captureException` (process stays alive) |
 
-**Owner procedure**
+**Owner procedure (API-less path)**
 1. Ensure repository secret `SENTRY_DSN` is set (Owner-only).
 2. Produce a **release** APK via CI (`assembleRelease` / Release Candidate Artifact).
 3. Install that APK (not a debug build).
-4. Reach Dashboard; if the gate is open, tap **Send Sentry smoke**.
+4. On **Sign in** screen, if the gate is open, tap **Send Sentry smoke** (no credentials needed).
 5. In Sentry project `android`, search for `SENTINEL_SENTRY_SMOKE`.
-6. After confirm: open a follow-up PR that **removes** `SentrySmoke.kt` and the Dashboard TEMP card.
+6. After confirm: open a follow-up PR that **removes** `SentrySmoke.kt`, Login TEMP card, and Dashboard TEMP card.
 
 Do not leave the smoke UI in a public distribution release.
+
+**Note:** Release CI currently defaults `SENTINEL_API_BASE_URL` to `http://127.0.0.1:8000` when the env is unset. Login against a real Core still requires injecting a reachable base URL; smoke on LoginScreen does not.
 
 ---
 

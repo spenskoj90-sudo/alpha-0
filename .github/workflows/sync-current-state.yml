@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
 
-# contents: create branch + commit; pull-requests: open PR.
-# No direct push to protected main.
 permissions:
   contents: write
   pull-requests: write
@@ -14,15 +12,9 @@ jobs:
   sync-head:
     name: Open CURRENT_STATE HEAD sync PR
     runs-on: ubuntu-latest
-    # Skip re-entrancy: only skip when *this* commit is itself an auto-sync
-    # commit (message starts with the canonical auto-sync subject) or carries
-    # [skip ci]. Do NOT match arbitrary mentions of the phrase "auto-sync
-    # CURRENT_STATE" in commit bodies (that previously skipped the #155 merge).
-    if: >-
-      ${
-        !contains(github.event.head_commit.message, '[skip ci]')
-        && !startsWith(github.event.head_commit.message, 'chore: auto-sync CURRENT_STATE')
-      }
+    # Skip only genuine auto-sync commits (subject prefix) or [skip ci].
+    # Single-line form to avoid expression delimiter mangling.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !startsWith(github.event.head_commit.message, 'chore: auto-sync CURRENT_STATE') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -108,22 +100,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Reuse a branch already created for this exact TARGET_SHA on a rerun.
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             git fetch --no-tags origin "$BRANCH"
             git checkout -B "$BRANCH" "origin/$BRANCH"
             echo "Reusing existing sync branch $BRANCH"
           else
-            # Branch from the exact commit that triggered this run.
             git checkout -b "$BRANCH"
             git add docs/SENTINEL_CURRENT_STATE.md
-            # No [skip ci]: required checks must run on this SHA via push triggers
-            # for ci/state-sync-auto-* (see Issue #154).
             git commit -m "chore: auto-sync CURRENT_STATE observed HEAD to ${TARGET_SHA}"
             git push -u origin "$BRANCH"
           fi
 
-          # Avoid duplicate open PRs for the same branch.
           if gh pr list --head "$BRANCH" --base main --state open --json number --jq 'length' | grep -qx '0'; then
             gh pr create \
               --base main \

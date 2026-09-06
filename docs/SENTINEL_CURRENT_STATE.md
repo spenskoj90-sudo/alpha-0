@@ -4,7 +4,7 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
-**Current process state:** Temporary Sentry release smoke (PR #159 lineage) for Owner DSN activation verify. Issue #154 required-checks fix is on main via PR #155–#158. Live `main` HEAD is ahead of the observed snapshot above; auto-sync remains responsible for advancing that line.
+**Current process state:** Temporary Sentry release smoke extended to **LoginScreen** (Owner Variant 3) so DSN path can be verified without backend / `SENTINEL_API_BASE_URL`. Live `main` HEAD may be ahead of the observed snapshot; auto-sync advances that line.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.
 > This document records an observed/snapshot `main` SHA; the live `main` HEAD may advance after this snapshot is committed.
@@ -26,7 +26,7 @@
 - In-process `RateLimiter` is bounded by `RATE_LIMIT_MAX_BUCKETS` (default 10000), evicts inactive buckets before capacity enforcement, and never displaces active buckets; implemented by PR #104.
 - Android backup and cleartext traffic are disabled; release signing/fingerprint gates are enforced in CI.
 - Sentry Android SDK 8.54.0 is integrated for release runtime observability by PR #105. `SENTRY_DSN` is supplied only to release assembly jobs; debug/PR builds use an empty default. Privacy scrubbing is implemented in `SentinelApplication`, and Sentry auto-init is disabled so initialization is controlled by application code.
-- **TEMPORARY Sentry smoke (remove after dashboard verify):** `SentrySmoke` + Dashboard **OBSERVABILITY (TEMP)** button, gated by `!DEBUG && non-empty SENTRY_DSN`. Sends one controlled `captureException` with message `SENTINEL_SENTRY_SMOKE` without killing the process. See `docs/OBSERVABILITY.md`.
+- **TEMPORARY Sentry smoke (remove after dashboard verify):** `SentrySmoke` + **LoginScreen** and Dashboard **OBSERVABILITY (TEMP)** buttons, gated by `!DEBUG && non-empty SENTRY_DSN`. LoginScreen path requires **no backend** (Owner Variant 3 after physical device hit `127.0.0.1:8000` default API base). Sends one controlled `captureException` with message `SENTINEL_SENTRY_SMOKE`. See `docs/OBSERVABILITY.md`.
 - **Characters/game-state domain (#107) COMPLETE on main:**
   - Phase 1 (PR #115): store `list_characters` / `get_character` / `upsert_character`; read routes `GET /v1/characters`, `/v1/characters/{id}`, `/v1/games`, `/v1/games/{id}`, `/v1/games/{id}/access` with auth + IDOR.
   - Phase 2 (PR #118): `character_projection.py` + `apply_character_projections` after successful `/v1/events:batch`; types `character.snapshot` / `character.upsert` / `character.state`; required payload `game_id`, `external_id`, `name`; invalid payload skips projection. No public mutable character write API.
@@ -61,7 +61,7 @@ Numeric coverage remains **UNVERIFIED** as a published percent until extracted f
 Rate-limit bounding/eviction is merged in PR #104. Security-negative, RLS, and postgres refresh concurrency coverage exist under `server/tests/`. Character store + game-state read routes (PR #115, `test_game_state.py`). Event→character projection (PR #118, `character_projection.py`, `test_character_projection.py`).
 
 ### `app/`
-Sentry Android runtime observability is merged in PR #105. Client refresh lifecycle and session persistence tests exist (PR #94/#96 lineage). **TEMPORARY** release-only Sentry smoke UI/helper is present for Owner DSN path verify and must be removed after the first confirmed dashboard event.
+Sentry Android runtime observability is merged in PR #105. Client refresh lifecycle and session persistence tests exist (PR #94/#96 lineage). **TEMPORARY** release-only Sentry smoke UI/helper is present for Owner DSN path verify (LoginScreen primary, Dashboard secondary) and must be removed after the first confirmed dashboard event.
 
 ### `web/`
 Admin entitlements route test present (`web/app/api/admin/entitlements/route.test.ts`).
@@ -78,6 +78,7 @@ Dedicated test/coverage evidence: **UNVERIFIED**.
 - Firebase Test Lab GCS `storage.objects.create` permission (issue #59).
 - GitHub repository secret `SENTRY_DSN`: Owner reports secret added and Sentry project `android` created (`ntinel-p7.sentry.io`); dashboard still showed 0 activity at activation time — **runtime path UNVERIFIED** until a release APK with DSN produces event `SENTINEL_SENTRY_SMOKE` (or equivalent).
 - Optional remote Deploy: set repository variable `DEPLOY_ENABLED=true` and secrets `DEPLOY_HOST` / `DEPLOY_USER` / `DEPLOY_KEY` only when a host is ready.
+- `SENTINEL_API_BASE_URL` is **not** injected by Release Candidate CI; release APK defaults to `http://127.0.0.1:8000`. Physical-device login against production Core remains **BLOCKED** until a reachable base URL is configured and APK rebuilt.
 
 ## 5. Explicit security invariants
 
@@ -130,7 +131,8 @@ Also enabled: require branches up to date before merging. Deploy is intentionall
 - **#13** — define PostHog telemetry contract.
 - **#11** — synchronize Figma design system with implementation.
 - **#10** — establish measurable build/runtime performance baseline.
-- **Sentry smoke cleanup** — after Owner confirms `SENTINEL_SENTRY_SMOKE` in dashboard, remove `SentrySmoke.kt` and the Dashboard TEMP card.
+- **Sentry smoke cleanup** — after Owner confirms `SENTINEL_SENTRY_SMOKE` in dashboard, remove `SentrySmoke.kt`, Login TEMP card, and Dashboard TEMP card.
+- **SENTINEL_API_BASE_URL for release** — inject reachable production/staging URL into release assemble when Core is available (separate from Sentry smoke).
 
 Issue #8 (SENTINEL baseline consistency audit) is **CLOSED**; its completed audit was recorded through PRs #106/#108. Issue #107 is **CLOSED** as the completed characters/game-state domain. Issue #154 code path is on main; leftover is operational verification of Sync runs.
 

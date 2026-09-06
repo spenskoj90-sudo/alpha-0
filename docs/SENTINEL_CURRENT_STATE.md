@@ -4,7 +4,7 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
 **Observed `main` baseline before Issue #167:** `33934d4d3d9c4655372fa159820f79ba90ed490d`  
-**Observed `main` HEAD (snapshot):** `5a6668a46d92254e25bafbe6fe6d089a37733743`
+**Observed `main` HEAD (snapshot):** `c3d9ca55eb4437fa2fe709d69bf00726b9f1d586`
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state.
 > Exact CI/release claims require exact SHA + workflow Run ID where available. Unknown facts remain **UNVERIFIED**.

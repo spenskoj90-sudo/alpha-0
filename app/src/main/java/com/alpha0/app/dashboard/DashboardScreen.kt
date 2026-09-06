@@ -20,6 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.diagnostics.SentrySmoke
+import com.alpha0.app.ui.DangerButton
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
@@ -39,6 +41,7 @@ fun DashboardScreen(
     var entitlements by remember { mutableStateOf<List<DashboardApi.Entitlement>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var smokeStatus by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(deviceId, accessToken) {
         loading = true
@@ -103,6 +106,35 @@ fun DashboardScreen(
                             StatusBadge(entitlement.status, active = entitlement.status.equals("ACTIVE", ignoreCase = true))
                             Text(entitlement.platform, style = MaterialTheme.typography.bodyMedium, color = SentinelColors.TextSecondary)
                             DataText("Valid until: ${entitlement.validUntil}")
+                        }
+                    }
+                }
+            }
+            // TEMPORARY: Sentry smoke — visible only on release builds with non-empty DSN.
+            // Remove after Owner confirms event in Sentry dashboard (see docs/OBSERVABILITY.md).
+            if (SentrySmoke.isEnabled()) {
+                item {
+                    SentinelCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("OBSERVABILITY (TEMP)", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                "Sentry smoke — sends one controlled event. Remove after dashboard verify.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = SentinelColors.TextSecondary,
+                            )
+                            DangerButton(
+                                text = "Send Sentry smoke",
+                                onClick = {
+                                    val ok = SentrySmoke.captureSmoke()
+                                    smokeStatus = if (ok) {
+                                        "Sent ${SentrySmoke.MESSAGE}. Check Sentry project android."
+                                    } else {
+                                        "Smoke gated off (debug or empty DSN)."
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            smokeStatus?.let { DataText(it) }
                         }
                     }
                 }

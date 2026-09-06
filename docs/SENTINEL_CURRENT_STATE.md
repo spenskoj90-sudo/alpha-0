@@ -3,7 +3,7 @@
 **State record:** 2026-09-06  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `2553270da1c07e82304b232ebc401781920efa64`  
+**Observed `main` HEAD (snapshot):** `33934d4d3d9c4655372fa159820f79ba90ed490d`  
 **Current process state:** Sentry Android runtime path **VERIFIED** on physical device (Owner evidence: `SENTINEL_SENTRY_SMOKE`, issue 145252132, release 1.0.0-RC2). TEMP smoke UI removed after confirm. Live `main` HEAD may be ahead of the observed snapshot; auto-sync advances that line.
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state unless merged.

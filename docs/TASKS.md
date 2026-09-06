@@ -1,7 +1,12 @@
 # Sentinel — Task Board
 
 Формат: `[ ]` открыта, `[~]` в работе, `[x]` закрыта (указывай SHA/PR подтверждения).
-Любой ИИ перед началом работы читает этот файл и берёт в работу только то, что здесь открыто. После завершения статус обновляется в том же PR.
+
+## Governance rule
+
+**Proposed under Issue #167:** engineering uses one AI only — GPT/ChatGPT. The Human Owner is the final authority. No other AI system may participate in engineering, analysis, coding, testing, review, security, CI diagnosis, architecture or integration.
+
+GPT may autonomously progress a tracked task through inspection → implementation → verification → PR → CI → diagnosis/fix until a protected Owner gate or unresolved product decision is reached. Exact-SHA evidence remains mandatory.
 
 ## Закрыто на текущем main
 
@@ -19,19 +24,21 @@
 - [x] PR #114 — docs: close #63 as completed; mark #107 next priority — merged at `657ceb80afc1ddfe7a38e2a3e2e72799ae7c22b8`.
 - [x] **PR #115 / #107 Phase 1** — characters/game-state read domain — merged at `a261389f589c0d281c3f45a772fa6ee17abade42`.
 - [x] **PR #116** — docs sync after Phase 1 — merged at `01a8539cb122f9a71f798b6ece3a26173bd2a469`.
-- [x] **PR #118 / #107 Phase 2** — event → character projection — merged at `f5b342310a0278b318b434976cc0d33e15fe10a6`. Projection from `/v1/events:batch` into `characters`; types `character.snapshot` / `character.upsert` / `character.state`; tests in `test_character_projection.py`.
+- [x] **PR #118 / #107 Phase 2** — event → character projection — merged at `f5b342310a0278b318b434976cc0d33e15fe10a6`.
 - [x] **#107 characters/game-state domain COMPLETE** — Phase 1 + Phase 2 on main (2026-09-02).
 - [x] **#22 repository governance COMPLETE** — branch cleanup + required status checks on `main` (Owner 2026-09-01).
 - [x] **#63 P1 preventive hardening COMPLETE** — closed 2026-09-01 by Owner after D-019 reconciliation.
 - [x] **Issue #8 — SENTINEL baseline consistency audit COMPLETE** — completed through PRs #106/#108.
-- [x] **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.** Main HEAD is `6eac9bbf88e614bd2584c78f19877739a4bcf9e0`.
+- [x] **PR #120 — Deploy workflow trigger fix + docs synchronization: MERGED.**
 
 ## Текущие открытые items
 
+- [ ] **#167 — establish GPT-only autonomous engineering operating system.** Governance/documentation migration; pending Owner approval of the final operating scheme.
 - [ ] #59 — P0 Firebase Test Lab service-account GCS `storage.objects.create` permission. **External/operator blocker** (optional given emulator CI / D-013).
 - [ ] #13 — define PostHog telemetry contract.
 - [ ] #11 — synchronize Figma design system with implementation.
 - [ ] #10 — establish measurable build/runtime performance baseline.
+- [ ] Configure `SENTINEL_API_BASE_URL` for release once a reachable Core environment is available; current-state record says physical-device production login remains blocked until this is configured and rebuilt.
 
 ## Дальше по плану
 
@@ -43,7 +50,7 @@
 ## Правила ведения файла
 
 - Не отмечать `[x]` без прямой ссылки на SHA/PR/CI run.
-- Не добавлять новые задачи без явного решения Owner.
+- Не добавлять новые продуктовые задачи без явного решения Owner.
 - Governance/security acceptance gates не заменяются предположением.
 - FTL usage must be quota-aware; prefer the GitHub-hosted emulator for routine CI.
 - Current repository state is governed by `docs/SENTINEL_CURRENT_STATE.md`; historical documents are not current HEAD evidence.

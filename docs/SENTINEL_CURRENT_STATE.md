@@ -78,3 +78,29 @@ Use each source for the kind of truth it actually owns:
 Ordinary code changes do **not** require a generated current-state commit or a documentation-only PR. Update this guide only when its semantic orientation materially changes. Never embed a mutable `main` HEAD or workflow-run mirror here.
 
 A document can describe an intended architecture or a historical observation, but it cannot prove that an implementation exists on current `main`. For implementation claims, inspect the repository and require evidence.
+
+## 9. Vertical-block completion rule
+
+A substantive SENTINEL block is complete only when its applicable concerns are completed as one coherent vertical slice:
+
+1. implementation and stable contract boundaries;
+2. UX/design/visualization for user-facing behavior;
+3. security/privacy and failure/degradation behavior;
+4. performance/resource behavior appropriate to the block;
+5. automated tests and regression evidence;
+6. runtime/device/integration evidence where applicable;
+7. semantic documentation/decision records when the block changes product or architectural meaning.
+
+A large architectural block may be delivered through several short-lived, independently verifiable PRs. What is prohibited is intentionally leaving a known required dimension of the active block for an unspecified later pass.
+
+The completion gate is evidence-based: an item remains **UNVERIFIED** when the required repository, CI, runtime, device or exact-environment evidence does not exist.
+
+## 10. First complete SENTINEL vertical slice
+
+The approved implementation sequence is:
+
+`UGS runtime validation → deterministic replay → conservative WoW adapter → Companion protocol/runtime → Policy Engine / Action Gateway → context/recommendation/confidence/provenance → Command Center/overlay UX → observability/performance → real-device/integration acceptance`
+
+This sequence is the primary implementation program for the first complete SENTINEL path. The slice remains conservative: no autonomous combat, no premature broad game/version expansion, no production/live deployment, and no release publication. Exact-environment capabilities remain UNVERIFIED until L3 evidence exists.
+
+Each completed block becomes the verified foundation for the next block; do not create parallel long-lived unfinished implementations when the next stage depends on the current one.

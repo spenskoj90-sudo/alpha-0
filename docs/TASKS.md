@@ -54,3 +54,25 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 - Keep branches short-lived and return completed work to `main` promptly after exact-SHA validation.
 - Documentation changes belong in the same logical PR when product/architecture meaning changes. Do not create generated HEAD-sync documentation changes for ordinary code commits.
 - FTL usage must be quota-aware; prefer GitHub-hosted emulator for routine CI while the external FTL permission gate remains unresolved.
+
+## Active implementation program: first complete vertical slice
+
+The next program is intentionally end-to-end. It is not a collection of unrelated backlog items. The sequence is:
+
+1. **UGS Runtime Validator** — schema compatibility, ordering, idempotency, quality propagation, bounded staleness/expiry and safe rejection.
+2. **Deterministic Replay** — versioned fixtures and replay/regression coverage so Core behavior is reproducible without a live game.
+3. **Conservative WoW Adapter** — first real adapter slice covering the minimum session/player/target/combat/capability/event path defined by UGS v1 and Game Adapter Contract v1.
+4. **Companion** — protocol, version/capability handshake, bounded queues, reconnect/backpressure, health/watchdog, kill switch, degraded behavior and measurable latency classes.
+5. **Policy Engine / Action Gateway** — explicit authorization boundary before any action-capable feature.
+6. **Intelligence** — context, recommendation, confidence and provenance on top of verified UGS inputs.
+7. **Command Center / Overlay UX** — user-facing visualization implemented from the design system as part of the same logical product slice, not postponed as cosmetic work.
+8. **Observability / Performance** — runtime telemetry, latency/resource measurements and privacy-safe diagnostics appropriate to the completed path.
+9. **Runtime acceptance** — integration and real-device evidence required for the surfaces involved.
+
+### Definition of Done for every substantive block
+
+A block is complete only when all applicable dimensions are addressed: implementation/contract, UX/design/visualization, security/privacy/failure behavior, performance/resource behavior, automated tests, runtime/device/integration evidence, and semantic documentation when meaning changes. Large blocks may be split into short-lived PRs, but each increment must remain independently testable, reviewable and integrable.
+
+### Scope discipline
+
+Do not expand into autonomous combat, broad game/version coverage, production infrastructure or release publication merely to make the roadmap look complete. Exact-environment capabilities remain UNVERIFIED until exact L3 evidence exists. The next block must baseline current `main` before implementation begins.

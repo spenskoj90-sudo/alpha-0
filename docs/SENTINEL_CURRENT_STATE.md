@@ -28,6 +28,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Unified Game State v1 is implemented with bounded Pydantic state validation, timezone-aware timestamp ordering, per-session duplicate/out-of-order rejection, capability observability guards, explicit stale-state degradation, and deterministic canonical replay.
 - Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
 - The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
+- Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Telemetry and performance
@@ -42,12 +43,13 @@ These statements are orientation-level invariants. They do not replace inspectio
 The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
 - Companion protocol and measurable latency classes;
-- Policy Engine / Action Gateway boundary for action-capable features;
 - adapter/Companion observability implementation;
 - simulation harness before expanding recommendation logic;
 - exact-environment WoW validation with L3 evidence;
 - AI provider abstraction/routing, confidence/provenance implementation, compatibility/version negotiation, overlay/voice interaction contracts and related MVP architecture items where implementation evidence is absent;
 - Android `AuthApi` transport architecture remains technical debt because it still uses synchronous `HttpURLConnection`.
+
+The Policy Engine / Action Gateway boundary is no longer an open architectural gap; its execution surface remains intentionally conservative and does not authorize autonomous game actions.
 
 This list is a planning aid, not a claim that the gaps have not changed. The next baseline must inspect the repository and tests before selecting work.
 

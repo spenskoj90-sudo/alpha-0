@@ -3,13 +3,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from pydantic import ValidationError
 
-from app.core.game_adapter import CapabilityStatus, DataQuality, EvidenceLevel
+from app.core.game_adapter import DataQuality
 from app.core.ugs_replay import DeterministicUGSReplay
-from app.core.unified_game_state import (
-    CombatState,
-    UGSIngestor,
-    UGSState,
-)
+from app.core.unified_game_state import CombatState, UGSIngestor, UGSState
 
 
 BASE = datetime(2026, 9, 7, 8, 0, tzinfo=UTC)
@@ -29,12 +25,7 @@ def event(sequence: int) -> dict:
     }
 
 
-def state(sequence: int, *, observed_at: datetime = BASE, target_health: bool = True) -> UGSState:
-    capabilities = {
-        "player.state": {"status": "LIMITED", "evidence_level": "L2"},
-    }
-    if target_health:
-        capabilities["target.health"] = {"status": "UNVERIFIED", "evidence_level": "L1"}
+def state(sequence: int, *, observed_at: datetime = BASE) -> UGSState:
     return UGSState(
         schema_version="1.0",
         state_id=f"state-{sequence}",
@@ -43,7 +34,10 @@ def state(sequence: int, *, observed_at: datetime = BASE, target_health: bool = 
         observed_at=observed_at,
         ingested_at=observed_at + timedelta(milliseconds=5),
         source={"adapter_id": "wow-legacy", "profile": "3.3.5a-test"},
-        capabilities=capabilities,
+        capabilities={
+            "player.state": {"status": "LIMITED", "evidence_level": "L2"},
+            "target.health": {"status": "UNVERIFIED", "evidence_level": "L1"},
+        },
         player={
             "id": "player-1",
             "class": "warrior",
@@ -111,8 +105,10 @@ def test_fresh_state_is_retained() -> None:
 
 
 def test_invalid_timestamp_order_is_rejected() -> None:
+    payload = state(1).model_dump(mode="python", by_alias=True)
+    payload["ingested_at"] = BASE - timedelta(seconds=1)
     with pytest.raises(ValidationError, match="ingested_at"):
-        state(1).model_copy(update={"ingested_at": BASE - timedelta(seconds=1)})
+        UGSState.model_validate(payload)
 
 
 def test_future_event_sequence_is_rejected() -> None:

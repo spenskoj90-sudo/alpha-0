@@ -23,7 +23,7 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 - [x] Deterministic replay fixture format and first replay/regression test — implemented in `server/app/core/ugs_replay.py` with canonical digest and rejection tests.
 - [x] Conservative first WoW adapter vertical slice against the v1 contracts — implemented as passive observation normalization with bounded profiles and UNVERIFIED-by-default capabilities.
 - [x] Companion protocol v1 — bounded envelope, five-way compatibility handshake, explicit latency classes and queue backpressure are implemented and tested.
-- [ ] Companion runtime/integration — runtime lifecycle, heartbeat watchdog, deterministic reconnect/backoff and transport-neutral health/session binding are implemented; concrete network transport, kill switch, real end-to-end latency evidence and persistent runtime telemetry remain open.
+- [ ] Companion runtime/integration — runtime lifecycle, heartbeat watchdog, deterministic reconnect/backoff and transport-neutral health/session binding are implemented; concrete bounded TCP transport is now implemented as a TLS-by-default foundation with localhost framing tests; transport/session integration, peer authentication/authorization, kill switch, real end-to-end latency evidence and persistent runtime telemetry remain open.
 - [x] Policy Engine / Action Gateway boundary before any action-capable feature — implemented in `server/app/core/action_gateway.py` and documented by `docs/ACTION_GATEWAY_CONTRACT_V1.md`; automatic execution remains denied.
 - [ ] Adapter/Companion observability implementation after the telemetry runtime path is ready.
 - [ ] Simulation harness before expanding recommendation logic.

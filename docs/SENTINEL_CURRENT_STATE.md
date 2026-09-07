@@ -3,7 +3,7 @@
 **State record:** 2026-09-06  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `c9b6b13a351553a35f036921dbdbeea17b6276a3`
+**Observed `main` HEAD (snapshot):** `75d8bb19d415d0a8d6242987be43cd4d127b8191`
 
 > Git/main is authoritative for product state. Unmerged branch evidence is not current product state.
 > Exact CI/release claims require exact SHA + workflow Run ID where available. Unknown facts remain **UNVERIFIED**.

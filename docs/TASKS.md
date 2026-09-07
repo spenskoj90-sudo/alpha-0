@@ -19,11 +19,11 @@
 
 These are the next candidate blocks. Before starting a block, GPT must baseline current `main` and verify that the gap still exists in code/tests.
 
-- [ ] UGS validator — schema compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry.
-- [ ] Deterministic replay fixture format and first replay/regression test.
-- [ ] Conservative first WoW adapter vertical slice against the v1 contracts.
+- [x] UGS validator — schema compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry — implemented in `server/app/core/unified_game_state.py` with regression coverage.
+- [x] Deterministic replay fixture format and first replay/regression test — implemented in `server/app/core/ugs_replay.py` with canonical digest and rejection tests.
+- [x] Conservative first WoW adapter vertical slice against the v1 contracts — implemented as passive observation normalization with bounded profiles and UNVERIFIED-by-default capabilities.
 - [ ] Companion protocol and explicit latency classes; then measurable end-to-end latency evidence.
-- [ ] Policy Engine / Action Gateway boundary before any action-capable feature.
+- [x] Policy Engine / Action Gateway boundary before any action-capable feature — implemented in `server/app/core/action_gateway.py` and documented by `docs/ACTION_GATEWAY_CONTRACT_V1.md`; automatic execution remains denied.
 - [ ] Adapter/Companion observability implementation after the telemetry runtime path is ready.
 - [ ] Simulation harness before expanding recommendation logic.
 - [ ] Exact WoW 3.3.5a/private-server validation; keep capabilities UNVERIFIED until exact-environment L3 evidence exists.

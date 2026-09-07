@@ -1,104 +1,75 @@
 # SENTINEL — Canonical Current State
 
-**State record:** 2026-09-06  
-**Repository:** `spenskoj90-sudo/alpha-0`  
-**Canonical branch:** `main`  
-**Observed `main` HEAD (snapshot):** `c9b6b13a351553a35f036921dbdbeea17b6276a3`
+> **Source-of-truth rule:** Git `main` is authoritative for repository/product state. This document is a semantic state summary, not a live mirror of commit SHAs or workflow runs. Do not embed a mutable `main` HEAD here; exact commit/check evidence belongs to GitHub commit and Actions records.
+>
+> Exact CI/release claims require an exact SHA plus workflow/check Run ID where applicable. Unknown facts remain **UNVERIFIED**.
 
-> Git/main is authoritative for product state. Unmerged branch evidence is not current product state.
-> Exact CI/release claims require exact SHA + workflow Run ID where available. Unknown facts remain **UNVERIFIED**.
-
-## 1. Current product state
+## 1. Product surfaces
 
 - Android client exists under `app/`.
 - FastAPI Core exists under `server/`.
 - Next.js control plane exists under `web/`.
 - Electron launcher exists under `launcher/`.
 - WoW addon sources exist under `wow-addon/`.
+
+## 2. Security and persistence baseline
+
 - Android device identity is Keystore-backed P-256 with SHA-256 fingerprinting.
 - Sessions use opaque tokens with one-time refresh rotation.
 - Authorization is server-authoritative and default-deny.
 - PostgreSQL is the production persistence architecture when `DATABASE_URL` is configured; migration `004_p1_rls_force.sql` applies FORCE RLS.
-- Character/game-state work (#107) is complete on main.
-- Sentry Android runtime path is VERIFIED on a physical device on 2026-09-06; temporary smoke UI was removed after confirmation.
-- Deploy workflow is release/manual triggered and optional remote rollout is separately gated.
-- CURRENT_STATE auto-sync is implemented through the dedicated CI path.
-- Game Adapter Contract v1 and Unified Game State v1 are now part of the main architecture foundation.
-- PostHog/runtime telemetry contract v1 is defined; runtime instrumentation, dashboards and alerts remain separate implementation work.
-- A reproducible CI performance baseline is recorded; device startup/memory/network and API/event-batch latency remain UNVERIFIED.
+- Release signing controls and production/live deployment remain Owner-gated.
 
-## 2. Active governance
+## 3. Game integration architecture
 
-The canonical governance document is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`.
+- Game Adapter Contract v1 is implemented as the canonical adapter boundary.
+- Unified Game State v1 is defined as the normalized Core state contract.
+- Adapter Registry / Capability Registry v1 is implemented on `main` with:
+  - typed adapter identity;
+  - capability status and L1/L2/L3 evidence discipline;
+  - L3 enforcement for `AVAILABLE` capabilities;
+  - capability downgrade tracking;
+  - bounded normalized event envelopes;
+  - Core-side usable-capability guards;
+  - registration, capability, evidence, sequencing and payload-bound tests.
+- The registry is not an authorization store and does not execute game actions or access game-process memory.
+- Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
-| Responsibility | GPT / ChatGPT | Human Owner | Other AI |
-|---|---|---|---|
-| Engineering analysis | **Sole AI role** | Final authority | **No role** |
-| Architecture | **Sole AI role** | Product authority | **No role** |
-| Implementation | **Sole AI role** | Scope/acceptance authority | **No role** |
-| Testing/security/CI analysis | **Sole AI role** | Protected-action authority | **No role** |
-| PR preparation/review | **Sole AI role** | Final product authority | **No role** |
-| Merge to `main` | **May merge after exact-SHA required checks pass** | Ultimate authority / protected gates | **No role** |
-| Production/live actions | Prepare/verify | **Owner gate** | **No role** |
+## 4. Telemetry and performance
 
-No other AI system participates in engineering, coding, testing, review, security, research, CI diagnosis, architecture, DevOps, release engineering or integration.
+- PostHog telemetry contract v1 is defined and provider-neutral.
+- Runtime PostHog instrumentation is not yet established as a complete implementation; the contract and runtime instrumentation are separate stages.
+- Performance baseline methodology/contract exists; measured results must be treated as branch/Run-ID evidence until reconciled onto `main`.
+- Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED**.
 
-Routine CI failures are not a conversational stop condition. GPT diagnoses, fixes, retests and reruns CI until required validation passes or a genuine Owner gate/blocker is reached.
+## 5. Architecture work that remains
 
-## 3. Exact-SHA merge rule
+The current architecture gap register includes, at minimum:
 
-GPT may merge a PR into `main` only when all required checks have successfully completed on the exact PR HEAD SHA being merged. Missing, pending, failed or stale required checks are a hard no-merge condition. Branch protection and security gates must never be bypassed or weakened.
+- UGS validator: schema compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry;
+- deterministic replay fixture format and replay tests;
+- conservative first WoW adapter vertical slice;
+- Companion protocol and measurable latency classes;
+- Policy Engine / Action Gateway boundary for action-capable features;
+- adapter/companion observability implementation;
+- simulation harness before expanding recommendation logic;
+- exact-environment WoW validation with L3 evidence;
+- AI provider abstraction/routing, confidence/provenance implementation, compatibility/version negotiation, overlay/voice interaction contracts and related MVP architecture items where implementation evidence is absent;
+- Android `AuthApi` transport architecture remains technical debt because it still uses synchronous `HttpURLConnection`.
 
-## 4. Owner gates
+These items must be marked only from repository evidence and remain **PARTIAL**, **UNVERIFIED**, or **NOT STARTED** until their implementation/evidence exists.
 
-Production secrets/credentials, signing material, branch-protection changes, irreversible destructive operations, production/live deployment, release publication and unresolved fundamental product-direction decisions remain Owner-gated.
+## 6. Governance
 
-## 5. Security invariants
+The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and merges require exact-SHA successful required checks without bypassing security or branch protection.
 
-Do not silently weaken the documented server-authoritative/default-deny model, device identity protections, opaque session/refresh protections, database/RLS boundaries, migration integrity or release signing controls.
+## 7. Documentation model
 
-## 6. Verification state
+This document intentionally avoids self-referential commit snapshots and workflow-run mirrors. A change to repository code does not require a generated HEAD-sync commit. Semantic state changes should update this document in the same logical PR when the product/architecture state actually changes.
 
-- `server/`: security, RLS, refresh-concurrency, character/game-state and projection coverage exists; Game Adapter registry is implemented with bounded normalized events and explicit capability evidence discipline.
-- `app/`: Sentry runtime path verified; refresh/session test lineage exists.
-- `web/`: admin entitlements route test exists.
-- `launcher/` / `wow-addon/`: dedicated test/coverage evidence **UNVERIFIED**.
-- Unified Game State validation, replay determinism, live WoW capability validation and end-to-end companion latency are **UNVERIFIED**.
+For live state, use:
 
-## 7. External/open work
-
-- **#59** — Firebase Test Lab IAM blocker; Owner action remains required only if dedicated FTL coverage is needed beyond the working GitHub Emulator path.
-- **#11** — Figma design-system synchronization; requires the actual Figma design file/key before repository-to-design comparison can be completed.
-- Release `SENTINEL_API_BASE_URL` configuration remains blocked until a reachable Core environment is available.
-
-## 8. Architecture implementation queue
-
-1. Deterministic replay fixture and validation harness for normalized adapter events / Unified Game State.
-2. Unified Game State validator: schema, compatibility, idempotency, ordering, data-quality propagation and bounded staleness expiry.
-3. Adapter Registry / Capability Registry integration into the Core runtime path without turning the registry into authorization.
-4. Conservative first WoW adapter; capability status remains UNVERIFIED/LIMITED until exact target-environment evidence exists.
-5. Companion protocol with interactive / near-real-time / batch / offline-replay transport classes and measurable end-to-end latency.
-6. Policy Engine / Action Gateway boundary: recommendation/request → policy decision → explicit action gateway, with no adapter-side authorization.
-7. Adapter/companion observability using the telemetry contract and bounded diagnostics.
-8. Simulation harness for replay and recommendation evaluation.
-9. Exact WoW 3.3.5a/private-server environment validation.
-
-## 9. Engineering maintenance queue
-
-- Modernize deprecated GitHub Actions runtimes/versions and move workflows away from Node 20 where supported.
-- Replace stale task-board references to already-closed historical issues.
-- Complete Figma design-system synchronization after the actual design file is available.
-- Resolve Firebase Test Lab bucket IAM only when dedicated FTL coverage is required.
-
-## 10. Canonical documents
-
-- `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md` — canonical GPT-only operating system.
-- `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` — system architecture foundation.
-- `docs/GAME_ADAPTER_CONTRACT_V1.md` — adapter boundary and capability evidence contract.
-- `docs/UNIFIED_GAME_STATE_V1.md` — normalized state contract.
-- `docs/POSTHOG_TELEMETRY_CONTRACT_V1.md` — runtime telemetry contract.
-- `docs/SENTINEL_PERFORMANCE_BASELINE.md` — reproducible performance measurements.
-- `docs/SENTINEL_EVIDENCE_PROTOCOL.md` — evidence semantics.
-- `docs/RELEASE_GATES.md` — release/CI acceptance gates.
-
-This record describes repository facts as of the stated state record. The observed snapshot is maintained by the normal state-sync mechanism and always points to the triggering `main` SHA.
+- Git `main` for the current repository commit and file tree;
+- GitHub Actions for current workflow/check results and exact Run IDs;
+- issues/PRs for active work and historical implementation evidence;
+- architecture contracts and capability matrices for normative requirements.

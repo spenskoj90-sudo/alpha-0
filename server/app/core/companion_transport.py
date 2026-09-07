@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol
 
 from .companion_protocol import CompanionEnvelope, CompanionMode, CompanionQueue
@@ -63,10 +63,10 @@ class CompanionTransportSession:
         """Make transport loss visible as degradation; never authorize or execute actions."""
         if self._closed:
             return CompanionMode.STOPPED
-        self.runtime.stop()
+        self.runtime.degrade()
         return self.runtime.mode
 
-    def register_reconnect_attempt(self) -> object:
+    def register_reconnect_attempt(self) -> timedelta:
         if self._closed:
             raise RuntimeError("transport session is closed")
         return self.runtime.register_reconnect_attempt()
@@ -77,7 +77,7 @@ class CompanionTransportSession:
             last_heartbeat=self.runtime.last_heartbeat,
             last_latency_ms=self.runtime.last_latency_ms,
             reconnect_attempts=self.runtime.reconnect_attempts,
-            queue_depth=len(self.queue._items),
+            queue_depth=self.queue.depth,
             dropped_events=self.queue.dropped,
             last_successful_send=self.last_successful_send,
         )

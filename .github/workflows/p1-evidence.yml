@@ -2,14 +2,17 @@ name: P1 Evidence
 
 on:
   push:
-    branches:
-      - main
-      - 'ci/state-sync-auto-*'
+    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   p1-evidence:
@@ -72,3 +75,4 @@ jobs:
           name: sentinel-p1-evidence-${{ github.sha }}
           path: artifacts/
           if-no-files-found: error
+          retention-days: 14

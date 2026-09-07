@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import deque
 from enum import StrEnum
-from typing import Generic, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,10 +31,10 @@ class LatencyClass(StrEnum):
 class CompanionHandshake(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    protocol_version: str = Field(pattern=r"^1\\.\\d+$", max_length=16)
-    ugs_schema_version: str = Field(pattern=r"^1\\.\\d+$", max_length=16)
-    adapter_contract_version: str = Field(pattern=r"^1\\.\\d+$", max_length=16)
-    core_protocol_version: str = Field(pattern=r"^1\\.\\d+$", max_length=16)
+    protocol_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
+    ugs_schema_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
+    adapter_contract_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
+    core_protocol_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
     capability_profile: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
     instance_id: UUID = Field(default_factory=uuid4)
 
@@ -48,7 +47,7 @@ class CompanionHandshakeResult(BaseModel):
     mode: CompanionMode
 
 
-class CompanionEnvelope(BaseModel, Generic[TypeVar("PayloadT")]):
+class CompanionEnvelope(BaseModel):
     """Transport-neutral bounded protocol envelope; it is not a command executor."""
 
     model_config = ConfigDict(extra="forbid")
@@ -58,9 +57,6 @@ class CompanionEnvelope(BaseModel, Generic[TypeVar("PayloadT")]):
     message_type: CompanionMessageType
     latency_class: LatencyClass
     payload: dict[str, object] = Field(default_factory=dict)
-
-
-PayloadT = TypeVar("PayloadT")
 
 
 class CompanionQueue:
@@ -111,6 +107,8 @@ def negotiate_handshake(
 ) -> CompanionHandshakeResult:
     """Accept only exact v1 compatibility for the first protocol slice."""
 
+    if offered.protocol_version != "1.0":
+        return CompanionHandshakeResult(False, "PROTOCOL_VERSION_UNSUPPORTED", CompanionMode.STOPPED)
     if offered.ugs_schema_version != expected_ugs_schema:
         return CompanionHandshakeResult(False, "UGS_SCHEMA_MISMATCH", CompanionMode.STOPPED)
     if offered.adapter_contract_version != expected_adapter_contract:

@@ -53,10 +53,10 @@ class CompanionEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message_id: UUID = Field(default_factory=uuid4)
-    sequence: int = Field(ge=0)
+    sequence: int = Field(ge=0, le=2**63 - 1)
     message_type: CompanionMessageType
     latency_class: LatencyClass
-    payload: dict[str, object] = Field(default_factory=dict)
+    payload: dict[str, object] = Field(default_factory=dict, max_length=64)
 
 
 class CompanionQueue:
@@ -108,16 +108,40 @@ def negotiate_handshake(
     """Accept only exact v1 compatibility for the first protocol slice."""
 
     if offered.protocol_version != "1.0":
-        return CompanionHandshakeResult(False, "PROTOCOL_VERSION_UNSUPPORTED", CompanionMode.STOPPED)
+        return CompanionHandshakeResult(
+            accepted=False,
+            reason_code="PROTOCOL_VERSION_UNSUPPORTED",
+            mode=CompanionMode.STOPPED,
+        )
     if offered.ugs_schema_version != expected_ugs_schema:
-        return CompanionHandshakeResult(False, "UGS_SCHEMA_MISMATCH", CompanionMode.STOPPED)
+        return CompanionHandshakeResult(
+            accepted=False,
+            reason_code="UGS_SCHEMA_MISMATCH",
+            mode=CompanionMode.STOPPED,
+        )
     if offered.adapter_contract_version != expected_adapter_contract:
-        return CompanionHandshakeResult(False, "ADAPTER_CONTRACT_MISMATCH", CompanionMode.STOPPED)
+        return CompanionHandshakeResult(
+            accepted=False,
+            reason_code="ADAPTER_CONTRACT_MISMATCH",
+            mode=CompanionMode.STOPPED,
+        )
     if offered.core_protocol_version != expected_core_protocol:
-        return CompanionHandshakeResult(False, "CORE_PROTOCOL_MISMATCH", CompanionMode.STOPPED)
+        return CompanionHandshakeResult(
+            accepted=False,
+            reason_code="CORE_PROTOCOL_MISMATCH",
+            mode=CompanionMode.STOPPED,
+        )
     if offered.capability_profile != expected_capability_profile:
-        return CompanionHandshakeResult(False, "CAPABILITY_PROFILE_MISMATCH", CompanionMode.STOPPED)
-    return CompanionHandshakeResult(True, "HANDSHAKE_ACCEPTED", CompanionMode.ACTIVE)
+        return CompanionHandshakeResult(
+            accepted=False,
+            reason_code="CAPABILITY_PROFILE_MISMATCH",
+            mode=CompanionMode.STOPPED,
+        )
+    return CompanionHandshakeResult(
+        accepted=True,
+        reason_code="HANDSHAKE_ACCEPTED",
+        mode=CompanionMode.ACTIVE,
+    )
 
 
 def latency_class_for_budget(budget_ms: int) -> LatencyClass:

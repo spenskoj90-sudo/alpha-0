@@ -29,14 +29,14 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
 - The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
 - Companion protocol v1 is implemented with five-way compatibility negotiation, bounded envelopes and FIFO backpressure, explicit latency classes, and fail-closed mismatch handling.
-- Companion runtime v1 now provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect-backoff scheduling and timestamp-based latency measurement. Network transport, kill-switch integration and real end-to-end evidence remain open.
+- Companion runtime v1 now provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect-backoff scheduling and timestamp-based latency measurement. A transport-neutral session seam now binds queue admission/consumption, transport-failure degradation, reconnect scheduling and privacy-safe health state. Concrete network transport, kill-switch integration and real end-to-end evidence remain open.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Telemetry and performance
 
 - PostHog telemetry contract v1 is defined and provider-neutral.
-- Runtime PostHog instrumentation is not yet established as a complete implementation; contract and runtime instrumentation are separate stages.
+- Runtime health state for Companion is now available through a provider-neutral snapshot; persistent/PostHog instrumentation is not yet established as a complete implementation.
 - Performance baseline methodology exists; measured results are acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
 - Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED** unless current repository evidence proves otherwise.
 
@@ -44,8 +44,8 @@ These statements are orientation-level invariants. They do not replace inspectio
 
 The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
-- Companion network transport/reconnect and kill-switch integration, plus real end-to-end latency evidence;
-- adapter/Companion observability implementation;
+- Companion concrete network transport/reconnect and kill-switch integration, plus real end-to-end latency evidence;
+- persistent adapter/Companion observability implementation;
 - simulation harness before expanding recommendation logic;
 - exact-environment WoW validation with L3 evidence;
 - AI provider abstraction/routing, confidence/provenance implementation, compatibility/version negotiation, overlay/voice interaction contracts and related MVP architecture items where implementation evidence is absent;

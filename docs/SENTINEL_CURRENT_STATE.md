@@ -28,6 +28,8 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Unified Game State v1 is implemented with bounded Pydantic state validation, timezone-aware timestamp ordering, per-session duplicate/out-of-order rejection, capability observability guards, explicit stale-state degradation, and deterministic canonical replay.
 - Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
 - The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
+- Companion protocol v1 is implemented with five-way compatibility negotiation, bounded envelopes and FIFO backpressure, explicit latency classes, and fail-closed mismatch handling.
+- Companion runtime v1 now provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect-backoff scheduling and timestamp-based latency measurement. Network transport, kill-switch integration and real end-to-end evidence remain open.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
@@ -42,7 +44,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 
 The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
-- Companion protocol and measurable latency classes;
+- Companion network transport/reconnect and kill-switch integration, plus real end-to-end latency evidence;
 - adapter/Companion observability implementation;
 - simulation harness before expanding recommendation logic;
 - exact-environment WoW validation with L3 evidence;

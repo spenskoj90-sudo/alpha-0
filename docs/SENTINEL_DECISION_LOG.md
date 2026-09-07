@@ -162,3 +162,30 @@
 **Decision:** Use trunk-oriented development with short-lived branches and independently verifiable change sets. Work may be organized into larger coherent architectural blocks, but each PR should remain self-contained, testable, reviewable and integrable. Long-lived feature branches and artificial documentation-sync steps are avoided.
 
 **Reason:** This preserves the user's requirement for coherent architectural progress while adopting established continuous-integration/trunk-based practices that reduce integration risk and feedback delay.
+
+## D-027 — Vertical-block Definition of Done
+
+**Date:** 2026-09-07  
+**Decision:** A substantive SENTINEL architectural/product block is not considered complete merely because its code compiles or its backend tests pass. A block is complete only when its required vertical concerns are addressed together: implementation, applicable UX/design/visualization, security/privacy, performance/resource behavior, automated regression evidence, and required runtime/device/integration evidence. Documentation and acceptance criteria are updated in the same logical change set whenever the block changes product or architectural meaning.
+
+**Operating rule:** Large architectural blocks may be delivered through several short-lived PRs, but every increment must remain independently testable, reviewable and integrable. No known required concern is intentionally deferred as a "later polish" item when it belongs to the block being implemented.
+
+**Minimum completion dimensions:**
+- implementation and contract boundaries;
+- UX/design/visualization when the block has a user-facing surface;
+- security, privacy and failure/degradation behavior;
+- performance and resource characteristics appropriate to the block;
+- automated tests and regression coverage;
+- runtime/device/integration evidence where applicable;
+- semantic documentation/decision records when architecture or product meaning changes.
+
+**Reason:** SENTINEL is intended to be a durable, user-facing system rather than a collection of disconnected technical prototypes. Completing each block as a coherent vertical slice prevents deferred design, security, performance and validation work from becoming long-lived technical debt.
+
+## D-028 — First SENTINEL Vertical Slice
+
+**Date:** 2026-09-07  
+**Decision:** The next implementation program is the first complete game-to-user vertical slice. Its ordered foundation is: UGS runtime validation → deterministic replay → conservative WoW adapter slice → Companion protocol/runtime → Policy Engine / Action Gateway boundary → context/recommendation/confidence/provenance → Command Center/overlay UX → observability/performance → real-device/integration acceptance.
+
+**Scope rule:** The first slice remains deliberately conservative. It does not introduce autonomous combat, broad multi-version game support, production infrastructure or release publication. Exact-environment capabilities remain UNVERIFIED until the required L3 evidence exists.
+
+**Reason:** This creates one complete, measurable SENTINEL path from game observation to safe user-facing intelligence before expanding breadth. Later features must build on this verified path rather than creating parallel unfinished subsystems.

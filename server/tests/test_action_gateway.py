@@ -49,10 +49,8 @@ def test_policy_allow_never_executes_and_recommendation_requires_confirmation(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {
-        "decision": ActionDecision.CONFIRM,
-        "reason_code": "USER_CONFIRMATION_REQUIRED",
-    }
+    assert result.decision is ActionDecision.CONFIRM
+    assert result.reason_code == "USER_CONFIRMATION_REQUIRED"
 
 
 def test_user_confirmed_action_requires_policy_and_usable_capability(
@@ -70,10 +68,8 @@ def test_user_confirmed_action_requires_policy_and_usable_capability(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {
-        "decision": ActionDecision.ALLOW,
-        "reason_code": "POLICY_ALLOW_USER_CONFIRMED",
-    }
+    assert result.decision is ActionDecision.ALLOW
+    assert result.reason_code == "POLICY_ALLOW_USER_CONFIRMED"
 
 
 def test_automatic_execution_is_denied_even_when_policy_and_capability_allow(
@@ -92,10 +88,8 @@ def test_automatic_execution_is_denied_even_when_policy_and_capability_allow(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {
-        "decision": ActionDecision.DENY,
-        "reason_code": "AUTOMATIC_EXECUTION_DISABLED",
-    }
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == "AUTOMATIC_EXECUTION_DISABLED"
 
 
 def test_unverified_capability_cannot_authorize_action(
@@ -113,10 +107,8 @@ def test_unverified_capability_cannot_authorize_action(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {
-        "decision": ActionDecision.DENY,
-        "reason_code": "CAPABILITY_NOT_VERIFIED",
-    }
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == "CAPABILITY_NOT_VERIFIED"
 
 
 def test_missing_required_capability_is_denied(
@@ -134,15 +126,11 @@ def test_missing_required_capability_is_denied(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {
-        "decision": ActionDecision.DENY,
-        "reason_code": "REQUIRED_CAPABILITY_MISSING",
-    }
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == "REQUIRED_CAPABILITY_MISSING"
 
 
-def test_policy_deny_wins_over_capability(
-    principal: Principal,
-) -> None:
+def test_policy_deny_wins_over_capability(principal: Principal) -> None:
     gateway = ActionGateway(
         AuthorizationEngine(
             [
@@ -175,7 +163,8 @@ def test_policy_deny_wins_over_capability(
         required_capabilities=("command_bridge",),
     )
 
-    assert result == {"decision": ActionDecision.DENY, "reason_code": "POLICY_DENY"}
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == "POLICY_DENY"
 
 
 def test_invalid_action_input_is_bounded() -> None:

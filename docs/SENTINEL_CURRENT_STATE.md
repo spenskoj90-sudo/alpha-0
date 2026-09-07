@@ -25,9 +25,9 @@ These statements are orientation-level invariants. They do not replace inspectio
 ## 3. Game integration architecture
 
 - Game Adapter Contract v1 is implemented as the canonical adapter boundary.
-- Unified Game State v1 is defined as the normalized Core state contract.
+- Unified Game State v1 is implemented with bounded Pydantic state validation, timezone-aware timestamp ordering, per-session duplicate/out-of-order rejection, capability observability guards, explicit stale-state degradation, and deterministic canonical replay.
 - Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
-- The registry is not an authorization store and does not execute game actions or access game-process memory.
+- The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Telemetry and performance
@@ -41,9 +41,6 @@ These statements are orientation-level invariants. They do not replace inspectio
 
 The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
-- UGS validation: compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry;
-- deterministic replay fixtures and replay tests;
-- conservative first WoW adapter vertical slice;
 - Companion protocol and measurable latency classes;
 - Policy Engine / Action Gateway boundary for action-capable features;
 - adapter/Companion observability implementation;

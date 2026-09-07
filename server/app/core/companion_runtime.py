@@ -61,6 +61,11 @@ class CompanionRuntime:
             self.mode = CompanionMode.DEGRADED
         return self.mode
 
+    def degrade(self) -> None:
+        """Mark transport health degraded without making a stop or authorization decision."""
+        if self.mode is not CompanionMode.STOPPED:
+            self.mode = CompanionMode.DEGRADED
+
     def stop(self) -> None:
         self.mode = CompanionMode.STOPPED
 

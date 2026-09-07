@@ -71,6 +71,10 @@ class CompanionQueue:
         self._stopped = False
 
     @property
+    def depth(self) -> int:
+        return len(self._items)
+
+    @property
     def dropped(self) -> int:
         return self._dropped
 

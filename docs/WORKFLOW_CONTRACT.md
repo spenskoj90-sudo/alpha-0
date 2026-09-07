@@ -1,6 +1,5 @@
 # SENTINEL — Autonomous Engineering Workflow Contract
 
-**Tracking issue:** #167  
 **Status:** ACTIVE — approved by Human Owner on 2026-09-06.  
 **Authority:** Human Owner is final authority for product direction and protected actions. GPT/ChatGPT is the sole AI engineering participant and executor.  
 **Canonical governance:** `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
@@ -18,7 +17,7 @@ No other AI may be delegated engineering work.
 
 GitHub repository state is authoritative for repository facts. GPT reconciles live `main`, issues/PRs, diffs, canonical governance/current-state documents and exact CI evidence. Conversation memory never substitutes for current Git state.
 
-`docs/SENTINEL_CURRENT_STATE.md` is a semantic state summary. It must not contain a mutable self-referential `main` HEAD or workflow-run mirror. Git and Actions are the live source for those values.
+`docs/SENTINEL_CURRENT_STATE.md` is a semantic orientation guide. It must not contain a mutable self-referential `main` HEAD or workflow-run mirror. Git and Actions are the live source for those values.
 
 ## 3. Autonomous lifecycle
 
@@ -39,6 +38,7 @@ Routine CI failures are not a conversational stop condition. GPT diagnoses, fixe
 - Prefer one issue = one logical change set = one PR.
 - Keep changes inside declared boundaries.
 - Split unrelated work into a separate issue/branch.
+- Keep task branches short-lived; a larger architectural goal may be delivered as several independently valid PRs.
 
 ## 5. Autonomous actions
 
@@ -91,6 +91,6 @@ The repository should keep the minimum workflow set that provides required valid
 
 ## 12. Documentation synchronization
 
-Process rules belong in this contract and `docs/OPERATING_PLAYBOOK.md`; roles in `docs/AI_ROLES.md`; permissions in `docs/AUTONOMOUS_PERMISSIONS.md`; semantic current facts in `docs/SENTINEL_CURRENT_STATE.md`; release gates in `docs/RELEASE_GATES.md`; evidence semantics in `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
+Process rules belong in this contract and `docs/OPERATING_PLAYBOOK.md`; roles in `docs/AI_ROLES.md`; permissions in `docs/AUTONOMOUS_PERMISSIONS.md`; semantic repository orientation in `docs/SENTINEL_CURRENT_STATE.md`; release gates in `docs/RELEASE_GATES.md`; evidence semantics in `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
 
 Documentation updates are part of the same logical change when product or architecture state materially changes. There is no separate HEAD-sync workflow or generated documentation PR for every `main` commit.

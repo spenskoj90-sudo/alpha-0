@@ -35,7 +35,7 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 - [ ] #11 — synchronize the Figma design system with the implementation; use Figma only when the corresponding UI work is active.
 - [ ] #59 — Firebase Test Lab service-account GCS `storage.objects.create` permission; external/Owner infrastructure gate, not a reason to distort routine CI.
 - [ ] #181 — reconcile architecture gap register, task board and implementation state under the repository-first documentation model.
-- [ ] #10 — measured performance baseline; retain as open until reproducible measurements are tied to current-main evidence.
+- [ ] Measured performance baseline — retain as open until reproducible measurements are tied to current-main evidence.
 
 ## Later horizons
 

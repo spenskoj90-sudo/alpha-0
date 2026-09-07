@@ -9,7 +9,7 @@ The Companion protocol is the bounded transport contract between a local compani
 
 ## Compatibility handshake
 
-The handshake identifies and negotiates four independent compatibility dimensions:
+The handshake identifies and negotiates five independent compatibility dimensions:
 
 - Companion protocol version;
 - UGS schema version;
@@ -23,7 +23,7 @@ The first implementation accepts only protocol `1.0` and exact expected values f
 
 `HANDSHAKE`, `HANDSHAKE_ACK`, `UGS_UPDATE`, `HEARTBEAT`, `HEALTH`, and `SHUTDOWN` are the initial transport-neutral message types.
 
-Every envelope has a bounded sequence number, UUID message ID, explicit latency class, and bounded dictionary payload. Unknown envelope fields are rejected.
+Every envelope has a bounded sequence number, UUID message ID, explicit latency class, and a bounded payload dictionary of at most 64 entries. Unknown envelope fields are rejected.
 
 ## Backpressure
 

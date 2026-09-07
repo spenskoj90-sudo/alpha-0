@@ -1,12 +1,14 @@
 name: Release Candidate Artifact
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
 
 jobs:
   release-candidate:

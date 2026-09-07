@@ -18,6 +18,8 @@ No other AI may be delegated engineering work.
 
 GitHub repository state is authoritative for repository facts. GPT reconciles live `main`, issues/PRs, diffs, canonical governance/current-state documents and exact CI evidence. Conversation memory never substitutes for current Git state.
 
+`docs/SENTINEL_CURRENT_STATE.md` is a semantic state summary. It must not contain a mutable self-referential `main` HEAD or workflow-run mirror. Git and Actions are the live source for those values.
+
 ## 3. Autonomous lifecycle
 
 ```text
@@ -75,6 +77,20 @@ For material acceptance claims preserve exact SHA, workflow/check name, Run ID w
 
 GPT must not outsource engineering analysis, implementation, testing, review, security auditing, research, CI diagnosis, DevOps or integration to another AI system.
 
-## 11. Documentation synchronization
+## 11. Workflow hygiene
 
-Process rules belong in this contract and `docs/OPERATING_PLAYBOOK.md`; roles in `docs/AI_ROLES.md`; permissions in `docs/AUTONOMOUS_PERMISSIONS.md`; current facts in `docs/SENTINEL_CURRENT_STATE.md`; release gates in `docs/RELEASE_GATES.md`; evidence semantics in `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
+The repository should keep the minimum workflow set that provides required validation and intentional release/deployment actions.
+
+- Pull-request validation is the primary branch-development gate.
+- Push validation is limited to `main` where post-merge evidence is useful.
+- Feature-branch push triggers should not duplicate pull-request validation.
+- Automatic workflows must not create self-mutating documentation PRs for derived metadata.
+- Concurrency should cancel obsolete non-release validation for the same branch/PR so stale commits do not consume runner capacity unnecessarily.
+- Release-candidate signing/build workflows are manual or explicitly release-scoped; they must not run on every ordinary `main` push.
+- Release publication remains tag-triggered and Owner-gated.
+
+## 12. Documentation synchronization
+
+Process rules belong in this contract and `docs/OPERATING_PLAYBOOK.md`; roles in `docs/AI_ROLES.md`; permissions in `docs/AUTONOMOUS_PERMISSIONS.md`; semantic current facts in `docs/SENTINEL_CURRENT_STATE.md`; release gates in `docs/RELEASE_GATES.md`; evidence semantics in `docs/SENTINEL_EVIDENCE_PROTOCOL.md`.
+
+Documentation updates are part of the same logical change when product or architecture state materially changes. There is no separate HEAD-sync workflow or generated documentation PR for every `main` commit.

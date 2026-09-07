@@ -1,6 +1,5 @@
 # SENTINEL — Autonomous Engineering Contract
 
-**Tracking issue:** #167  
 **Status:** ACTIVE — approved by Human Owner on 2026-09-06.  
 **Canonical governance:** `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
 
@@ -19,10 +18,10 @@
 Establish goal, boundaries, acceptance criteria, dependencies and non-goals.
 
 ### S1 — BASELINE
-Read live `main`, relevant issues/PRs, canonical documents and CI evidence. Record exact baseline SHA.
+Read live `main` at an exact SHA. Inspect the relevant repository code, tests, workflows and configuration directly. Then inspect relevant issues/PRs and canonical architecture/governance documents. State snapshots are orientation only.
 
 ### S2 — PLAN
-Choose the smallest coherent implementation, tests, documentation and verification strategy.
+Choose the smallest coherent implementation block that can be independently tested and integrated without breaking the repository. For larger architecture work, define a sequence of independently valid increments rather than a long-lived feature branch.
 
 ### S3 — IMPLEMENT
 Create/update the task branch and modify only in-scope files.
@@ -53,7 +52,7 @@ Confirm acceptance criteria and release gates are satisfied by evidence.
 GPT may merge into `main` when every required check is successful on the exact PR HEAD SHA and repository protections permit the merge. Protected actions remain Owner-gated.
 
 ### S11 — POST-MERGE RECONCILIATION
-Re-read live `main`, verify resulting SHA and reconcile `docs/SENTINEL_CURRENT_STATE.md` before the next substantive task.
+Re-read live `main`, verify the resulting SHA and establish the next repository baseline. Update semantic documentation only when its meaning changed; do not perform a generated HEAD-sync solely because the SHA changed.
 
 ## 3. Autonomous continuation
 

@@ -80,7 +80,8 @@
 ## D-015 — PR #68 merge gate
 
 **Date:** 2026-08-27  
-**Decision:** Merge only after exact-head product CI green and explicit Owner accept. Agents must not merge.
+**Original decision:** Merge only after exact-head product CI green and explicit Owner accept; agents must not merge.  
+**Status:** **SUPERSEDED by the GPT-only governance adopted 2026-09-06.** Current rule is the exact-SHA merge gate in `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT may merge when all required checks succeed on the exact PR HEAD SHA and repository protections permit the merge. Protected Owner gates remain unchanged.
 
 ## D-016 — Historical branch cleanup groups 1+2 (issue #22)
 
@@ -146,5 +147,18 @@
 ## D-024 — Deploy workflow must not email on routine pushes
 
 **Date:** 2026-09-02  
-**Decision:** `deploy.yml` triggers only on `release` (published) and `workflow_dispatch`. Do not use `secrets.*` in job-level `if` (GitHub evaluates that poorly and produced repeated Failure runs + Gmail noise). Optional remote rollout is gated on repository variable `DEPLOY_ENABLED=true`; secrets are checked only inside the job when enabled.  
-**Reason:** Owner reported continuous Deploy failure notifications during development; product CI already covers build/test; Deploy is not a required status check (D-018).
+**Decision:** `deploy.yml` triggers only on `release` (published) and `workflow_dispatch`. Do not use `secrets.*` in job-level `if` (GitHub evaluates that poorly and produced repeated Failure runs + Gmail noise). Optional remote rollout is gated on repository variable `DEPLOY_ENABLED=true`; secrets are checked only inside the job when enabled. Deploy is not a required status check.
+
+## D-025 — Repository-first engineering state (current)
+
+**Date:** 2026-09-07  
+**Decision:** Git `main` at an exact SHA is the authoritative source of actual repository/product implementation state. `SENTINEL_CURRENT_STATE.md` is an orientation document, not a live mirror or acceptance authority. Architecture documents/ADRs define intended design and constraints; TASKS defines work intent; CI/tests/runtime evidence prove implementation. Ordinary code changes do not require generated HEAD-sync documentation commits or PRs.
+
+**Reason:** The project now has one AI engineering participant (GPT/ChatGPT) with direct repository access. Maintaining mutable state snapshots as a mandatory synchronization mechanism creates stale-document risk and unnecessary commits without adding technical evidence.
+
+## D-026 — Short-lived, independently verifiable change sets
+
+**Date:** 2026-09-07  
+**Decision:** Use trunk-oriented development with short-lived branches and independently verifiable change sets. Work may be organized into larger coherent architectural blocks, but each PR should remain self-contained, testable, reviewable and integrable. Long-lived feature branches and artificial documentation-sync steps are avoided.
+
+**Reason:** This preserves the user's requirement for coherent architectural progress while adopting established continuous-integration/trunk-based practices that reduce integration risk and feedback delay.

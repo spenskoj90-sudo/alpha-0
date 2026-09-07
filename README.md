@@ -4,7 +4,7 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 
 ## Canonical repository state
 
-Актуальное состояние: см. `docs/SENTINEL_CURRENT_STATE.md`.
+**Git `main` is the authoritative source for actual repository/product state.** Read `main` at an exact commit SHA to determine what is implemented. `docs/SENTINEL_CURRENT_STATE.md` is a semantic orientation guide, not a live state mirror and not a substitute for inspecting the repository.
 
 ## MVP scope currently implemented on main
 
@@ -164,7 +164,7 @@ See `docs/API.md` for the endpoint contract.
 
 ## Contributing
 
-See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. PRs that change code or process must update `README.md` and `docs/SENTINEL_CURRENT_STATE.md` with the current HEAD. The operational workflow is documented in `docs/OPERATING_PLAYBOOK.md`.
+See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. Update repository documentation when product or architecture meaning changes; do not create generated HEAD-sync documentation changes for ordinary code commits. The operational workflow is documented in `docs/OPERATING_PLAYBOOK.md`.
 
 ## License
 

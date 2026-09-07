@@ -1,8 +1,8 @@
-# SENTINEL — Canonical Current State
+# SENTINEL — Repository State Guide
 
-> **Source-of-truth rule:** Git `main` is authoritative for repository/product state. This document is a semantic state summary, not a live mirror of commit SHAs or workflow runs. Do not embed a mutable `main` HEAD here; exact commit/check evidence belongs to GitHub commit and Actions records.
+> **Authoritative state:** Git `main` at an exact commit SHA. This document is an orientation guide, not a live mirror of commit SHAs, workflow runs, or file inventories.
 >
-> Exact CI/release claims require an exact SHA plus workflow/check Run ID where applicable. Unknown facts remain **UNVERIFIED**.
+> When a repository fact matters, inspect the current `main` tree and code. When an acceptance claim matters, require the exact SHA plus the relevant test/CI/runtime evidence. Unknown facts remain **UNVERIFIED**.
 
 ## 1. Product surfaces
 
@@ -20,56 +20,61 @@
 - PostgreSQL is the production persistence architecture when `DATABASE_URL` is configured; migration `004_p1_rls_force.sql` applies FORCE RLS.
 - Release signing controls and production/live deployment remain Owner-gated.
 
+These statements are orientation-level invariants. They do not replace inspection of the current implementation and tests.
+
 ## 3. Game integration architecture
 
 - Game Adapter Contract v1 is implemented as the canonical adapter boundary.
 - Unified Game State v1 is defined as the normalized Core state contract.
-- Adapter Registry / Capability Registry v1 is implemented on `main` with:
-  - typed adapter identity;
-  - capability status and L1/L2/L3 evidence discipline;
-  - L3 enforcement for `AVAILABLE` capabilities;
-  - capability downgrade tracking;
-  - bounded normalized event envelopes;
-  - Core-side usable-capability guards;
-  - registration, capability, evidence, sequencing and payload-bound tests.
+- Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
 - The registry is not an authorization store and does not execute game actions or access game-process memory.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Telemetry and performance
 
 - PostHog telemetry contract v1 is defined and provider-neutral.
-- Runtime PostHog instrumentation is not yet established as a complete implementation; the contract and runtime instrumentation are separate stages.
-- Performance baseline methodology/contract exists; measured results must be treated as branch/Run-ID evidence until reconciled onto `main`.
-- Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED**.
+- Runtime PostHog instrumentation is not yet established as a complete implementation; contract and runtime instrumentation are separate stages.
+- Performance baseline methodology exists; measured results are acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
+- Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED** unless current repository evidence proves otherwise.
 
-## 5. Architecture work that remains
+## 5. Architecture work remaining
 
-The current architecture gap register includes, at minimum:
+The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
-- UGS validator: schema compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry;
-- deterministic replay fixture format and replay tests;
+- UGS validation: compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry;
+- deterministic replay fixtures and replay tests;
 - conservative first WoW adapter vertical slice;
 - Companion protocol and measurable latency classes;
 - Policy Engine / Action Gateway boundary for action-capable features;
-- adapter/companion observability implementation;
+- adapter/Companion observability implementation;
 - simulation harness before expanding recommendation logic;
 - exact-environment WoW validation with L3 evidence;
 - AI provider abstraction/routing, confidence/provenance implementation, compatibility/version negotiation, overlay/voice interaction contracts and related MVP architecture items where implementation evidence is absent;
 - Android `AuthApi` transport architecture remains technical debt because it still uses synchronous `HttpURLConnection`.
 
-These items must be marked only from repository evidence and remain **PARTIAL**, **UNVERIFIED**, or **NOT STARTED** until their implementation/evidence exists.
+This list is a planning aid, not a claim that the gaps have not changed. The next baseline must inspect the repository and tests before selecting work.
 
 ## 6. Governance
 
-The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and merges require exact-SHA successful required checks without bypassing security or branch protection.
+The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and merges require exact-SHA successful required checks without bypassing security or repository protection.
 
-## 7. Documentation model
+## 7. Source-of-truth model
 
-This document intentionally avoids self-referential commit snapshots and workflow-run mirrors. A change to repository code does not require a generated HEAD-sync commit. Semantic state changes should update this document in the same logical PR when the product/architecture state actually changes.
+Use each source for the kind of truth it actually owns:
 
-For live state, use:
+| Source | Authority |
+|---|---|
+| Git `main` + exact SHA | Actual repository/product implementation state |
+| Code + tests | Implemented behavior and regression evidence |
+| GitHub Actions | Build/test/security workflow evidence and Run IDs |
+| Issues / PRs | Active work, acceptance scope and historical implementation evidence |
+| Architecture contracts / ADRs | Normative target, constraints and accepted design decisions |
+| TASKS.md | Human-readable work queue and open architectural gaps |
+| This document | Orientation only; never a substitute for repository inspection |
+| Historical audits / handovers | Historical context only unless independently revalidated |
 
-- Git `main` for the current repository commit and file tree;
-- GitHub Actions for current workflow/check results and exact Run IDs;
-- issues/PRs for active work and historical implementation evidence;
-- architecture contracts and capability matrices for normative requirements.
+## 8. Documentation rule
+
+Ordinary code changes do **not** require a generated current-state commit or a documentation-only PR. Update this guide only when its semantic orientation materially changes. Never embed a mutable `main` HEAD or workflow-run mirror here.
+
+A document can describe an intended architecture or a historical observation, but it cannot prove that an implementation exists on current `main`. For implementation claims, inspect the repository and require evidence.

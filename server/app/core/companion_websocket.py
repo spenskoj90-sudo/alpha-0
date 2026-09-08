@@ -162,7 +162,9 @@ async def companion_websocket(websocket: WebSocket) -> None:
         if not result.accepted:
             return
         while True:
-            await transport.receive_envelope()
+            envelope = await transport.receive_envelope()
+            if envelope is None:
+                return
     except WebSocketDisconnect:
         return
     finally:

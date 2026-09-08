@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -62,7 +63,7 @@ def test_websocket_handshake_rejects_incompatible_profile_fail_closed() -> None:
         assert result["reason_code"] == "CAPABILITY_PROFILE_MISMATCH"
         assert result["mode"] == "STOPPED"
 
-        with __import__("pytest").raises(WebSocketDisconnect):
+        with pytest.raises(WebSocketDisconnect):
             websocket.receive_json()
 
 
@@ -72,7 +73,7 @@ def test_websocket_rejects_malformed_envelope_after_handshake() -> None:
         assert websocket.receive_json()["accepted"] is True
         websocket.send_json({"sequence": "not-an-int", "message_type": "HEARTBEAT"})
 
-        with __import__("pytest").raises(WebSocketDisconnect) as exc:
+        with pytest.raises(WebSocketDisconnect) as exc:
             websocket.receive_json()
         assert exc.value.code == 1003
 

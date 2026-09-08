@@ -125,7 +125,7 @@ class CompanionWebSocketTransport:
         """Send exactly one queued envelope after a successful handshake."""
         if self._closed or not self._handshaken:
             return None
-        queued = self.session.queue.pop()
+        queued = self.session.queue.peek()
         if queued is None:
             return None
         try:
@@ -133,8 +133,8 @@ class CompanionWebSocketTransport:
         except Exception:
             self.session.mark_transport_failure()
             return None
-        self.session.record_send_success()
-        return queued
+        sent = self.session.mark_send_success()
+        return sent
 
     async def close(self) -> None:
         if self._closed:

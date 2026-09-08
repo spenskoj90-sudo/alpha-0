@@ -95,6 +95,11 @@ class CompanionQueue:
         self._items.append(envelope)
         return True
 
+    def peek(self) -> CompanionEnvelope | None:
+        if not self._items:
+            return None
+        return self._items[0]
+
     def pop(self) -> CompanionEnvelope | None:
         if not self._items:
             return None

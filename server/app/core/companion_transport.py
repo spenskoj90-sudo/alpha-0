@@ -87,7 +87,7 @@ class CompanionTransportSession:
         if self._closed:
             raise RuntimeError("transport session is closed")
         self.runtime.reset_kill_switch()
-        self.queue = CompanionQueue(max_items=self.queue.max_items)
+        self.queue.reset()
 
     def health(self) -> CompanionRuntimeHealth:
         return CompanionRuntimeHealth(

@@ -29,7 +29,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
 - The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
 - Companion protocol v1 is implemented with five-way compatibility negotiation, bounded envelopes and FIFO backpressure, explicit latency classes, and fail-closed mismatch handling.
-- Companion runtime v1 now provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect-backoff scheduling and timestamp-based latency measurement. A transport-neutral session seam now binds queue admission/consumption, transport-failure degradation, reconnect scheduling and privacy-safe health state. Concrete network transport, kill-switch integration and real end-to-end evidence remain open.
+- Companion runtime v1 provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect-backoff scheduling and timestamp-based latency measurement. The transport-neutral session seam binds queue admission/consumption, transport-failure degradation, reconnect scheduling and privacy-safe health state. The local kill switch is integrated as a fail-closed terminal stop/queue gate requiring a fresh connection after reset. A concrete loopback WebSocket transport and a bounded TLS-by-default TCP transport foundation are implemented; peer authentication/authorization, full transport/session integration and real end-to-end evidence remain open.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
@@ -44,7 +44,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 
 The repository should be compared against `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` before each substantive implementation block. Known architectural gaps include, but are not limited to:
 
-- Companion concrete network transport/reconnect and kill-switch integration, plus real end-to-end latency evidence;
+- Companion transport/session integration and peer authentication/authorization, plus real end-to-end latency evidence;
 - persistent adapter/Companion observability implementation;
 - simulation harness before expanding recommendation logic;
 - exact-environment WoW validation with L3 evidence;
@@ -100,7 +100,7 @@ The completion gate is evidence-based: an item remains **UNVERIFIED** when the r
 
 The approved implementation sequence is:
 
-`UGS runtime validation → deterministic replay → conservative WoW adapter → Companion protocol/runtime → Policy Engine / Action Gateway → context/recommendation/confidence/provenance → Command Center/overlay UX → observability/performance → real-device/integration acceptance`
+`UGS runtime validation → deterministic replay → conservative WoW adapter → Companion protocol/runtime → Policy Engine / Action Gateway → context/recommendation/confidence/provenance → Command Center/Overlay UX → observability/performance → real-device/integration acceptance`
 
 This sequence is the primary implementation program for the first complete SENTINEL path. The slice remains conservative: no autonomous combat, no premature broad game/version expansion, no production/live deployment, and no release publication. Exact-environment capabilities remain UNVERIFIED until L3 evidence exists.
 

@@ -31,6 +31,7 @@ def test_connect_and_health_expose_runtime_and_queue_state() -> None:
     assert health.dropped_events == 0
     assert health.last_heartbeat == BASE
     assert health.last_successful_send is None
+    assert health.kill_switch_active is False
 
 
 def test_successful_send_consumes_fifo_and_records_timestamp() -> None:
@@ -107,3 +108,35 @@ def test_closed_session_is_fail_closed() -> None:
     assert session.health().mode is CompanionMode.STOPPED
     with pytest.raises(RuntimeError, match="closed"):
         session.register_reconnect_attempt()
+
+
+def test_kill_switch_stops_session_and_blocks_reconnect() -> None:
+    session = CompanionTransportSession(CompanionRuntime())
+    session.connect(BASE)
+    session.enqueue(envelope(1))
+
+    session.activate_kill_switch()
+
+    health = session.health()
+    assert health.mode is CompanionMode.STOPPED
+    assert health.kill_switch_active is True
+    assert health.queue_depth == 0
+    assert session.enqueue(envelope(2)) is False
+    assert session.mark_send_success(BASE) is None
+    with pytest.raises(RuntimeError, match="kill switch"):
+        session.register_reconnect_attempt()
+
+
+def test_kill_switch_reset_requires_fresh_connect() -> None:
+    session = CompanionTransportSession(CompanionRuntime())
+    session.connect(BASE)
+    session.activate_kill_switch()
+    session.reset_kill_switch()
+
+    health = session.health()
+    assert health.mode is CompanionMode.STOPPED
+    assert health.kill_switch_active is False
+    assert session.enqueue(envelope(1)) is True
+
+    session.connect(BASE + timedelta(seconds=1))
+    assert session.health().mode is CompanionMode.ACTIVE

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from .companion_kill_switch import CompanionKillSwitch
 from .companion_protocol import CompanionMode
 
 
@@ -24,19 +25,26 @@ class CompanionRuntimeConfig:
 class CompanionRuntime:
     """Transport-neutral lifecycle/watchdog state; never authorizes or executes actions."""
 
-    def __init__(self, config: CompanionRuntimeConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: CompanionRuntimeConfig | None = None,
+        kill_switch: CompanionKillSwitch | None = None,
+    ) -> None:
         self.config = config or CompanionRuntimeConfig()
+        self.kill_switch = kill_switch or CompanionKillSwitch()
         self.mode = CompanionMode.STOPPED
         self.last_heartbeat: datetime | None = None
         self.reconnect_attempts = 0
         self.last_latency_ms: float | None = None
 
     def start(self, now: datetime | None = None) -> None:
+        self.kill_switch.require_clear()
         self.mode = CompanionMode.ACTIVE
         self.reconnect_attempts = 0
         self.record_heartbeat(now)
 
     def record_heartbeat(self, now: datetime | None = None) -> None:
+        self.kill_switch.require_clear()
         timestamp = self.timestamp_utc(now)
         if self.last_heartbeat is not None and timestamp < self.last_heartbeat:
             raise ValueError("heartbeat timestamp must be monotonic")
@@ -54,6 +62,9 @@ class CompanionRuntime:
         return latency_ms
 
     def watchdog(self, now: datetime | None = None) -> CompanionMode:
+        if self.kill_switch.active:
+            self.mode = CompanionMode.STOPPED
+            return self.mode
         if self.mode is CompanionMode.STOPPED:
             return self.mode
         timestamp = self.timestamp_utc(now)
@@ -63,13 +74,28 @@ class CompanionRuntime:
 
     def degrade(self) -> None:
         """Mark transport health degraded without making a stop or authorization decision."""
+        if self.kill_switch.active:
+            self.mode = CompanionMode.STOPPED
+            return
         if self.mode is not CompanionMode.STOPPED:
             self.mode = CompanionMode.DEGRADED
+
+    def activate_kill_switch(self) -> None:
+        """Stop Companion locally and prevent reconnect/start until reset."""
+        self.kill_switch.activate()
+        self.mode = CompanionMode.STOPPED
+
+    def reset_kill_switch(self) -> None:
+        """Explicitly clear the local latch; the runtime remains stopped until start()."""
+        self.kill_switch.reset()
+        self.mode = CompanionMode.STOPPED
 
     def stop(self) -> None:
         self.mode = CompanionMode.STOPPED
 
     def reconnect_delay(self) -> timedelta:
+        if self.kill_switch.active:
+            raise RuntimeError("Companion kill switch is active")
         exponent = min(self.reconnect_attempts, 10)
         delay = self.config.reconnect_initial * (2**exponent)
         return min(delay, self.config.reconnect_max)

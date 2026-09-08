@@ -71,6 +71,10 @@ class CompanionQueue:
         self._stopped = False
 
     @property
+    def max_items(self) -> int:
+        return self._max_items
+
+    @property
     def depth(self) -> int:
         return len(self._items)
 
@@ -85,6 +89,11 @@ class CompanionQueue:
     def stop(self) -> None:
         self._stopped = True
         self._items.clear()
+
+    def reset(self) -> None:
+        """Explicitly reopen the queue after a local kill-switch reset."""
+        self._items.clear()
+        self._stopped = False
 
     def push(self, envelope: CompanionEnvelope) -> bool:
         if self._stopped:

@@ -27,6 +27,7 @@ class CompanionRuntimeHealth:
     queue_depth: int
     dropped_events: int
     last_successful_send: datetime | None
+    kill_switch_active: bool
 
 
 class CompanionTransportSession:
@@ -44,13 +45,13 @@ class CompanionTransportSession:
         self.runtime.start(now)
 
     def enqueue(self, envelope: CompanionEnvelope) -> bool:
-        if self._closed:
+        if self._closed or self.runtime.kill_switch.active:
             return False
         return self.queue.push(envelope)
 
     def mark_send_success(self, now: datetime | None = None) -> CompanionEnvelope | None:
         """Record a successful transport send and consume exactly one queued envelope."""
-        if self._closed:
+        if self._closed or self.runtime.kill_switch.active:
             return None
         sent = self.queue.pop()
         if sent is None:
@@ -60,7 +61,7 @@ class CompanionTransportSession:
 
     def record_send_success(self, now: datetime | None = None) -> None:
         """Record transport-level send completion without changing queue state."""
-        if self._closed:
+        if self._closed or self.runtime.kill_switch.active:
             return
         self.last_successful_send = self.runtime.timestamp_utc(now)
 
@@ -76,6 +77,18 @@ class CompanionTransportSession:
             raise RuntimeError("transport session is closed")
         return self.runtime.register_reconnect_attempt()
 
+    def activate_kill_switch(self) -> None:
+        """Stop locally and prevent queue admission or reconnect until explicit reset."""
+        self.runtime.activate_kill_switch()
+        self.queue.stop()
+
+    def reset_kill_switch(self) -> None:
+        """Clear the local latch; a fresh connect is still required before sending."""
+        if self._closed:
+            raise RuntimeError("transport session is closed")
+        self.runtime.reset_kill_switch()
+        self.queue.reset()
+
     def health(self) -> CompanionRuntimeHealth:
         return CompanionRuntimeHealth(
             mode=self.runtime.mode,
@@ -85,6 +98,7 @@ class CompanionTransportSession:
             queue_depth=self.queue.depth,
             dropped_events=self.queue.dropped,
             last_successful_send=self.last_successful_send,
+            kill_switch_active=self.runtime.kill_switch.active,
         )
 
     def close(self) -> None:

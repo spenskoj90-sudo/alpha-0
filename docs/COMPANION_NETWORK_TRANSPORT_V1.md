@@ -1,6 +1,6 @@
 # SENTINEL — Companion Network Transport v1
 
-**Status:** PROPOSED IMPLEMENTATION CONTRACT
+**Status:** ACTIVE IMPLEMENTATION CONTRACT
 **Version:** 1.0
 
 ## Purpose
@@ -9,7 +9,7 @@ Define the first concrete network transport for the local Companion ↔ Core pat
 
 ## Scope
 
-The first transport is a **loopback WebSocket transport** between a local Companion process and SENTINEL Core.
+The implemented transport is a **loopback WebSocket transport** between a local Companion process and SENTINEL Core, exposed at `/v1/companion/ws`.
 
 It is intentionally limited to localhost traffic. Internet-facing Companion transport, reverse proxies, TLS termination, and production deployment are outside this increment.
 
@@ -17,10 +17,10 @@ It is intentionally limited to localhost traffic. Internet-facing Companion tran
 
 The transport is a delivery mechanism, not an authorization source.
 
-- Bind only to loopback by default.
-- Reject non-loopback peer addresses.
-- Require the existing Companion handshake before accepting application envelopes.
+- Bind only to loopback by default and reject non-loopback peers.
+- Require the existing five-way Companion handshake before accepting application envelopes.
 - Fail closed on protocol, UGS schema, adapter contract, Core protocol, or capability-profile mismatch.
+- Validate the complete bounded `CompanionEnvelope` before queue admission.
 - Do not accept arbitrary executable payloads.
 - Do not authorize privileged game actions.
 - Do not expose authentication tokens or credentials through health snapshots or logs.
@@ -32,7 +32,7 @@ A future authenticated deployment transport may add TLS or another authenticated
 
 Each WebSocket message carries one bounded `CompanionEnvelope` serialized as JSON.
 
-The receiver must validate the complete envelope before queue admission. Invalid, oversized, unknown-field or unsupported-message payloads are rejected without execution.
+The receiver validates the complete envelope before queue admission. Invalid, oversized, unknown-field or unsupported-message payloads are rejected without execution.
 
 ## Lifecycle
 
@@ -51,7 +51,7 @@ DEGRADED on transport failure
   ↓
 RECONNECT with bounded backoff
   ↓
-ACTIVE after successful handshake
+ACTIVE after a fresh compatible handshake
 ```
 
 An explicit shutdown is terminal for the session and produces `STOPPED`. A stopped session cannot be revived by a reconnect callback.
@@ -61,16 +61,16 @@ An explicit shutdown is terminal for the session and produces `STOPPED`. A stopp
 The existing bounded `CompanionQueue` remains authoritative for buffering.
 
 - Producers enqueue through `CompanionTransportSession`.
-- The transport drains FIFO entries.
+- The transport drains FIFO entries for sends.
 - Queue overflow follows existing drop-oldest accounting.
-- Transport code must never allocate an unbounded pending-message buffer.
+- Transport code does not allocate an unbounded pending-message buffer.
 - Queue depth and dropped-event counts remain visible through the privacy-safe health snapshot.
 
 ## Failure semantics
 
-- Connection failure → `DEGRADED` and schedule bounded reconnect.
-- Send failure → do not report success; preserve the session's failure state.
-- Receive validation failure → reject the message and keep the connection alive only when the protocol permits safe continuation.
+- Connection failure → `DEGRADED`; reconnect scheduling remains bounded by `CompanionRuntime`.
+- Send failure → do not report success; preserve the session failure state.
+- Receive validation failure → close with an appropriate protocol/data error and enter terminal `STOPPED` for that session.
 - Handshake mismatch → reject and stop the session.
 - Explicit close/kill-switch integration → `STOPPED`; no reconnect.
 
@@ -90,24 +90,13 @@ They must not be represented as real device end-to-end latency until a real Comp
 
 ## Privacy
 
-Transport logs and health snapshots must contain operational metadata only. Raw game payloads, chat, authentication credentials and user identifiers are not logged by the transport implementation.
+Transport logs and health snapshots contain operational state only. Raw game payloads, chat, authentication credentials and user identifiers are not logged by the transport implementation.
 
-## Testing contract
+## Verification
 
-Automated tests must cover at least:
+The implementation includes socket-level FastAPI `TestClient` coverage for the loopback WebSocket handshake, fail-closed compatibility rejection, malformed-envelope rejection and loopback peer policy. Existing Companion protocol/session tests cover queue/backpressure, degradation, reconnect scheduling and terminal stop semantics.
 
-1. loopback binding policy;
-2. handshake success and each compatibility rejection;
-3. bounded envelope serialization/deserialization;
-4. malformed/oversized payload rejection;
-5. FIFO queue/backpressure behavior;
-6. transport failure → `DEGRADED`;
-7. reconnect scheduling and successful recovery;
-8. explicit close → terminal `STOPPED`;
-9. no delivery after stop;
-10. transport latency timestamp ordering.
-
-A socket-level integration test may prove the transport implementation. It is not a substitute for real-device E2E evidence.
+Socket-level integration evidence is not a substitute for real-device E2E evidence.
 
 ## Non-goals
 

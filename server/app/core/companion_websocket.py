@@ -4,7 +4,7 @@ import ipaddress
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from .companion_protocol import (
     CompanionEnvelope,
@@ -16,6 +16,8 @@ from .companion_protocol import (
 )
 from .companion_runtime import CompanionRuntime
 from .companion_transport import CompanionTransportSession
+
+router = APIRouter(tags=["companion"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,14 +58,15 @@ class CompanionWebSocketTransport:
     def health(self):
         return self.session.health()
 
-    async def accept(self) -> None:
+    async def accept(self) -> bool:
         host = self.websocket.client.host if self.websocket.client else None
         if not is_loopback_peer(host):
             await self.websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="LOOPBACK_ONLY")
             self._closed = True
-            return
+            return False
         await self.websocket.accept()
         self.session.connect()
+        return True
 
     async def handshake(self) -> CompanionHandshakeResult:
         if self._closed:
@@ -110,15 +113,16 @@ class CompanionWebSocketTransport:
             self._fail_transport()
             raise
         except Exception:
-            await self.websocket.close(code=status.WS_1003_UNSUPPORTED_DATA, reason="INVALID_ENVELOPE")
             self._closed = True
             self.session.close()
+            await self.websocket.close(code=status.WS_1003_UNSUPPORTED_DATA, reason="INVALID_ENVELOPE")
             return None
         if not self.session.enqueue(envelope):
             return None
         return envelope
 
     async def send(self) -> CompanionEnvelope | None:
+        """Send exactly one queued envelope after a successful handshake."""
         if self._closed or not self._handshaken:
             return None
         queued = self.session.queue.pop()
@@ -129,7 +133,7 @@ class CompanionWebSocketTransport:
         except Exception:
             self.session.mark_transport_failure()
             return None
-        self.session.last_successful_send = self.session.runtime._utc(None)
+        self.session.record_send_success()
         return queued
 
     async def close(self) -> None:
@@ -148,26 +152,18 @@ class CompanionWebSocketTransport:
             self._closed = True
 
 
-def install_companion_websocket_route(
-    app: FastAPI,
-    *,
-    compatibility: CompanionTransportCompatibility | None = None,
-) -> None:
-    """Install the loopback-only Companion WebSocket endpoint."""
-
-    @app.websocket("/v1/companion/ws")
-    async def companion_websocket(websocket: WebSocket) -> None:
-        transport = CompanionWebSocketTransport(websocket, compatibility=compatibility)
-        await transport.accept()
-        if transport.health.mode is CompanionMode.STOPPED:
-            return
+@router.websocket("/v1/companion/ws")
+async def companion_websocket(websocket: WebSocket) -> None:
+    transport = CompanionWebSocketTransport(websocket)
+    if not await transport.accept():
+        return
+    try:
         result = await transport.handshake()
         if not result.accepted:
             return
-        try:
-            while True:
-                await transport.receive_envelope()
-        except WebSocketDisconnect:
-            return
-        finally:
-            transport._fail_transport()
+        while True:
+            await transport.receive_envelope()
+    except WebSocketDisconnect:
+        return
+    finally:
+        transport._fail_transport()

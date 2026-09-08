@@ -49,6 +49,20 @@ def test_successful_send_consumes_fifo_and_records_timestamp() -> None:
     assert session.queue.pop() == second
 
 
+def test_queue_peek_is_non_destructive_until_send_is_acknowledged() -> None:
+    session = CompanionTransportSession(CompanionRuntime(), CompanionQueue(max_items=2))
+    session.connect(BASE)
+    first = envelope(1)
+    session.enqueue(first)
+
+    assert session.queue.peek() == first
+    assert session.health().queue_depth == 1
+    assert session.queue.peek() == first
+
+    assert session.mark_send_success(BASE) == first
+    assert session.health().queue_depth == 0
+
+
 def test_transport_failure_degrades_but_does_not_stop_session() -> None:
     session = CompanionTransportSession(CompanionRuntime())
     session.connect(BASE)

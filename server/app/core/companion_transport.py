@@ -9,7 +9,7 @@ from .companion_runtime import CompanionRuntime
 
 
 class CompanionTransport(Protocol):
-    """Minimal transport seam; concrete network implementations live outside this module."""
+    """Minimal synchronous transport seam for bounded Companion delivery."""
 
     def send(self, envelope: CompanionEnvelope) -> None:
         ...
@@ -30,7 +30,7 @@ class CompanionRuntimeHealth:
 
 
 class CompanionTransportSession:
-    """Binds protocol queue state to runtime health without implementing network I/O."""
+    """Binds protocol queue state to runtime health without choosing network I/O."""
 
     def __init__(self, runtime: CompanionRuntime, queue: CompanionQueue | None = None) -> None:
         self.runtime = runtime
@@ -55,9 +55,14 @@ class CompanionTransportSession:
         sent = self.queue.pop()
         if sent is None:
             return None
-        timestamp = self.runtime._utc(now)
-        self.last_successful_send = timestamp
+        self.record_send_success(now)
         return sent
+
+    def record_send_success(self, now: datetime | None = None) -> None:
+        """Record transport-level send completion without changing queue state."""
+        if self._closed:
+            return
+        self.last_successful_send = self.runtime.timestamp_utc(now)
 
     def mark_transport_failure(self, now: datetime | None = None) -> CompanionMode:
         """Make transport loss visible as degradation; never authorize or execute actions."""

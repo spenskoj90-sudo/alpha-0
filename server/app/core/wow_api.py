@@ -7,9 +7,11 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.core.admin import require_admin
+from app.core.companion_websocket import router as companion_router
 from app.core.wow_catalog import MMOTOP_REALM_SEEDS, WOW_PATCHES, get_patch, get_realm
 
 router = APIRouter(tags=["world-of-warcraft", "device-security"])
+router.include_router(companion_router)
 
 
 class RealmObservation(BaseModel):

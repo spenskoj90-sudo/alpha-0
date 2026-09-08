@@ -37,7 +37,7 @@ class CompanionRuntime:
         self.record_heartbeat(now)
 
     def record_heartbeat(self, now: datetime | None = None) -> None:
-        timestamp = self._utc(now)
+        timestamp = self.timestamp_utc(now)
         if self.last_heartbeat is not None and timestamp < self.last_heartbeat:
             raise ValueError("heartbeat timestamp must be monotonic")
         self.last_heartbeat = timestamp
@@ -45,8 +45,8 @@ class CompanionRuntime:
             self.mode = CompanionMode.ACTIVE
 
     def observe_latency(self, sent_at: datetime, received_at: datetime) -> float:
-        start = self._utc(sent_at)
-        end = self._utc(received_at)
+        start = self.timestamp_utc(sent_at)
+        end = self.timestamp_utc(received_at)
         if end < start:
             raise ValueError("received_at must be >= sent_at")
         latency_ms = (end - start).total_seconds() * 1000
@@ -56,7 +56,7 @@ class CompanionRuntime:
     def watchdog(self, now: datetime | None = None) -> CompanionMode:
         if self.mode is CompanionMode.STOPPED:
             return self.mode
-        timestamp = self._utc(now)
+        timestamp = self.timestamp_utc(now)
         if self.last_heartbeat is None or timestamp - self.last_heartbeat > self.config.heartbeat_timeout:
             self.mode = CompanionMode.DEGRADED
         return self.mode
@@ -80,7 +80,7 @@ class CompanionRuntime:
         return delay
 
     @staticmethod
-    def _utc(value: datetime | None) -> datetime:
+    def timestamp_utc(value: datetime | None) -> datetime:
         timestamp = value or datetime.now(timezone.utc)
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError("timestamp must be timezone-aware")

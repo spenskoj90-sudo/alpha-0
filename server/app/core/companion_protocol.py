@@ -2,24 +2,23 @@ from __future__ import annotations
 
 from collections import deque
 from enum import StrEnum
+from typing import Final
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class CompanionMessageType(StrEnum):
-    HANDSHAKE = "HANDSHAKE"
-    HANDSHAKE_ACK = "HANDSHAKE_ACK"
-    UGS_UPDATE = "UGS_UPDATE"
-    HEARTBEAT = "HEARTBEAT"
-    HEALTH = "HEALTH"
-    SHUTDOWN = "SHUTDOWN"
+from pydantic import BaseModel, Field
 
 
 class CompanionMode(StrEnum):
     ACTIVE = "ACTIVE"
     DEGRADED = "DEGRADED"
     STOPPED = "STOPPED"
+
+
+class CompanionMessageType(StrEnum):
+    HEARTBEAT = "HEARTBEAT"
+    STATE = "STATE"
+    EVENT = "EVENT"
+    COMMAND = "COMMAND"
 
 
 class LatencyClass(StrEnum):
@@ -29,29 +28,20 @@ class LatencyClass(StrEnum):
 
 
 class CompanionHandshake(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    protocol_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
-    ugs_schema_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
-    adapter_contract_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
-    core_protocol_version: str = Field(pattern=r"^1\.\d+$", max_length=16)
-    capability_profile: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
-    instance_id: UUID = Field(default_factory=uuid4)
+    protocol_version: str = Field(min_length=1, max_length=32)
+    ugs_schema_version: str = Field(min_length=1, max_length=32)
+    adapter_contract_version: str = Field(min_length=1, max_length=32)
+    core_protocol_version: str = Field(min_length=1, max_length=32)
+    capability_profile: str = Field(min_length=1, max_length=64)
 
 
 class CompanionHandshakeResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     accepted: bool
-    reason_code: str
+    reason_code: str = Field(min_length=1, max_length=64)
     mode: CompanionMode
 
 
 class CompanionEnvelope(BaseModel):
-    """Transport-neutral bounded protocol envelope; it is not a command executor."""
-
-    model_config = ConfigDict(extra="forbid")
-
     message_id: UUID = Field(default_factory=uuid4)
     sequence: int = Field(ge=0, le=2**63 - 1)
     message_type: CompanionMessageType
@@ -71,6 +61,10 @@ class CompanionQueue:
         self._stopped = False
 
     @property
+    def max_items(self) -> int:
+        return self._max_items
+
+    @property
     def depth(self) -> int:
         return len(self._items)
 
@@ -85,6 +79,11 @@ class CompanionQueue:
     def stop(self) -> None:
         self._stopped = True
         self._items.clear()
+
+    def reset(self) -> None:
+        """Explicitly reopen the queue after a local kill-switch reset."""
+        self._items.clear()
+        self._stopped = False
 
     def push(self, envelope: CompanionEnvelope) -> bool:
         if self._stopped:
@@ -117,40 +116,16 @@ def negotiate_handshake(
     """Accept only exact v1 compatibility for the first protocol slice."""
 
     if offered.protocol_version != "1.0":
-        return CompanionHandshakeResult(
-            accepted=False,
-            reason_code="PROTOCOL_VERSION_UNSUPPORTED",
-            mode=CompanionMode.STOPPED,
-        )
+        return CompanionHandshakeResult(accepted=False, reason_code="PROTOCOL_VERSION_UNSUPPORTED", mode=CompanionMode.STOPPED)
     if offered.ugs_schema_version != expected_ugs_schema:
-        return CompanionHandshakeResult(
-            accepted=False,
-            reason_code="UGS_SCHEMA_MISMATCH",
-            mode=CompanionMode.STOPPED,
-        )
+        return CompanionHandshakeResult(accepted=False, reason_code="UGS_SCHEMA_MISMATCH", mode=CompanionMode.STOPPED)
     if offered.adapter_contract_version != expected_adapter_contract:
-        return CompanionHandshakeResult(
-            accepted=False,
-            reason_code="ADAPTER_CONTRACT_MISMATCH",
-            mode=CompanionMode.STOPPED,
-        )
+        return CompanionHandshakeResult(accepted=False, reason_code="ADAPTER_CONTRACT_MISMATCH", mode=CompanionMode.STOPPED)
     if offered.core_protocol_version != expected_core_protocol:
-        return CompanionHandshakeResult(
-            accepted=False,
-            reason_code="CORE_PROTOCOL_MISMATCH",
-            mode=CompanionMode.STOPPED,
-        )
+        return CompanionHandshakeResult(accepted=False, reason_code="CORE_PROTOCOL_MISMATCH", mode=CompanionMode.STOPPED)
     if offered.capability_profile != expected_capability_profile:
-        return CompanionHandshakeResult(
-            accepted=False,
-            reason_code="CAPABILITY_PROFILE_MISMATCH",
-            mode=CompanionMode.STOPPED,
-        )
-    return CompanionHandshakeResult(
-        accepted=True,
-        reason_code="HANDSHAKE_ACCEPTED",
-        mode=CompanionMode.ACTIVE,
-    )
+        return CompanionHandshakeResult(accepted=False, reason_code="CAPABILITY_PROFILE_MISMATCH", mode=CompanionMode.STOPPED)
+    return CompanionHandshakeResult(accepted=True, reason_code="HANDSHAKE_ACCEPTED", mode=CompanionMode.ACTIVE)
 
 
 def latency_class_for_budget(budget_ms: int) -> LatencyClass:

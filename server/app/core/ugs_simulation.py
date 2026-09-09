@@ -73,6 +73,7 @@ class DeterministicUGSSimulation:
         observations: list[UGSSimulationObservation] = []
         for step in steps:
             state = step.state
+            fresh = self._ingestor.is_fresh(state, now=step.now)
             accepted = self._ingestor.accept(state)
             expired_state = self._ingestor.expire(
                 session_id=state.session_id,
@@ -83,7 +84,7 @@ class DeterministicUGSSimulation:
                 sorted(
                     name
                     for name in effective_state.capabilities
-                    if self._ingestor.usable_capability(effective_state, name)
+                    if fresh and self._ingestor.usable_capability(effective_state, name)
                 )
             )
             observations.append(
@@ -91,7 +92,7 @@ class DeterministicUGSSimulation:
                     session_id=state.session_id,
                     sequence=state.sequence,
                     accepted=accepted,
-                    fresh=self._ingestor.is_fresh(state, now=step.now),
+                    fresh=fresh,
                     expired=(
                         expired_state is not None
                         and "stale_state" in expired_state.missing_signals

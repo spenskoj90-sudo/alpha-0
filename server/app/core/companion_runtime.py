@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from .companion_kill_switch import CompanionKillSwitch
+from .companion_observability import CompanionTelemetryEvent, CompanionTelemetrySink
 from .companion_protocol import CompanionMode
 
 
@@ -29,19 +30,34 @@ class CompanionRuntime:
         self,
         config: CompanionRuntimeConfig | None = None,
         kill_switch: CompanionKillSwitch | None = None,
+        telemetry: CompanionTelemetrySink | None = None,
     ) -> None:
         self.config = config or CompanionRuntimeConfig()
         self.kill_switch = kill_switch or CompanionKillSwitch()
+        self.telemetry = telemetry
         self.mode = CompanionMode.STOPPED
         self.last_heartbeat: datetime | None = None
         self.reconnect_attempts = 0
         self.last_latency_ms: float | None = None
 
+    def _record(self, name: str, now: datetime | None = None, **attributes: str | int | float | bool) -> None:
+        if self.telemetry is None:
+            return
+        self.telemetry.record(
+            CompanionTelemetryEvent.create(
+                name=name,
+                observed_at=self.timestamp_utc(now),
+                attributes=attributes,
+            )
+        )
+
     def start(self, now: datetime | None = None) -> None:
         self.kill_switch.require_clear()
+        timestamp = self.timestamp_utc(now)
         self.mode = CompanionMode.ACTIVE
         self.reconnect_attempts = 0
-        self.record_heartbeat(now)
+        self.record_heartbeat(timestamp)
+        self._record("companion.runtime.started", timestamp)
 
     def record_heartbeat(self, now: datetime | None = None) -> None:
         self.kill_switch.require_clear()
@@ -51,6 +67,7 @@ class CompanionRuntime:
         self.last_heartbeat = timestamp
         if self.mode is not CompanionMode.STOPPED:
             self.mode = CompanionMode.ACTIVE
+        self._record("companion.runtime.heartbeat", timestamp, mode=self.mode.value)
 
     def observe_latency(self, sent_at: datetime, received_at: datetime) -> float:
         start = self.timestamp_utc(sent_at)
@@ -59,39 +76,47 @@ class CompanionRuntime:
             raise ValueError("received_at must be >= sent_at")
         latency_ms = (end - start).total_seconds() * 1000
         self.last_latency_ms = latency_ms
+        self._record("companion.runtime.latency", end, latency_ms=latency_ms)
         return latency_ms
 
     def watchdog(self, now: datetime | None = None) -> CompanionMode:
         if self.kill_switch.active:
             self.mode = CompanionMode.STOPPED
+            self._record("companion.runtime.stopped", now, reason="kill_switch")
             return self.mode
         if self.mode is CompanionMode.STOPPED:
             return self.mode
         timestamp = self.timestamp_utc(now)
         if self.last_heartbeat is None or timestamp - self.last_heartbeat > self.config.heartbeat_timeout:
             self.mode = CompanionMode.DEGRADED
+            self._record("companion.runtime.degraded", timestamp, reason="heartbeat_timeout")
         return self.mode
 
     def degrade(self) -> None:
         """Mark transport health degraded without making a stop or authorization decision."""
         if self.kill_switch.active:
             self.mode = CompanionMode.STOPPED
+            self._record("companion.runtime.stopped", reason="kill_switch")
             return
         if self.mode is not CompanionMode.STOPPED:
             self.mode = CompanionMode.DEGRADED
+            self._record("companion.runtime.degraded", reason="transport")
 
     def activate_kill_switch(self) -> None:
         """Stop Companion locally and prevent reconnect/start until reset."""
         self.kill_switch.activate()
         self.mode = CompanionMode.STOPPED
+        self._record("companion.runtime.kill_switch", reason="activated")
 
     def reset_kill_switch(self) -> None:
         """Explicitly clear the local latch; the runtime remains stopped until start()."""
         self.kill_switch.reset()
         self.mode = CompanionMode.STOPPED
+        self._record("companion.runtime.kill_switch", reason="reset")
 
     def stop(self) -> None:
         self.mode = CompanionMode.STOPPED
+        self._record("companion.runtime.stopped", reason="explicit")
 
     def reconnect_delay(self) -> timedelta:
         if self.kill_switch.active:
@@ -103,6 +128,11 @@ class CompanionRuntime:
     def register_reconnect_attempt(self) -> timedelta:
         delay = self.reconnect_delay()
         self.reconnect_attempts += 1
+        self._record(
+            "companion.runtime.reconnect",
+            attempt=self.reconnect_attempts,
+            delay_ms=delay.total_seconds() * 1000,
+        )
         return delay
 
     @staticmethod

@@ -35,7 +35,6 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 
 - [ ] #11 — synchronize the Figma design system with the implementation; use Figma only when the corresponding UI work is active.
 - [ ] #59 — Firebase Test Lab service-account GCS `storage.objects.create` permission; external/Owner infrastructure gate, not a reason to distort routine CI.
-- [ ] #181 — reconcile architecture gap register, task board and implementation state under the repository-first documentation model.
 - [ ] Measured performance baseline — retain as open until reproducible measurements are tied to current-main evidence.
 
 ## Later horizons
@@ -72,7 +71,7 @@ The next program is intentionally end-to-end. It is not a collection of unrelate
 
 ### Definition of Done for every substantive block
 
-A block is complete only when all applicable dimensions are addressed: implementation/contract, UX/design/visualization, security/privacy/failure behavior, performance/resource behavior, automated tests, runtime/device/integration evidence, and semantic documentation when meaning changes. Large blocks may be split into short-lived PRs, but each increment must remain independently testable, reviewable and integrable.
+A block is complete only when all applicable dimensions are addressed: implementation/contract, UX/design/visualization, security/privacy/failure, performance/resource, automated tests, runtime/device/integration evidence, and semantic documentation as applicable. Large blocks may be split into short-lived PRs, but each increment must remain independently testable, reviewable and integrable.
 
 ### Scope discipline
 

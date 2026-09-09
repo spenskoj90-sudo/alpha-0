@@ -2,6 +2,7 @@ import pytest
 
 from app.core.companion_peer_auth import (
     AllowlistPeerAuthenticator,
+    PeerAuthDecision,
     PeerAuthEvidence,
 )
 

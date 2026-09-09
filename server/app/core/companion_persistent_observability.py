@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol
-from uuid import UUID, uuid4
+from typing import Protocol
+from uuid import uuid4
 
 from sqlalchemy import text
 

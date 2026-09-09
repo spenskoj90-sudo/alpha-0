@@ -4,7 +4,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.core.companion_observability import BoundedCompanionTelemetrySink
+from app.core.companion_observability import (
+    BoundedCompanionTelemetrySink,
+    CompanionTelemetryEvent,
+)
 from app.core.companion_protocol import CompanionMode
 from app.core.companion_runtime import CompanionRuntime, CompanionRuntimeConfig
 
@@ -105,17 +108,11 @@ def test_runtime_emits_privacy_safe_lifecycle_events() -> None:
     assert events[4].attributes == (("attempt", 1), ("delay_ms", 1000.0))
 
 
-def test_telemetry_sink_is_bounded_and_thread_safe_by_contract() -> None:
+def test_telemetry_sink_is_bounded() -> None:
     sink = BoundedCompanionTelemetrySink(max_events=2)
-    sink.record(
-        CompanionTelemetryEvent.create("companion.runtime.one", T0)
-    )
-    sink.record(
-        CompanionTelemetryEvent.create("companion.runtime.two", T0 + timedelta(seconds=1))
-    )
-    sink.record(
-        CompanionTelemetryEvent.create("companion.runtime.three", T0 + timedelta(seconds=2))
-    )
+    sink.record(CompanionTelemetryEvent.create("companion.runtime.one", T0))
+    sink.record(CompanionTelemetryEvent.create("companion.runtime.two", T0 + timedelta(seconds=1)))
+    sink.record(CompanionTelemetryEvent.create("companion.runtime.three", T0 + timedelta(seconds=2)))
 
     assert [event.name for event in sink.snapshot()] == [
         "companion.runtime.two",

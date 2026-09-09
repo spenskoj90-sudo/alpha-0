@@ -26,7 +26,7 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 - [ ] Companion runtime/integration — runtime lifecycle, heartbeat watchdog, deterministic reconnect/backoff and transport-neutral health/session binding are implemented; the local kill switch, concrete loopback WebSocket transport, and bounded TLS-by-default TCP transport foundation are implemented and tested. Transport/session integration, peer authentication/authorization, real end-to-end latency evidence and persistent runtime telemetry remain open. `docs/COMPANION_TCP_TRANSPORT_V1.md` defines the TCP transport foundation contract.
 - [x] Policy Engine / Action Gateway boundary before any action-capable feature — implemented in `server/app/core/action_gateway.py` and documented by `docs/ACTION_GATEWAY_CONTRACT_V1.md`; automatic execution remains denied.
 - [ ] Adapter/Companion observability implementation after the telemetry runtime path is ready.
-- [ ] Simulation harness before expanding recommendation logic.
+- [x] Simulation harness before expanding recommendation logic — deterministic UGS scenario execution, stale-state capability suppression, canonical result digest and regression coverage implemented in `server/app/core/ugs_simulation.py`; documented by `docs/SIMULATION_HARNESS_V1.md`.
 - [ ] Exact WoW 3.3.5a/private-server validation; keep capabilities UNVERIFIED until exact-environment L3 evidence exists.
 - [ ] AI provider abstraction/routing and confidence/provenance implementation where the current codebase still lacks the required boundaries.
 - [ ] Compatibility/version negotiation and overlay/voice interaction contracts where implementation evidence is absent.

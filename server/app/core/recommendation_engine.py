@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .ai_provider import AIProvider, AIProviderRegistry, BaselineRecommendationProvider
+from .ai_provider import AIProvider, AIProviderRegistry, AIProviderResult, BaselineRecommendationProvider
 
 
 class RecommendationEngine:
@@ -19,6 +19,6 @@ class RecommendationEngine:
         context: Mapping[str, Any],
         *,
         provider_id: str | None = None,
-    ):
+    ) -> AIProviderResult:
         provider: AIProvider = self.registry.route(provider_id)
         return provider.generate(context)

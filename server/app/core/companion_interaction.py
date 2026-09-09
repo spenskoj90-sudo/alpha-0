@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -26,12 +26,12 @@ class CompanionPresentation:
     correlation_id: UUID
     provenance: tuple[str, ...] = ()
     confidence: float | None = None
-    presentation_id: UUID = uuid4()
+    presentation_id: UUID = field(default_factory=uuid4)
 
     def __post_init__(self) -> None:
         if not self.text or len(self.text) > 2000:
             raise ValueError("text must be between 1 and 2000 characters")
-        if not 0.0 <= (self.confidence if self.confidence is not None else 0.0) <= 1.0:
+        if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be between 0 and 1")
         if len(self.provenance) > 20:
             raise ValueError("provenance must contain at most 20 items")

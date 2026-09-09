@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.core.companion_observability import BoundedCompanionTelemetrySink
 from app.core.companion_protocol import CompanionMode
 from app.core.companion_runtime import CompanionRuntime, CompanionRuntimeConfig
 
@@ -78,3 +79,45 @@ def test_config_rejects_invalid_bounds() -> None:
         CompanionRuntimeConfig(
             reconnect_initial=timedelta(seconds=2), reconnect_max=timedelta(seconds=1)
         )
+
+
+def test_runtime_emits_privacy_safe_lifecycle_events() -> None:
+    sink = BoundedCompanionTelemetrySink(max_events=16)
+    runtime = CompanionRuntime(telemetry=sink)
+
+    runtime.start(T0)
+    runtime.observe_latency(T0, T0 + timedelta(milliseconds=37))
+    runtime.watchdog(T0 + timedelta(seconds=11))
+    runtime.register_reconnect_attempt()
+    runtime.stop()
+
+    events = sink.snapshot()
+    assert [event.name for event in events] == [
+        "companion.runtime.heartbeat",
+        "companion.runtime.started",
+        "companion.runtime.latency",
+        "companion.runtime.degraded",
+        "companion.runtime.reconnect",
+        "companion.runtime.stopped",
+    ]
+    assert events[2].attributes == (("latency_ms", 37.0),)
+    assert events[3].attributes == (("reason", "heartbeat_timeout"),)
+    assert events[4].attributes == (("attempt", 1), ("delay_ms", 1000.0))
+
+
+def test_telemetry_sink_is_bounded_and_thread_safe_by_contract() -> None:
+    sink = BoundedCompanionTelemetrySink(max_events=2)
+    sink.record(
+        CompanionTelemetryEvent.create("companion.runtime.one", T0)
+    )
+    sink.record(
+        CompanionTelemetryEvent.create("companion.runtime.two", T0 + timedelta(seconds=1))
+    )
+    sink.record(
+        CompanionTelemetryEvent.create("companion.runtime.three", T0 + timedelta(seconds=2))
+    )
+
+    assert [event.name for event in sink.snapshot()] == [
+        "companion.runtime.two",
+        "companion.runtime.three",
+    ]

@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -30,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.SentinelColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -42,6 +44,7 @@ fun LoginScreen(
     var registerMode by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     fun submit() {
         val normalizedEmail = email.trim().lowercase()
@@ -51,21 +54,23 @@ fun LoginScreen(
             else -> {
                 busy = true
                 error = null
-                Thread {
-                    val result = if (registerMode) api.register(normalizedEmail, password) else api.login(normalizedEmail, password)
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        busy = false
-                        when (result) {
-                            is AuthApi.Result.Success -> onAuthenticated(result.session)
-                            is AuthApi.Result.Failure -> error = when (result.message) {
-                                "INVALID_CREDENTIALS" -> "Email or password is incorrect"
-                                "EMAIL_ALREADY_REGISTERED" -> "An account with this email already exists"
-                                "NETWORK_ERROR" -> "Cannot reach SENTINEL server"
-                                else -> "Authentication failed: ${result.message}"
-                            }
+                scope.launch {
+                    val result = if (registerMode) {
+                        api.register(normalizedEmail, password)
+                    } else {
+                        api.login(normalizedEmail, password)
+                    }
+                    busy = false
+                    when (result) {
+                        is AuthApi.Result.Success -> onAuthenticated(result.session)
+                        is AuthApi.Result.Failure -> error = when (result.message) {
+                            "INVALID_CREDENTIALS" -> "Email or password is incorrect"
+                            "EMAIL_ALREADY_REGISTERED" -> "An account with this email already exists"
+                            "NETWORK_ERROR" -> "Cannot reach SENTINEL server"
+                            else -> "Authentication failed: ${result.message}"
                         }
                     }
-                }.start()
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.alpha0.app.auth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,7 +12,7 @@ import kotlin.concurrent.thread
 @RunWith(AndroidJUnit4::class)
 class AuthApiRefreshInstrumentedTest {
     @Test
-    fun refreshPostsRefreshTokenAndParsesReplacementSession() {
+    fun refreshPostsRefreshTokenAndParsesReplacementSession() = runBlocking {
         ServerSocket(0).use { server ->
             val response = """
                 {"session_token":"new-access","refresh_token":"new-refresh","scopes":["account:read"]}

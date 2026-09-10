@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from bisect import insort
 from dataclasses import dataclass
 from threading import Lock
 
@@ -28,7 +27,7 @@ class CompanionLatencyStats:
         if latency_ms < 0:
             raise ValueError("latency_ms must be non-negative")
         with self._lock:
-            insort(self._samples, latency_ms)
+            self._samples.append(latency_ms)
             if len(self._samples) > self._max_samples:
                 self._samples.pop(0)
 
@@ -37,13 +36,14 @@ class CompanionLatencyStats:
             count = len(self._samples)
             if not count:
                 return CompanionLatencySnapshot(0, None, None, None, None)
+            ordered = sorted(self._samples)
             index = max(0, min(count - 1, int((count - 1) * 0.95)))
             return CompanionLatencySnapshot(
                 count=count,
-                minimum_ms=self._samples[0],
-                maximum_ms=self._samples[-1],
-                average_ms=sum(self._samples) / count,
-                p95_ms=self._samples[index],
+                minimum_ms=ordered[0],
+                maximum_ms=ordered[-1],
+                average_ms=sum(ordered) / count,
+                p95_ms=ordered[index],
             )
 
     def clear(self) -> None:

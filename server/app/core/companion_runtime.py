@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from .companion_kill_switch import CompanionKillSwitch
+from .companion_latency_stats import CompanionLatencyStats
 from .companion_observability import CompanionTelemetryEvent, CompanionTelemetrySink
 from .companion_protocol import CompanionMode
 
@@ -31,10 +32,12 @@ class CompanionRuntime:
         config: CompanionRuntimeConfig | None = None,
         kill_switch: CompanionKillSwitch | None = None,
         telemetry: CompanionTelemetrySink | None = None,
+        latency_stats: CompanionLatencyStats | None = None,
     ) -> None:
         self.config = config or CompanionRuntimeConfig()
         self.kill_switch = kill_switch or CompanionKillSwitch()
         self.telemetry = telemetry
+        self.latency_stats = latency_stats or CompanionLatencyStats()
         self.mode = CompanionMode.STOPPED
         self.last_heartbeat: datetime | None = None
         self.reconnect_attempts = 0
@@ -76,6 +79,7 @@ class CompanionRuntime:
             raise ValueError("received_at must be >= sent_at")
         latency_ms = (end - start).total_seconds() * 1000
         self.last_latency_ms = latency_ms
+        self.latency_stats.observe(latency_ms)
         self._record("companion.runtime.latency", end, latency_ms=latency_ms)
         return latency_ms
 

@@ -86,6 +86,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.play:integrity:1.4.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // Sentry Android SDK — runtime crash / error reporting (issue #7).
     // Initialized only when BuildConfig.SENTRY_DSN is non-empty (release CI).
     implementation("io.sentry:sentry-android:8.54.0")

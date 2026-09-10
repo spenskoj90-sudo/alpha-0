@@ -2,13 +2,15 @@ package com.alpha0.app.auth
 
 import android.content.Context
 import com.alpha0.app.diagnostics.DiagnosticLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
 interface RefreshClient {
-    fun refresh(refreshToken: String): AuthApi.Result
+    suspend fun refresh(refreshToken: String): AuthApi.Result
 }
 
 class AuthApi(private val baseUrl: String) : RefreshClient {
@@ -30,11 +32,15 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
         diag = DiagnosticLogger.get(context)
     }
 
-    fun register(email: String, password: String): Result = requestCredentials("/v1/auth/register", email, password, "REGISTER")
+    suspend fun register(email: String, password: String): Result = withContext(Dispatchers.IO) {
+        requestCredentials("/v1/auth/register", email, password, "REGISTER")
+    }
 
-    fun login(email: String, password: String): Result = requestCredentials("/v1/auth/login", email, password, "LOGIN")
+    suspend fun login(email: String, password: String): Result = withContext(Dispatchers.IO) {
+        requestCredentials("/v1/auth/login", email, password, "LOGIN")
+    }
 
-    override fun refresh(refreshToken: String): Result {
+    override suspend fun refresh(refreshToken: String): Result = withContext(Dispatchers.IO) {
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         val connection = (URL("$normalizedBase/v1/sessions/refresh").openConnection() as HttpURLConnection).apply {
@@ -45,7 +51,7 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
         }
-        return try {
+        try {
             connection.outputStream.bufferedWriter().use {
                 it.write(JSONObject().apply { put("refresh_token", refreshToken) }.toString())
             }
@@ -53,11 +59,11 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
         } catch (e: IOException) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", "REFRESH", "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("NETWORK_ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            Result.Failure("NETWORK_ERROR")
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", "REFRESH", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("UNEXPECTED_ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            Result.Failure("UNEXPECTED_ERROR")
         } finally {
             connection.disconnect()
         }
@@ -84,11 +90,11 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
         } catch (e: IOException) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("NETWORK_ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            Result.Failure("NETWORK_ERROR")
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("UNEXPECTED_ERROR: ${e.javaClass.simpleName}: ${e.message}")
+            Result.Failure("UNEXPECTED_ERROR")
         } finally {
             connection.disconnect()
         }

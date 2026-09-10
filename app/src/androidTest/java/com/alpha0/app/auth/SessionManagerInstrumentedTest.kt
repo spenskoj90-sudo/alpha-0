@@ -3,6 +3,7 @@ package com.alpha0.app.auth
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.alpha0.app.security.SecureSessionStore
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -25,7 +26,7 @@ class SessionManagerInstrumentedTest {
     }
 
     @Test
-    fun successfulRefreshReplacesTokensAndPreservesDeviceId() {
+    fun successfulRefreshReplacesTokensAndPreservesDeviceId() = runBlocking {
         store.save(context, "old-access", "old-refresh", "device-123")
         val client = FakeRefreshClient(
             AuthApi.Result.Success(AuthApi.Session("new-access", "new-refresh", listOf("account:read")))
@@ -43,7 +44,7 @@ class SessionManagerInstrumentedTest {
     }
 
     @Test
-    fun invalidRefreshClearsSession() {
+    fun invalidRefreshClearsSession() = runBlocking {
         store.save(context, "old-access", "old-refresh")
         val client = FakeRefreshClient(AuthApi.Result.Failure("INVALID_REFRESH"))
         val manager = SessionManager(client, store)
@@ -67,7 +68,7 @@ class SessionManagerInstrumentedTest {
             executor.execute {
                 try {
                     start.await()
-                    manager.refreshStoredSession(context)
+                    runBlocking { manager.refreshStoredSession(context) }
                 } finally {
                     done.countDown()
                 }
@@ -86,7 +87,7 @@ class SessionManagerInstrumentedTest {
     private class FakeRefreshClient(private val result: AuthApi.Result) : RefreshClient {
         val seenRefreshTokens = mutableListOf<String>()
 
-        override fun refresh(refreshToken: String): AuthApi.Result {
+        override suspend fun refresh(refreshToken: String): AuthApi.Result {
             seenRefreshTokens += refreshToken
             return result
         }
@@ -95,7 +96,7 @@ class SessionManagerInstrumentedTest {
     private class RecordingRefreshClient : RefreshClient {
         val seenRefreshTokens = Collections.synchronizedList(mutableListOf<String>())
 
-        override fun refresh(refreshToken: String): AuthApi.Result {
+        override suspend fun refresh(refreshToken: String): AuthApi.Result {
             seenRefreshTokens += refreshToken
             val next = seenRefreshTokens.size
             return AuthApi.Result.Success(AuthApi.Session("access-$next", "refresh-$next", emptyList()))

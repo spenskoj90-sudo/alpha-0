@@ -31,8 +31,6 @@ import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.security.SecureSessionStore
 import com.alpha0.app.ui.SentinelTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
@@ -78,9 +76,7 @@ class MainActivity : ComponentActivity() {
                     if (session == null) {
                         refreshComplete = true
                     } else {
-                        withContext(Dispatchers.IO) {
-                            sessionManager.refreshStoredSession(this@MainActivity)
-                        }
+                        sessionManager.refreshStoredSession(this@MainActivity)
                         activeSession = sessionStore.load(this@MainActivity)
                         refreshComplete = true
                     }

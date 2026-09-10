@@ -32,6 +32,11 @@ def test_negative_latency_is_rejected() -> None:
         CompanionLatencyStats().observe(-1.0)
 
 
+def test_non_positive_sample_window_is_rejected() -> None:
+    with pytest.raises(ValueError, match="max_samples must be positive"):
+        CompanionLatencyStats(max_samples=0)
+
+
 def test_clear_removes_retained_samples() -> None:
     stats = CompanionLatencyStats()
     stats.observe(12.0)

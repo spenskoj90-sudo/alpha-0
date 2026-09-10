@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 from threading import Lock
 
 
@@ -37,7 +38,8 @@ class CompanionLatencyStats:
             if not count:
                 return CompanionLatencySnapshot(0, None, None, None, None)
             ordered = sorted(self._samples)
-            index = max(0, min(count - 1, int((count - 1) * 0.95)))
+            # Nearest-rank p95: rank = ceil(0.95 * N), expressed as zero-based index.
+            index = max(0, min(count - 1, ceil(count * 0.95) - 1))
             return CompanionLatencySnapshot(
                 count=count,
                 minimum_ms=ordered[0],

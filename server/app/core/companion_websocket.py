@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from .companion_peer_auth import (
+    AllowlistPeerAuthenticator,
+    CompanionPeerAuthenticator,
+    PeerAuthEvidence,
+)
 from .companion_protocol import (
     CompanionEnvelope,
     CompanionHandshake,
@@ -38,7 +43,7 @@ def is_loopback_peer(host: str | None) -> bool:
 
 
 class CompanionWebSocketTransport:
-    """Concrete loopback WebSocket transport over the existing Companion session seam."""
+    """Concrete loopback WebSocket transport over the authenticated session seam."""
 
     def __init__(
         self,
@@ -47,10 +52,24 @@ class CompanionWebSocketTransport:
         compatibility: CompanionTransportCompatibility | None = None,
         runtime: CompanionRuntime | None = None,
         queue: CompanionQueue | None = None,
+        peer_authenticator: CompanionPeerAuthenticator | None = None,
+        peer_auth_evidence_factory: Callable[[str], PeerAuthEvidence] | None = None,
     ) -> None:
         self.websocket = websocket
         self.compatibility = compatibility or CompanionTransportCompatibility()
-        self.session = CompanionTransportSession(runtime or CompanionRuntime(), queue)
+        self.peer_authenticator = peer_authenticator
+        self.peer_auth_evidence_factory = peer_auth_evidence_factory or (
+            lambda host: PeerAuthEvidence(
+                mechanism="loopback",
+                peer_id=host,
+                authenticated=True,
+            )
+        )
+        self.session = CompanionTransportSession(
+            runtime or CompanionRuntime(),
+            queue,
+            peer_authenticator,
+        )
         self._handshaken = False
         self._closed = False
 
@@ -64,8 +83,20 @@ class CompanionWebSocketTransport:
             await self.websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="LOOPBACK_ONLY")
             self._closed = True
             return False
+        assert host is not None
+        if self.peer_authenticator is None:
+            self.peer_authenticator = AllowlistPeerAuthenticator({host})
+            self.session.peer_authenticator = self.peer_authenticator
+        try:
+            self.session.connect(auth_evidence=self.peer_auth_evidence_factory(host))
+        except (PermissionError, ValueError):
+            await self.websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="PEER_AUTHORIZATION_FAILED",
+            )
+            self._closed = True
+            return False
         await self.websocket.accept()
-        self.session.connect()
         return True
 
     async def handshake(self) -> CompanionHandshakeResult:

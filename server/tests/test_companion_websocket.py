@@ -10,6 +10,7 @@ from app.main import app
 
 
 client = TestClient(app, client=("127.0.0.1", 43123))
+non_loopback_client = TestClient(app, client=("192.0.2.1", 43124))
 
 
 def handshake(**overrides: object) -> dict[str, object]:
@@ -38,6 +39,13 @@ def test_loopback_policy_accepts_ip_addresses_only() -> None:
     assert is_loopback_peer("192.0.2.1") is False
     assert is_loopback_peer("localhost") is False
     assert is_loopback_peer(None) is False
+
+
+def test_websocket_rejects_non_loopback_peer_before_runtime_activation() -> None:
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with non_loopback_client.websocket_connect("/v1/companion/ws"):
+            pass
+    assert exc.value.code == 1008
 
 
 def test_websocket_handshake_is_real_socket_level_integration() -> None:

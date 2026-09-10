@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.core.companion_peer_auth import AllowlistPeerAuthenticator, PeerAuthEvidence
 from app.core.companion_protocol import CompanionEnvelope, CompanionMessageType, CompanionQueue, LatencyClass, CompanionMode
 from app.core.companion_runtime import CompanionRuntime
 from app.core.companion_transport import CompanionTransportSession
@@ -32,6 +33,51 @@ def test_connect_and_health_expose_runtime_and_queue_state() -> None:
     assert health.last_heartbeat == BASE
     assert health.last_successful_send is None
     assert health.kill_switch_active is False
+    assert health.peer_authenticated is False
+    assert health.peer_id is None
+
+
+def test_peer_authorization_is_required_and_fail_closed_when_configured() -> None:
+    session = CompanionTransportSession(
+        CompanionRuntime(),
+        peer_authenticator=AllowlistPeerAuthenticator({"peer-a"}),
+    )
+
+    with pytest.raises(PermissionError, match="PEER_AUTHENTICATION_REQUIRED"):
+        session.connect(BASE)
+    with pytest.raises(PermissionError, match="PEER_NOT_AUTHENTICATED"):
+        session.connect(
+            BASE,
+            auth_evidence=PeerAuthEvidence(
+                mechanism="test",
+                peer_id="peer-a",
+                authenticated=False,
+            ),
+        )
+    with pytest.raises(PermissionError, match="PEER_NOT_AUTHORIZED"):
+        session.connect(
+            BASE,
+            auth_evidence=PeerAuthEvidence(
+                mechanism="test",
+                peer_id="peer-b",
+                authenticated=True,
+            ),
+        )
+
+    decision = session.connect(
+        BASE,
+        auth_evidence=PeerAuthEvidence(
+            mechanism="test",
+            peer_id="peer-a",
+            authenticated=True,
+        ),
+    )
+
+    assert decision is not None
+    assert decision.accepted is True
+    assert session.health().peer_authenticated is True
+    assert session.health().peer_id == "peer-a"
+    assert session.health().mode is CompanionMode.ACTIVE
 
 
 def test_successful_send_consumes_fifo_and_records_timestamp() -> None:

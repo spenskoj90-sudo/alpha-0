@@ -4,9 +4,13 @@ from app.core.companion_latency_stats import CompanionLatencyStats
 
 
 def test_snapshot_is_empty_before_observations() -> None:
-    assert CompanionLatencyStats().snapshot() == (
-        CompanionLatencyStats().snapshot()
-    )
+    snapshot = CompanionLatencyStats().snapshot()
+
+    assert snapshot.count == 0
+    assert snapshot.minimum_ms is None
+    assert snapshot.maximum_ms is None
+    assert snapshot.average_ms is None
+    assert snapshot.p95_ms is None
 
 
 def test_snapshot_reports_bounded_statistics() -> None:

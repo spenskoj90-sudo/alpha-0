@@ -22,7 +22,6 @@ class CompanionLatencyStats:
             raise ValueError("max_samples must be positive")
         self._max_samples = max_samples
         self._samples: list[float] = []
-        self._total = 0.0
         self._lock = Lock()
 
     def observe(self, latency_ms: float) -> None:
@@ -32,7 +31,6 @@ class CompanionLatencyStats:
             insort(self._samples, latency_ms)
             if len(self._samples) > self._max_samples:
                 self._samples.pop(0)
-            self._total += latency_ms
 
     def snapshot(self) -> CompanionLatencySnapshot:
         with self._lock:
@@ -44,11 +42,10 @@ class CompanionLatencyStats:
                 count=count,
                 minimum_ms=self._samples[0],
                 maximum_ms=self._samples[-1],
-                average_ms=self._total / count,
+                average_ms=sum(self._samples) / count,
                 p95_ms=self._samples[index],
             )
 
     def clear(self) -> None:
         with self._lock:
             self._samples.clear()
-            self._total = 0.0

@@ -1,3 +1,5 @@
+import { RecommendationPanel } from './components/recommendation-panel';
+
 const games = [
   ['Diablo', 'Windows', 'diablo-1-pc'],
   ['Diablo II', 'Windows', 'diablo-2-pc'],
@@ -17,9 +19,12 @@ export default function Dashboard() {
       <section className="grid">
         {[["DEVICE", "ACTIVE", "ok"], ["SESSION", "12h", "info"], ["ENTITLEMENT", "SERVER-AUTH", "ok"], ["SYNC QUEUE", "0", "ok"]].map(([label, value, tone]) => <article className="card" key={label}><div className="label">{label}</div><div className={`value ${tone}`}>{value}</div></article>)}
       </section>
+      <section className="section recommendation-section">
+        <RecommendationPanel />
+        <article className="card"><div className="label">SECURITY</div><div className="item"><span className="ok">●</span> Device key active</div><div className="item"><span className="ok">●</span> Replay protection active</div><div className="item"><span className="ok">●</span> Server authorization active</div><div className="item"><span className="info">●</span> Audit trail enabled</div></article>
+      </section>
       <section className="section">
         <article className="card"><div className="label">SUPPORTED DIABLO CATALOG</div>{games.map(([name, platform, id]) => <div className="item" key={id}><strong>{name}</strong><span className="label"> {platform} · {id}</span></div>)}</article>
-        <article className="card"><div className="label">SECURITY</div><div className="item"><span className="ok">●</span> Device key active</div><div className="item"><span className="ok">●</span> Replay protection active</div><div className="item"><span className="ok">●</span> Server authorization active</div><div className="item"><span className="info">●</span> Audit trail enabled</div></article>
       </section>
     </main>
   );

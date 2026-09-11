@@ -38,7 +38,7 @@ class CompanionRuntimeHealth:
 
 
 class CompanionTransportSession:
-    """Binds protocol queue, peer authorization, and runtime health without choosing network I/O."""
+    """Binds protocol queue, peer authorization, runtime health and transport telemetry."""
 
     def __init__(
         self,
@@ -68,18 +68,38 @@ class CompanionTransportSession:
                     peer_id=None,
                     reason_code="PEER_AUTHENTICATION_REQUIRED",
                 )
+                self.runtime.record_transport_event(
+                    "companion.transport.connect.denied",
+                    reason="PEER_AUTHENTICATION_REQUIRED",
+                )
                 raise PermissionError("PEER_AUTHENTICATION_REQUIRED")
             decision = self.peer_authenticator.authenticate(auth_evidence)
             self.peer_auth_decision = decision
             if not decision.accepted:
+                self.runtime.record_transport_event(
+                    "companion.transport.connect.denied",
+                    reason=decision.reason_code,
+                )
                 raise PermissionError(decision.reason_code)
         self.runtime.start(now)
+        self.runtime.record_transport_event(
+            "companion.transport.connected",
+            peer_authenticated=self.peer_auth_decision.accepted if self.peer_auth_decision else False,
+        )
         return self.peer_auth_decision
 
     def enqueue(self, envelope: CompanionEnvelope) -> bool:
         if self._closed or self.runtime.kill_switch.active:
             return False
-        return self.queue.push(envelope)
+        accepted = self.queue.push(envelope)
+        if not accepted:
+            self.runtime.record_transport_event("companion.transport.queue.rejected")
+        elif self.queue.dropped:
+            self.runtime.record_transport_event(
+                "companion.transport.queue.dropped",
+                dropped_events=self.queue.dropped,
+            )
+        return accepted
 
     def mark_send_success(self, now: datetime | None = None) -> CompanionEnvelope | None:
         """Record a successful transport send and consume exactly one queued envelope."""
@@ -95,23 +115,33 @@ class CompanionTransportSession:
         """Record transport-level send completion without changing queue state."""
         if self._closed or self.runtime.kill_switch.active:
             return
-        self.last_successful_send = self.runtime.timestamp_utc(now)
+        timestamp = self.runtime.timestamp_utc(now)
+        self.last_successful_send = timestamp
+        self.runtime.record_transport_event("companion.transport.send.success", timestamp)
 
     def mark_transport_failure(self, now: datetime | None = None) -> CompanionMode:
-        """Make transport loss visible as degradation; never authorize or execute actions."""
+        """Make transport loss visible as degradation and emit bounded telemetry."""
         if self._closed:
             return CompanionMode.STOPPED
         self.runtime.degrade()
+        self.runtime.record_transport_event("companion.transport.failure", now)
         return self.runtime.mode
 
     def register_reconnect_attempt(self) -> timedelta:
         if self._closed:
             raise RuntimeError("transport session is closed")
-        return self.runtime.register_reconnect_attempt()
+        delay = self.runtime.register_reconnect_attempt()
+        self.runtime.record_transport_event(
+            "companion.transport.reconnect.scheduled",
+            delay_ms=delay.total_seconds() * 1000,
+            attempt=self.runtime.reconnect_attempts,
+        )
+        return delay
 
     def activate_kill_switch(self) -> None:
         """Stop locally and prevent queue admission or reconnect until explicit reset."""
         self.runtime.activate_kill_switch()
+        self.runtime.record_transport_event("companion.transport.kill_switch")
         self.queue.stop()
 
     def reset_kill_switch(self) -> None:
@@ -121,6 +151,7 @@ class CompanionTransportSession:
         self.runtime.reset_kill_switch()
         self.peer_auth_decision = None
         self.queue.reset()
+        self.runtime.record_transport_event("companion.transport.kill_switch.reset")
 
     def health(self) -> CompanionRuntimeHealth:
         return CompanionRuntimeHealth(
@@ -146,3 +177,4 @@ class CompanionTransportSession:
         self._closed = True
         self.queue.stop()
         self.runtime.stop()
+        self.runtime.record_transport_event("companion.transport.closed")

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Callable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from .companion_compatibility import negotiate_companion_compatibility
 from .companion_peer_auth import (
     AllowlistPeerAuthenticator,
     CompanionPeerAuthenticator,
@@ -17,9 +19,9 @@ from .companion_protocol import (
     CompanionHandshakeResult,
     CompanionMode,
     CompanionQueue,
-    negotiate_handshake,
 )
 from .companion_runtime import CompanionRuntime
+from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
 
 router = APIRouter(tags=["companion"])
@@ -31,6 +33,11 @@ class CompanionTransportCompatibility:
     adapter_contract_version: str = "1.0"
     core_protocol_version: str = "1.0"
     capability_profile: str = "wow.passive.v1"
+    supported_protocols: tuple[str, ...] = ("1.0",)
+    supported_ugs_schemas: tuple[str, ...] = ("1.0",)
+    supported_adapter_contracts: tuple[str, ...] = ("1.0",)
+    supported_core_protocols: tuple[str, ...] = ("1.0",)
+    supported_capability_profiles: tuple[str, ...] = ("wow.passive.v1",)
 
 
 def is_loopback_peer(host: str | None) -> bool:
@@ -66,7 +73,7 @@ class CompanionWebSocketTransport:
             )
         )
         self.session = CompanionTransportSession(
-            runtime or CompanionRuntime(),
+            runtime or build_companion_runtime(),
             queue,
             peer_authenticator,
         )
@@ -118,12 +125,38 @@ class CompanionWebSocketTransport:
                 mode=CompanionMode.STOPPED,
             )
 
-        result = negotiate_handshake(
-            offered,
-            expected_ugs_schema=self.compatibility.ugs_schema_version,
-            expected_adapter_contract=self.compatibility.adapter_contract_version,
-            expected_core_protocol=self.compatibility.core_protocol_version,
-            expected_capability_profile=self.compatibility.capability_profile,
+        compatibility = negotiate_companion_compatibility(
+            offered_protocol=offered.protocol_version,
+            supported_protocols=self.compatibility.supported_protocols,
+            offered_ugs_schema=offered.ugs_schema_version,
+            supported_ugs_schemas=self.compatibility.supported_ugs_schemas,
+            offered_adapter_contract=offered.adapter_contract_version,
+            supported_adapter_contracts=self.compatibility.supported_adapter_contracts,
+            offered_core_protocol=offered.core_protocol_version,
+            supported_core_protocols=self.compatibility.supported_core_protocols,
+            offered_capability_profile=offered.capability_profile,
+            supported_capability_profiles=self.compatibility.supported_capability_profiles,
+        )
+        if compatibility.accepted:
+            reason_code = "HANDSHAKE_ACCEPTED"
+        elif compatibility.reason_code == "CAPABILITY_PROFILE_UNSUPPORTED":
+            reason_code = "CAPABILITY_PROFILE_MISMATCH"
+        else:
+            negotiated_dimensions = (
+                (offered.protocol_version, self.compatibility.supported_protocols, "PROTOCOL_VERSION_UNSUPPORTED"),
+                (offered.ugs_schema_version, self.compatibility.supported_ugs_schemas, "UGS_SCHEMA_MISMATCH"),
+                (offered.adapter_contract_version, self.compatibility.supported_adapter_contracts, "ADAPTER_CONTRACT_MISMATCH"),
+                (offered.core_protocol_version, self.compatibility.supported_core_protocols, "CORE_PROTOCOL_MISMATCH"),
+            )
+            reason_code = next(
+                (reason for offered_version, supported, reason in negotiated_dimensions
+                 if not _has_compatible_version(offered_version, supported)),
+                "VERSION_NEGOTIATION_FAILED",
+            )
+        result = CompanionHandshakeResult(
+            accepted=compatibility.accepted,
+            reason_code=reason_code,
+            mode=CompanionMode.ACTIVE if compatibility.accepted else CompanionMode.STOPPED,
         )
         await self.websocket.send_json(result.model_dump(mode="json"))
         if not result.accepted:
@@ -153,19 +186,21 @@ class CompanionWebSocketTransport:
         return envelope
 
     async def send(self) -> CompanionEnvelope | None:
-        """Send exactly one queued envelope after a successful handshake."""
+        """Send exactly one queued envelope and measure local transport-call latency."""
         if self._closed or not self._handshaken:
             return None
         queued = self.session.queue.peek()
         if queued is None:
             return None
+        sent_at = datetime.now(UTC)
         try:
             await self.websocket.send_json(queued.model_dump(mode="json"))
         except Exception:
             self.session.mark_transport_failure()
             return None
-        sent = self.session.mark_send_success()
-        return sent
+        received_at = datetime.now(UTC)
+        self.session.runtime.observe_latency(sent_at, received_at)
+        return self.session.mark_send_success(received_at)
 
     async def close(self) -> None:
         if self._closed:
@@ -181,6 +216,15 @@ class CompanionWebSocketTransport:
         if not self._closed:
             self.session.mark_transport_failure()
             self._closed = True
+
+
+def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
+    try:
+        from .companion_compatibility import negotiate_version
+
+        return negotiate_version(offered, supported) is not None
+    except ValueError:
+        return False
 
 
 @router.websocket("/v1/companion/ws")

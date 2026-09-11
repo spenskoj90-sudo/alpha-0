@@ -20,6 +20,7 @@ from .companion_protocol import (
     CompanionQueue,
 )
 from .companion_runtime import CompanionRuntime
+from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
 
 router = APIRouter(tags=["companion"])
@@ -71,7 +72,7 @@ class CompanionWebSocketTransport:
             )
         )
         self.session = CompanionTransportSession(
-            runtime or CompanionRuntime(),
+            runtime or build_companion_runtime(),
             queue,
             peer_authenticator,
         )

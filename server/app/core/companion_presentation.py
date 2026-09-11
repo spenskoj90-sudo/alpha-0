@@ -8,6 +8,7 @@ from .companion_interaction import (
     CompanionPresentationChannel,
     CompanionPresentationKind,
 )
+from .companion_presentation_policy import bound_presentation_text, validate_recommendation_metadata
 from .companion_transport import CompanionRuntimeHealth
 from .models import RecommendationResponse
 
@@ -20,7 +21,10 @@ def health_presentation(
     """Convert bounded health state into presentation-only status text."""
     snapshot = companion_health_response(health)
     mode = snapshot["mode"]
-    text = f"Companion status: {mode}. Queue {snapshot['queue_depth']}, latency {snapshot['last_latency_ms'] if snapshot['last_latency_ms'] is not None else 'n/a'} ms."
+    text = bound_presentation_text(
+        f"Companion status: {mode}. Queue {snapshot['queue_depth']}, latency "
+        f"{snapshot['last_latency_ms'] if snapshot['last_latency_ms'] is not None else 'n/a'} ms."
+    )
     return CompanionPresentation(
         channel=channel,
         kind=CompanionPresentationKind.STATUS,
@@ -35,14 +39,22 @@ def recommendation_presentations(
     channel: CompanionPresentationChannel = CompanionPresentationChannel.OVERLAY,
 ) -> tuple[CompanionPresentation, ...]:
     """Map API recommendations into bounded presentation messages."""
-    return tuple(
-        CompanionPresentation(
-            channel=channel,
-            kind=CompanionPresentationKind.RECOMMENDATION,
-            text=item.text,
-            correlation_id=uuid4(),
+    presentations: list[CompanionPresentation] = []
+    for item in response.recommendations:
+        metadata = validate_recommendation_metadata(
+            provider_id=item.provider_id,
+            model_id=item.model_id,
             provenance=tuple(item.provenance),
             confidence=item.confidence,
         )
-        for item in response.recommendations
-    )
+        presentations.append(
+            CompanionPresentation(
+                channel=channel,
+                kind=CompanionPresentationKind.RECOMMENDATION,
+                text=bound_presentation_text(item.text),
+                correlation_id=uuid4(),
+                provenance=metadata.provenance,
+                confidence=metadata.confidence,
+            )
+        )
+    return tuple(presentations)

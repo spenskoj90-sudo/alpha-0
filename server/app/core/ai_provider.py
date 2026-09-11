@@ -76,6 +76,17 @@ class AIProviderRegistry:
     def provider_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._providers))
 
+    def describe(self) -> tuple[dict[str, str | bool], ...]:
+        """Return bounded provider metadata without exposing credentials/config."""
+        return tuple(
+            {
+                "provider_id": provider_id,
+                "model_id": self._providers[provider_id].model_id,
+                "default": provider_id == self._default_provider_id,
+            }
+            for provider_id in sorted(self._providers)
+        )
+
 
 class BaselineRecommendationProvider:
     """Deterministic local provider preserving the current baseline behavior."""

@@ -7,6 +7,7 @@ from .companion_runtime_builder import build_companion_runtime
 from .companion_runtime import CompanionRuntimeConfig
 from .companion_tcp_transport import CompanionTcpTransport
 from .companion_transport import CompanionTransportSession
+from .companion_transport_binding import CompanionTransportBinding
 
 
 def build_companion_tcp_session(
@@ -38,3 +39,31 @@ def build_companion_tcp_session(
         max_frame_bytes=max_frame_bytes,
     )
     return session, transport
+
+
+def build_companion_tcp_binding(
+    host: str,
+    port: int,
+    *,
+    config: CompanionRuntimeConfig | None = None,
+    peer_authenticator: CompanionPeerAuthenticator | None = None,
+    ssl_context: ssl.SSLContext | None = None,
+    allow_insecure: bool = False,
+    max_frame_bytes: int = 64 * 1024,
+) -> CompanionTransportBinding:
+    """Construct a TCP transport bound to the Companion security/session seam.
+
+    Construction performs no network I/O. The returned binding evaluates peer
+    authorization before opening the TCP connection and preserves the existing
+    TLS-by-default transport policy.
+    """
+    session, transport = build_companion_tcp_session(
+        host,
+        port,
+        config=config,
+        peer_authenticator=peer_authenticator,
+        ssl_context=ssl_context,
+        allow_insecure=allow_insecure,
+        max_frame_bytes=max_frame_bytes,
+    )
+    return CompanionTransportBinding(session, transport)

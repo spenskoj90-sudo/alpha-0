@@ -23,7 +23,7 @@ def test_adapter_observability_records_metadata_without_raw_payload():
 
     recorded = sink.snapshot()
     assert len(recorded) == 1
-    assert recorded[0].name == "adapter.event.normalized"
+    assert recorded[0].name == "companion.adapter.event.normalized"
     assert recorded[0].attributes == (
         ("adapter_id", "wow-conservative"),
         ("data_quality", "MEDIUM"),

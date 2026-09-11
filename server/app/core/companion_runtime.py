@@ -54,6 +54,17 @@ class CompanionRuntime:
             )
         )
 
+    def record_transport_event(
+        self,
+        name: str,
+        now: datetime | None = None,
+        **attributes: str | int | float | bool,
+    ) -> None:
+        """Expose a narrow telemetry seam for transport lifecycle events."""
+        if not name.startswith("companion.transport."):
+            raise ValueError("transport telemetry event must use companion.transport namespace")
+        self._record(name, now, **attributes)
+
     def start(self, now: datetime | None = None) -> None:
         self.kill_switch.require_clear()
         timestamp = self.timestamp_utc(now)

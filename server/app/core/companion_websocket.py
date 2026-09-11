@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from .companion_compatibility import negotiate_companion_compatibility
 from .companion_peer_auth import (
     AllowlistPeerAuthenticator,
     CompanionPeerAuthenticator,
@@ -17,7 +18,6 @@ from .companion_protocol import (
     CompanionHandshakeResult,
     CompanionMode,
     CompanionQueue,
-    negotiate_handshake,
 )
 from .companion_runtime import CompanionRuntime
 from .companion_transport import CompanionTransportSession
@@ -31,6 +31,11 @@ class CompanionTransportCompatibility:
     adapter_contract_version: str = "1.0"
     core_protocol_version: str = "1.0"
     capability_profile: str = "wow.passive.v1"
+    supported_protocols: tuple[str, ...] = ("1.0",)
+    supported_ugs_schemas: tuple[str, ...] = ("1.0",)
+    supported_adapter_contracts: tuple[str, ...] = ("1.0",)
+    supported_core_protocols: tuple[str, ...] = ("1.0",)
+    supported_capability_profiles: tuple[str, ...] = ("wow.passive.v1",)
 
 
 def is_loopback_peer(host: str | None) -> bool:
@@ -118,12 +123,22 @@ class CompanionWebSocketTransport:
                 mode=CompanionMode.STOPPED,
             )
 
-        result = negotiate_handshake(
-            offered,
-            expected_ugs_schema=self.compatibility.ugs_schema_version,
-            expected_adapter_contract=self.compatibility.adapter_contract_version,
-            expected_core_protocol=self.compatibility.core_protocol_version,
-            expected_capability_profile=self.compatibility.capability_profile,
+        compatibility = negotiate_companion_compatibility(
+            offered_protocol=offered.protocol_version,
+            supported_protocols=self.compatibility.supported_protocols,
+            offered_ugs_schema=offered.ugs_schema_version,
+            supported_ugs_schemas=self.compatibility.supported_ugs_schemas,
+            offered_adapter_contract=offered.adapter_contract_version,
+            supported_adapter_contracts=self.compatibility.supported_adapter_contracts,
+            offered_core_protocol=offered.core_protocol_version,
+            supported_core_protocols=self.compatibility.supported_core_protocols,
+            offered_capability_profile=offered.capability_profile,
+            supported_capability_profiles=self.compatibility.supported_capability_profiles,
+        )
+        result = CompanionHandshakeResult(
+            accepted=compatibility.accepted,
+            reason_code=compatibility.reason_code,
+            mode=CompanionMode.ACTIVE if compatibility.accepted else CompanionMode.STOPPED,
         )
         await self.websocket.send_json(result.model_dump(mode="json"))
         if not result.accepted:
@@ -164,8 +179,7 @@ class CompanionWebSocketTransport:
         except Exception:
             self.session.mark_transport_failure()
             return None
-        sent = self.session.mark_send_success()
-        return sent
+        return self.session.mark_send_success()
 
     async def close(self) -> None:
         if self._closed:

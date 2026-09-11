@@ -117,7 +117,8 @@ def test_tcp_transport_rejects_invalid_peer_pin_before_connected_state(monkeypat
 
     assert transport.connected is False
     assert transport.peer_certificate_sha256 is None
-    raw.close.assert_called_once()
+    wrapped.close.assert_called_once()
+    raw.close.assert_not_called()
 
 
 def test_tcp_transport_records_matching_peer_pin(monkeypatch: pytest.MonkeyPatch) -> None:

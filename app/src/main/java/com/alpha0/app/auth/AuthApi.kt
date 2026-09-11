@@ -6,14 +6,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 interface RefreshClient {
     suspend fun refresh(refreshToken: String): AuthApi.Result
 }
 
-class AuthApi(private val baseUrl: String) : RefreshClient {
+class AuthApi(
+    private val baseUrl: String,
+    private val transport: AuthHttpTransport = UrlConnectionAuthHttpTransport(),
+) : RefreshClient {
     data class Session(
         val accessToken: String,
         val refreshToken: String,
@@ -41,52 +42,30 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
     }
 
     override suspend fun refresh(refreshToken: String): Result = withContext(Dispatchers.IO) {
-        val t0 = System.currentTimeMillis()
-        val normalizedBase = baseUrl.trim().trimEnd('/')
-        val connection = (URL("$normalizedBase/v1/sessions/refresh").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-        }
-        try {
-            connection.outputStream.bufferedWriter().use {
-                it.write(JSONObject().apply { put("refresh_token", refreshToken) }.toString())
-            }
-            parseSessionResponse(connection, "REFRESH", t0)
-        } catch (e: IOException) {
-            val duration = System.currentTimeMillis() - t0
-            diag?.error("AUTH", "REFRESH", "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("NETWORK_ERROR")
-        } catch (e: Exception) {
-            val duration = System.currentTimeMillis() - t0
-            diag?.error("AUTH", "REFRESH", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
-        }
+        requestJson(
+            "/v1/sessions/refresh",
+            JSONObject().apply { put("refresh_token", refreshToken) }.toString(),
+            "REFRESH",
+        )
     }
 
     private fun requestCredentials(path: String, email: String, password: String, op: String): Result {
+        val payload = JSONObject().apply {
+            put("email", email.trim().lowercase())
+            put("password", password)
+        }.toString()
+        return requestJson(path, payload, op)
+    }
+
+    private fun requestJson(path: String, payload: String, op: String): Result {
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
-        val connection = (URL("$normalizedBase$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-        }
         return try {
-            val payload = JSONObject().apply {
-                put("email", email.trim().lowercase())
-                put("password", password)
-            }.toString()
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            parseSessionResponse(connection, op, t0)
+            val response = transport.postJson(
+                "$normalizedBase$path",
+                payload.toByteArray(Charsets.UTF_8),
+            )
+            parseSessionResponse(response, op, t0)
         } catch (e: IOException) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
@@ -95,19 +74,14 @@ class AuthApi(private val baseUrl: String) : RefreshClient {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             Result.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
         }
     }
 
-    private fun parseSessionResponse(connection: HttpURLConnection, op: String, t0: Long): Result {
-        val status = connection.responseCode
-        val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-            ?.bufferedReader()?.use { it.readText() }.orEmpty()
-        val json = runCatching { JSONObject(body) }.getOrNull()
+    private fun parseSessionResponse(response: AuthHttpResponse, op: String, t0: Long): Result {
+        val json = runCatching { JSONObject(response.body) }.getOrNull()
         val duration = System.currentTimeMillis() - t0
-        if (status !in 200..299 || json == null) {
-            val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_$status"
+        if (response.status !in 200..299 || json == null) {
+            val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
             diag?.warn("AUTH", op, "FAILURE", errorCode = code, durationMs = duration)
             return Result.Failure(code)
         }

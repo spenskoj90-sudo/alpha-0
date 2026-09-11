@@ -50,7 +50,7 @@ def test_transport_session_fail_closed_peer_auth_has_no_active_runtime() -> None
     try:
         session.connect(auth_evidence=PeerAuthEvidence("test", "denied", True))
     except PermissionError as exc:
-        assert str(exc) == "PEER_NOT_ALLOWED"
+        assert str(exc) == "PEER_NOT_AUTHORIZED"
     else:
         raise AssertionError("unauthorized peer was accepted")
 

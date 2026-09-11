@@ -137,9 +137,25 @@ class CompanionWebSocketTransport:
             offered_capability_profile=offered.capability_profile,
             supported_capability_profiles=self.compatibility.supported_capability_profiles,
         )
+        if compatibility.accepted:
+            reason_code = "HANDSHAKE_ACCEPTED"
+        elif compatibility.reason_code == "CAPABILITY_PROFILE_UNSUPPORTED":
+            reason_code = "CAPABILITY_PROFILE_MISMATCH"
+        else:
+            negotiated_dimensions = (
+                (offered.protocol_version, self.compatibility.supported_protocols, "PROTOCOL_VERSION_UNSUPPORTED"),
+                (offered.ugs_schema_version, self.compatibility.supported_ugs_schemas, "UGS_SCHEMA_MISMATCH"),
+                (offered.adapter_contract_version, self.compatibility.supported_adapter_contracts, "ADAPTER_CONTRACT_MISMATCH"),
+                (offered.core_protocol_version, self.compatibility.supported_core_protocols, "CORE_PROTOCOL_MISMATCH"),
+            )
+            reason_code = next(
+                (reason for offered_version, supported, reason in negotiated_dimensions
+                 if not _has_compatible_version(offered_version, supported)),
+                "VERSION_NEGOTIATION_FAILED",
+            )
         result = CompanionHandshakeResult(
             accepted=compatibility.accepted,
-            reason_code=compatibility.reason_code,
+            reason_code=reason_code,
             mode=CompanionMode.ACTIVE if compatibility.accepted else CompanionMode.STOPPED,
         )
         await self.websocket.send_json(result.model_dump(mode="json"))
@@ -200,6 +216,15 @@ class CompanionWebSocketTransport:
         if not self._closed:
             self.session.mark_transport_failure()
             self._closed = True
+
+
+def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
+    try:
+        from .companion_compatibility import negotiate_version
+
+        return negotiate_version(offered, supported) is not None
+    except ValueError:
+        return False
 
 
 @router.websocket("/v1/companion/ws")

@@ -1,17 +1,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Protocol
+from typing import Any, Literal, Mapping, Protocol
+
+AIResultKind = Literal["fact", "inference", "recommendation"]
 
 
 @dataclass(frozen=True, slots=True)
 class AIProviderResult:
-    kind: str
+    """Provider-neutral AI output with explicit evidence metadata."""
+
+    kind: AIResultKind
     text: str
     confidence: float
     provenance: tuple[str, ...]
     provider_id: str
     model_id: str
+
+    def __post_init__(self) -> None:
+        if not self.text or len(self.text) > 2000:
+            raise ValueError("AI_RESULT_TEXT_INVALID")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("AI_RESULT_CONFIDENCE_INVALID")
+        if not self.provenance or len(self.provenance) > 20:
+            raise ValueError("AI_RESULT_PROVENANCE_INVALID")
+        if any(not item or len(item) > 256 for item in self.provenance):
+            raise ValueError("AI_RESULT_PROVENANCE_INVALID")
+        if not self.provider_id or len(self.provider_id) > 128:
+            raise ValueError("AI_RESULT_PROVIDER_INVALID")
+        if not self.model_id or len(self.model_id) > 128:
+            raise ValueError("AI_RESULT_MODEL_INVALID")
 
 
 class AIProvider(Protocol):

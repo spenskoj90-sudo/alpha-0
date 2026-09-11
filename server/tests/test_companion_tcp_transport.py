@@ -1,6 +1,7 @@
 import hashlib
 import json
 import socket
+import ssl
 import struct
 import threading
 from datetime import datetime, timezone
@@ -100,7 +101,7 @@ def test_tcp_transport_rejects_invalid_peer_pin_before_connected_state(monkeypat
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = b"certificate-a"
-    context = Mock(spec=object)
+    context = Mock(spec=ssl.SSLContext)
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 
@@ -125,7 +126,7 @@ def test_tcp_transport_records_matching_peer_pin(monkeypatch: pytest.MonkeyPatch
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = certificate
-    context = Mock(spec=object)
+    context = Mock(spec=ssl.SSLContext)
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import socket
 import struct
@@ -11,6 +12,11 @@ from app.core.companion_peer_auth import AllowlistPeerAuthenticator, PeerAuthEvi
 from app.core.companion_protocol import CompanionEnvelope, CompanionMessageType, LatencyClass, CompanionQueue
 from app.core.companion_runtime import CompanionRuntime
 from app.core.companion_tcp_transport import CompanionTcpTransport
+from app.core.companion_tls_peer import (
+    certificate_sha256_fingerprint,
+    normalize_sha256_fingerprint,
+    verify_certificate_fingerprint,
+)
 from app.core.companion_transport import CompanionTransportSession
 from app.core.companion_transport_binding import CompanionTransportBinding
 
@@ -57,6 +63,83 @@ def start_receiver() -> tuple[int, list[bytes], threading.Event, threading.Threa
 def test_transport_requires_explicit_tls_or_insecure_opt_in() -> None:
     with pytest.raises(ValueError, match="ssl_context"):
         CompanionTcpTransport("127.0.0.1", 1)
+
+
+def test_tls_peer_pin_requires_tls() -> None:
+    with pytest.raises(ValueError, match="requires TLS"):
+        CompanionTcpTransport(
+            "127.0.0.1",
+            1,
+            allow_insecure=True,
+            pinned_peer_sha256="00" * 32,
+        )
+
+
+def test_normalize_sha256_fingerprint_accepts_colons_and_case() -> None:
+    value = "aa:BB:" + ":".join(["01"] * 30)
+    assert normalize_sha256_fingerprint(value) == value.replace(":", "").upper()
+
+
+def test_certificate_sha256_fingerprint_is_deterministic() -> None:
+    certificate = b"test-certificate"
+    assert certificate_sha256_fingerprint(certificate) == hashlib.sha256(certificate).hexdigest().upper()
+
+
+def test_verify_certificate_fingerprint_accepts_matching_pin() -> None:
+    certificate = b"test-certificate"
+    fingerprint = certificate_sha256_fingerprint(certificate)
+    assert verify_certificate_fingerprint(certificate, fingerprint) == fingerprint
+
+
+def test_verify_certificate_fingerprint_rejects_mismatch() -> None:
+    with pytest.raises(PermissionError, match="FINGERPRINT_MISMATCH"):
+        verify_certificate_fingerprint(b"certificate-a", "00" * 32)
+
+
+def test_tcp_transport_rejects_invalid_peer_pin_before_connected_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    raw = Mock(spec=socket.socket)
+    wrapped = Mock()
+    wrapped.getpeercert.return_value = b"certificate-a"
+    context = Mock(spec=object)
+    context.wrap_socket.return_value = wrapped
+    monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
+
+    transport = CompanionTcpTransport(
+        "127.0.0.1",
+        1,
+        ssl_context=context,
+        pinned_peer_sha256="00" * 32,
+    )
+
+    with pytest.raises(PermissionError, match="FINGERPRINT_MISMATCH"):
+        transport.connect()
+
+    assert transport.connected is False
+    assert transport.peer_certificate_sha256 is None
+    raw.close.assert_called_once()
+
+
+def test_tcp_transport_records_matching_peer_pin(monkeypatch: pytest.MonkeyPatch) -> None:
+    certificate = b"certificate-a"
+    fingerprint = certificate_sha256_fingerprint(certificate)
+    raw = Mock(spec=socket.socket)
+    wrapped = Mock()
+    wrapped.getpeercert.return_value = certificate
+    context = Mock(spec=object)
+    context.wrap_socket.return_value = wrapped
+    monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
+
+    transport = CompanionTcpTransport(
+        "127.0.0.1",
+        1,
+        ssl_context=context,
+        pinned_peer_sha256=fingerprint,
+    )
+    transport.connect()
+
+    assert transport.connected is True
+    assert transport.peer_certificate_sha256 == fingerprint
+    assert transport._socket is wrapped
 
 
 def test_tcp_transport_sends_length_prefixed_json_frame() -> None:

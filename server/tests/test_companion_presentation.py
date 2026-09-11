@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import pytest
+
 from app.core.companion_interaction import CompanionPresentationChannel
 from app.core.companion_presentation import health_presentation, recommendation_presentations
 from app.core.companion_protocol import CompanionMode
@@ -46,3 +48,32 @@ def test_recommendation_presentation_preserves_evidence() -> None:
     assert items[0].provenance == ("test",)
     assert items[0].confidence == 0.8
     assert items[0].action_capable is False
+
+
+def test_recommendation_presentation_normalizes_whitespace() -> None:
+    response = RecommendationResponse(recommendations=[
+        Recommendation(
+            kind="recommendation",
+            text="  Review\n  the current   state. ",
+            confidence=0.8,
+            provenance=["test"],
+            provider_id="sentinel-core",
+            model_id="context-baseline-v1",
+        )
+    ])
+    assert recommendation_presentations(response)[0].text == "Review the current state."
+
+
+def test_recommendation_presentation_rejects_oversized_text() -> None:
+    response = RecommendationResponse(recommendations=[
+        Recommendation(
+            kind="recommendation",
+            text="x" * 2001,
+            confidence=0.8,
+            provenance=["test"],
+            provider_id="sentinel-core",
+            model_id="context-baseline-v1",
+        )
+    ])
+    with pytest.raises(ValueError, match="presentation text exceeds"):
+        recommendation_presentations(response)

@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from app.core.models import RecommendationRequest, RecommendationResponse
+from app.core.security import Principal
 from app.core.wow_api import recommendations_v2
 
 
@@ -9,7 +10,18 @@ def _request() -> Request:
     return Request({"type": "http", "method": "POST", "path": "/v1/recommendations", "headers": []})
 
 
-def test_recommendation_endpoint_uses_application_provider_metadata():
+def _authorized(monkeypatch) -> None:
+    import app.main as main
+
+    principal = Principal("user-1", None, frozenset(), frozenset({"game:read"}))
+    monkeypatch.setattr(main, "require_bearer", lambda value: value)
+    monkeypatch.setattr(main, "principal_from_token", lambda token: principal)
+    monkeypatch.setattr(main, "authorize_request", lambda *args, **kwargs: None)
+    monkeypatch.setattr(main, "request_id", lambda request, supplied=None: supplied or "request-generated")
+
+
+def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch):
+    _authorized(monkeypatch)
     response = recommendations_v2(
         RecommendationRequest(context={"state": "bounded"}),
         _request(),
@@ -25,7 +37,9 @@ def test_recommendation_endpoint_uses_application_provider_metadata():
     assert item.provenance == ["sentinel-core:context-baseline"]
 
 
-def test_recommendation_endpoint_fails_closed_for_unknown_provider():
+def test_recommendation_endpoint_fails_closed_for_unknown_provider(monkeypatch):
+    _authorized(monkeypatch)
+
     try:
         recommendations_v2(
             RecommendationRequest(context={"state": "bounded"}),

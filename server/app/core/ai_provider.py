@@ -1,35 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Mapping, Protocol
-
-AIResultKind = Literal["fact", "inference", "recommendation"]
+from typing import Any, Mapping, Protocol
 
 
 @dataclass(frozen=True, slots=True)
 class AIProviderResult:
-    """Provider-neutral AI output with explicit evidence metadata."""
-
-    kind: AIResultKind
+    kind: str
     text: str
     confidence: float
     provenance: tuple[str, ...]
     provider_id: str
     model_id: str
-
-    def __post_init__(self) -> None:
-        if not self.text or len(self.text) > 2000:
-            raise ValueError("AI_RESULT_TEXT_INVALID")
-        if not 0.0 <= self.confidence <= 1.0:
-            raise ValueError("AI_RESULT_CONFIDENCE_INVALID")
-        if not self.provenance or len(self.provenance) > 20:
-            raise ValueError("AI_RESULT_PROVENANCE_INVALID")
-        if any(not item or len(item) > 256 for item in self.provenance):
-            raise ValueError("AI_RESULT_PROVENANCE_INVALID")
-        if not self.provider_id or len(self.provider_id) > 128:
-            raise ValueError("AI_RESULT_PROVIDER_INVALID")
-        if not self.model_id or len(self.model_id) > 128:
-            raise ValueError("AI_RESULT_MODEL_INVALID")
 
 
 class AIProvider(Protocol):
@@ -75,6 +57,17 @@ class AIProviderRegistry:
 
     def provider_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._providers))
+
+    def describe(self) -> tuple[dict[str, str | bool], ...]:
+        """Return bounded provider metadata without exposing credentials/config."""
+        return tuple(
+            {
+                "provider_id": provider_id,
+                "model_id": self._providers[provider_id].model_id,
+                "default": provider_id == self._default_provider_id,
+            }
+            for provider_id in sorted(self._providers)
+        )
 
 
 class BaselineRecommendationProvider:

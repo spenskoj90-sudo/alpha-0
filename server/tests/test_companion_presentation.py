@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
 from app.core.companion_interaction import CompanionPresentationChannel
 from app.core.companion_presentation import health_presentation, recommendation_presentations
@@ -64,16 +65,15 @@ def test_recommendation_presentation_normalizes_whitespace() -> None:
     assert recommendation_presentations(response)[0].text == "Review the current state."
 
 
-def test_recommendation_presentation_rejects_oversized_text() -> None:
-    response = RecommendationResponse(recommendations=[
-        Recommendation(
-            kind="recommendation",
-            text="x" * 2001,
-            confidence=0.8,
-            provenance=["test"],
-            provider_id="sentinel-core",
-            model_id="context-baseline-v1",
-        )
-    ])
-    with pytest.raises(ValueError, match="presentation text exceeds"):
-        recommendation_presentations(response)
+def test_recommendation_model_rejects_oversized_text() -> None:
+    with pytest.raises(ValidationError, match="at most 2000 characters"):
+        RecommendationResponse(recommendations=[
+            Recommendation(
+                kind="recommendation",
+                text="x" * 2001,
+                confidence=0.8,
+                provenance=["test"],
+                provider_id="sentinel-core",
+                model_id="context-baseline-v1",
+            )
+        ])

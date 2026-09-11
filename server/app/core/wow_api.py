@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.core.admin import require_admin
 from app.core.companion_websocket import router as companion_router
+from app.core.models import RecommendationRequest, RecommendationResponse
 from app.core.wow_catalog import MMOTOP_REALM_SEEDS, WOW_PATCHES, get_patch, get_realm
 
 router = APIRouter(tags=["world-of-warcraft", "device-security"])
@@ -125,9 +126,9 @@ def entitlement_detail(entitlement_id: str, authorization_header: str = Header(.
     return {"id": item["id"], "game_id": item["game_id"], "game_name": game.name if game else item["game_id"], "platform": game.platform.value if game else "unknown", "family": game.family if game else "unknown", "versioning": game.versioning if game else "unknown", "launcher_supported": game.launcher_supported if game else False, "interaction_mode": game.interaction_mode if game else "unknown", "status": item["status"], "source": item["source"], "valid_from": item["valid_from"], "valid_until": item["valid_until"]}
 
 
-@router.post("/v1/recommendations", response_model="RecommendationResponse")
+@router.post("/v1/recommendations", response_model=RecommendationResponse)
 def recommendations_v2(
-    payload: "RecommendationRequest",
+    payload: RecommendationRequest,
     request: Request,
     authorization_header: str = Header(..., alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
@@ -139,13 +140,12 @@ def recommendations_v2(
     and unknown providers fail closed; no action execution or provider network
     call is introduced by this endpoint.
     """
-    from app.core.models import RecommendationRequest, RecommendationResponse
     from app.core.recommendation_application import RecommendationApplication
-    from app.main import authorize_request, principal_from_token, require_bearer
+    from app.main import authorize_request, principal_from_token, require_bearer, request_id
 
-    rid = request_id_value = x_request_id or str(__import__("uuid").uuid4())
+    rid = request_id(request, x_request_id)
     principal = principal_from_token(require_bearer(authorization_header))
-    authorize_request(principal, "knowledge:recommend", "recommendation", request_id_value)
+    authorize_request(principal, "knowledge:recommend", "recommendation", rid)
     if x_recommendation_provider and len(x_recommendation_provider) > 128:
         raise HTTPException(status_code=400, detail="RECOMMENDATION_PROVIDER_INVALID")
     try:

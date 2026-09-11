@@ -46,7 +46,7 @@ def test_recommendation_endpoint_fails_closed_for_unknown_provider(monkeypatch):
             _request(),
             "Bearer test-token",
             "request-2",
-            "unknown-provider",
+            x_recommendation_provider="unknown-provider",
         )
     except HTTPException as exc:
         assert exc.status_code == 503

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.core.admin import require_admin
 from app.core.companion_websocket import router as companion_router
+from app.core.models import RecommendationRequest, RecommendationResponse
 from app.core.wow_catalog import MMOTOP_REALM_SEEDS, WOW_PATCHES, get_patch, get_realm
 
 router = APIRouter(tags=["world-of-warcraft", "device-security"])
@@ -123,3 +124,34 @@ def entitlement_detail(entitlement_id: str, authorization_header: str = Header(.
     from app.core.game_catalog import get_game
     game = get_game(item["game_id"])
     return {"id": item["id"], "game_id": item["game_id"], "game_name": game.name if game else item["game_id"], "platform": game.platform.value if game else "unknown", "family": game.family if game else "unknown", "versioning": game.versioning if game else "unknown", "launcher_supported": game.launcher_supported if game else False, "interaction_mode": game.interaction_mode if game else "unknown", "status": item["status"], "source": item["source"], "valid_from": item["valid_from"], "valid_until": item["valid_until"]}
+
+
+@router.post("/v1/recommendations", response_model=RecommendationResponse)
+def recommendations_v2(
+    payload: RecommendationRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    x_recommendation_provider: str | None = Header(default=None, alias="X-Recommendation-Provider"),
+):
+    """Serve recommendations through the bounded application/provider seam.
+
+    Authorization remains server-authoritative. Provider selection is explicit
+    and unknown providers fail closed; no action execution or provider network
+    call is introduced by this endpoint.
+    """
+    from app.core.recommendation_application import RecommendationApplication
+    from app.main import authorize_request, principal_from_token, require_bearer, request_id
+
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "knowledge:recommend", "recommendation", rid)
+    if x_recommendation_provider and len(x_recommendation_provider) > 128:
+        raise HTTPException(status_code=400, detail="RECOMMENDATION_PROVIDER_INVALID")
+    try:
+        return RecommendationApplication().recommend(
+            payload.context,
+            provider_id=x_recommendation_provider,
+        )
+    except (KeyError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

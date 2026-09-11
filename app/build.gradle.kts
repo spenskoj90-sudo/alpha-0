@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "com.alpha0.app"
+
     compileSdk = 35
 
     defaultConfig {
@@ -92,6 +93,9 @@ dependencies {
     implementation("io.sentry:sentry-android:8.54.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    // Local JVM unit tests must use a real org.json implementation; the Android mock jar
+    // intentionally throws from JSONObject mutators outside an Android runtime.
+    testImplementation("org.json:json:20250517")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")

@@ -14,7 +14,7 @@ def record_adapter_event(
     game_id = event.source.get("game_id", "unknown")
     sink.record(
         CompanionTelemetryEvent.create(
-            "adapter.event.normalized",
+            "companion.adapter.event.normalized",
             event.occurred_at,
             attributes={
                 "adapter_id": adapter_id,

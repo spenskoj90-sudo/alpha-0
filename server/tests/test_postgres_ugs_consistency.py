@@ -14,9 +14,9 @@ def test_postgres_game_event_outbox_and_character_version_guard() -> None:
         pytest.skip("PostgresStore is required")
 
     client = TestClient(app)
-    _, _, session = provision()
+    _, device, session = provision()
     token = session["session_token"]
-    device_id = session["device_id"]
+    device_id = device["device_id"]
 
     response = client.post(
         "/v1/events:batch",

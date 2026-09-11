@@ -25,6 +25,7 @@ class FakeTransport:
         self.connected = False
         self.sent: list[CompanionEnvelope] = []
         self.closed = False
+        self.fail_send = False
 
     def connect(self) -> None:
         self.connected = True
@@ -32,6 +33,8 @@ class FakeTransport:
     def send(self, value: CompanionEnvelope) -> None:
         if not self.connected:
             raise RuntimeError("not connected")
+        if self.fail_send:
+            raise OSError("send failed")
         self.sent.append(value)
 
     def close(self) -> None:
@@ -99,6 +102,35 @@ def test_send_next_preserves_fifo_and_records_completion_evidence() -> None:
     assert evidence.completed_at == BASE
     assert transport.sent == [first]
     assert session.queue.peek() == second
+
+
+def test_kill_switch_prevents_bound_transport_send() -> None:
+    transport = FakeTransport()
+    session = CompanionTransportSession(CompanionRuntime(), CompanionQueue(max_items=2))
+    binding = CompanionTransportBinding(session, transport)
+    binding.connect(BASE)
+    session.enqueue(envelope(1))
+    session.activate_kill_switch()
+
+    assert binding.send_next(BASE) is None
+    assert transport.sent == []
+    assert session.queue.depth == 0
+
+
+def test_transport_send_failure_degrades_session_and_preserves_queued_item() -> None:
+    transport = FakeTransport()
+    transport.fail_send = True
+    session = CompanionTransportSession(CompanionRuntime(), CompanionQueue(max_items=2))
+    binding = CompanionTransportBinding(session, transport)
+    binding.connect(BASE)
+    queued = envelope(1)
+    session.enqueue(queued)
+
+    with pytest.raises(OSError, match="send failed"):
+        binding.send_next(BASE)
+
+    assert session.health().mode.name == "DEGRADED"
+    assert session.queue.peek() == queued
 
 
 def test_close_closes_both_transport_and_session() -> None:

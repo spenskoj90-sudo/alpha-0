@@ -27,6 +27,7 @@ def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch)
         _request(),
         "Bearer test-token",
         "request-1",
+        x_recommendation_provider=None,
     )
 
     assert isinstance(response, RecommendationResponse)

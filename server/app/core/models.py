@@ -104,6 +104,8 @@ class Recommendation(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     confidence: float = Field(ge=0.0, le=1.0)
     provenance: list[str] = Field(max_length=20)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=128)
+    model_id: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class RecommendationResponse(BaseModel):

@@ -70,6 +70,7 @@ class CompanionTcpTransport:
             return
         raw = socket.create_connection((self.host, self.port), timeout=self.timeout_seconds)
         raw.settimeout(self.timeout_seconds)
+        wrapped: ssl.SSLSocket | None = None
         try:
             if self.ssl_context is not None:
                 wrapped = self.ssl_context.wrap_socket(raw, server_hostname=self.host)
@@ -84,7 +85,10 @@ class CompanionTcpTransport:
             else:
                 self._socket = raw
         except (OSError, PermissionError, ValueError):
-            raw.close()
+            if wrapped is not None:
+                wrapped.close()
+            else:
+                raw.close()
             raise
 
     def send(self, envelope: CompanionEnvelope) -> None:

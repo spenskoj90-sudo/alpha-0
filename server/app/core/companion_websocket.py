@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Callable
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
@@ -169,18 +170,21 @@ class CompanionWebSocketTransport:
         return envelope
 
     async def send(self) -> CompanionEnvelope | None:
-        """Send exactly one queued envelope after a successful handshake."""
+        """Send exactly one queued envelope and measure local transport-call latency."""
         if self._closed or not self._handshaken:
             return None
         queued = self.session.queue.peek()
         if queued is None:
             return None
+        sent_at = datetime.now(UTC)
         try:
             await self.websocket.send_json(queued.model_dump(mode="json"))
         except Exception:
             self.session.mark_transport_failure()
             return None
-        return self.session.mark_send_success()
+        received_at = datetime.now(UTC)
+        self.session.runtime.observe_latency(sent_at, received_at)
+        return self.session.mark_send_success(received_at)
 
     async def close(self) -> None:
         if self._closed:

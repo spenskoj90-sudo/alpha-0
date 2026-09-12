@@ -163,6 +163,10 @@ class DeviceApi(private val baseUrl: String) {
                         add(scopesJson.getString(index))
                     }
                 }
+                if ("game:write" !in scopes) {
+                    diag?.warn("DEVICE", "PROVE", "FAILURE", errorCode = "DEVICE_PROOF_SCOPE_INVALID", durationMs = duration)
+                    return ProofResult.Failure("DEVICE_PROOF_SCOPE_INVALID")
+                }
                 diag?.info(
                     "DEVICE", "PROVE", "SUCCESS",
                     durationMs = duration,

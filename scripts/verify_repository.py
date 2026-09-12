@@ -120,9 +120,11 @@ def check_versions(checks: Checks) -> None:
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
     python_version = normalize_python_version(match.group(1)) if match else ""
     android = read("app/build.gradle.kts")
+    main = read("server/app/main.py")
 
     checks.require(package == canonical, "web version matches VERSION")
     checks.require(python_version == canonical, "Core package version matches VERSION")
+    checks.require('APP_VERSION = (Path(__file__).resolve().parents[2] / "VERSION").read_text' in main, "API runtime version reads VERSION")
     checks.require(
         'versionName = rootProject.file("VERSION").readText().trim()' in android,
         "Android versionName reads VERSION",

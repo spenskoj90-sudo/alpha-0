@@ -6,6 +6,7 @@ import time
 import uuid
 from collections import deque
 from datetime import UTC, datetime
+from pathlib import Path
 from threading import Lock
 from typing import Any
 
@@ -52,7 +53,7 @@ from app.core.store import MemoryStore, PostgresStore, Store
 from app.core.user_store import UserAccountStore
 from app.core.wow_api import router as wow_router
 
-APP_VERSION = "1.0.0-rc1"
+APP_VERSION = (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "3600"))
 REFRESH_TTL_SECONDS = int(os.getenv("REFRESH_TTL_SECONDS", "2592000"))
 MAX_REQUEST_SKEW_SECONDS = int(os.getenv("MAX_REQUEST_SKEW_SECONDS", "120"))

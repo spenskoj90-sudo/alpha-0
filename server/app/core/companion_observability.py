@@ -7,6 +7,36 @@ from threading import Lock
 from typing import Mapping, Protocol
 
 
+_SENSITIVE_ATTRIBUTE_PARTS = (
+    "token",
+    "secret",
+    "password",
+    "credential",
+    "authorization",
+    "cookie",
+    "transcript",
+    "audio",
+    "email",
+    "ip_address",
+)
+
+
+def scrub_telemetry_attributes(
+    attributes: Mapping[str, str | int | float | bool],
+) -> dict[str, str | int | float | bool]:
+    """Redact sensitive operational fields before they enter any sink."""
+    scrubbed: dict[str, str | int | float | bool] = {}
+    for key, value in attributes.items():
+        normalized = key.strip().lower()
+        if not normalized or len(normalized) > 128:
+            continue
+        if any(part in normalized for part in _SENSITIVE_ATTRIBUTE_PARTS):
+            scrubbed[normalized] = "REDACTED"
+        else:
+            scrubbed[normalized] = value
+    return scrubbed
+
+
 @dataclass(frozen=True, slots=True)
 class CompanionTelemetryEvent:
     """Privacy-safe operational event; payload contains no user/game raw data."""
@@ -33,7 +63,7 @@ class CompanionTelemetryEvent:
         return cls(
             name=name,
             observed_at=observed_at,
-            attributes=tuple(sorted((attributes or {}).items())),
+            attributes=tuple(sorted(scrub_telemetry_attributes(attributes or {}).items())),
         )
 
 

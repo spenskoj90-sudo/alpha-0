@@ -7,6 +7,7 @@ import pytest
 from app.core.companion_observability import (
     BoundedCompanionTelemetrySink,
     CompanionTelemetryEvent,
+    scrub_telemetry_attributes,
 )
 
 
@@ -46,3 +47,14 @@ def test_sink_is_bounded_and_clearable() -> None:
 def test_sink_rejects_non_positive_capacity() -> None:
     with pytest.raises(ValueError, match="max_events"):
         BoundedCompanionTelemetrySink(max_events=0)
+
+
+def test_sensitive_attributes_are_redacted_before_sink_storage() -> None:
+    assert scrub_telemetry_attributes({"request_id": "r-1", "Authorization": "secret"}) == {
+        "request_id": "r-1",
+        "authorization": "REDACTED",
+    }
+    event = CompanionTelemetryEvent.create(
+        "companion.runtime.event", T0, {"access_token": "do-not-store"}
+    )
+    assert event.attributes == (("access_token", "REDACTED"),)

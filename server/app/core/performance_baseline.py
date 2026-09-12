@@ -34,6 +34,39 @@ class PerformanceSummary:
     max_ms: float
 
 
+@dataclass(frozen=True, slots=True)
+class PerformanceBudget:
+    """A measurable local budget; it never implies remote/E2E performance."""
+
+    operation: str
+    max_elapsed_ms: float
+
+    def __post_init__(self) -> None:
+        if not self.operation or len(self.operation) > 128:
+            raise ValueError("operation must be between 1 and 128 characters")
+        if self.max_elapsed_ms < 0:
+            raise ValueError("max_elapsed_ms cannot be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class PerformanceBudgetResult:
+    operation: str
+    observed_ms: float
+    budget_ms: float
+    passed: bool
+
+
+def evaluate_budget(sample: PerformanceSample, budget: PerformanceBudget) -> PerformanceBudgetResult:
+    if sample.operation != budget.operation:
+        raise ValueError("sample and budget operations must match")
+    return PerformanceBudgetResult(
+        operation=sample.operation,
+        observed_ms=sample.elapsed_ms,
+        budget_ms=budget.max_elapsed_ms,
+        passed=sample.elapsed_ms <= budget.max_elapsed_ms,
+    )
+
+
 def measure(operation: str, fn: Callable[[], T]) -> tuple[T, PerformanceSample]:
     """Measure one local callable invocation; no remote/E2E claim is implied."""
     started = monotonic()

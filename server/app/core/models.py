@@ -118,3 +118,18 @@ class AdminEntitlementRequest(BaseModel):
     source: str = Field(min_length=1, max_length=256)
     valid_from: datetime
     valid_until: datetime
+
+
+class BillingSubscriptionRequest(BaseModel):
+    plan_code: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    provider: str = Field(default="manual", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
+    provider_subscription_id: str | None = Field(default=None, min_length=1, max_length=256)
+
+
+class BillingWebhookRequest(BaseModel):
+    event_id: str = Field(min_length=8, max_length=256, pattern=r"^[A-Za-z0-9._:-]+$")
+    provider_subscription_id: str = Field(min_length=1, max_length=256)
+    status: Literal["ACTIVE", "PAST_DUE", "CANCELED", "EXPIRED"]
+    occurred_at: datetime
+    external_reference: str | None = Field(default=None, max_length=256)
+    payload: dict[str, Any] = Field(default_factory=dict)

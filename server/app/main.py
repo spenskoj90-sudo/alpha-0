@@ -16,6 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.admin import require_admin
+from app.core.billing import BillingService, BillingWebhookEvent
+from app.core.p1_runtime import BillingState
 from app.core.character_projection import apply_character_projections
 from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
 from app.core.entitlements import EntitlementStatus
@@ -37,6 +39,8 @@ from app.core.models import (
     RefreshRequest,
     RegisterRequest,
     SessionResponse,
+    BillingSubscriptionRequest,
+    BillingWebhookRequest,
 )
 from app.core.security import (
     AuthorizationEngine,
@@ -99,7 +103,10 @@ policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "audit:read", "audit", scopes=frozenset({"audit:read"})),
     Policy(Decision.ALLOW, "game:read", "game:*", scopes=frozenset({"game:read"})),
     Policy(Decision.ALLOW, "knowledge:recommend", "recommendation", scopes=frozenset({"game:read"})),
+    Policy(Decision.ALLOW, "billing:read", "billing:*", scopes=frozenset({"game:read"})),
+    Policy(Decision.ALLOW, "billing:write", "billing:*", scopes=frozenset({"game:read"})),
 ])
+billing_service = BillingService(store)
 
 
 class RateLimiter:
@@ -580,6 +587,104 @@ def admin_create_entitlement(payload: AdminEntitlementRequest, request: Request,
     store.create_entitlement(item)
     store.add_audit({"actor_user_id": payload.user_id, "actor_device_id": None, "action": "admin:entitlement:create", "resource": payload.game_id, "decision": "ALLOW", "reason_code": "ADMIN_GRANT", "request_id": None})
     return item
+
+
+@app.get("/v1/billing/plans")
+def billing_plans(
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> dict[str, Any]:
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "billing:read", "billing:plans", rid)
+    return {"plans": billing_service.plans()}
+
+
+@app.get("/v1/billing/subscriptions")
+def billing_subscriptions(
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> dict[str, Any]:
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "billing:read", "billing:subscriptions", rid)
+    return {"subscriptions": store.list_subscriptions(principal.user_id)}
+
+
+@app.post("/v1/billing/subscriptions")
+def create_billing_subscription(
+    payload: BillingSubscriptionRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> dict[str, Any]:
+    rid = request_id(request, x_request_id)
+    principal = principal_from_token(require_bearer(authorization_header))
+    authorize_request(principal, "billing:write", "billing:subscriptions", rid)
+    try:
+        item = billing_service.create_subscription(
+            principal.user_id,
+            payload.plan_code,
+            provider=payload.provider,
+            provider_subscription_id=payload.provider_subscription_id,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 409 if code == "SUBSCRIPTION_ALREADY_EXISTS" else 400
+        raise HTTPException(status_code=status, detail=code) from exc
+    store.add_audit({
+        "actor_user_id": principal.user_id,
+        "actor_device_id": principal.device_id,
+        "action": "billing:subscription:create",
+        "resource": item["id"],
+        "decision": "ALLOW",
+        "reason_code": "SUBSCRIPTION_PENDING",
+        "request_id": rid,
+    })
+    return item
+
+
+@app.post("/v1/billing/webhooks/{provider}")
+def billing_webhook(
+    provider: str,
+    payload: BillingWebhookRequest,
+    request: Request,
+    x_billing_webhook_token: str | None = Header(default=None, alias="X-Billing-Webhook-Token"),
+) -> dict[str, Any]:
+    configured = os.getenv("SENTINEL_BILLING_WEBHOOK_TOKEN", "")
+    if not configured:
+        raise HTTPException(status_code=503, detail="BILLING_WEBHOOK_NOT_CONFIGURED")
+    if not x_billing_webhook_token or not secrets.compare_digest(x_billing_webhook_token, configured):
+        raise HTTPException(status_code=401, detail="INVALID_BILLING_WEBHOOK_TOKEN")
+    try:
+        result = billing_service.apply_webhook(
+            BillingWebhookEvent(
+                event_id=payload.event_id,
+                provider=provider,
+                provider_subscription_id=payload.provider_subscription_id,
+                target_state=BillingState(payload.status),
+                occurred_at=payload.occurred_at,
+                external_reference=payload.external_reference,
+                payload=payload.payload,
+            )
+        )
+    except ValueError as exc:
+        code = str(exc)
+        status = 404 if code == "SUBSCRIPTION_NOT_FOUND" else 409 if code in {"SUBSCRIPTION_STATE_CHANGED", "INVALID_WEBHOOK_STATE"} else 400
+        raise HTTPException(status_code=status, detail=code) from exc
+    subscription = result["subscription"]
+    store.add_audit({
+        "actor_user_id": subscription.get("user_id"),
+        "actor_device_id": None,
+        "action": "billing:webhook:apply",
+        "resource": subscription["id"],
+        "decision": "ALLOW",
+        "reason_code": "BILLING_EVENT_DUPLICATE" if result["duplicate"] else "BILLING_EVENT_ACCEPTED",
+        "request_id": request_id(request),
+    })
+    return result
 
 
 @app.post("/v1/integrity/nonce")

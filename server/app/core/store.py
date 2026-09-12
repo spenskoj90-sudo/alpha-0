@@ -62,6 +62,18 @@ class Store(ABC):
     @abstractmethod
     def create_entitlement(self, item: dict[str, Any]) -> dict[str, Any]: ...
     @abstractmethod
+    def create_subscription(self, item: dict[str, Any]) -> dict[str, Any]: ...
+    @abstractmethod
+    def list_subscriptions(self, user_id: str) -> list[dict[str, Any]]: ...
+    @abstractmethod
+    def find_subscription_by_provider_id(self, provider: str, provider_subscription_id: str) -> dict[str, Any] | None: ...
+    @abstractmethod
+    def apply_subscription_transition(self, subscription_id: str, event: Any, previous: str, current: str) -> dict[str, Any]: ...
+    @abstractmethod
+    def has_billing_event(self, event_id: str) -> bool: ...
+    @abstractmethod
+    def record_billing_event(self, event: Any, subscription_id: str) -> None: ...
+    @abstractmethod
     def list_characters(self, user_id: str) -> list[dict[str, Any]]: ...
     @abstractmethod
     def get_character(self, character_id: str) -> dict[str, Any] | None: ...
@@ -82,6 +94,8 @@ class MemoryStore(Store):
         self.audit: list[dict[str, Any]] = []
         self.failures: list[tuple[str, float]] = []
         self.entitlements: dict[str, list[dict[str, Any]]] = {}
+        self.subscriptions: dict[str, dict[str, Any]] = {}
+        self.billing_events: dict[str, dict[str, Any]] = {}
         self.characters: dict[str, dict[str, Any]] = {}
         self.lock = Lock()
 
@@ -218,6 +232,171 @@ class MemoryStore(Store):
         with self.lock:
             self.entitlements.setdefault(item["user_id"], []).append(item)
         return item
+
+    def create_subscription(self, item):
+        subscription_id = str(uuid.uuid4())
+        provider_subscription_id = item.get("provider_subscription_id") or f"local_{subscription_id}"
+        with self.engine.begin() as conn:
+            identity_id = conn.execute(
+                text("SELECT id FROM identities WHERE user_handle=:u"), {"u": item["user_id"]}
+            ).scalar_one_or_none()
+            if not identity_id:
+                identity_id = conn.execute(
+                    text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}
+                ).scalar_one()
+            conn.execute(
+                text(
+                    "INSERT INTO subscriptions(id,identity_id,plan_code,status,currency,started_at,expires_at,provider,provider_subscription_id,updated_at) "
+                    "VALUES (:id,:identity,:plan,:status,:currency,:started,:expires,:provider,:provider_sub,:updated)"
+                ),
+                {
+                    "id": subscription_id,
+                    "identity": identity_id,
+                    "plan": item["plan_code"],
+                    "status": item["status"],
+                    "currency": item["currency"],
+                    "started": item["started_at"],
+                    "expires": item.get("expires_at"),
+                    "provider": item["provider"],
+                    "provider_sub": provider_subscription_id,
+                    "updated": item["started_at"],
+                },
+            )
+        return self.find_subscription_by_provider_id(item["provider"], provider_subscription_id) or item
+
+    def list_subscriptions(self, user_id):
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                text(
+                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
+                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
+                    "JOIN identities i ON i.id=s.identity_id WHERE i.user_handle=:u ORDER BY s.updated_at DESC"
+                ),
+                {"u": user_id},
+            ).mappings().all()
+        return [dict(row) for row in rows]
+
+    def find_subscription_by_provider_id(self, provider, provider_subscription_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
+                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
+                    "JOIN identities i ON i.id=s.identity_id WHERE s.provider=:p AND s.provider_subscription_id=:ps"
+                ),
+                {"p": provider, "ps": provider_subscription_id},
+            ).mappings().first()
+        return dict(row) if row else None
+
+    def apply_subscription_transition(self, subscription_id, event, previous, current):
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "UPDATE subscriptions SET status=:current, updated_at=:at, "
+                    "expires_at=CASE WHEN :current IN ('CANCELED','EXPIRED') THEN :at ELSE expires_at END "
+                    "WHERE id=:id AND status=:previous RETURNING id::text id"
+                ),
+                {"current": current, "at": event.occurred_at, "id": subscription_id, "previous": previous},
+            ).mappings().first()
+            if not row:
+                raise ValueError("SUBSCRIPTION_STATE_CHANGED")
+        return self.get_subscription(subscription_id)
+
+    def get_subscription(self, subscription_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
+                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
+                    "JOIN identities i ON i.id=s.identity_id WHERE s.id=:id"
+                ),
+                {"id": subscription_id},
+            ).mappings().first()
+        return dict(row) if row else None
+
+    def has_billing_event(self, event_id):
+        with self.engine.begin() as conn:
+            return conn.execute(
+                text("SELECT 1 FROM billing_webhook_events WHERE event_id=:e"), {"e": event_id}
+            ).first() is not None
+
+    def record_billing_event(self, event, subscription_id):
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO billing_webhook_events(event_id,subscription_id,provider,status,occurred_at,payload_json) "
+                    "VALUES (:event,:sub,:provider,:status,:occurred,CAST(:payload AS jsonb))"
+                ),
+                {
+                    "event": event.event_id,
+                    "sub": subscription_id,
+                    "provider": event.provider,
+                    "status": event.target_state.value,
+                    "occurred": event.occurred_at,
+                    "payload": json.dumps(event.payload or {}),
+                },
+            )
+
+    def create_subscription(self, item):
+        with self.lock:
+            subscription_id = str(uuid.uuid4())
+            provider_subscription_id = item.get("provider_subscription_id") or f"local_{subscription_id}"
+            if any(
+                s["provider"] == item["provider"]
+                and s["provider_subscription_id"] == provider_subscription_id
+                for s in self.subscriptions.values()
+            ):
+                raise ValueError("SUBSCRIPTION_ALREADY_EXISTS")
+            record = {
+                "id": subscription_id,
+                "user_id": item["user_id"],
+                "plan_code": item["plan_code"],
+                "currency": item["currency"],
+                "provider": item["provider"],
+                "provider_subscription_id": provider_subscription_id,
+                "status": item["status"],
+                "started_at": item["started_at"],
+                "expires_at": item.get("expires_at"),
+                "updated_at": item["started_at"],
+            }
+            self.subscriptions[subscription_id] = record
+            return dict(record)
+
+    def list_subscriptions(self, user_id):
+        with self.lock:
+            return [dict(s) for s in self.subscriptions.values() if s["user_id"] == user_id]
+
+    def find_subscription_by_provider_id(self, provider, provider_subscription_id):
+        with self.lock:
+            for item in self.subscriptions.values():
+                if item["provider"] == provider and item["provider_subscription_id"] == provider_subscription_id:
+                    return dict(item)
+        return None
+
+    def apply_subscription_transition(self, subscription_id, event, previous, current):
+        with self.lock:
+            item = self.subscriptions[subscription_id]
+            item["status"] = current
+            item["updated_at"] = event.occurred_at
+            if current in {"CANCELED", "EXPIRED"}:
+                item["expires_at"] = event.occurred_at
+            return dict(item)
+
+    def has_billing_event(self, event_id):
+        with self.lock:
+            return event_id in self.billing_events
+
+    def record_billing_event(self, event, subscription_id):
+        with self.lock:
+            if event.event_id in self.billing_events:
+                raise ValueError("BILLING_EVENT_DUPLICATE")
+            self.billing_events[event.event_id] = {
+                "event_id": event.event_id,
+                "subscription_id": subscription_id,
+                "provider": event.provider,
+                "status": event.target_state.value,
+                "occurred_at": event.occurred_at,
+            }
 
     def list_characters(self, user_id: str) -> list[dict[str, Any]]:
         with self.lock:

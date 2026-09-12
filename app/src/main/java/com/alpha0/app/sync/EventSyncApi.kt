@@ -7,7 +7,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 
-class EventSyncApi(private val baseUrl: String) {
+interface EventBatchClient {
+    fun sendBatch(accessToken: String, events: List<OfflineEventQueue.Item>): EventSyncApi.Result
+}
+
+class EventSyncApi(private val baseUrl: String) : EventBatchClient {
     data class BatchResult(
         val accepted: Int,
         val duplicates: Int,
@@ -18,7 +22,8 @@ class EventSyncApi(private val baseUrl: String) {
         data class Failure(val code: String) : Result
     }
 
-    fun sendBatch(accessToken: String, events: List<OfflineEventQueue.Item>): Result {
+    override fun sendBatch(accessToken: String, events: List<OfflineEventQueue.Item>): Result {
+        require(accessToken.isNotBlank()) { "accessToken must not be blank" }
         require(events.isNotEmpty()) { "events must not be empty" }
         require(events.size <= 100) { "events must contain at most 100 items" }
 

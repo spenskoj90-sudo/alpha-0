@@ -122,12 +122,22 @@ class MainActivity : ComponentActivity() {
                                     accessToken = currentSession.accessToken,
                                     deviceIdentity = deviceIdentity,
                                     api = deviceApi,
-                                    onBound = { deviceId ->
-                                        diag.info("DEVICE", "BIND_SUCCESS", "SUCCESS", details = mapOf("device_id_prefix" to deviceId.take(12)))
+                                    onBound = { provenSession ->
+                                        val deviceId = provenSession.deviceId
+                                        diag.info(
+                                            "DEVICE",
+                                            "PROOF_SUCCESS",
+                                            "SUCCESS",
+                                            details = mapOf(
+                                                "device_id_prefix" to deviceId.take(12),
+                                                "scopes_count" to provenSession.scopes.size,
+                                                "can_write_game_events" to provenSession.scopes.contains("game:write")
+                                            )
+                                        )
                                         sessionStore.save(
                                             this@MainActivity,
-                                            currentSession.accessToken,
-                                            currentSession.refreshToken,
+                                            provenSession.accessToken,
+                                            provenSession.refreshToken,
                                             deviceId
                                         )
                                         activeSession = sessionStore.load(this@MainActivity)

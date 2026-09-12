@@ -39,4 +39,32 @@ class GameAdapterCoordinatorTest {
         assertEquals("demo.character.snapshot", received!!.single().type)
         assertEquals(0L, received!!.single().sequence)
     }
+
+    @Test
+    fun sequenceRecoveryUsesEntireQueueNotOnlyFirstBatch() {
+        val queue = OfflineEventQueue(maxItems = 200)
+        repeat(101) { index ->
+            queue.enqueue(
+                deviceId = "device-1234",
+                type = "demo.seed",
+                schemaVersion = 1,
+                occurredAt = 1_700_000_000L + index,
+                sequence = index.toLong(),
+                payload = JSONObject().put("index", index)
+            )
+        }
+        val adapter = object : GameAdapter {
+            override val gameId = "demo"
+            override fun start() = Unit
+            override fun stop() = Unit
+            override fun pollFacts() = listOf(
+                GameFact("character.snapshot", JSONObject().put("hp", 100), 1_700_000_200)
+            )
+        }
+
+        GameAdapterCoordinator("device-1234", queue, adapter).collect()
+
+        assertEquals(102, queue.size())
+        assertEquals(101L, queue.maxSequence())
+    }
 }

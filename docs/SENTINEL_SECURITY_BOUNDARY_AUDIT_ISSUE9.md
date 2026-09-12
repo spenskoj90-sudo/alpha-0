@@ -1,5 +1,7 @@
 # SENTINEL Security Boundary Audit — Issue #9
 
+**Status: HISTORICAL** — point-in-time audit. Current CI/signing behavior is defined by the workflow tree and `docs/RELEASE_GATES.md`.
+
 **Audit date:** 2026-08-29  
 **Baseline SHA (main at audit start):** `8027f2f914184e7aea5b36a75e531f436e26b915`  
 **Branch:** `security/least-privilege-secrets-audit-9-clean`  

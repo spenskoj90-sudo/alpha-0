@@ -26,7 +26,9 @@ check 'Core migrations' test -d server/migrations
 check 'Docker Core' test -f server/Dockerfile
 check 'Docker Compose' test -f docker-compose.yml
 check 'Web package' test -f web/package.json
+check 'Web lockfile' test -f web/package-lock.json
 check 'Web Dockerfile' test -f web/Dockerfile
+check 'Canonical version' test -s VERSION
 check 'Android manifest' test -f app/src/main/AndroidManifest.xml
 check 'CI build workflow' test -f .github/workflows/build.yml
 check 'CI security workflow' test -f .github/workflows/security.yml
@@ -38,13 +40,18 @@ check 'Architecture docs' test -f docs/ARCHITECTURE.md
 check 'Deployment docs' test -f docs/DEPLOYMENT.md
 check 'Contributing docs' test -f docs/CONTRIBUTING.md
 check 'Changelog' test -f docs/CHANGELOG.md
+check 'Document authority map' test -f docs/DOCUMENT_STATUS.md
+check 'Repository policy verifier' test -f scripts/verify_repository.py
 
 if command -v python >/dev/null 2>&1; then
   check 'Python compile' python -m compileall -q server/app server/migrate.py
+  check 'Repository policy invariants' python scripts/verify_repository.py
 fi
 
 if command -v grep >/dev/null 2>&1; then
-  if grep -RInE '(AKIA[0-9A-Z]{16}|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9_]{20,})' . --exclude-dir=.git --exclude='*.md' >/dev/null; then
+  if grep -RInE '(AKIA[0-9A-Z]{16}|-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----|gh[pousr]_[A-Za-z0-9_]{20,})' . \
+      --exclude-dir=.git --exclude-dir=.gradle --exclude-dir=.next --exclude-dir=.venv --exclude-dir=build \
+      --exclude-dir=node_modules --exclude='*.md' >/dev/null; then
     printf 'FAIL  obvious credential pattern scan\n'; fail=$((fail+1))
   else
     printf 'PASS  obvious credential pattern scan\n'; pass=$((pass+1))

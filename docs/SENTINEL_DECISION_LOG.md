@@ -189,3 +189,24 @@
 **Scope rule:** The first slice remains deliberately conservative. It does not introduce autonomous combat, broad multi-version game support, production infrastructure or release publication. Exact-environment capabilities remain UNVERIFIED until the required L3 evidence exists.
 
 **Reason:** This creates one complete, measurable SENTINEL path from game observation to safe user-facing intelligence before expanding breadth. Later features must build on this verified path rather than creating parallel unfinished subsystems.
+
+## D-029 — Routine CI and release-signing separation
+
+**Date:** 2026-09-12  
+**Decision:** Pull-request validation builds/tests only debug and instrumentation Android artifacts and never loads release-keystore secrets. Signed APK creation and certificate verification exist only in manual release-candidate or Owner-triggered tag release workflows. Existing protected-check names remain stable.
+
+**Reason:** Untrusted or routine PR execution does not need signing custody. Separating the boundary reduces secret exposure without weakening Android build, unit or emulator coverage.
+
+## D-030 — Immutable CI dependencies and deterministic web install
+
+**Date:** 2026-09-12  
+**Decision:** Third-party GitHub Actions are pinned to full commit SHAs with readable release comments. Web dependencies use a committed npm lockfile and `npm ci`; Vitest is required before lint and production build. Repository verification rejects mutable Action references and regression to non-deterministic web CI installation.
+
+**Reason:** Mutable Action tags and dependency resolution without a lockfile make exact-SHA repository evidence non-reproducible and expand supply-chain risk.
+
+## D-031 — Canonical release-candidate version source
+
+**Date:** 2026-09-12  
+**Decision:** Root `VERSION` is the canonical cross-surface release-candidate version. Android reads it directly; repository verification requires equivalent npm and Python package versions. The release workflow rejects a tag that does not match it. Release tag creation and publication remain Owner-only.
+
+**Reason:** Android already carried the monotonic RC2 build (`versionCode 10002`) while web/Core metadata and RC1-labelled documents lagged. Reconciliation must not downgrade an installed Android build or silently publish a version.

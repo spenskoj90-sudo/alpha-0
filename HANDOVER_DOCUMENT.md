@@ -1,4 +1,4 @@
-ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+**Status: HISTORICAL** — archived handover, not current state. See `docs/SENTINEL_CURRENT_STATE.md`.
 
 # SENTINEL — Technical Handover Document
 

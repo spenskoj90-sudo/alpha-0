@@ -1,4 +1,4 @@
-# SENTINEL Deployment Guide — 1.0.0-RC1
+# SENTINEL Deployment Guide — Release Candidate
 
 ## Runtime
 

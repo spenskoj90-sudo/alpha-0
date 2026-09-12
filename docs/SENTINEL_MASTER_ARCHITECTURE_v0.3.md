@@ -461,26 +461,20 @@ MVP does NOT require every possible WoW client, every automation action, marketp
 
 ## 21. Current ALPHA-0 gap assessment
 
-Current repository already provides a strong security-first base: Android, FastAPI, Next.js, Electron launcher, WoW addon sources, PostgreSQL persistence, event ingestion, character/game-state projection, server-authoritative authorization and extensive CI/security controls. `docs/SENTINEL_CURRENT_STATE.md` records the current main HEAD as `6eac9bbf88e614bd2584c78f19877739a4bcf9e0` and identifies the existing WoW addon, launcher and game-state domain. The historical handover is explicitly archived and not authoritative.
+Current repository inspection is the authority for implementation state; this living architecture deliberately does not embed a mutable `main` SHA. The repository provides a security-first base across Android, FastAPI, Next.js, Electron launcher, WoW addon sources, PostgreSQL persistence, event/runtime processing, UGS/projections, Companion transport/runtime, bounded intelligence/recommendation and server-authoritative authorization. `docs/SENTINEL_CURRENT_STATE.md` is the semantic orientation guide; historical handovers are not current evidence.
 
 The principal product-architecture gap is therefore not "build a backend from zero". It is to evolve the existing secure foundation into the full game-intelligence platform described above.
 
-### Highest-priority gaps
+### Highest-priority remaining gaps
 
-1. Formal Game Adapter contract and registry.
-2. Formal Capability schema and discovery protocol.
-3. Unified Game State v1 contract.
-4. Local Companion architecture/protocol.
-5. Real-time latency classes and budgets.
-6. Policy Engine / Action Gateway boundary.
-7. Replay and simulation infrastructure.
-8. Confidence/provenance model for intelligence.
-9. WoW version/profile capability matrix, including 3.3.5a/private-server profile.
-10. Overlay/voice interaction contracts.
-11. AI provider abstraction/routing.
-12. Privacy/telemetry contract for game data.
-13. Adapter and Companion observability.
-14. Compatibility/version negotiation.
+The formal adapter/capability/UGS, Companion protocol/runtime, Action Gateway, replay/simulation, confidence/provenance, interaction, telemetry/observability and compatibility foundations listed by the original 2026-09-03 assessment are now represented by code and automated tests. Current priorities are:
+
+1. Complete monetization/entitlement/account-control lifecycle and provider reconciliation without embedding production credentials.
+2. Package the Companion runtime into a coherent host with bounded durable local buffering and recovery.
+3. Complete the strongest legitimate WoW-to-Companion data path and retain exact-environment claims as `UNVERIFIED` until L3 evidence exists.
+4. Complete player-facing presentation and provider-neutral voice boundaries without bypassing the Action Gateway.
+5. Establish end-to-end correlation, privacy-safe operational telemetry, performance budgets and resilience evidence.
+6. Close real-host/device/environment and signed-release acceptance gates.
 
 Existing security, identity, authorization, persistence and CI infrastructure should be reused unless an architecture review proves a better replacement is required.
 
@@ -511,15 +505,10 @@ No new technology is adopted solely because it is newer. Replacements must demon
 
 ## 24. Immediate next implementation sequence
 
-1. Freeze this architecture as the reviewed target on a PR branch.
-2. Create `SENTINEL GAME CAPABILITY MATRIX v1`.
-3. Create `GAME ADAPTER CONTRACT v1`.
-4. Create `UNIFIED GAME STATE v1`.
-5. Audit current `wow-addon/`, `launcher/`, `server/` event/state paths against those contracts.
-6. Define Companion protocol and latency classes.
-7. Build the smallest end-to-end vertical slice.
-8. Add replay/simulation before expanding intelligence.
-9. Validate WoW 3.3.5a/private-server assumptions using a real compatible environment.
-10. Only then expand Retail, additional private-server profiles and other games.
+1. Reconcile repository truth, CI signing boundaries, deterministic web validation, immutable Action references and release/governance documentation.
+2. Complete the monetization/entitlement/account-control vertical.
+3. Complete the real Companion/WoW/player-experience/voice block on the existing primitives.
+4. Complete observability/performance/resilience/security readiness and automate all available acceptance evidence.
+5. Present only genuine external/Owner gates for exact-environment validation, signing custody, release publication and live production activation.
 
 **Status of this document:** architecture target approved by the Human Owner on 2026-09-03; implementation remains subject to the staged review and evidence rules above.

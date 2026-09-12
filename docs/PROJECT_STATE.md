@@ -1,4 +1,4 @@
-ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+**Status: SUPERSEDED** — retained historical snapshot. Use `docs/SENTINEL_CURRENT_STATE.md` and inspect live `main`.
 
 # SENTINEL — PROJECT STATE
 

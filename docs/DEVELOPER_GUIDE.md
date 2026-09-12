@@ -21,8 +21,9 @@ Open the repository in Android Studio and run the `app` module. The CI build mus
 
 ```bash
 cd web
-pnpm install
-pnpm dev
+npm ci
+npm test
+npm run dev
 ```
 
 Next.js App Router uses filesystem-based routes and server/client component boundaries. Keep privileged data access on the server side; never put authorization secrets in browser bundles.

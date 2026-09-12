@@ -12,9 +12,9 @@ Code coverage is a quality signal and a regression guard. It is not a target to 
 
 | Level | Threshold | Meaning |
 |---|---:|---|
-| Absolute release floor | 80% | Existing CI/RC1 minimum; falling below this is a release-quality failure. |
+| Absolute release floor | 80% | Existing release-candidate CI minimum; falling below this is a release-quality failure. |
 | Engineering floor | 85% | New working baseline to protect against routine coverage regression. |
-| Development target | 90%+ | Desired global coverage as the project approaches RC1. |
+| Development target | 90%+ | Desired global coverage as the project approaches release acceptance. |
 | Critical paths | 90–95%+ | Preferred coverage for security, authorization, identity, event processing, UGS, intelligence, recommendation, billing/entitlement, and other high-impact decision paths. |
 
 The current observed baseline is 86.23%, so the 85% engineering floor is immediately achievable without artificially inflating coverage.

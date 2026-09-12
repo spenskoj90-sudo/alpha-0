@@ -1,4 +1,4 @@
-# SENTINEL Architecture — RC1
+# SENTINEL Architecture — Release Candidate
 
 ## Baseline
 

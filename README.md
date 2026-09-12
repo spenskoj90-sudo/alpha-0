@@ -2,6 +2,8 @@
 
 SENTINEL is a security-first modular monolith for device identity, server-authoritative authorization, game entitlements, auditability and a personal control plane.
 
+The repository's canonical build version is stored in [`VERSION`](VERSION). Release publication is a separate Owner-gated operation.
+
 ## Canonical repository state
 
 **Git `main` is the authoritative source for actual repository/product state.** Read `main` at an exact commit SHA to determine what is implemented. `docs/SENTINEL_CURRENT_STATE.md` is a semantic orientation guide, not a live state mirror and not a substitute for inspecting the repository.
@@ -21,6 +23,11 @@ SENTINEL is a security-first modular monolith for device identity, server-author
 - User-bound device enrollment and one-time challenge proof.
 - Opaque access sessions and one-time refresh rotation/session-security primitives.
 - Device-bound, sequence-protected and idempotent game events and supporting structures.
+- Transactional event-to-outbox persistence, lease-owned workers, bounded retry/dead-letter recovery and deterministic UGS projections.
+- Conservative passive WoW normalization, authenticated Companion UGS ingress and deterministic replay/simulation coverage.
+- Bounded Companion protocol/runtime with compatibility negotiation, queue/backpressure, watchdog, kill switch, peer authorization, TLS verification/pinning, transport binding and privacy-safe persistent telemetry seams.
+- Provider-neutral knowledge/recommendation routing with bounded confidence/provenance and Command Center presentation.
+- Android proven-device session establishment and retry-safe event-batch delivery to Core.
 - Diablo catalog, entitlement gate, admin entitlement control and WoW support.
 - Next.js web control plane.
 - Docker Compose reference deployment.
@@ -65,8 +72,9 @@ The Android device identity remains Keystore-backed: P-256 / `secp256r1` with SH
 
 ## Current-state limitations / open work
 
-- PostgreSQL runtime persistence still requires exact-main runtime evidence before PostgreSQL is declared the authoritative runtime system of record.
-- Repository hygiene: historical branch cleanup (Owner-only deletes).
+- Live production PostgreSQL, ingress/TLS, distributed rate limiting and operational backup/restore remain environment-level acceptance gates; CI evidence does not prove a live deployment.
+- Remote branch deletion is intentionally not performed by autonomous engineering because it is destructive; the current classification is recorded in `docs/REMOTE_BRANCH_CLEANUP_2026-09-12.md`.
+- Exact target WoW/private-server execution and a complete packaged Companion application remain evidence-limited work.
 - A soft battery-optimization onboarding prompt remains planned to reduce first-run network failures on aggressive Android/MIUI-like firmware.
 
 ## Repository
@@ -127,7 +135,8 @@ Release signing must be performed in a protected release environment. CI signing
 
 ```bash
 cd web
-npm install
+npm ci
+npm test
 npm run lint
 npm run build
 ```
@@ -138,7 +147,7 @@ The authoritative rule is:
 
 `FAIL → root cause → FIX → regression → MAIN PASS → ACCEPTED`
 
-The RC workflow scope includes Core coverage (minimum 80%), Android build/tests, web lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed.
+The release-candidate workflow scope includes Core coverage (minimum 80%), Android build/tests, web tests/lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed. Routine PR CI never loads Android release-signing secrets.
 
 See `docs/RELEASE_GATES.md` for the RC acceptance matrix.
 

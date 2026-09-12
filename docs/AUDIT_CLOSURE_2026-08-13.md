@@ -1,4 +1,4 @@
-ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+**Status: HISTORICAL** — point-in-time audit evidence, not current state. See `docs/SENTINEL_CURRENT_STATE.md`.
 
 # SENTINEL audit closure evidence — 2026-08-13
 

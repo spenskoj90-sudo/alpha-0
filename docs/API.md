@@ -1,4 +1,4 @@
-# SENTINEL CORE API — RC1
+# SENTINEL CORE API — Release Candidate
 
 The running FastAPI service publishes the live API specification at `/openapi.json` and Swagger UI at `/docs`. This document is a concise manual index of the currently implemented routes; when in doubt, `/openapi.json` is the runtime source of truth.
 

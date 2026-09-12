@@ -9,12 +9,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Repository verification
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: bash verify.sh
 
   core:
@@ -24,8 +28,8 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
           cache: pip
@@ -64,8 +68,8 @@ jobs:
       SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
       SENTINEL_REQUIRE_ENROLLMENT: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
@@ -83,143 +87,19 @@ jobs:
     name: Android build and tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - run: chmod +x gradlew
       - run: ./gradlew --no-daemon assembleDebug
       - run: ./gradlew --no-daemon test
       - name: Build instrumentation test APK
         run: ./gradlew --no-daemon assembleDebugAndroidTest
-      - name: Decode release keystore
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          set +x
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          python - <<'PY'
-          import base64, os, pathlib
-          raw = os.environ["ANDROID_KEYSTORE_BASE64"]
-          compact = "".join(raw.split())
-          padded = compact + ("=" * (-len(compact) % 4))
-          data = base64.b64decode(padded, validate=True)
-          if not data:
-              raise SystemExit("decoded keystore is empty")
-          path = pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-release.jks")
-          path.write_bytes(data)
-          PY
-          chmod 600 "$RUNNER_TEMP/sentinel-release.jks"
-          test -s "$RUNNER_TEMP/sentinel-release.jks"
-      - name: Keystore file and format validity
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          set +x
-          keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -rfc
-      - name: Keystore store password validation
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-          set +x
-          keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/keystore-store-list.txt"
-          grep -q '^Keystore type:' "$RUNNER_TEMP/keystore-store-list.txt"
-          echo "Store password validation: PASS"
-          rm -f "$RUNNER_TEMP/keystore-store-list.txt"
-      - name: Verify release key alias exists
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          set +x
-          aliases="$(keytool -list -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" | awk -F, '/^[^,]+,/{print $1}')"
-          if ! printf '%s\n' "$aliases" | grep -Fxq "$ANDROID_KEY_ALIAS"; then
-            echo "Alias validation: FAIL"
-            echo "Expected alias: $ANDROID_KEY_ALIAS"
-            echo "Available aliases:"
-            printf '%s\n' "$aliases"
-            exit 1
-          fi
-          echo "Alias validation: PASS"
-      - name: Verify release key entry type
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          set +x
-          entry="$(keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | awk -F': ' '/^Entry type:/{print $2; exit}')"
-          echo "Entry type: $entry"
-          test "$entry" = "PrivateKeyEntry"
-          echo "Entry type validation: PASS"
-      - name: Extract release certificate fingerprint
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
-          set +x
-          keytool -list -v -keystore "$RUNNER_TEMP/sentinel-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-cert.txt"
-          actual="$(awk -F': ' '/^[[:space:]]*SHA256:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
-          test -n "$actual"
-          echo "Alias: $ANDROID_KEY_ALIAS"
-          echo "Entry type: $(awk -F': ' '/^Entry type:/{print $2; exit}' "$RUNNER_TEMP/release-cert.txt")"
-          echo "SHA-256 fingerprint: $actual"
-          printf '%s\n' "$actual" > "$RUNNER_TEMP/release-fingerprint.txt"
-          rm -f "$RUNNER_TEMP/release-cert.txt"
-      - name: Compare keystore certificate fingerprint
-        run: |
-          set -euo pipefail
-          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
-          actual="$(cat "$RUNNER_TEMP/release-fingerprint.txt")"
-          expected="$(printf '%s' "$expected" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
-          actual="$(printf '%s' "$actual" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
-          echo "EXPECTED: $expected"
-          echo "ACTUAL:   $actual"
-          if [ "$actual" != "$expected" ]; then
-            echo "RESULT: FAIL"
-            exit 1
-          fi
-          echo "RESULT: PASS"
-      - name: Assemble signed release
-        env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-        run: |
-          ./gradlew --no-daemon assembleRelease
-      - name: Verify release APK signature and fingerprint
-        run: |
-          set -euo pipefail
-          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
-          apk="app/build/outputs/apk/release/app-release.apk"
-          test -f "$apk"
-          apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
-          test -x "$apksigner"
-          "$apksigner" verify --verbose --print-certs "$apk"
-          actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
-          expected_norm="$(printf '%s' "$expected" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-          actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-          echo "EXPECTED: $expected"
-          echo "ACTUAL:   $actual"
-          if [ "$actual_norm" != "$expected_norm" ]; then
-            echo "APK fingerprint comparison: FAIL"
-            exit 1
-          fi
-          echo "APK fingerprint comparison: PASS"
-      - name: Cleanup temporary keystore
-        if: always()
-        run: rm -f "$RUNNER_TEMP/sentinel-release.jks" "$RUNNER_TEMP/release-fingerprint.txt" "$RUNNER_TEMP/keystore-store-list.txt" "$RUNNER_TEMP/release-cert.txt"
       - name: Upload Android instrumentation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: alpha-0-android-instrumentation-${{ github.sha }}
           path: |
@@ -234,14 +114,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: Make gradlew executable
         run: chmod +x gradlew
       - name: Enable KVM
@@ -251,7 +131,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run Android instrumentation on API 35 emulator
-        uses: ReactiveCircus/android-emulator-runner@v2.37.0
+        uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
         with:
           api-level: 35
           target: google_apis
@@ -269,11 +149,14 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
-      - run: npm install
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
       - run: npm run lint
       - run: npm run build
 
@@ -282,9 +165,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [core, postgres]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: server/Dockerfile
@@ -296,8 +179,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [core, postgres, docker]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build runtime image
         run: docker build -f server/Dockerfile -t sentinel-core:smoke .
       - name: Start PostgreSQL
@@ -327,8 +210,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [core, postgres]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build artifact A
         run: |
           docker buildx build --load --provenance=false --sbom=false -f server/Dockerfile -t sentinel-core:repro-a .

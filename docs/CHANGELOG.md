@@ -1,5 +1,16 @@
 # Changelog
 
+**Status:** ACTIVE HISTORICAL LEDGER — entries describe their own repository era and are not current-state evidence.
+
+## Unreleased — 2026-09-12
+
+- Block A re-baselines CI and governance truth after implementation passes 1–6.
+- Routine PR Android validation no longer loads release-signing secrets; signed artifacts stay in manual/tag-scoped workflows.
+- Web validation uses a committed npm lockfile, deterministic installation and a Vitest gate before lint/build.
+- Third-party GitHub Actions are pinned to immutable commit SHAs and repository verification enforces the boundary.
+- Release-candidate version metadata is reconciled through root `VERSION`; publication remains Owner-gated.
+- Active, historical and superseded document roles plus remote-branch cleanup classifications are explicit.
+
 ## Unreleased — 2026-08-31
 
 - **Sentry observability (#7 / PR #105):** integrated Sentry Android runtime crash reporting with release-only `SENTRY_DSN` injection, privacy scrubbing, and controlled initialization.
@@ -17,8 +28,6 @@
 - Android Keystore generation prefers StrongBox and falls back to TEE when StrongBox is unavailable.
 - Android `usesCleartextTraffic=false` (loopback cleartext remains domain-scoped in network security config).
 - Build & Test instrumentation job replaced with GitHub-hosted Android Emulator (Owner-approved FTL replacement).
-
-# Changelog
 
 ## 1.0.0-RC1 — 2026-08-13
 

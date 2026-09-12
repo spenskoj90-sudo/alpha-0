@@ -1,4 +1,4 @@
-ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+**Status: HISTORICAL** — point-in-time reconciliation, not current state. See `docs/SENTINEL_CURRENT_STATE.md`.
 
 # SENTINEL — FINAL CLEAN-ROOM AUDIT RECONCILIATION
 

@@ -1,4 +1,4 @@
-# SENTINEL Security — RC1
+# SENTINEL Security — Release Candidate
 
 ## Controls
 

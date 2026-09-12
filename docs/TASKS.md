@@ -6,43 +6,34 @@
 
 **ACTIVE:** SENTINEL uses only GPT/ChatGPT as its AI engineering participant. The Human Owner remains the final decision-maker and sole owner of protected actions. GPT may autonomously execute ordinary engineering work through the canonical lifecycle and may merge after the exact-SHA gate passes.
 
-## Completed architectural foundation on main
+## Completed foundation on main
 
-- [x] GPT-only autonomous engineering operating system and role model — active canonical governance in `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md` and related contracts.
-- [x] Architecture foundation — Master Architecture v0.3, Game Adapter Contract v1 and Unified Game State v1 are present on main.
-- [x] Adapter Registry / Capability Registry foundation — typed identity, capability status/evidence discipline, L3 availability enforcement, downgrade tracking, bounded normalized events and regression coverage are present on main.
-- [x] Telemetry contract v1 — provider-neutral taxonomy/privacy/retention contract is present; runtime instrumentation remains a separate implementation stage.
-- [x] Workflow cleanup — obsolete CURRENT_STATE self-sync workflow and remaining state-sync execution path were removed; routine validation is now focused on repository/build/security evidence.
-- [x] Characters/game-state domain — Phase 1 + Phase 2 are complete on main.
+- [x] GPT-only governance, exact-SHA merge gate and repository-first evidence model.
+- [x] Identity/session/default-deny authorization, PostgreSQL/RLS, migrations, audit and device proof foundations.
+- [x] Adapter/capability contract, UGS validation, deterministic replay/simulation and character projection.
+- [x] PASS 1 — transactional event/outbox consistency and monotonic UGS projection.
+- [x] PASS 2 — recoverable event runtime with lease ownership, bounded retry/dead-letter and explicit replay.
+- [x] PASS 3 — conservative authenticated WoW observation → UGS → projection → recommendation-context vertical.
+- [x] PASS 4 — bounded Knowledge Engine, provider-neutral intelligence routing and confidence/provenance.
+- [x] PASS 5 — Companion transport/session/TLS hardening, peer authorization ordering, kill switch and bounded observability seams.
+- [x] PASS 6 — Android Keystore device proof and retry-safe device-session event ingestion.
 
-## Current architectural implementation queue
+## Active completion program
 
-These are the next candidate blocks. Before starting a block, GPT must baseline current `main` and verify that the gap still exists in code/tests.
+Before each block, inspect current `main` and keep external/runtime claims evidence-scoped.
 
-- [x] UGS validator — schema compatibility, ordering, idempotency, quality propagation and bounded staleness/expiry — implemented in `server/app/core/unified_game_state.py` with regression coverage.
-- [x] Deterministic replay fixture format and first replay/regression test — implemented in `server/app/core/ugs_replay.py` with canonical digest and rejection tests.
-- [x] Conservative first WoW adapter vertical slice against the v1 contracts — implemented as passive observation normalization with bounded profiles and UNVERIFIED-by-default capabilities.
-- [x] Companion protocol v1 — bounded envelope, five-way compatibility handshake, explicit latency classes and queue backpressure are implemented and tested.
-- [ ] Companion runtime/integration — runtime lifecycle, heartbeat watchdog, deterministic reconnect/backoff and transport-neutral health/session binding are implemented; the local kill switch, concrete loopback WebSocket transport, and bounded TLS-by-default TCP transport foundation are implemented and tested. Transport/session integration, peer authentication/authorization, real end-to-end latency evidence and persistent runtime telemetry remain open. `docs/COMPANION_TCP_TRANSPORT_V1.md` defines the TCP transport foundation contract.
-- [x] Policy Engine / Action Gateway boundary before any action-capable feature — implemented in `server/app/core/action_gateway.py` and documented by `docs/ACTION_GATEWAY_CONTRACT_V1.md`; automatic execution remains denied.
-- [ ] Adapter/Companion observability implementation after the telemetry runtime path is ready.
-- [x] Simulation harness before expanding recommendation logic — deterministic UGS scenario execution, stale-state capability suppression, canonical result digest and regression coverage implemented in `server/app/core/ugs_simulation.py`; documented by `docs/SIMULATION_HARNESS_V1.md`.
-- [ ] Exact WoW 3.3.5a/private-server validation; keep capabilities UNVERIFIED until exact-environment L3 evidence exists.
-- [ ] AI provider abstraction/routing and confidence/provenance implementation where the current codebase still lacks the required boundaries.
-- [ ] Compatibility/version negotiation and overlay/voice interaction contracts where implementation evidence is absent.
+- [ ] **Block A — repository/CI/supply-chain/governance truth:** remove release signing from routine PR CI; make web tests and lockfile deterministic gates; pin Actions by immutable SHA; strengthen repository verification; reconcile active/historical documentation, release terminology/version metadata and remote-branch cleanup classification.
+- [ ] **Block B — monetization/entitlement/account control:** canonical plan/product model, persistent lifecycle, provider/webhook/reconciliation boundaries, replay/idempotency/audit, API/web/account surfaces and security/PostgreSQL tests. Production payment credentials remain Owner-only.
+- [ ] **Block C — Companion/WoW/player experience/voice:** packaged Companion composition, durable bounded local queue/cache, recovery/backpressure, strongest legitimate WoW bridge, presentation/overlay and safe provider-neutral STT/TTS boundaries. No recommendation or voice path bypasses the Action Gateway.
+- [ ] **Block D — observability/performance/resilience/RC readiness:** cross-component correlation and privacy scrubbing, measurable budgets, failure/recovery matrix, final security review, documentation agreement and all automatable acceptance evidence.
 
-## Active external / product work
+## External / Owner-gated evidence
 
-- [ ] #11 — synchronize the Figma design system with the implementation; use Figma only when the corresponding UI work is active.
-- [ ] #59 — Firebase Test Lab service-account GCS `storage.objects.create` permission; external/Owner infrastructure gate, not a reason to distort routine CI.
-- [ ] Measured performance baseline — retain as open until reproducible measurements are tied to current-main evidence.
-
-## Later horizons
-
-- [ ] User admin panel — after the MVP vertical slice requires it.
-- [ ] PC/WoW launcher/Companion — implement as the architecture reaches the Companion stage, not as an isolated parallel subsystem.
-- [ ] Production infrastructure — only when external users/production traffic justify it; live deployment remains Owner-gated.
-- [ ] Feedback intake — GitHub Issues remains the canonical project feedback channel.
+- [ ] Exact WoW 3.3.5a/private-server L3 validation; capabilities remain `UNVERIFIED` until exercised in that environment.
+- [ ] Production payment/provider credentials, production database/ingress configuration and signing-key custody.
+- [ ] Signed release-candidate execution, release tag/publication and live production deployment.
+- [ ] Physical-device and real Companion-host acceptance where not already tied to the selected release commit.
+- [ ] Firebase Test Lab remains optional/non-blocking while GitHub Emulator instrumentation is the routine Android gate.
 
 ## Rules
 
@@ -55,19 +46,9 @@ These are the next candidate blocks. Before starting a block, GPT must baseline 
 - Documentation changes belong in the same logical PR when product/architecture meaning changes. Do not create generated HEAD-sync documentation changes for ordinary code commits.
 - FTL usage must be quota-aware; prefer GitHub-hosted emulator for routine CI while the external FTL permission gate remains unresolved.
 
-## Active implementation program: first complete vertical slice
+## Program order
 
-The next program is intentionally end-to-end. It is not a collection of unrelated backlog items. The sequence is:
-
-1. **UGS Runtime Validator** — schema compatibility, ordering, idempotency, quality propagation, bounded staleness/expiry and safe rejection.
-2. **Deterministic Replay** — versioned fixtures and replay/regression coverage so Core behavior is reproducible without a live game.
-3. **Conservative WoW Adapter** — first real adapter slice covering the minimum session/player/target/combat/capability/event path defined by UGS v1 and Game Adapter Contract v1.
-4. **Companion** — protocol, version/capability handshake, bounded queues, reconnect/backpressure, health/watchdog, kill switch, degraded behavior and measurable latency classes.
-5. **Policy Engine / Action Gateway** — explicit authorization boundary before any action-capable feature.
-6. **Intelligence** — context, recommendation, confidence and provenance on top of verified UGS inputs.
-7. **Command Center / Overlay UX** — user-facing visualization implemented from the design system as part of the same logical product slice, not postponed as cosmetic work.
-8. **Observability / Performance** — runtime telemetry, latency/resource measurements and privacy-safe diagnostics appropriate to the completed path.
-9. **Runtime acceptance** — integration and real-device evidence required for the surfaces involved.
+`Completed passes 1–6 → Block A → Block B → Block C → Block D → Owner/external release gates`
 
 ### Definition of Done for every substantive block
 
@@ -75,4 +56,4 @@ A block is complete only when all applicable dimensions are addressed: implement
 
 ### Scope discipline
 
-Do not expand into autonomous combat, broad game/version coverage, production infrastructure or release publication merely to make the roadmap look complete. Exact-environment capabilities remain UNVERIFIED until exact L3 evidence exists. The next block must baseline current `main` before implementation begins.
+Do not expand into autonomous combat, pretend broad game/version support, or perform release/live deployment merely to make the roadmap look complete. Exact-environment capabilities remain `UNVERIFIED` until exact L3 evidence exists. Continue independent engineering when one external stream is blocked.

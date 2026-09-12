@@ -1,5 +1,7 @@
 # SENTINEL Platform RC
 
+**Status: SUPERSEDED** — historical feature-branch report. Use `docs/SENTINEL_CURRENT_STATE.md`, current code/tests and exact-SHA CI evidence.
+
 This document describes the implementation added by `agent/sentinel-complete-platform`.
 
 ## Product surfaces

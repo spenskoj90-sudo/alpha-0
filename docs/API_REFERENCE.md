@@ -1,4 +1,4 @@
-ARCHIVED — historical document, not current state. See docs/SENTINEL_CURRENT_STATE.md
+**Status: SUPERSEDED** — retained for history. Use `docs/API.md` and the runtime OpenAPI document.
 
 # SENTINEL API Reference v1
 

@@ -39,4 +39,4 @@ Automated Android/JVM tests cover the queue/sync seam, game-fact-to-sync flow, q
 
 This pass does **not** claim that Android is the production WoW game-data bridge. The repository's target architecture assigns live game/client bridging and durable local queue/cache responsibilities primarily to the local Companion. No concrete live WoW Android adapter lifecycle is asserted here.
 
-`OfflineEventQueue` remains an in-memory application queue, so this pass does not claim Android process-death/device-reboot persistence. It also does not claim real-device network execution, exact WoW environment execution, production deployment, or release acceptance. Those require separate runtime evidence before RC1 acceptance.
+`OfflineEventQueue` remains an in-memory application queue, so this pass does not claim Android process-death/device-reboot persistence. It also does not claim real-device network execution, exact WoW environment execution, production deployment, or release acceptance. Those require separate runtime evidence before release-candidate acceptance.

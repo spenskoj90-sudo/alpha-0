@@ -5,6 +5,7 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.UUID
 
 interface EventBatchClient {
@@ -37,7 +38,7 @@ class EventSyncApi(private val baseUrl: String) : EventBatchClient {
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
             setRequestProperty("X-Request-ID", UUID.randomUUID().toString())
-            setRequestProperty("Idempotency-Key", UUID.randomUUID().toString())
+            setRequestProperty("Idempotency-Key", batchIdempotencyKey(events))
         }
 
         return try {
@@ -76,6 +77,16 @@ class EventSyncApi(private val baseUrl: String) : EventBatchClient {
             Result.Failure("UNEXPECTED_ERROR")
         } finally {
             connection.disconnect()
+        }
+    }
+
+    companion object {
+        internal fun batchIdempotencyKey(events: List<OfflineEventQueue.Item>): String {
+            require(events.isNotEmpty()) { "events must not be empty" }
+            val canonical = events.joinToString(separator = "\n") { it.eventId }
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(canonical.toByteArray(Charsets.UTF_8))
+            return digest.joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
         }
     }
 }

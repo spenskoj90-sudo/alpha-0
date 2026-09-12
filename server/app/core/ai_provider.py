@@ -81,11 +81,7 @@ class AIProviderRegistry:
     def describe(self) -> tuple[dict[str, str | bool], ...]:
         """Return bounded provider metadata without exposing credentials/config."""
         return tuple(
-            {
-                "provider_id": provider_id,
-                "model_id": self._providers[provider_id].model_id,
-                "default": provider_id == self._default_provider_id,
-            }
+            {"provider_id": provider_id, "model_id": self._providers[provider_id].model_id, "default": provider_id == self._default_provider_id}
             for provider_id in sorted(self._providers)
         )
 
@@ -94,16 +90,13 @@ class BaselineRecommendationProvider:
     """Deterministic local provider consuming the Knowledge Engine projection."""
 
     provider_id = "sentinel-core"
-    model_id = "context-baseline-v2"
+    model_id = "context-baseline-v1"
 
     def generate(self, context: Mapping[str, Any]) -> AIProviderResult:
         knowledge = knowledge_context(context)
         items = knowledge["items"]
-        recommendation = next(
-            (item for item in items if item["kind"] == "inference" and item["confidence"] >= 0.50),
-            None,
-        )
-        if recommendation is None:
+        inference = next((item for item in items if item["kind"] == "inference" and item["confidence"] >= 0.50), None)
+        if inference is None:
             return AIProviderResult(
                 kind="recommendation",
                 text="Insufficient evidence for a specific progression recommendation; review recent character events first.",
@@ -112,8 +105,7 @@ class BaselineRecommendationProvider:
                 provider_id=self.provider_id,
                 model_id=self.model_id,
             )
-
-        confidence = min(0.89, max(0.50, float(recommendation["confidence"]) - 0.02))
+        confidence = min(0.89, max(0.50, float(inference["confidence"]) - 0.02))
         provenance = tuple(knowledge["provenance"][:19]) + ("recommendation:progression-review",)
         return AIProviderResult(
             kind="recommendation",

@@ -22,7 +22,7 @@ class GameAdapterCoordinator(
     private val queue: OfflineEventQueue,
     private val adapter: GameAdapter
 ) {
-    private var sequence: Long = (queue.peekBatch(100).maxOfOrNull { it.sequence } ?: -1L) + 1L
+    private var sequence: Long = (queue.maxSequence() ?: -1L) + 1L
 
     fun collect() {
         adapter.pollFacts().forEach { fact ->

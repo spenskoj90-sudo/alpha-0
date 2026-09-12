@@ -11,6 +11,7 @@ ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
 
 WORKDIR /build
 COPY server/pyproject.toml /build/server/pyproject.toml
+COPY VERSION /build/VERSION
 COPY server/app /build/server/app
 COPY server/migrations /build/server/migrations
 COPY server/migrate.py /build/server/migrate.py
@@ -34,6 +35,7 @@ ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
 WORKDIR /app/server
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /build/server/app /app/server/app
+COPY --from=builder /build/VERSION /app/VERSION
 COPY --from=builder /build/server/migrations /app/server/migrations
 COPY --from=builder /build/server/migrate.py /app/server/migrate.py
 

@@ -120,11 +120,19 @@ def test_verify_certificate_fingerprint_rejects_mismatch() -> None:
         verify_certificate_fingerprint(b"certificate-a", "00" * 32)
 
 
+def _tls_test_context() -> Mock:
+    context = Mock(spec=ssl.SSLContext)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    return context
+
+
 def test_tcp_transport_rejects_invalid_peer_pin_before_connected_state(monkeypatch: pytest.MonkeyPatch) -> None:
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = b"certificate-a"
-    context = Mock(spec=ssl.SSLContext)
+    context = _tls_test_context()
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 
@@ -150,7 +158,7 @@ def test_tcp_transport_records_matching_peer_pin(monkeypatch: pytest.MonkeyPatch
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = certificate
-    context = Mock(spec=ssl.SSLContext)
+    context = _tls_test_context()
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 

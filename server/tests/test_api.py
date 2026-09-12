@@ -37,7 +37,7 @@ def provision():
     pub = key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     pub64 = base64.b64encode(pub).decode()
     fingerprint = hashlib.sha256(pub).hexdigest()
-    reg = client.post("/v1/devices/register", headers={"X-Enrollment-Token": "u1:secret"}, json={"user_id": "u1", "platform": "android", "public_key_der_b64": pub64, "fingerprint_sha256": fingerprint})
+    reg = client.post("/v1/devices/register", headers={"X-Enrollment-Token": os.environ["SENTINEL_ENROLLMENT_TOKEN"]}, json={"user_id": "u1", "platform": "android", "public_key_der_b64": pub64, "fingerprint_sha256": fingerprint})
     assert reg.status_code == 200
     device = reg.json()
     body = {"challenge": device["challenge"], "timestamp": int(time.time()), "request_id": "req-1"}

@@ -9,7 +9,7 @@ def test_provider_registry_routes_default_and_explicit_provider() -> None:
     assert registry.route("sentinel-core") is provider
     assert registry.provider_ids() == ("sentinel-core",)
     assert registry.describe() == (
-        {"provider_id": "sentinel-core", "model_id": "context-baseline-v2", "default": True},
+        {"provider_id": "sentinel-core", "model_id": "context-baseline-v1", "default": True},
     )
 
 

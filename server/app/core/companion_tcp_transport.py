@@ -12,6 +12,7 @@ from .companion_tls_peer import verify_certificate_fingerprint
 _FRAME_HEADER: Final[int] = 4
 _DEFAULT_MAX_FRAME_BYTES: Final[int] = 64 * 1024
 _MAX_ALLOWED_FRAME_BYTES: Final[int] = 1024 * 1024
+_MIN_TLS_VERSION: Final[ssl.TLSVersion] = ssl.TLSVersion.TLSv1_2
 
 
 class CompanionTcpTransport:
@@ -51,6 +52,13 @@ class CompanionTcpTransport:
             raise ValueError("ssl_context is required unless allow_insecure=True")
         if pinned_peer_sha256 is not None and allow_insecure:
             raise ValueError("TLS peer pinning requires TLS; plaintext mode cannot provide a peer certificate")
+        if isinstance(ssl_context, ssl.SSLContext):
+            if ssl_context.minimum_version < _MIN_TLS_VERSION:
+                raise ValueError("TLS minimum version must be TLS 1.2 or newer")
+            if ssl_context.verify_mode is not ssl.CERT_REQUIRED:
+                raise ValueError("TLS peer verification must require certificates")
+            if not ssl_context.check_hostname:
+                raise ValueError("TLS hostname verification must be enabled")
 
         self.host = host
         self.port = port
@@ -89,6 +97,7 @@ class CompanionTcpTransport:
                 wrapped.close()
             else:
                 raw.close()
+            self.peer_certificate_sha256 = None
             raise
 
     def send(self, envelope: CompanionEnvelope) -> None:

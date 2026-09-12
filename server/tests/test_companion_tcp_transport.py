@@ -66,6 +66,29 @@ def test_transport_requires_explicit_tls_or_insecure_opt_in() -> None:
         CompanionTcpTransport("127.0.0.1", 1)
 
 
+def test_real_tls_context_requires_tls_1_2_and_peer_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_1
+    with pytest.raises(ValueError, match="TLS 1.2"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
+def test_real_tls_context_requires_certificate_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with pytest.raises(ValueError, match="require certificates"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
+def test_real_tls_context_requires_hostname_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_REQUIRED
+    with pytest.raises(ValueError, match="hostname verification"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
 def test_tls_peer_pin_requires_tls() -> None:
     with pytest.raises(ValueError, match="requires TLS"):
         CompanionTcpTransport(
@@ -97,11 +120,19 @@ def test_verify_certificate_fingerprint_rejects_mismatch() -> None:
         verify_certificate_fingerprint(b"certificate-a", "00" * 32)
 
 
+def _tls_test_context() -> Mock:
+    context = Mock(spec=ssl.SSLContext)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    return context
+
+
 def test_tcp_transport_rejects_invalid_peer_pin_before_connected_state(monkeypatch: pytest.MonkeyPatch) -> None:
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = b"certificate-a"
-    context = Mock(spec=ssl.SSLContext)
+    context = _tls_test_context()
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 
@@ -127,7 +158,7 @@ def test_tcp_transport_records_matching_peer_pin(monkeypatch: pytest.MonkeyPatch
     raw = Mock(spec=socket.socket)
     wrapped = Mock()
     wrapped.getpeercert.return_value = certificate
-    context = Mock(spec=ssl.SSLContext)
+    context = _tls_test_context()
     context.wrap_socket.return_value = wrapped
     monkeypatch.setattr(socket, "create_connection", Mock(return_value=raw))
 

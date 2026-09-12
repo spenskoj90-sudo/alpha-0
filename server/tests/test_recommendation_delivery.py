@@ -1,15 +1,18 @@
 from app.core.recommendation_delivery import RecommendationDelivery
 
 
-def test_delivery_preserves_provider_evidence() -> None:
+def test_delivery_preserves_provider_and_knowledge_evidence() -> None:
     delivered = RecommendationDelivery().deliver({"state": "bounded"})
 
     assert len(delivered) == 1
     item = delivered[0]
     assert item.kind == "recommendation"
     assert item.text
-    assert item.confidence == 0.72
-    assert item.provenance == ("sentinel-core:context-baseline",)
+    assert item.confidence == 0.40
+    assert item.provenance == (
+        "knowledge:insufficient-context",
+        "recommendation:suppressed-low-evidence",
+    )
     assert item.provider_id == "sentinel-core"
     assert item.model_id == "context-baseline-v1"
 

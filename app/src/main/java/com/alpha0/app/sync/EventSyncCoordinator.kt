@@ -19,7 +19,7 @@ class EventSyncCoordinator(
 
         return when (val result = api.sendBatch(accessToken, batch)) {
             is EventSyncApi.Result.Success -> {
-                queue.acknowledge(batch.mapTo(HashSet(batch.size) { batch[it].eventId }))
+                queue.acknowledge(batch.map { it.eventId }.toSet())
                 FlushResult(batch.size, result.value.accepted, result.value.duplicates)
             }
             is EventSyncApi.Result.Failure -> FlushResult(batch.size, 0, 0, result.code)

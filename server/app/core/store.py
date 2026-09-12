@@ -234,110 +234,6 @@ class MemoryStore(Store):
         return item
 
     def create_subscription(self, item):
-        subscription_id = str(uuid.uuid4())
-        provider_subscription_id = item.get("provider_subscription_id") or f"local_{subscription_id}"
-        with self.engine.begin() as conn:
-            identity_id = conn.execute(
-                text("SELECT id FROM identities WHERE user_handle=:u"), {"u": item["user_id"]}
-            ).scalar_one_or_none()
-            if not identity_id:
-                identity_id = conn.execute(
-                    text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}
-                ).scalar_one()
-            conn.execute(
-                text(
-                    "INSERT INTO subscriptions(id,identity_id,plan_code,status,currency,started_at,expires_at,provider,provider_subscription_id,updated_at) "
-                    "VALUES (:id,:identity,:plan,:status,:currency,:started,:expires,:provider,:provider_sub,:updated)"
-                ),
-                {
-                    "id": subscription_id,
-                    "identity": identity_id,
-                    "plan": item["plan_code"],
-                    "status": item["status"],
-                    "currency": item["currency"],
-                    "started": item["started_at"],
-                    "expires": item.get("expires_at"),
-                    "provider": item["provider"],
-                    "provider_sub": provider_subscription_id,
-                    "updated": item["started_at"],
-                },
-            )
-        return self.find_subscription_by_provider_id(item["provider"], provider_subscription_id) or item
-
-    def list_subscriptions(self, user_id):
-        with self.engine.begin() as conn:
-            rows = conn.execute(
-                text(
-                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
-                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
-                    "JOIN identities i ON i.id=s.identity_id WHERE i.user_handle=:u ORDER BY s.updated_at DESC"
-                ),
-                {"u": user_id},
-            ).mappings().all()
-        return [dict(row) for row in rows]
-
-    def find_subscription_by_provider_id(self, provider, provider_subscription_id):
-        with self.engine.begin() as conn:
-            row = conn.execute(
-                text(
-                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
-                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
-                    "JOIN identities i ON i.id=s.identity_id WHERE s.provider=:p AND s.provider_subscription_id=:ps"
-                ),
-                {"p": provider, "ps": provider_subscription_id},
-            ).mappings().first()
-        return dict(row) if row else None
-
-    def apply_subscription_transition(self, subscription_id, event, previous, current):
-        with self.engine.begin() as conn:
-            row = conn.execute(
-                text(
-                    "UPDATE subscriptions SET status=:current, updated_at=:at, "
-                    "expires_at=CASE WHEN :current IN ('CANCELED','EXPIRED') THEN :at ELSE expires_at END "
-                    "WHERE id=:id AND status=:previous RETURNING id::text id"
-                ),
-                {"current": current, "at": event.occurred_at, "id": subscription_id, "previous": previous},
-            ).mappings().first()
-            if not row:
-                raise ValueError("SUBSCRIPTION_STATE_CHANGED")
-        return self.get_subscription(subscription_id)
-
-    def get_subscription(self, subscription_id):
-        with self.engine.begin() as conn:
-            row = conn.execute(
-                text(
-                    "SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,"
-                    "s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s "
-                    "JOIN identities i ON i.id=s.identity_id WHERE s.id=:id"
-                ),
-                {"id": subscription_id},
-            ).mappings().first()
-        return dict(row) if row else None
-
-    def has_billing_event(self, event_id):
-        with self.engine.begin() as conn:
-            return conn.execute(
-                text("SELECT 1 FROM billing_webhook_events WHERE event_id=:e"), {"e": event_id}
-            ).first() is not None
-
-    def record_billing_event(self, event, subscription_id):
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    "INSERT INTO billing_webhook_events(event_id,subscription_id,provider,status,occurred_at,payload_json) "
-                    "VALUES (:event,:sub,:provider,:status,:occurred,CAST(:payload AS jsonb))"
-                ),
-                {
-                    "event": event.event_id,
-                    "sub": subscription_id,
-                    "provider": event.provider,
-                    "status": event.target_state.value,
-                    "occurred": event.occurred_at,
-                    "payload": json.dumps(event.payload or {}),
-                },
-            )
-
-    def create_subscription(self, item):
         with self.lock:
             subscription_id = str(uuid.uuid4())
             provider_subscription_id = item.get("provider_subscription_id") or f"local_{subscription_id}"
@@ -601,6 +497,52 @@ class PostgresStore(Store):
                 identity_id = conn.execute(text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}).scalar_one()
             conn.execute(text("INSERT INTO entitlements(id,identity_id,game_id,source,status,valid_from,valid_until) VALUES (:id,:uid,:gid,:source,:status,:vf,:vu)"), {"id": item["id"], "uid": identity_id, "gid": item["game_id"], "source": item["source"], "status": item["status"], "vf": item["valid_from"], "vu": item["valid_until"]})
         return item
+
+    def create_subscription(self, item):
+        subscription_id = str(uuid.uuid4())
+        provider_subscription_id = item.get("provider_subscription_id") or f"local_{subscription_id}"
+        with self.engine.begin() as conn:
+            identity_id = conn.execute(text("SELECT id FROM identities WHERE user_handle=:u"), {"u": item["user_id"]}).scalar_one_or_none()
+            if not identity_id:
+                identity_id = conn.execute(text("INSERT INTO identities(user_handle) VALUES (:u) RETURNING id"), {"u": item["user_id"]}).scalar_one()
+            conn.execute(
+                text(
+                    "INSERT INTO subscriptions(id,identity_id,plan_code,status,currency,started_at,expires_at,provider,provider_subscription_id,updated_at) "
+                    "VALUES (:id,:identity,:plan,:status,:currency,:started,:expires,:provider,:provider_sub,:updated)"
+                ),
+                {"id": subscription_id, "identity": identity_id, "plan": item["plan_code"], "status": item["status"], "currency": item["currency"], "started": item["started_at"], "expires": item.get("expires_at"), "provider": item["provider"], "provider_sub": provider_subscription_id, "updated": item["started_at"]},
+            )
+        return self.find_subscription_by_provider_id(item["provider"], provider_subscription_id) or item
+
+    def list_subscriptions(self, user_id):
+        with self.engine.begin() as conn:
+            rows = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE i.user_handle=:u ORDER BY s.updated_at DESC"), {"u": user_id}).mappings().all()
+        return [dict(row) for row in rows]
+
+    def find_subscription_by_provider_id(self, provider, provider_subscription_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE s.provider=:p AND s.provider_subscription_id=:ps"), {"p": provider, "ps": provider_subscription_id}).mappings().first()
+        return dict(row) if row else None
+
+    def apply_subscription_transition(self, subscription_id, event, previous, current):
+        with self.engine.begin() as conn:
+            row = conn.execute(text("UPDATE subscriptions SET status=:current, updated_at=:at, expires_at=CASE WHEN :current IN ('CANCELED','EXPIRED') THEN :at ELSE expires_at END WHERE id=:id AND status=:previous RETURNING id::text id"), {"current": current, "at": event.occurred_at, "id": subscription_id, "previous": previous}).mappings().first()
+            if not row:
+                raise ValueError("SUBSCRIPTION_STATE_CHANGED")
+        return self.get_subscription(subscription_id)
+
+    def get_subscription(self, subscription_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE s.id=:id"), {"id": subscription_id}).mappings().first()
+        return dict(row) if row else None
+
+    def has_billing_event(self, event_id):
+        with self.engine.begin() as conn:
+            return conn.execute(text("SELECT 1 FROM billing_webhook_events WHERE event_id=:e"), {"e": event_id}).first() is not None
+
+    def record_billing_event(self, event, subscription_id):
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO billing_webhook_events(event_id,subscription_id,provider,status,occurred_at,payload_json) VALUES (:event,:sub,:provider,:status,:occurred,CAST(:payload AS jsonb))"), {"event": event.event_id, "sub": subscription_id, "provider": event.provider, "status": event.target_state.value, "occurred": event.occurred_at, "payload": json.dumps(event.payload or {})})
 
     def list_characters(self, user_id: str) -> list[dict[str, Any]]:
         with self.engine.begin() as conn:

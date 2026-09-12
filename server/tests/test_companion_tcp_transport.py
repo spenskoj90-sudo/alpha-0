@@ -66,6 +66,29 @@ def test_transport_requires_explicit_tls_or_insecure_opt_in() -> None:
         CompanionTcpTransport("127.0.0.1", 1)
 
 
+def test_real_tls_context_requires_tls_1_2_and_peer_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_1
+    with pytest.raises(ValueError, match="TLS 1.2"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
+def test_real_tls_context_requires_certificate_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with pytest.raises(ValueError, match="require certificates"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
+def test_real_tls_context_requires_hostname_verification() -> None:
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_REQUIRED
+    with pytest.raises(ValueError, match="hostname verification"):
+        CompanionTcpTransport("example.test", 443, ssl_context=context)
+
+
 def test_tls_peer_pin_requires_tls() -> None:
     with pytest.raises(ValueError, match="requires TLS"):
         CompanionTcpTransport(

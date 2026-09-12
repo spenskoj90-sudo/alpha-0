@@ -147,44 +147,30 @@ fun DeviceSetupScreen(
                             return@launch
                         }
 
-                        val challenge = if (bound === pendingBind && pendingBind?.challenge == bound.challenge && error == null) {
-                            // The challenge returned by bind is valid for the first proof attempt.
-                            bound.challenge
-                        } else {
-                            bound.challenge
-                        }
-
-                        val proofChallenge = if (pendingBind == bound && bound.challenge.isNotBlank()) {
-                            bound.challenge
-                        } else {
-                            bound.challenge
-                        }
-
-                        val proof = withContext(Dispatchers.IO) {
-                            api.prove(bound.deviceId, proofChallenge, deviceIdentity)
-                        }
-                        when (proof) {
+                        when (val proof = withContext(Dispatchers.IO) {
+                            api.prove(bound.deviceId, bound.challenge, deviceIdentity)
+                        }) {
                             is DeviceApi.ProofResult.Success -> {
                                 pendingBind = null
                                 busy = false
                                 onBound(proof.value)
                             }
                             is DeviceApi.ProofResult.Failure -> {
-                                // The server consumes proof challenges exactly once. Obtain a fresh
-                                // challenge now so the next user retry does not create another device.
+                                // A proof attempt consumes its server challenge. Refresh the
+                                // challenge so retry proves the same device rather than rebinding.
                                 when (val renewed = withContext(Dispatchers.IO) {
                                     api.challenge(accessToken, bound.deviceId)
                                 }) {
-                                    is DeviceApi.ChallengeResult.Success -> pendingBind = bound.copy(challenge = renewed.challenge)
+                                    is DeviceApi.ChallengeResult.Success -> {
+                                        pendingBind = bound.copy(challenge = renewed.challenge)
+                                        error = proof.message
+                                    }
                                     is DeviceApi.ChallengeResult.Failure -> {
                                         pendingBind = null
                                         error = "${proof.message}; CHALLENGE_RENEWAL_${renewed.message}"
-                                        busy = false
-                                        return@launch
                                     }
                                 }
                                 busy = false
-                                error = proof.message
                             }
                         }
                     }

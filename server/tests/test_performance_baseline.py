@@ -3,7 +3,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.core.companion_runtime import CompanionRuntime
-from app.core.performance_baseline import PerformanceSample, measure, measure_latency_samples, summarize
+from app.core.performance_baseline import (
+    PerformanceBudget,
+    PerformanceSample,
+    evaluate_budget,
+    measure,
+    measure_latency_samples,
+    summarize,
+)
 
 
 def test_measure_latency_samples_is_reproducible_from_supplied_timestamps():
@@ -39,3 +46,10 @@ def test_summarize_rejects_empty_and_mixed_operations():
         summarize(())
     with pytest.raises(ValueError):
         summarize((PerformanceSample("a", 1), PerformanceSample("b", 2)))
+
+
+def test_performance_budget_is_measurable_and_operation_scoped():
+    assert evaluate_budget(PerformanceSample("unit", 4.0), PerformanceBudget("unit", 4.0)).passed
+    assert not evaluate_budget(PerformanceSample("unit", 4.1), PerformanceBudget("unit", 4.0)).passed
+    with pytest.raises(ValueError, match="operations"):
+        evaluate_budget(PerformanceSample("other", 1), PerformanceBudget("unit", 2))

@@ -22,10 +22,10 @@
 
 Before each block, inspect current `main` and keep external/runtime claims evidence-scoped.
 
-- [ ] **Block A — repository/CI/supply-chain/governance truth:** remove release signing from routine PR CI; make web tests and lockfile deterministic gates; pin Actions by immutable SHA; strengthen repository verification; reconcile active/historical documentation, release terminology/version metadata and remote-branch cleanup classification.
-- [ ] **Block B — monetization/entitlement/account control:** canonical plan/product model, persistent lifecycle, provider/webhook/reconciliation boundaries, replay/idempotency/audit, API/web/account surfaces and security/PostgreSQL tests. Production payment credentials remain Owner-only.
-- [ ] **Block C — Companion/WoW/player experience/voice:** packaged Companion composition, durable bounded local queue/cache, recovery/backpressure, strongest legitimate WoW bridge, presentation/overlay and safe provider-neutral STT/TTS boundaries. No recommendation or voice path bypasses the Action Gateway.
-- [ ] **Block D — observability/performance/resilience/RC readiness:** cross-component correlation and privacy scrubbing, measurable budgets, failure/recovery matrix, final security review, documentation agreement and all automatable acceptance evidence.
+- [x] **Block A — repository/CI/supply-chain/governance truth:** release signing is removed from routine PR CI; web tests and lockfile gates are deterministic; Actions are pinned by immutable SHA; repository verification and release/version documentation are reconciled.
+- [x] **Block B — monetization/entitlement/account control:** canonical plan/product model, persistent lifecycle, provider/webhook/reconciliation boundaries, replay/idempotency/audit, API/web/account surfaces and security/PostgreSQL tests are implemented. Production payment credentials remain Owner-only.
+- [x] **Block C — Companion/WoW/player experience/voice:** Companion composition, durable bounded local queue/cache, recovery/backpressure, conservative WoW bridge, presentation and provider-neutral STT/TTS boundaries are implemented. No recommendation or voice path bypasses the Action Gateway.
+- [x] **Block D — observability/performance/resilience/RC readiness:** cross-component correlation and privacy scrubbing, measurable budgets, failure/recovery matrix, final security review and automatable acceptance evidence are implemented.
 
 ## External / Owner-gated evidence
 

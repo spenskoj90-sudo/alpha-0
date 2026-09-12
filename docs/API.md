@@ -53,6 +53,15 @@ Accepted character events are projected into the character store on a best-effor
 - `GET /v1/admin/entitlements` — list entitlements for an authorized administrator.
 - `POST /v1/admin/entitlements` — create an entitlement for a user and game.
 
+## Billing and account control (provider-neutral)
+
+- `GET /v1/billing/plans` — list the canonical product-plan catalog; prices are metadata only and no provider is contacted.
+- `GET /v1/billing/subscriptions` — list subscriptions owned by the authenticated caller.
+- `POST /v1/billing/subscriptions` — create a pending subscription intent for the caller. Provider credentials and payment capture are Owner-only.
+- `POST /v1/billing/webhooks/{provider}` — accept a replay-safe lifecycle event only when `SENTINEL_BILLING_WEBHOOK_TOKEN` is configured; missing production configuration fails closed.
+
+Webhook deliveries are keyed by provider event ID and persisted with their subscription transition. Terminal `CANCELED` and `EXPIRED` states cannot be reactivated by a later event.
+
 ## World of Warcraft
 
 - `GET /v1/wow/patches` — list known WoW patches.

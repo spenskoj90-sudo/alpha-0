@@ -46,6 +46,11 @@ class BillingRuntime:
         with self._lock:
             return self._state.get(subscription_id)
 
+    def seed(self, subscription_id: str, current: BillingState) -> None:
+        """Load durable state before evaluating a webhook transition."""
+        with self._lock:
+            self._state.setdefault(subscription_id, current)
+
     def transition(
         self,
         subscription_id: str,

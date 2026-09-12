@@ -8,6 +8,7 @@ This document defines the P1 work that is executable without production Stripe c
 - Android key lifecycle has explicit `GENERATED -> ACTIVE -> ROTATING -> ACTIVE` and terminal `REVOKED` states.
 - `EntitlementEngine` is deterministic and fail-closed for missing, suspended, not-yet-valid and expired entitlements.
 - `BillingRuntime` is provider-neutral. It validates state transitions without contacting Stripe or requiring production credentials.
+- Block B adds a canonical plan catalog, durable subscription state, replay-safe provider event records and caller-scoped billing API routes. Payment capture, provider secrets and reconciliation jobs remain Owner-only boundaries.
 - `OutboxManager` and `WorkerManager` model `PENDING -> PROCESSING -> DONE/FAILED`, attempt counting, duplicate protection and retry semantics.
 - PostgreSQL RLS is now explicit policy-backed rather than `ENABLE ROW LEVEL SECURITY` only. The persistence role must explicitly opt into the service policy through `app.service_role=true`; absent that setting, row access fails closed.
 

@@ -33,24 +33,20 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding. Automated loopback tests exercise the composed socket path; a packaged production Companion host and live network environment remain unverified.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
 - The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing, confidence/provenance, recommendation delivery and the web Command Center presentation. No external AI provider or credential is implied.
-- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. Its `OfflineEventQueue` is process-memory only and is not the durable production WoW bridge.
+- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` now provides bounded, atomically persisted local buffering with malformed-file isolation; exact WoW/private-server L3 validation remains **UNVERIFIED**.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Telemetry and performance
 
 - The telemetry contract is provider-neutral. Companion emits bounded privacy-safe runtime/transport events, exposes health and latency snapshots, supports fanout, and has opt-in PostgreSQL persistence/retention seams.
 - External telemetry-provider delivery and a deployed operator observability stack remain optional environment integrations, not implementation claims.
-- Performance baseline methodology exists; measured results are acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
+- Performance budgets are represented as operation-scoped contracts with deterministic pass/fail evaluation; measured results remain acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
+- Block D adds deterministic privacy scrubbing for telemetry attributes and a canonical recovery matrix with fail-closed health outcomes; implementation evidence is covered by unit tests and the Block D contract.
 - Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED** unless current repository evidence proves otherwise.
 
 ## 5. Architecture work remaining
 
-The first six implementation passes closed the foundational UGS, event-runtime, WoW Core vertical, intelligence, Companion-hardening and Android-to-Core ingestion seams. Remaining program blocks are:
-
-- repository/CI/supply-chain/governance re-baseline and release-contract consistency;
-- complete monetization, entitlement lifecycle and account-control vertical without production payment credentials;
-- packaged Companion application, durable local buffering, strongest legitimate WoW data plane, player presentation and provider-neutral voice boundaries;
-- end-to-end observability, measurable performance budgets, resilience/security finalization and RC acceptance evidence.
+The first six implementation passes and Blocks A–D closed the repository/CI re-baseline, monetization/entitlement, Companion experience, and observability/resilience verticals. Remaining work is external or Owner-gated activation only: exact WoW target validation, production credentials and ingress/database configuration, real-device/Companion-host acceptance, signed release-candidate execution, release publication and live deployment.
 
 Known evidence and environment gaps remain: exact WoW target validation, a real Companion host, live production ingress/database evidence, external provider credentials where selected, and signed/public release acceptance. Android `AuthApi` retains a `HttpURLConnection` implementation behind an injectable transport and coroutine I/O boundary; replacing that implementation is technical debt, not a current authorization bypass.
 

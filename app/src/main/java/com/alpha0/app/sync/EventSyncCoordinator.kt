@@ -2,7 +2,7 @@ package com.alpha0.app.sync
 
 class EventSyncCoordinator(
     private val queue: OfflineEventQueue,
-    private val api: EventSyncApi,
+    private val api: EventBatchClient,
 ) {
     data class FlushResult(
         val attempted: Int,

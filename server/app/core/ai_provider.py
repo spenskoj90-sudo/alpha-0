@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping, Protocol
 
+from .knowledge_engine import knowledge_context
+
 AIResultKind = Literal["fact", "inference", "recommendation"]
 
 
@@ -79,28 +81,37 @@ class AIProviderRegistry:
     def describe(self) -> tuple[dict[str, str | bool], ...]:
         """Return bounded provider metadata without exposing credentials/config."""
         return tuple(
-            {
-                "provider_id": provider_id,
-                "model_id": self._providers[provider_id].model_id,
-                "default": provider_id == self._default_provider_id,
-            }
+            {"provider_id": provider_id, "model_id": self._providers[provider_id].model_id, "default": provider_id == self._default_provider_id}
             for provider_id in sorted(self._providers)
         )
 
 
 class BaselineRecommendationProvider:
-    """Deterministic local provider preserving the current baseline behavior."""
+    """Deterministic local provider consuming the Knowledge Engine projection."""
 
     provider_id = "sentinel-core"
     model_id = "context-baseline-v1"
 
     def generate(self, context: Mapping[str, Any]) -> AIProviderResult:
-        del context
+        knowledge = knowledge_context(context)
+        items = knowledge["items"]
+        inference = next((item for item in items if item["kind"] == "inference" and item["confidence"] >= 0.50), None)
+        if inference is None:
+            return AIProviderResult(
+                kind="recommendation",
+                text="Insufficient evidence for a specific progression recommendation; review recent character events first.",
+                confidence=0.40,
+                provenance=tuple(knowledge["provenance"][:19]) + ("recommendation:suppressed-low-evidence",),
+                provider_id=self.provider_id,
+                model_id=self.model_id,
+            )
+        confidence = min(0.89, max(0.50, float(inference["confidence"]) - 0.02))
+        provenance = tuple(knowledge["provenance"][:19]) + ("recommendation:progression-review",)
         return AIProviderResult(
             kind="recommendation",
             text="Review the most recent character events before making a progression decision.",
-            confidence=0.72,
-            provenance=("sentinel-core:context-baseline",),
+            confidence=confidence,
+            provenance=provenance,
             provider_id=self.provider_id,
             model_id=self.model_id,
         )

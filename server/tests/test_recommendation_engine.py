@@ -28,9 +28,13 @@ def test_default_engine_routes_to_deterministic_baseline_provider() -> None:
 
     assert first == second
     assert first.kind == "recommendation"
-    assert first.confidence == 0.72
-    assert first.provenance == ("sentinel-core:context-baseline",)
+    assert first.confidence == 0.40
+    assert first.provenance == (
+        "knowledge:insufficient-context",
+        "recommendation:suppressed-low-evidence",
+    )
     assert first.provider_id == "sentinel-core"
+    assert first.model_id == "context-baseline-v1"
 
 
 def test_engine_routes_explicit_provider_and_preserves_context() -> None:

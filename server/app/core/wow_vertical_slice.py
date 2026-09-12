@@ -5,12 +5,21 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from .companion_protocol import CompanionEnvelope, CompanionMessageType
-from .game_adapter import CapabilityStatus
 from .recommendation_application import RecommendationApplication
 from .recommendation_context import recommendation_context
-from .unified_game_state import CapabilitySnapshot, UGSIngestor, UGSState
+from .unified_game_state import (
+    CapabilitySnapshot,
+    SourceIdentity,
+    UGSIngestor,
+    UGSState,
+)
 from .ugs_projection import ProjectionResult, UGSProjectionRegistry
-from .wow_adapter import ConservativeWowAdapter, WowObservation, WowPatchProfile, WowServerProfile
+from .wow_adapter import (
+    ConservativeWowAdapter,
+    WowObservation,
+    WowPatchProfile,
+    WowServerProfile,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +82,9 @@ class WowVerticalSlice:
                 status=capability.status,
                 evidence_level=capability.evidence_level,
             )
-            for name, capability in self.adapter.capabilities(observed_at=observation.observed_at).items()
+            for name, capability in self.adapter.capabilities(
+                observed_at=observation.observed_at
+            ).items()
         }
         state = UGSState(
             schema_version="1.0",
@@ -82,7 +93,10 @@ class WowVerticalSlice:
             sequence=observation.sequence,
             observed_at=observation.observed_at,
             ingested_at=ingested_at,
-            source=identity_source(identity.adapter_id, identity.server_profile or WowServerProfile.UNKNOWN.value),
+            source=SourceIdentity(
+                adapter_id=identity.adapter_id,
+                profile=identity.server_profile or WowServerProfile.UNKNOWN.value,
+            ),
             capabilities=capabilities,
             events=[event],
             data_quality=observation.data_quality,
@@ -127,7 +141,9 @@ class WowVerticalSlice:
             observed_at=_parse_timestamp(payload.get("observed_at"), now),
             sequence=envelope.sequence,
             patch_profile=WowPatchProfile(str(payload["patch_profile"])),
-            server_profile=WowServerProfile(str(payload.get("server_profile", WowServerProfile.UNKNOWN.value))),
+            server_profile=WowServerProfile(
+                str(payload.get("server_profile", WowServerProfile.UNKNOWN.value))
+            ),
             realm_id=_optional_text(payload.get("realm_id")),
             latency_ms=_optional_int(payload.get("latency_ms")),
             addon_connected=_optional_bool(payload.get("addon_connected")),
@@ -140,12 +156,6 @@ class WowVerticalSlice:
 
     def _project_context(self, state: UGSState) -> None:
         self._projected_context[state.session_id] = recommendation_context(state)
-
-
-def identity_source(adapter_id: str, profile: str):
-    from .unified_game_state import SourceIdentity
-
-    return SourceIdentity(adapter_id=adapter_id, profile=profile)
 
 
 def _parse_timestamp(value: object, fallback: datetime | None) -> datetime:

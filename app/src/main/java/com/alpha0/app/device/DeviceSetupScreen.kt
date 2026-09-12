@@ -119,8 +119,8 @@ fun DeviceSetupScreen(
                     busy = true
                     error = null
                     scope.launch {
-                        var binding = pendingBind
-                        if (binding == null) {
+                        val existingBinding = pendingBind
+                        val bound = if (existingBinding == null) {
                             when (val bind = withContext(Dispatchers.IO) {
                                 api.bind(
                                     accessToken = accessToken,
@@ -130,8 +130,8 @@ fun DeviceSetupScreen(
                                 )
                             }) {
                                 is DeviceApi.Result.Success -> {
-                                    binding = bind.value
                                     pendingBind = bind.value
+                                    bind.value
                                 }
                                 is DeviceApi.Result.Failure -> {
                                     busy = false
@@ -139,12 +139,19 @@ fun DeviceSetupScreen(
                                     return@launch
                                 }
                             }
-                        }
-
-                        val bound = binding ?: run {
-                            busy = false
-                            error = "DEVICE_BIND_STATE_INVALID"
-                            return@launch
+                        } else {
+                            when (val renewed = withContext(Dispatchers.IO) {
+                                api.challenge(accessToken, existingBinding.deviceId)
+                            }) {
+                                is DeviceApi.ChallengeResult.Success -> {
+                                    existingBinding.copy(challenge = renewed.challenge).also { pendingBind = it }
+                                }
+                                is DeviceApi.ChallengeResult.Failure -> {
+                                    busy = false
+                                    error = "CHALLENGE_RENEWAL_${renewed.message}"
+                                    return@launch
+                                }
+                            }
                         }
 
                         when (val proof = withContext(Dispatchers.IO) {
@@ -156,21 +163,12 @@ fun DeviceSetupScreen(
                                 onBound(proof.value)
                             }
                             is DeviceApi.ProofResult.Failure -> {
-                                // A proof attempt consumes its server challenge. Refresh the
-                                // challenge so retry proves the same device rather than rebinding.
-                                when (val renewed = withContext(Dispatchers.IO) {
-                                    api.challenge(accessToken, bound.deviceId)
-                                }) {
-                                    is DeviceApi.ChallengeResult.Success -> {
-                                        pendingBind = bound.copy(challenge = renewed.challenge)
-                                        error = proof.message
-                                    }
-                                    is DeviceApi.ChallengeResult.Failure -> {
-                                        pendingBind = null
-                                        error = "${proof.message}; CHALLENGE_RENEWAL_${renewed.message}"
-                                    }
-                                }
+                                // Keep the bound device. The next retry obtains a fresh one-time
+                                // challenge before signing, so a transient failure cannot create
+                                // an unnecessary second device registration.
+                                pendingBind = bound
                                 busy = false
+                                error = proof.message
                             }
                         }
                     }

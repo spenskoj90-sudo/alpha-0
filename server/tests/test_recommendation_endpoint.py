@@ -35,7 +35,11 @@ def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch)
     item = response.recommendations[0]
     assert item.provider_id == "sentinel-core"
     assert item.model_id == "context-baseline-v1"
-    assert item.provenance == ["sentinel-core:context-baseline"]
+    assert item.confidence == 0.40
+    assert item.provenance == [
+        "knowledge:insufficient-context",
+        "recommendation:suppressed-low-evidence",
+    ]
 
 
 def test_recommendation_endpoint_fails_closed_for_unknown_provider(monkeypatch):

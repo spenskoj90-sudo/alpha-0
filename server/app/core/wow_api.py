@@ -76,6 +76,45 @@ def my_device(authorization_header: str = Header(..., alias="Authorization")) ->
     return _device_payload(principal.user_id, principal.device_id, store)
 
 
+@router.post("/v1/devices/{device_id}/challenge")
+def issue_device_challenge(
+    device_id: str,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> dict[str, str]:
+    """Issue a fresh one-time device proof challenge for a caller-owned device.
+
+    The caller still needs a valid authenticated session and may only refresh a
+    challenge for its own active device. The challenge grants no permissions by
+    itself; successful P-256 proof is what establishes a device-bound session.
+    """
+    from app.main import rate_limit, request_id
+
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-challenge")
+    principal_from_token, require_bearer, store = _security_context()
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if device.get("user_id") != principal.user_id:
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if device.get("state") != "ACTIVE":
+        raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
+    challenge = store.create_challenge(device_id)
+    store.add_audit({
+        "actor_user_id": principal.user_id,
+        "actor_device_id": device_id,
+        "action": "device:challenge",
+        "resource": "device",
+        "decision": "ALLOW",
+        "reason_code": "CHALLENGE_ISSUED",
+        "request_id": rid,
+    })
+    return {"challenge": challenge}
+
+
 def _device_payload(user_id: str, device_id: str, store) -> dict[str, Any]:
     device = store.get_device(device_id)
     if not device or device.get("user_id") != user_id:

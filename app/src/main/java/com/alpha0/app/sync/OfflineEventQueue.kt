@@ -29,6 +29,9 @@ class OfflineEventQueue(private val maxItems: Int = 1000) {
     fun peekBatch(limit: Int = 100): List<Item> = queue.take(limit)
 
     @Synchronized
+    fun maxSequence(): Long? = queue.maxOfOrNull { it.sequence }
+
+    @Synchronized
     fun acknowledge(eventIds: Set<String>) {
         while (queue.isNotEmpty() && queue.first().eventId in eventIds) queue.removeFirst()
         if (eventIds.isNotEmpty()) queue.removeAll { it.eventId in eventIds }

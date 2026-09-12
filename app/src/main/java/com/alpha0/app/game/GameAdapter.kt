@@ -1,5 +1,6 @@
 package com.alpha0.app.game
 
+import com.alpha0.app.sync.EventSyncCoordinator
 import com.alpha0.app.sync.OfflineEventQueue
 import org.json.JSONObject
 
@@ -21,7 +22,7 @@ class GameAdapterCoordinator(
     private val queue: OfflineEventQueue,
     private val adapter: GameAdapter
 ) {
-    private var sequence: Long = 0
+    private var sequence: Long = (queue.maxSequence() ?: -1L) + 1L
 
     fun collect() {
         adapter.pollFacts().forEach { fact ->
@@ -34,5 +35,10 @@ class GameAdapterCoordinator(
                 payload = fact.payload
             )
         }
+    }
+
+    fun collectAndFlush(accessToken: String, sync: EventSyncCoordinator): EventSyncCoordinator.FlushResult {
+        collect()
+        return sync.flush(accessToken)
     }
 }

@@ -39,7 +39,7 @@ fun DeviceSetupScreen(
     accessToken: String,
     deviceIdentity: DeviceIdentity,
     api: DeviceApi,
-    onBound: (String) -> Unit
+    onBound: (DeviceApi.ProvenSession) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -47,6 +47,7 @@ fun DeviceSetupScreen(
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pendingBind by remember { mutableStateOf<DeviceApi.BindResult?>(null) }
     var batteryOptimizationIgnored by remember { mutableStateOf(BatteryOptimization.isIgnored(context)) }
 
     DisposableEffect(lifecycleOwner, context) {
@@ -65,7 +66,11 @@ fun DeviceSetupScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text("DEVICE SETUP", style = MaterialTheme.typography.headlineMedium)
-            Text("Bind this phone to your authenticated SENTINEL account.", style = MaterialTheme.typography.bodyLarge, color = SentinelColors.TextSecondary)
+            Text(
+                "Bind this phone and prove possession of its hardware-backed identity before SENTINEL enables device-scoped operations.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = SentinelColors.TextSecondary
+            )
 
             SentinelCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -105,34 +110,75 @@ fun DeviceSetupScreen(
             }
 
             if (error != null) {
-                Text("Binding failed: $error", color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
+                Text("Device setup failed: $error", color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
             }
 
             PrimaryButton(
-                text = "Привязать устройство",
+                text = if (pendingBind == null) "Привязать и подтвердить устройство" else "Повторить подтверждение",
                 onClick = {
                     busy = true
                     error = null
                     scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            api.bind(
-                                accessToken = accessToken,
-                                platform = "android",
-                                publicKeyDerB64 = deviceIdentity.getPublicKeyDerBase64(),
-                                fingerprintSha256 = identity.fingerprint
-                            )
+                        val existingBinding = pendingBind
+                        val bound = if (existingBinding == null) {
+                            when (val bind = withContext(Dispatchers.IO) {
+                                api.bind(
+                                    accessToken = accessToken,
+                                    platform = "android",
+                                    publicKeyDerB64 = deviceIdentity.getPublicKeyDerBase64(),
+                                    fingerprintSha256 = identity.fingerprint
+                                )
+                            }) {
+                                is DeviceApi.Result.Success -> {
+                                    pendingBind = bind.value
+                                    bind.value
+                                }
+                                is DeviceApi.Result.Failure -> {
+                                    busy = false
+                                    error = bind.message
+                                    return@launch
+                                }
+                            }
+                        } else {
+                            when (val renewed = withContext(Dispatchers.IO) {
+                                api.challenge(accessToken, existingBinding.deviceId)
+                            }) {
+                                is DeviceApi.ChallengeResult.Success -> {
+                                    existingBinding.copy(challenge = renewed.challenge).also { pendingBind = it }
+                                }
+                                is DeviceApi.ChallengeResult.Failure -> {
+                                    busy = false
+                                    error = "CHALLENGE_RENEWAL_${renewed.message}"
+                                    return@launch
+                                }
+                            }
                         }
-                        busy = false
-                        when (result) {
-                            is DeviceApi.Result.Success -> onBound(result.value.deviceId)
-                            is DeviceApi.Result.Failure -> error = result.message
+
+                        when (val proof = withContext(Dispatchers.IO) {
+                            api.prove(bound.deviceId, bound.challenge, deviceIdentity)
+                        }) {
+                            is DeviceApi.ProofResult.Success -> {
+                                pendingBind = null
+                                busy = false
+                                onBound(proof.value)
+                            }
+                            is DeviceApi.ProofResult.Failure -> {
+                                // Keep the bound device. The next retry obtains a fresh one-time
+                                // challenge before signing, so a transient failure cannot create
+                                // an unnecessary second device registration.
+                                pendingBind = bound
+                                busy = false
+                                error = proof.message
+                            }
                         }
                     }
                 },
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (busy) CircularProgressIndicator() else Text("Привязать устройство")
+                if (busy) CircularProgressIndicator() else Text(
+                    if (pendingBind == null) "Привязать и подтвердить устройство" else "Повторить подтверждение"
+                )
             }
         }
     }

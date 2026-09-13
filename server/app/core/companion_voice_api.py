@@ -37,7 +37,13 @@ class VoiceSynthesizeRequest(BaseModel):
 
 def _boundary(request: Request) -> VoiceBoundary:
     configured = getattr(request.app.state, "companion_voice_boundary", None)
-    return configured if isinstance(configured, VoiceBoundary) else VoiceBoundary()
+    if isinstance(configured, VoiceBoundary):
+        return configured
+    from .companion_voice_provider import configured_voice_boundary
+
+    boundary = configured_voice_boundary()
+    request.app.state.companion_voice_boundary = boundary
+    return boundary
 
 
 def _security_context():

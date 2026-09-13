@@ -1,11 +1,12 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, screen } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
+const { PresentationStore } = require('./presentation-runtime');
 const {
   WowCheckpointBridge,
   WowObservationQueue,
@@ -24,7 +25,26 @@ const catalog = [
 
 const session = new CoreSessionManager();
 let mainWindow = null;
+let overlayWindow = null;
 let wowBridge = null;
+
+function publishOverlaySnapshot(snapshot = presentationStore.snapshot()) {
+  const safeSnapshot = Array.isArray(snapshot) ? snapshot : [];
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay:snapshot', safeSnapshot);
+    if (safeSnapshot.length > 0) overlayWindow.showInactive();
+    else overlayWindow.hide();
+  }
+  mainWindow?.webContents.send('overlay:status', {
+    visible: safeSnapshot.length > 0,
+    count: safeSnapshot.length,
+  });
+}
+
+const presentationStore = new PresentationStore({
+  maxItems: 8,
+  onChange: publishOverlaySnapshot,
+});
 
 async function accountSnapshot() {
   if (!session.status) return { session: null, features: [] };
@@ -44,6 +64,7 @@ const companion = new CompanionProcessManager({
   onStatus: status => {
     wowBridge?.onCompanionStatus(status);
     mainWindow?.webContents.send('companion:status', status);
+    if (status.state === 'STOPPED') presentationStore.clear();
     if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(status.reason)) {
       publishAccountSnapshot();
     }
@@ -57,6 +78,7 @@ const companion = new CompanionProcessManager({
     wowBridge?.acknowledge(eventId, accepted, reason);
   },
   onObservationDeferred: eventId => wowBridge?.defer(eventId),
+  onPresentation: presentation => presentationStore.add(presentation),
 });
 
 function configPath() { return path.join(app.getPath('userData'), 'games.json'); }
@@ -81,6 +103,41 @@ function createWowBridge() {
   });
 }
 
+function createOverlayWindow() {
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const width = Math.min(440, workArea.width);
+  const height = Math.min(320, workArea.height);
+  const margin = 18;
+  const win = new BrowserWindow({
+    width,
+    height,
+    x: Math.max(workArea.x, workArea.x + workArea.width - width - margin),
+    y: Math.max(workArea.y, workArea.y + margin),
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  overlayWindow = win;
+  win.setIgnoreMouseEvents(true, { forward: true });
+  win.setAlwaysOnTop(true, 'floating');
+  win.on('closed', () => { if (overlayWindow === win) overlayWindow = null; });
+  win.webContents.on('did-finish-load', () => publishOverlaySnapshot());
+  win.loadFile(path.join(__dirname, 'overlay.html'));
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1180,
@@ -96,7 +153,11 @@ function createWindow() {
     },
   });
   mainWindow = win;
-  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null;
+    if (process.platform !== 'darwin' && overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
+  });
+  win.webContents.on('did-finish-load', () => publishOverlaySnapshot());
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
@@ -125,6 +186,7 @@ ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
   return accountSnapshot();
 });
 ipcMain.handle('account:logout', () => {
+  presentationStore.clear();
   wowBridge?.stop();
   companion.stop('ACCOUNT_LOGOUT');
   session.clear();
@@ -146,16 +208,22 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   return status;
 });
 ipcMain.handle('companion:stop', () => {
+  presentationStore.clear();
   wowBridge?.stop();
   return companion.stop('STOPPED_BY_USER');
 });
 
 app.whenReady().then(() => {
   wowBridge = createWowBridge();
+  createOverlayWindow();
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) createOverlayWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  });
 });
 app.on('before-quit', () => {
+  presentationStore.clear();
   wowBridge?.stop();
   companion.stop('APPLICATION_EXIT');
 });

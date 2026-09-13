@@ -10,11 +10,13 @@ from app.core.admin import require_admin
 from app.core.companion_voice_api import router as companion_voice_router
 from app.core.companion_websocket import router as companion_router
 from app.core.models import RecommendationRequest, RecommendationResponse
+from app.core.operational_observability_api import router as operational_observability_router
 from app.core.wow_catalog import MMOTOP_REALM_SEEDS, WOW_PATCHES, get_patch, get_realm
 
 router = APIRouter(tags=["world-of-warcraft", "device-security"])
 router.include_router(companion_router)
 router.include_router(companion_voice_router)
+router.include_router(operational_observability_router)
 
 
 class RealmObservation(BaseModel):

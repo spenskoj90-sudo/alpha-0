@@ -6,6 +6,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
+const {
+  WowCheckpointBridge,
+  WowObservationQueue,
+  discoverSentinelSavedVariables,
+} = require('./wow-savedvariables');
 
 const catalog = [
   { id: 'world-of-warcraft', name: 'World of Warcraft', platform: 'windows' },
@@ -19,6 +24,7 @@ const catalog = [
 
 const session = new CoreSessionManager();
 let mainWindow = null;
+let wowBridge = null;
 
 async function accountSnapshot() {
   if (!session.status) return { session: null, features: [] };
@@ -36,6 +42,7 @@ function publishAccountSnapshot() {
 
 const companion = new CompanionProcessManager({
   onStatus: status => {
+    wowBridge?.onCompanionStatus(status);
     mainWindow?.webContents.send('companion:status', status);
     if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(status.reason)) {
       publishAccountSnapshot();
@@ -46,6 +53,10 @@ const companion = new CompanionProcessManager({
     publishAccountSnapshot();
     return session.accessToken;
   },
+  onObservationAck: ({ eventId, accepted, reason }) => {
+    wowBridge?.acknowledge(eventId, accepted, reason);
+  },
+  onObservationDeferred: eventId => wowBridge?.defer(eventId),
 });
 
 function configPath() { return path.join(app.getPath('userData'), 'games.json'); }
@@ -53,6 +64,22 @@ function loadConfig() {
   try { return JSON.parse(fs.readFileSync(configPath(), 'utf8')); } catch { return {}; }
 }
 function saveConfig(value) { fs.writeFileSync(configPath(), JSON.stringify(value, null, 2), { mode: 0o600 }); }
+
+function createWowBridge() {
+  const queue = new WowObservationQueue({
+    filePath: path.join(app.getPath('userData'), 'wow-observations.json'),
+    maxItems: 128,
+  });
+  return new WowCheckpointBridge({
+    queue,
+    resolvePath: () => discoverSentinelSavedVariables(
+      loadConfig()['world-of-warcraft'],
+      process.env.SENTINEL_WOW_SAVEDVARIABLES_PATH || null,
+    ),
+    sendObservation: observation => companion.sendObservation(observation),
+    onStatus: status => mainWindow?.webContents.send('wow:checkpoint-status', status),
+  });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -98,6 +125,7 @@ ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
   return accountSnapshot();
 });
 ipcMain.handle('account:logout', () => {
+  wowBridge?.stop();
   companion.stop('ACCOUNT_LOGOUT');
   session.clear();
   return true;
@@ -112,13 +140,23 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (!Array.isArray(features.features) || !features.features.includes('companion')) {
     throw new Error('COMPANION_ENTITLEMENT_REQUIRED');
   }
-  return companion.start({ coreUrl: session.coreUrl, sessionToken: session.accessToken });
+  const status = companion.start({ coreUrl: session.coreUrl, sessionToken: session.accessToken });
+  wowBridge?.start();
+  wowBridge?.onCompanionStatus(status);
+  return status;
 });
-ipcMain.handle('companion:stop', () => companion.stop('STOPPED_BY_USER'));
+ipcMain.handle('companion:stop', () => {
+  wowBridge?.stop();
+  return companion.stop('STOPPED_BY_USER');
+});
 
 app.whenReady().then(() => {
+  wowBridge = createWowBridge();
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => companion.stop('APPLICATION_EXIT'));
+app.on('before-quit', () => {
+  wowBridge?.stop();
+  companion.stop('APPLICATION_EXIT');
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

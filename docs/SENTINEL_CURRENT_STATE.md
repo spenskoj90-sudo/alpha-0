@@ -9,7 +9,7 @@
 - Android client exists under `app/`.
 - FastAPI Core exists under `server/`.
 - Next.js control plane exists under `web/`.
-- Electron launcher exists under `launcher/` and now exposes account/Companion runtime state in addition to local game launching.
+- Electron launcher exists under `launcher/` and exposes account/Companion runtime state, local game launching, passive WoW checkpoint state and a read-only Companion overlay renderer.
 - WoW addon sources exist under `wow-addon/`.
 
 Existence of a source tree does not by itself establish that the surface is packaged, integrated or accepted in a real target environment.
@@ -24,7 +24,7 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 The Web account-control boundary stores Core access/refresh tokens only in HttpOnly, SameSite=Strict cookies, applies same-origin checks to state-changing account/billing requests, rotates an expired access session through the existing one-time Core refresh endpoint, and does not expose opaque tokens to client-side JavaScript.
 
-The Electron launcher follows a separate desktop boundary: Core access/refresh tokens remain in main-process memory and are not persisted in launcher configuration or returned through renderer status APIs. The isolated renderer can request sign-in/start/stop operations only through the preload bridge. The dedicated Companion worker receives the current access token over local process IPC; it does not receive the refresh token.
+The Electron launcher follows a separate desktop boundary: Core access/refresh tokens remain in main-process memory and are not persisted in launcher configuration or returned through renderer status APIs. The isolated main renderer can request sign-in/start/stop operations only through the preload bridge. The dedicated Companion worker receives the current access token over local process IPC; it does not receive the refresh token. The overlay has a separate, narrower preload exposing only a one-way snapshot subscription and no renderer-originated action IPC.
 
 These statements are orientation-level invariants. They do not replace inspection of the current implementation and tests.
 
@@ -39,7 +39,8 @@ These statements are orientation-level invariants. They do not replace inspectio
 - Server-side Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding.
 - The Core WebSocket entrypoint requires loopback locality before account evaluation, a valid Core session and an ACTIVE subscription-derived `companion` feature. Browser-compatible launcher authentication may carry the opaque session token in a non-selected `sentinel.auth.<base64url>` WebSocket subprotocol so the token is not placed in the URL; Core selects only public `sentinel.v1`. ACTIVE feature state is revalidated on live Companion traffic so a transition such as `PAST_DUE` revokes an already-open session on the next heartbeat/envelope.
 - The Electron launcher composes a dedicated Companion worker process: main-process account/session ownership, worker handshake/heartbeat, bounded reconnect/backoff, one-time refresh handoff, explicit stop/kill switch and player-visible `CONNECTING`/`ACTIVE`/`DEGRADED`/`STOPPED` state. Dedicated Node tests run in the routine Build & Test workflow. This is repository/runtime composition evidence, not signed desktop packaging or real-host acceptance.
-- Classic and Retail addon variants now persist a bounded coarse `SentinelDB.snapshot` containing schema/sequence/time, patch/server profile, realm, bounded latency, addon-loaded state and coarse combat state. The launcher discovers the addon's SavedVariables file only beneath the configured WoW root (or a trusted process-level absolute override), parses a restricted Lua data subset without evaluation, normalizes it to a low-quality passive observation and places it in a bounded disk-backed FIFO. Companion delivers one observation at a time as `WOW_OBSERVATION`; Core validates it through `ConservativeWowAdapter`, overrides launcher/account association from server-authoritative state and returns `WOW_OBSERVATION_ACK` before the launcher removes the durable queue item. This path does not grant `game:write` and is not an action/event-execution path.
+- Classic and Retail addon variants persist a bounded coarse `SentinelDB.snapshot` containing schema/sequence/time, patch/server profile, realm, bounded latency, addon-loaded state and coarse combat state. The launcher discovers the addon's SavedVariables file only beneath the configured WoW root (or a trusted process-level absolute override), parses a restricted Lua data subset without evaluation, normalizes it to a low-quality passive observation and places it in a bounded disk-backed FIFO. Companion delivers one observation at a time as `WOW_OBSERVATION`; Core validates it through `ConservativeWowAdapter`, overrides launcher/account association from server-authoritative state and returns `WOW_OBSERVATION_ACK` before the launcher removes the durable queue item. This path does not grant `game:write` and is not an action/event-execution path.
+- Accepted passive WoW checkpoints can also produce a bounded Core-authored `OVERLAY` `STATUS` presentation. The worker accepts presentations only from known presentation-bearing envelope types and allowlist-normalizes presentation id/channel/kind/text/confidence/provenance. Electron main sanitizes the presentation again, stores only a small TTL-bounded set and forwards a snapshot to a dedicated sandboxed, context-isolated, non-Node, non-focusable, click-through overlay window. The overlay preload exposes no command IPC and renderer text is assigned with DOM `textContent`. This is an implemented read-only player presentation path, not an action surface.
 - WoW SavedVariables are checkpoint persistence rather than realtime addon IPC: disk updates depend on WoW's normal SavedVariables lifecycle such as logout/ReloadUI. Repository tests therefore prove parser/queue/protocol/addon-contract behavior, not live in-game streaming or exact-host compatibility.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation. Paid feature requirements are resolved server-side and fail closed when the resolver is missing, fails, or does not grant the required feature.
 - The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing and confidence/provenance. The Web includes a bounded recommendation presentation component, but the current default card is a presentation baseline; a live end-to-end Web recommendation retrieval path must not be inferred from that component alone.
@@ -64,7 +65,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 - External telemetry-provider delivery and a deployed operator observability stack remain optional environment integrations, not implementation claims.
 - Performance budgets are represented as operation-scoped contracts with deterministic pass/fail evaluation; measured results remain acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
 - Deterministic privacy scrubbing and a canonical recovery matrix with fail-closed health outcomes are implemented and covered by unit tests.
-- Launcher session/process/reconnect security plus passive SavedVariables parser/queue/protocol behavior now have deterministic routine CI coverage. This remains repository evidence; exact WoW addon lifecycle/host behavior is environment-unverified until exercised on the target client/server.
+- Launcher session/process/reconnect security, passive SavedVariables parser/queue/protocol behavior and overlay presentation isolation have deterministic routine CI coverage once their exact integrating PR passes. This remains repository evidence; exact WoW addon lifecycle/host behavior and real packaged-overlay latency are environment-unverified until exercised on the target runtime.
 - End-to-end correlation propagation, real metrics/tracing composition and benchmark/failure-injection measurements remain separate implementation/evidence concerns when repository inspection does not prove them.
 
 ## 6. Internal architecture work remaining
@@ -73,13 +74,12 @@ The first six implementation passes and Blocks A-D produced substantial foundati
 
 Largest remaining internal targets include:
 
-1. Continue launcher/Companion/WoW productization beyond the tested account/process/socket and passive checkpoint path into complete player-facing Overlay/voice runtime behavior. Signed desktop packaging and real-host acceptance remain evidence targets after repository composition exists.
-2. Complete actual player-facing Overlay/voice runtime wiring. Provider-neutral STT/TTS or presentation models alone do not constitute a complete voice product.
-3. Preserve exact-environment evidence classification for addon/launcher behavior; repository parser/protocol tests must not be promoted to WoW 3.3.5a/private-server L3 validation.
-4. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
-5. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
+1. Complete actual player-facing voice runtime wiring. The provider-neutral `VoiceBoundary` and presentation contracts are implemented/tested seams, but there is no production microphone capture, STT/TTS provider/device composition or voice UX acceptance yet.
+2. Preserve exact-environment evidence classification for addon/launcher behavior; repository parser/protocol/overlay tests must not be promoted to WoW 3.3.5a/private-server L3 or packaged-host acceptance.
+3. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
+4. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
 
-These are internal engineering targets and must not be mislabeled as Owner/external blockers.
+Signed desktop packaging and real-host acceptance remain evidence targets after repository composition exists; release signing/publication/deployment remain Owner-gated.
 
 ## 7. External / Owner-gated evidence
 

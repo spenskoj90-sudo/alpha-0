@@ -97,16 +97,16 @@ local function setSecurity(state, reason)
 end
 
 local function update()
-    if not overlay then return end
     local name, realm = safeName()
     local ping = latency()
+    writeCheckpoint(realm, ping)
+    if not overlay then return end
     local patch = currentPatch()
     statusText:SetText(paused and "SENTINEL  /  PROTECTION PAUSED" or "SENTINEL  /  PROTECTION ACTIVE")
     statusText:SetTextColor(paused and 0.95 or 0.60, paused and 0.70 or 0.85, paused and 0.20 or 0.35, 1)
     serverText:SetText(string.format("REALM  %s\nTYPE   OFFICIAL / PRIVATE: UNKNOWN\nPING   %d ms\nPLAYER %s", realm, clamp(ping, 0, 9999), name))
     patchText:SetText("PATCH PROFILE  " .. patch .. "\nADAPTER  PASSIVE TELEMETRY\nNO GAMEPLAY AUTOMATION")
     if locked then setSecurity("LOCKED") elseif ping > 180 then setSecurity("WARN") else setSecurity("OK") end
-    writeCheckpoint(realm, ping)
 end
 
 local function createOverlay()
@@ -156,11 +156,6 @@ local function createOverlay()
     end)
     lock:SetPoint("LEFT", shot, "RIGHT", 6, 0)
 
-    overlay:SetScript("OnUpdate", function(self, elapsed)
-        self._t = (self._t or 0) + elapsed
-        if self._t >= 2 then self._t = 0; update() end
-    end)
-
     update()
 end
 
@@ -172,9 +167,16 @@ frame:SetScript("OnEvent", function(_, event)
         db = SentinelDB or {}
         SentinelDB = db
         snapshotSequence = tonumber(db.snapshot_sequence or 0) or 0
-        if db.overlayHidden then return end
-        createOverlay()
+        if not db.overlayHidden then createOverlay() end
+        update()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        update()
+    end
+end)
+frame:SetScript("OnUpdate", function(self, elapsed)
+    self._sentinelElapsed = (self._sentinelElapsed or 0) + elapsed
+    if self._sentinelElapsed >= 2 then
+        self._sentinelElapsed = 0
         update()
     end
 end)

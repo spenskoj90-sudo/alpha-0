@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This contract defines the bounded presentation boundary for Companion overlay and voice surfaces. It carries status, recommendation and alert text without introducing an action protocol.
+This contract defines the bounded presentation boundary for Companion overlay and voice surfaces. It carries status, recommendation and alert text and presentation-only interaction intents without introducing a gameplay action protocol.
 
-## Contract
+## Presentation contract
 
 `CompanionPresentation` contains:
 
@@ -18,11 +18,21 @@ This contract defines the bounded presentation boundary for Companion overlay an
 
 `for_channel()` permits the same presentation to be routed to another explicit presentation surface while preserving presentation and correlation identity.
 
-## Security and authority boundary
+## Interaction authority
 
-Presentation is observational and user-facing only. The contract has no command, execution, authorization, credential or game-manipulation fields. `action_capable` is explicitly false.
+`InteractionIntent` is deliberately smaller than a command/action contract. It permits only:
 
-The launcher overlay implementation preserves that boundary end-to-end:
+- `OBSERVE` — surface existing read-only presentation state;
+- `ACKNOWLEDGE` — acknowledge/remove bounded presentation state;
+- `DISMISS` — dismiss bounded presentation state.
+
+`is_action_capable()` remains false. Entitlement, recommendation, overlay presence, voice classification or TTS feedback cannot grant gameplay authority.
+
+Action-like voice language is rejected by Core as `ACTION_GATEWAY_REQUIRED`; the voice runtime does not forward that language into an Action Gateway execution request.
+
+## Overlay security boundary
+
+The launcher overlay implementation preserves the presentation boundary end-to-end:
 
 - Core emits bounded presentation payload fields only on the dedicated `PRESENTATION` Companion envelope type over authenticated loopback transport;
 - `HEALTH` remains reserved for correlated runtime-health telemetry and `UGS_UPDATE` retains game-state/update semantics;
@@ -31,21 +41,39 @@ The launcher overlay implementation preserves that boundary end-to-end:
 - worker IPC and exit handling are bound to the currently active child process, so a stopped/replaced worker cannot publish stale presentation/status data or apply a delayed refresh result to a new worker;
 - the store is bounded and time-limited;
 - the overlay runs in a dedicated sandboxed, context-isolated, non-Node, non-focusable, click-through BrowserWindow;
-- its preload exposes only a one-way snapshot subscription, with no renderer-originated IPC action;
+- its preload exposes only a one-way snapshot subscription, with no renderer-originated action IPC;
 - renderer text is assigned with DOM `textContent`, not HTML evaluation.
 
-The overlay therefore does not authorize or execute gameplay actions and does not receive Core account credentials.
+Invalid or unbounded text, confidence, provenance, channel or kind is rejected before rendering. Unknown payload fields are dropped rather than copied through.
 
-## Failure and resource discipline
+## Voice security and privacy boundary
 
-Invalid or unbounded text, confidence, provenance, channel or kind is rejected before rendering. Unknown payload fields are dropped rather than copied through. The launcher retains at most a small bounded set of recent presentations and expires them automatically.
+Voice is explicit push-to-talk, not background listening.
 
-Presentation and runtime-health traffic are deliberately type-separated. Malformed or presentation-shaped telemetry cannot become overlay content merely by matching payload fields, and delayed IPC from a superseded worker is ignored by the parent process.
+- Consent defaults disabled and exists only in Electron main-process memory.
+- Sign-out and main-window close clear consent.
+- Consent alone does not grant ongoing microphone access. The trusted launcher renderer must explicitly arm a five-second main-process capture lease immediately before `getUserMedia`.
+- Voice IPC is sender-bound to the current main launcher `webContents`; the overlay and other renderers cannot arm/disarm/submit by reusing channel names.
+- Electron permission handlers deny by default and grant `media` only to the trusted launcher main webContents while both consent and the short-lived capture lease are active and the page is local `file://` content.
+- The lease is disarmed immediately after the `getUserMedia` request resolves or rejects, and is also cleared by submit, Companion stop, sign-out, entitlement revocation or shutdown.
+- Display/screen capture is explicitly denied.
+- Renderer capture requests audio only (`video: false`), fixed WebM/Opus, maximum six seconds and a bounded byte payload.
+- Capture errors, sign-out and Companion kill-switch discard partial audio instead of forwarding it.
+- Electron main validates audio/base64/locale again before Core transport.
+- Core repeats session, `game:read`, ACTIVE `companion` feature and explicit consent checks before provider I/O.
+- Raw audio and transcript are omitted from SENTINEL audit metadata; transcript is also omitted from the Core transcribe response.
+- Electron main, not renderer JavaScript, chooses the bounded current presentation identifier used for the interaction intent.
+- Accepted `ACKNOWLEDGE` or `DISMISS` can affect only local bounded overlay presentation state. `OBSERVE` can surface the existing read-only overlay.
+- Renderer JavaScript has no arbitrary synthesis-text IPC. Main selects feedback text from a fixed mapping and validates bounded WAV before playback.
 
-## Runtime status
+## Provider boundary
 
-The read-only launcher overlay runtime is implemented for server-authored `OVERLAY` presentation messages, including the passive WoW checkpoint acceptance status emitted by Core. This establishes an end-to-end Core → Companion worker → Electron parent → isolated overlay presentation path while keeping runtime `HEALTH` evidence on its own protocol meaning.
+The Core provider-neutral `VoiceBoundary` is composed with an optional JSON-over-HTTP adapter. Non-loopback endpoints require HTTPS; optional credentials are process-environment inputs, CR/LF header-injection values are rejected, and credentials are not exposed through voice status/results or audit metadata.
 
-## Scope boundary
+No provider configured means `VOICE_PROVIDER_UNAVAILABLE`. Invalid provider configuration fails closed as bounded `VOICE_PROVIDER_CONFIGURATION_INVALID`; provider exceptions become bounded failure codes. There is no implicit browser/cloud speech fallback.
 
-This does **not** claim a production voice provider, microphone ingestion, speech-to-text, text-to-speech, real-device overlay latency evidence, signed desktop packaging, exact WoW/private-server compatibility or production-host acceptance. The `VOICE` contract and provider-neutral `VoiceBoundary` remain implemented/tested seams until an explicit provider/device integration is selected and validated.
+## Runtime status and evidence
+
+The read-only overlay and explicit-consent voice runtime are implemented as repository/runtime compositions. Automated tests cover protocol/type separation, bounded stores, stale-worker isolation, voice DTO sanitization, sender-bound capture leases, default-deny permission logic, capture/discard bounds, session refresh, entitlement/consent enforcement, provider failures and transcript non-disclosure.
+
+This establishes **IMPLEMENTED / INTEGRATION-TESTED** repository evidence for the player interaction boundary once the integrating exact-head CI passes. It does **not** establish a selected production STT/TTS vendor, production credentials, physical microphone/driver acceptance, acoustic/latency targets, signed desktop packaging, exact WoW/private-server compatibility or production-host acceptance. Those remain environment/external evidence gates.

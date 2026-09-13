@@ -19,12 +19,15 @@ from .companion_protocol import (
     CompanionEnvelope,
     CompanionHandshake,
     CompanionHandshakeResult,
+    CompanionMessageType,
     CompanionMode,
     CompanionQueue,
+    LatencyClass,
 )
 from .companion_runtime import CompanionRuntime
 from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
+from .wow_adapter import ConservativeWowAdapter, WowObservation
 
 router = APIRouter(tags=["companion"])
 router.include_router(billing_provider_router)
@@ -321,6 +324,56 @@ async def _revoke_companion_session(websocket: WebSocket, user_id: str) -> None:
     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REVOKED")
 
 
+def _wow_observation_ack(
+    envelope: CompanionEnvelope,
+    *,
+    accepted: bool,
+    event_id: str,
+    reason: str,
+) -> CompanionEnvelope:
+    return CompanionEnvelope(
+        sequence=envelope.sequence,
+        message_type=CompanionMessageType.WOW_OBSERVATION_ACK,
+        latency_class=LatencyClass.BACKGROUND,
+        payload={"event_id": event_id, "accepted": accepted, "reason": reason},
+    )
+
+
+def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> CompanionEnvelope:
+    raw_event_id = str(envelope.payload.get("event_id") or "unknown")[:128]
+    try:
+        observation = WowObservation.model_validate(envelope.payload)
+        observation = observation.model_copy(
+            update={"launcher_associated": True, "account_entitled": True}
+        )
+        normalized = ConservativeWowAdapter().normalize(observation)
+    except Exception:
+        return _wow_observation_ack(
+            envelope,
+            accepted=False,
+            event_id=raw_event_id,
+            reason="INVALID_WOW_OBSERVATION",
+        )
+
+    from app.main import store
+
+    store.add_audit({
+        "actor_user_id": user_id,
+        "actor_device_id": None,
+        "action": "companion:wow-observation",
+        "resource": "wow-passive-observation",
+        "decision": "ALLOW",
+        "reason_code": "PASSIVE_CHECKPOINT_ACCEPTED",
+        "request_id": normalized.event_id,
+    })
+    return _wow_observation_ack(
+        envelope,
+        accepted=True,
+        event_id=normalized.event_id,
+        reason="PASSIVE_CHECKPOINT_ACCEPTED",
+    )
+
+
 @router.websocket("/v1/companion/ws")
 async def companion_websocket(websocket: WebSocket) -> None:
     host = websocket.client.host if websocket.client else None
@@ -346,6 +399,12 @@ async def companion_websocket(websocket: WebSocket) -> None:
             if not _companion_entitlement_active(user_id):
                 await _revoke_companion_session(websocket, user_id)
                 return
+            # Incoming envelopes are bounded transient transport work, not the durable
+            # outbound queue. Consume each after validation to avoid artificial buildup.
+            transport.session.queue.pop()
+            if envelope.message_type == CompanionMessageType.WOW_OBSERVATION:
+                ack = _process_wow_observation(envelope, user_id)
+                await websocket.send_json(ack.model_dump(mode="json"))
     except WebSocketDisconnect:
         return
     finally:

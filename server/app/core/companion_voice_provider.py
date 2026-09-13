@@ -6,12 +6,14 @@ import ipaddress
 import json
 import os
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .companion_experience import VoiceBoundary
+from .operational_observability import observability_registry
 
 _STT_PATH = "/v1/stt"
 _TTS_PATH = "/v1/tts"
@@ -71,7 +73,7 @@ class HttpJsonVoiceProvider:
     POST /v1/tts -> {"audio_b64": "...", "content_type": "audio/wav"}
 
     Production credentials are injected from process environment and are never
-    returned through application APIs or written to audit records.
+    returned through application APIs or written to audit/observability records.
     """
 
     def __init__(
@@ -108,36 +110,56 @@ class HttpJsonVoiceProvider:
         return decoded
 
     def transcribe(self, audio: bytes, *, locale: str) -> str:
-        payload = self._post_json(
-            _STT_PATH,
-            {
-                "audio_b64": base64.b64encode(audio).decode("ascii"),
-                "content_type": "audio/webm;codecs=opus",
-                "locale": locale,
-            },
-        )
-        transcript = payload.get("transcript")
-        if not isinstance(transcript, str):
-            raise RuntimeError("VOICE_PROVIDER_TRANSCRIPT_INVALID")
-        transcript = transcript.strip()
-        if not transcript or len(transcript) > _MAX_TRANSCRIPT_CHARS:
-            raise RuntimeError("VOICE_PROVIDER_TRANSCRIPT_INVALID")
-        return transcript
+        started = monotonic()
+        outcome = "failure"
+        try:
+            payload = self._post_json(
+                _STT_PATH,
+                {
+                    "audio_b64": base64.b64encode(audio).decode("ascii"),
+                    "content_type": "audio/webm;codecs=opus",
+                    "locale": locale,
+                },
+            )
+            transcript = payload.get("transcript")
+            if not isinstance(transcript, str):
+                raise RuntimeError("VOICE_PROVIDER_TRANSCRIPT_INVALID")
+            transcript = transcript.strip()
+            if not transcript or len(transcript) > _MAX_TRANSCRIPT_CHARS:
+                raise RuntimeError("VOICE_PROVIDER_TRANSCRIPT_INVALID")
+            outcome = "success"
+            return transcript
+        finally:
+            observability_registry.record_dependency(
+                component="voice_stt",
+                outcome=outcome,
+                duration_ms=(monotonic() - started) * 1000.0,
+            )
 
     def synthesize(self, text: str, *, locale: str) -> bytes:
-        payload = self._post_json(_TTS_PATH, {"text": text, "locale": locale, "content_type": "audio/wav"})
-        if payload.get("content_type") != "audio/wav":
-            raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
-        encoded = payload.get("audio_b64")
-        if not isinstance(encoded, str) or not encoded:
-            raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
+        started = monotonic()
+        outcome = "failure"
         try:
-            audio = base64.b64decode(encoded, validate=True)
-        except (ValueError, binascii.Error) as exc:
-            raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID") from exc
-        if not audio or len(audio) > _MAX_AUDIO_BYTES:
-            raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
-        return audio
+            payload = self._post_json(_TTS_PATH, {"text": text, "locale": locale, "content_type": "audio/wav"})
+            if payload.get("content_type") != "audio/wav":
+                raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
+            encoded = payload.get("audio_b64")
+            if not isinstance(encoded, str) or not encoded:
+                raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
+            try:
+                audio = base64.b64decode(encoded, validate=True)
+            except (ValueError, binascii.Error) as exc:
+                raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID") from exc
+            if not audio or len(audio) > _MAX_AUDIO_BYTES:
+                raise RuntimeError("VOICE_PROVIDER_AUDIO_INVALID")
+            outcome = "success"
+            return audio
+        finally:
+            observability_registry.record_dependency(
+                component="voice_tts",
+                outcome=outcome,
+                duration_ms=(monotonic() - started) * 1000.0,
+            )
 
 
 def configured_voice_boundary() -> VoiceBoundary:

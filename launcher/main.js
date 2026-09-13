@@ -24,6 +24,7 @@ const {
   discoverSentinelSavedVariables,
 } = require('./wow-savedvariables');
 
+const VOICE_CAPTURE_PERMISSION_LEASE_MS = 5000;
 const catalog = [
   { id: 'world-of-warcraft', name: 'World of Warcraft', platform: 'windows' },
   { id: 'diablo-1-pc', name: 'Diablo', platform: 'windows' },
@@ -45,6 +46,7 @@ let overlayExpiryTimer = null;
 let voiceConsentGranted = false;
 let voiceProviderStatus = null;
 let voiceStateReason = 'VOICE_CONSENT_REQUIRED';
+let voiceCapturePermissionExpiresAt = 0;
 
 async function accountSnapshot() {
   if (!session.status) return { session: null, features: [] };
@@ -64,7 +66,7 @@ function voiceSnapshot() {
   let state = 'SIGNED_OUT';
   if (session.status) {
     if (!voiceConsentGranted) state = 'CONSENT_REQUIRED';
-    else if (voiceStateReason === 'COMPANION_ENTITLEMENT_REQUIRED') state = 'ENTITLEMENT_REQUIRED';
+    else if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(voiceStateReason)) state = 'ENTITLEMENT_REQUIRED';
     else if (voiceProviderStatus?.sttAvailable) state = 'READY';
     else state = 'PROVIDER_UNAVAILABLE';
   }
@@ -86,7 +88,22 @@ function publishVoiceSnapshot() {
   mainWindow.webContents.send('voice:status', voiceSnapshot());
 }
 
+function clearVoiceCapturePermission() {
+  voiceCapturePermissionExpiresAt = 0;
+}
+
+function voiceCapturePermissionArmed() {
+  return voiceConsentGranted && voiceCapturePermissionExpiresAt > Date.now();
+}
+
+function requireMainRenderer(event) {
+  if (!mainWindow || mainWindow.isDestroyed() || event?.sender !== mainWindow.webContents) {
+    throw new Error('UNTRUSTED_RENDERER');
+  }
+}
+
 function resetVoiceState(reason = 'VOICE_CONSENT_REQUIRED') {
+  clearVoiceCapturePermission();
   voiceConsentGranted = false;
   voiceProviderStatus = null;
   voiceStateReason = reason;
@@ -242,7 +259,7 @@ function configureVoicePermissions() {
     permission,
     requestingOrigin,
     details,
-    consentGranted: voiceConsentGranted,
+    consentGranted: voiceCapturePermissionArmed(),
   }));
   runtimeSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     callback(mediaPermissionAllowed({
@@ -251,7 +268,7 @@ function configureVoicePermissions() {
       permission,
       requestingOrigin: details?.requestingUrl || details?.securityOrigin || webContents?.getURL?.() || '',
       details,
-      consentGranted: voiceConsentGranted,
+      consentGranted: voiceCapturePermissionArmed(),
     }));
   });
   runtimeSession.setDisplayMediaRequestHandler((_request, callback) => callback(null));
@@ -293,13 +310,16 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   wowBridge?.start(); wowBridge?.onCompanionStatus(status); publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
 ipcMain.handle('companion:stop', () => {
+  clearVoiceCapturePermission();
   wowBridge?.stop(); const status = companion.stop('STOPPED_BY_USER'); overlayStore.clear(); companionRuntimeHealth = null; publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
-ipcMain.handle('voice:status', async () => {
+ipcMain.handle('voice:status', async event => {
+  requireMainRenderer(event);
   if (!session.status) return voiceSnapshot();
   return refreshVoiceProviderStatus();
 });
-ipcMain.handle('voice:consent:set', async (_, granted) => {
+ipcMain.handle('voice:consent:set', async (event, granted) => {
+  requireMainRenderer(event);
   if (typeof granted !== 'boolean') throw new Error('VOICE_CONSENT_INVALID');
   if (!granted) {
     resetVoiceState('VOICE_CONSENT_REQUIRED');
@@ -315,7 +335,24 @@ ipcMain.handle('voice:consent:set', async (_, granted) => {
   voiceStateReason = null;
   return refreshVoiceProviderStatus();
 });
-ipcMain.handle('voice:submit', async (_, payload) => {
+ipcMain.handle('voice:capture:arm', async event => {
+  requireMainRenderer(event);
+  if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
+  if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
+  if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');
+  if (!voiceProviderStatus) await refreshVoiceProviderStatus();
+  if (!voiceProviderStatus?.sttAvailable) throw new Error(voiceStateReason || 'VOICE_PROVIDER_UNAVAILABLE');
+  voiceCapturePermissionExpiresAt = Date.now() + VOICE_CAPTURE_PERMISSION_LEASE_MS;
+  return { armed: true, expiresInMs: VOICE_CAPTURE_PERMISSION_LEASE_MS, actionCapable: false };
+});
+ipcMain.handle('voice:capture:disarm', event => {
+  requireMainRenderer(event);
+  clearVoiceCapturePermission();
+  return true;
+});
+ipcMain.handle('voice:submit', async (event, payload) => {
+  requireMainRenderer(event);
+  clearVoiceCapturePermission();
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
   if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
   if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');

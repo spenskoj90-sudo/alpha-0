@@ -15,17 +15,19 @@
 - [x] PASS 2 — recoverable event runtime with lease ownership, bounded retry/dead-letter and explicit replay.
 - [x] PASS 3 — conservative authenticated WoW observation → UGS → projection → recommendation-context vertical.
 - [x] PASS 4 — bounded Knowledge Engine, provider-neutral intelligence routing and confidence/provenance.
-- [x] PASS 5 — Companion transport/session/TLS hardening, peer authorization ordering, kill switch and bounded observability seams.
+- [x] PASS 5 — server-side Companion transport/session/TLS hardening, peer authorization ordering, kill switch and bounded observability seams.
 - [x] PASS 6 — Android Keystore device proof and retry-safe device-session event ingestion.
+- [x] **Block A foundation — repository/CI/supply-chain/governance truth:** release signing is removed from routine PR CI; web tests and lockfile gates are deterministic; Actions are pinned by immutable SHA; repository verification and release/version documentation are reconciled.
 
-## Active completion program
+## Active internal completion program
 
-Before each block, inspect current `main` and keep external/runtime claims evidence-scoped.
+The 2026-09-13 code-first rebaseline distinguished implemented foundations from product/runtime completion. Do not restore broad completion claims without code, automated evidence and exact-environment evidence appropriate to the claim.
 
-- [x] **Block A — repository/CI/supply-chain/governance truth:** release signing is removed from routine PR CI; web tests and lockfile gates are deterministic; Actions are pinned by immutable SHA; repository verification and release/version documentation are reconciled.
-- [x] **Block B — monetization/entitlement/account control:** canonical plan/product model, persistent lifecycle, provider/webhook/reconciliation boundaries, replay/idempotency/audit, API/web/account surfaces and security/PostgreSQL tests are implemented. Production payment credentials remain Owner-only.
-- [x] **Block C — Companion/WoW/player experience/voice:** Companion composition, durable bounded local queue/cache, recovery/backpressure, conservative WoW bridge, presentation and provider-neutral STT/TTS boundaries are implemented. No recommendation or voice path bypasses the Action Gateway.
-- [x] **Block D — observability/performance/resilience/RC readiness:** cross-component correlation and privacy scrubbing, measurable budgets, failure/recovery matrix, final security review and automatable acceptance evidence are implemented.
+- [ ] **Block B — monetization/entitlement/account control productization.** Core plan catalog, subscription persistence, lifecycle transitions, caller-scoped billing APIs, webhook replay/idempotency and game-entitlement APIs are implemented. The Web control plane now has a secure same-origin session boundary, HttpOnly opaque-token storage, refresh/retry handling, live plan/subscription/entitlement presentation and Core-backed admin catalog/readback. Remaining internal work includes a provider adapter/verifier contract beyond the generic token webhook, deterministic provider/reconciliation execution, and explicit feature-entitlement enforcement where paid Companion/player capabilities require it. Production payment credentials remain Owner-only.
+- [ ] **Block C — Companion/WoW/player experience/voice productization.** Server-side Companion protocol/runtime composition, Android durable bounded event buffering, conservative WoW adapter boundaries and provider-neutral STT/TTS/presentation primitives exist. A packaged/useful launcher-host composition, launcher↔Companion process lifecycle, addon ingestion/runtime evidence and exact WoW target validation are not established by those foundations alone. Player-facing Overlay/voice/connection/degraded/account integration must be judged from actual runtime UI, not presentation dataclasses.
+- [ ] **Block D — observability/performance/resilience productization.** Privacy scrubbing, budget contracts and deterministic recovery matrices exist. End-to-end correlation propagation, deployed metrics/tracing composition, benchmark/failure-injection measurements and launcher/addon operational telemetry remain separate implementation/evidence targets where absent. Deterministic tests are not measured production performance.
+- [ ] **Android client platform consolidation.** Multiple Android API surfaces still retain independent `HttpURLConnection` implementations. Consolidate only where the shared transport demonstrably improves coroutine I/O, timeout/header/request-ID/error/TLS/test-injection/retry discipline without changing server-authoritative security semantics.
+- [ ] **Dedicated launcher/WoW-addon deterministic evidence.** Add repository-level tests/validation where technically possible; exact WoW 3.3.5a/private-server L3 behavior remains environment-unverified.
 
 ## External / Owner-gated evidence
 
@@ -39,16 +41,17 @@ Before each block, inspect current `main` and keep external/runtime claims evide
 
 - Do not mark `[x]` without direct evidence appropriate to the claim: exact SHA + PR/commit + CI Run ID and/or device/runtime evidence.
 - Do not treat a stale document, old branch, old audit, or AI report as proof of current implementation.
+- Distinguish **IMPLEMENTED**, **INTEGRATION-TESTED**, **SIMULATED**, **PRODUCTIZED**, **ENVIRONMENT-UNVERIFIED**, **MISSING** and **TECHNICAL-DEBT** when a broad feature spans more than one evidence level.
 - Do not convert proposed thresholds or UNVERIFIED capabilities into achieved facts.
 - Do not weaken security gates to obtain green CI.
-- Prefer one coherent, independently testable change set per PR; split only when a block cannot remain safe and independently verifiable.
+- Prefer one coherent, independently testable large vertical per PR; split only when a block cannot remain safe and independently verifiable.
 - Keep branches short-lived and return completed work to `main` promptly after exact-SHA validation.
 - Documentation changes belong in the same logical PR when product/architecture meaning changes. Do not create generated HEAD-sync documentation changes for ordinary code commits.
 - FTL usage must be quota-aware; prefer GitHub-hosted emulator for routine CI while the external FTL permission gate remains unresolved.
 
 ## Program order
 
-`Completed passes 1–6 → Block A → Block B → Block C → Block D → Owner/external release gates`
+`Verified foundation → Block B productization → Companion/launcher/WoW runtime → player/voice UX → observability/performance runtime → Android transport debt → Owner/external release gates`
 
 ### Definition of Done for every substantive block
 
@@ -56,4 +59,4 @@ A block is complete only when all applicable dimensions are addressed: implement
 
 ### Scope discipline
 
-Do not expand into autonomous combat, pretend broad game/version support, or perform release/live deployment merely to make the roadmap look complete. Exact-environment capabilities remain `UNVERIFIED` until exact L3 evidence exists. Continue independent engineering when one external stream is blocked.
+Do not expand into autonomous combat, pretend broad game/version support, or perform release/live deployment merely to make the roadmap look complete. Exact-environment capabilities remain `UNVERIFIED` until L3 evidence exists. Continue independent engineering when one external stream is blocked.

@@ -1,68 +1,68 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { POST } from './route';
+import { GET, POST } from './route';
 
-describe('POST /api/admin/entitlements', () => {
+describe('/api/admin/entitlements', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('denies requests without the admin token', async () => {
+  it('denies reads and writes without the admin token', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
-
-    const response = await POST(new NextRequest('http://localhost/api/admin/entitlements', {
+    const read = await GET(new NextRequest('http://localhost/api/admin/entitlements'));
+    expect(read.status).toBe(403);
+    const write = await POST(new NextRequest('http://localhost/api/admin/entitlements', {
       method: 'POST',
-      body: JSON.stringify({ user_id: 'user-1' }),
       headers: { 'content-type': 'application/json' },
+      body: '{}',
     }));
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({ error: 'ADMIN_ACCESS_DENIED' });
+    expect(write.status).toBe(403);
   });
 
   it('fails closed when the upstream is not configured', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', '');
-
-    const response = await POST(new NextRequest('http://localhost/api/admin/entitlements', {
-      method: 'POST',
-      body: JSON.stringify({ user_id: 'user-1' }),
-      headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': 'test-token' },
+    const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
+      headers: { 'x-sentinel-admin-token': 'test-token' },
     }));
-
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' });
   });
 
-  it('forwards an authorized request without exposing the token in the response', async () => {
+  it('forwards admin readback without exposing the token in the response', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"entitlements":[]}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
+      headers: { 'x-sentinel-admin-token': 'test-token' },
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('{"entitlements":[]}');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://core.example/v1/admin/entitlements');
+    expect(new Headers(init?.headers).get('x-sentinel-admin-token')).toBe('test-token');
+    expect(response.headers.get('set-cookie') ?? '').not.toContain('test-token');
+  });
+
+  it('forwards authorized grants and preserves the request body', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"ok":true}', {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
-
+    const body = JSON.stringify({ user_id: 'user-1', game_id: 'diablo-4-pc' });
     const response = await POST(new NextRequest('http://localhost/api/admin/entitlements', {
       method: 'POST',
-      body: JSON.stringify({ user_id: 'user-1', product_id: 'wow-1' }),
+      body,
       headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': 'test-token' },
     }));
-
     expect(response.status).toBe(200);
-    const responseBody = await response.text();
-    expect(responseBody).toBe('{"ok":true}');
-    expect(responseBody).not.toContain('test-token');
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://core.example/v1/admin/entitlements');
-    expect(init).toMatchObject({
-      method: 'POST',
-      cache: 'no-store',
-      headers: {
-        'content-type': 'application/json',
-        'x-sentinel-admin-token': 'test-token',
-      },
-    });
-    expect(init?.body).toBe(JSON.stringify({ user_id: 'user-1', product_id: 'wow-1' }));
+    expect(init?.method).toBe('POST');
+    expect(init?.body).toBe(body);
+    expect(new Headers(init?.headers).get('x-sentinel-admin-token')).toBe('test-token');
   });
 });

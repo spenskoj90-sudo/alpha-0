@@ -120,7 +120,10 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   mainWindow = win;
-  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null;
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
+  });
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
@@ -180,7 +183,12 @@ ipcMain.handle('companion:stop', () => {
 
 app.whenReady().then(() => {
   wowBridge = createWowBridge(); createOverlayWindow(); createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) { createOverlayWindow(); createWindow(); } });
+  app.on('activate', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      if (!overlayWindow || overlayWindow.isDestroyed()) createOverlayWindow();
+      createWindow();
+    }
+  });
 });
 app.on('before-quit', () => { if (overlayExpiryTimer) clearTimeout(overlayExpiryTimer); wowBridge?.stop(); companion.stop('APPLICATION_EXIT'); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

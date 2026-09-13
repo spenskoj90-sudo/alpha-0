@@ -67,7 +67,7 @@ test('worker normalizes only bounded Core presentation envelopes', () => {
   assert.equal(normalizeServerPresentation({ message_type: 'WOW_OBSERVATION_ACK', payload: normalized }), null);
 });
 
-test('dedicated overlay renderer is sandboxed and contains no action IPC surface', () => {
+test('dedicated overlay renderer is sandboxed, non-actionable and tied to main-window lifecycle', () => {
   const root = path.resolve(__dirname, '..');
   const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
   const preload = fs.readFileSync(path.join(root, 'overlay-preload.js'), 'utf8');
@@ -77,6 +77,8 @@ test('dedicated overlay renderer is sandboxed and contains no action IPC surface
   assert.match(main, /nodeIntegration:\s*false/);
   assert.match(main, /sandbox:\s*true/);
   assert.match(main, /setIgnoreMouseEvents\(true/);
+  assert.match(main, /overlayWindow\.close\(\)/);
+  assert.doesNotMatch(main, /BrowserWindow\.getAllWindows\(\)/);
   assert.doesNotMatch(preload, /ipcRenderer\.(?:invoke|send)\s*\(/);
   assert.doesNotMatch(renderer, /innerHTML|eval\(|new Function|ipcRenderer/);
   assert.match(renderer, /textContent/);

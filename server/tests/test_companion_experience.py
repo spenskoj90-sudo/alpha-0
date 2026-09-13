@@ -16,6 +16,7 @@ from app.core.companion_protocol import (
 )
 from app.core.companion_runtime import CompanionRuntime
 from app.core.companion_transport import CompanionTransportSession
+from app.core.wow_adapter import WowObservation, WowPatchProfile, WowServerProfile
 
 
 NOW = datetime(2026, 9, 12, 8, 0, tzinfo=UTC)
@@ -49,6 +50,23 @@ def update_envelope() -> CompanionEnvelope:
     )
 
 
+def passive_observation() -> WowObservation:
+    return WowObservation(
+        event_id="passive-wow-1",
+        observed_at=NOW,
+        sequence=7,
+        patch_profile=WowPatchProfile.WOTLK_3_3_5A,
+        server_profile=WowServerProfile.PRIVATE,
+        realm_id="Example Realm",
+        latency_ms=84,
+        addon_connected=True,
+        launcher_associated=True,
+        account_entitled=True,
+        combat_state="IDLE",
+        provenance=["sentinel-addon-savedvariables", "sentinel-launcher-checkpoint"],
+    )
+
+
 def test_authenticated_update_composes_state_recommendation_health_and_presentation() -> None:
     runtime = connected_runtime()
     snapshot = runtime.process_update(update_envelope(), session_id="session-1", now=NOW)
@@ -60,6 +78,37 @@ def test_authenticated_update_composes_state_recommendation_health_and_presentat
     assert snapshot.entitlement is True
     assert "wow-3.3.5a:external-environment-unverified" in snapshot.capability_claims
     assert runtime.enqueue_presentations(snapshot) == len(snapshot.presentations)
+
+
+def test_server_validated_observation_emits_only_bounded_non_actionable_presentation_envelopes() -> None:
+    runtime = connected_runtime()
+    snapshot = runtime.process_observation(
+        passive_observation(),
+        session_id="companion:user-1",
+        now=NOW,
+    )
+    assert snapshot.vertical.accepted is True
+    assert snapshot.entitlement is True
+    assert "overlay:presentation-runtime" in snapshot.capability_claims
+
+    accepted = runtime.enqueue_presentations(snapshot)
+    assert accepted == len(snapshot.presentations)
+    assert runtime.session.queue.depth == accepted
+
+    envelopes = []
+    while runtime.session.queue.peek() is not None:
+        envelope = runtime.session.queue.pop()
+        assert envelope is not None
+        envelopes.append(envelope)
+
+    assert envelopes
+    for envelope in envelopes:
+        assert envelope.message_type is CompanionMessageType.PRESENTATION
+        assert envelope.latency_class is LatencyClass.RESPONSIVE
+        assert envelope.payload["channel"] == "OVERLAY"
+        assert envelope.payload["action_capable"] is False
+        assert 0 < len(str(envelope.payload["text"])) <= 2000
+        assert "action" not in envelope.payload
 
 
 def test_experience_requires_authenticated_transport() -> None:

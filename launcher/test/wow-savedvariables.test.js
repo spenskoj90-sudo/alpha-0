@@ -110,3 +110,15 @@ test('Companion observation envelope is passive background transport', () => {
   assert.equal(envelope.sequence, 11);
   assert.equal(envelope.payload.event_id, observation.event_id);
 });
+
+test('Classic and Retail addon sources persist only the bounded passive snapshot contract', () => {
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  for (const variant of ['classic', 'retail']) {
+    const source = fs.readFileSync(path.join(repoRoot, 'wow-addon', variant, 'Sentinel.lua'), 'utf8');
+    assert.match(source, /SentinelDB\.snapshot\s*=\s*\{/);
+    for (const field of ['schema_version', 'sequence', 'observed_at_epoch', 'patch_profile', 'server_profile', 'realm_id', 'latency_ms', 'addon_connected', 'combat_state']) {
+      assert.match(source, new RegExp(`${field}\\s*=`));
+    }
+    assert.doesNotMatch(source, /io\.|require\(|socket|SendChatMessage\(|CastSpell|RunMacro/);
+  }
+});

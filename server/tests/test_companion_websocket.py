@@ -107,7 +107,7 @@ def test_websocket_rejects_authenticated_account_without_companion_entitlement()
     assert exc.value.code == 1008
 
 
-def test_websocket_handshake_is_real_socket_level_integration() -> None:
+def test_websocket_handshake_and_heartbeat_health_are_real_socket_level_integration() -> None:
     with client.websocket_connect("/v1/companion/ws", headers=entitled_headers()) as websocket:
         websocket.send_json(handshake())
         result = websocket.receive_json()
@@ -118,7 +118,21 @@ def test_websocket_handshake_is_real_socket_level_integration() -> None:
             "mode": "ACTIVE",
         }
 
-        websocket.send_json(envelope())
+        heartbeat = envelope()
+        websocket.send_json(heartbeat)
+        health = websocket.receive_json()
+
+        assert health["sequence"] == heartbeat["sequence"]
+        assert health["message_type"] == "HEALTH"
+        assert health["latency_class"] == "RESPONSIVE"
+        assert health["payload"]["health_kind"] == "runtime"
+        assert health["payload"]["heartbeat_message_id"] == heartbeat["message_id"]
+        assert uuid.UUID(health["payload"]["connection_id"])
+        assert health["payload"]["mode"] == "ACTIVE"
+        assert health["payload"]["peer_authenticated"] is True
+        assert health["payload"]["queue_depth"] == 0
+        assert "peer_id" not in health["payload"]
+        assert "authorization" not in health["payload"]
 
 
 def test_websocket_handshake_rejects_incompatible_profile_fail_closed() -> None:

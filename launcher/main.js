@@ -29,6 +29,7 @@ let mainWindow = null;
 let overlayWindow = null;
 let wowBridge = null;
 let wowCheckpointStatus = null;
+let companionRuntimeHealth = null;
 let overlayExpiryTimer = null;
 
 async function accountSnapshot() {
@@ -48,6 +49,7 @@ function publishAccountSnapshot() {
 function overlaySnapshot() {
   return {
     companion: companion.status,
+    runtime: companionRuntimeHealth,
     wow: wowCheckpointStatus ? {
       state: wowCheckpointStatus.state,
       queueDepth: Number.isInteger(wowCheckpointStatus.queueDepth) ? wowCheckpointStatus.queueDepth : 0,
@@ -91,6 +93,10 @@ const companion = new CompanionProcessManager({
     if (!overlayStore.push(presentation)) return;
     publishOverlaySnapshot();
     scheduleOverlayExpiry();
+  },
+  onRuntimeHealth: health => {
+    companionRuntimeHealth = health;
+    publishOverlaySnapshot();
   },
 });
 
@@ -164,7 +170,7 @@ ipcMain.handle('game:launch', (_, id) => {
 });
 ipcMain.handle('account:login', async (_, coreUrl, email, password) => { await session.login({ coreUrl, email, password }); return accountSnapshot(); });
 ipcMain.handle('account:logout', () => {
-  wowBridge?.stop(); companion.stop('ACCOUNT_LOGOUT'); session.clear(); overlayStore.clear(); wowCheckpointStatus = null; publishOverlaySnapshot(); return true;
+  wowBridge?.stop(); companion.stop('ACCOUNT_LOGOUT'); session.clear(); overlayStore.clear(); wowCheckpointStatus = null; companionRuntimeHealth = null; publishOverlaySnapshot(); return true;
 });
 ipcMain.handle('account:status', () => accountSnapshot());
 ipcMain.handle('companion:status', () => companion.status);
@@ -174,11 +180,12 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (requestedCore !== session.coreUrl) throw new Error('CORE_SESSION_ORIGIN_MISMATCH');
   const features = await session.featureStatus();
   if (!Array.isArray(features.features) || !features.features.includes('companion')) throw new Error('COMPANION_ENTITLEMENT_REQUIRED');
+  companionRuntimeHealth = null;
   const status = companion.start({ coreUrl: session.coreUrl, sessionToken: session.accessToken });
   wowBridge?.start(); wowBridge?.onCompanionStatus(status); publishOverlaySnapshot(); return status;
 });
 ipcMain.handle('companion:stop', () => {
-  wowBridge?.stop(); const status = companion.stop('STOPPED_BY_USER'); overlayStore.clear(); publishOverlaySnapshot(); return status;
+  wowBridge?.stop(); const status = companion.stop('STOPPED_BY_USER'); overlayStore.clear(); companionRuntimeHealth = null; publishOverlaySnapshot(); return status;
 });
 
 app.whenReady().then(() => {

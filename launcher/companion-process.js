@@ -4,6 +4,49 @@ const path = require('node:path');
 const { fork } = require('node:child_process');
 const { sanitizePresentation } = require('./overlay-state');
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MODES = new Set(['ACTIVE', 'DEGRADED', 'STOPPED']);
+
+function safeCount(value, max = 1_000_000) {
+  return Number.isSafeInteger(value) && value >= 0 && value <= max ? value : null;
+}
+
+function safeMs(value) {
+  return Number.isFinite(value) && value >= 0 && value <= 60_000 ? value : null;
+}
+
+function sanitizeRuntimeHealth(health) {
+  if (!health || typeof health !== 'object' || health.healthKind !== 'runtime') return null;
+  if (typeof health.connectionId !== 'string' || !UUID_RE.test(health.connectionId)) return null;
+  if (typeof health.heartbeatMessageId !== 'string' || !UUID_RE.test(health.heartbeatMessageId)) return null;
+  if (typeof health.mode !== 'string' || !MODES.has(health.mode)) return null;
+  const reconnectAttempts = safeCount(health.reconnectAttempts, 10_000);
+  const queueDepth = safeCount(health.queueDepth, 4096);
+  const droppedEvents = safeCount(health.droppedEvents);
+  const rttMs = safeMs(health.rttMs);
+  const count = safeCount(health.rtt?.count, 1024);
+  const minimumMs = health.rtt?.minimumMs === null ? null : safeMs(health.rtt?.minimumMs);
+  const maximumMs = health.rtt?.maximumMs === null ? null : safeMs(health.rtt?.maximumMs);
+  const averageMs = health.rtt?.averageMs === null ? null : safeMs(health.rtt?.averageMs);
+  const p95Ms = health.rtt?.p95Ms === null ? null : safeMs(health.rtt?.p95Ms);
+  if ([reconnectAttempts, queueDepth, droppedEvents, rttMs, count].some(value => value === null)) return null;
+  if (typeof health.killSwitchActive !== 'boolean' || typeof health.peerAuthenticated !== 'boolean') return null;
+  if (count > 0 && [minimumMs, maximumMs, averageMs, p95Ms].some(value => value === null)) return null;
+  return {
+    healthKind: 'runtime',
+    connectionId: health.connectionId,
+    heartbeatMessageId: health.heartbeatMessageId,
+    mode: health.mode,
+    reconnectAttempts,
+    queueDepth,
+    droppedEvents,
+    killSwitchActive: health.killSwitchActive,
+    peerAuthenticated: health.peerAuthenticated,
+    rttMs,
+    rtt: { count, minimumMs, maximumMs, averageMs, p95Ms },
+  };
+}
+
 class CompanionProcessManager {
   constructor({
     workerPath = path.join(__dirname, 'companion-worker.js'),
@@ -13,6 +56,7 @@ class CompanionProcessManager {
     onObservationAck = () => {},
     onObservationDeferred = () => {},
     onPresentation = () => {},
+    onRuntimeHealth = () => {},
   } = {}) {
     this.workerPath = workerPath;
     this.forkImpl = forkImpl;
@@ -21,6 +65,7 @@ class CompanionProcessManager {
     this.onObservationAck = onObservationAck;
     this.onObservationDeferred = onObservationDeferred;
     this.onPresentation = onPresentation;
+    this.onRuntimeHealth = onRuntimeHealth;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
     this.expectedStop = false;
@@ -74,6 +119,11 @@ class CompanionProcessManager {
       if (presentation) this.onPresentation(presentation);
       return;
     }
+    if (message.type === 'runtime-health') {
+      const health = sanitizeRuntimeHealth(message.health);
+      if (health) this.onRuntimeHealth(health);
+      return;
+    }
     if (message.type === 'observation-ack') {
       this.onObservationAck({
         eventId: typeof message.eventId === 'string' ? message.eventId : null,
@@ -125,4 +175,4 @@ function sanitizeStatus(status) {
   return output;
 }
 
-module.exports = { CompanionProcessManager, sanitizeStatus };
+module.exports = { CompanionProcessManager, sanitizeRuntimeHealth, sanitizeStatus };

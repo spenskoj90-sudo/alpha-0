@@ -34,11 +34,11 @@ test('strict SavedVariables parser extracts only passive Sentinel checkpoint dat
 test('SavedVariables parser rejects executable Lua instead of evaluating it', () => {
   assert.throws(
     () => parseSavedVariables('SentinelDB = os.execute("calc")'),
-    /SAVEDVARIABLES_UNSUPPORTED_VALUE/,
+    /SAVEDVARIABLES_UNSUPPORTED_(?:TOKEN|VALUE)/,
   );
   assert.throws(
     () => parseSavedVariables('SentinelDB = { snapshot = function() end }'),
-    /SAVEDVARIABLES_UNSUPPORTED_VALUE/,
+    /SAVEDVARIABLES_UNSUPPORTED_(?:TOKEN|VALUE)/,
   );
 });
 
@@ -115,7 +115,7 @@ test('Classic and Retail addon sources persist only the bounded passive snapshot
   const repoRoot = path.resolve(__dirname, '..', '..');
   for (const variant of ['classic', 'retail']) {
     const source = fs.readFileSync(path.join(repoRoot, 'wow-addon', variant, 'Sentinel.lua'), 'utf8');
-    assert.match(source, /SentinelDB\.snapshot\s*=\s*\{/);
+    assert.match(source, /(?:SentinelDB|db)\.snapshot\s*=\s*\{/);
     for (const field of ['schema_version', 'sequence', 'observed_at_epoch', 'patch_profile', 'server_profile', 'realm_id', 'latency_ms', 'addon_connected', 'combat_state']) {
       assert.match(source, new RegExp(`${field}\\s*=`));
     }

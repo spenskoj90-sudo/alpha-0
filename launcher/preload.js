@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('sentinel', {
   stopCompanion: () => ipcRenderer.invoke('companion:stop'),
   voiceStatus: () => ipcRenderer.invoke('voice:status'),
   setVoiceConsent: granted => ipcRenderer.invoke('voice:consent:set', granted === true),
+  armVoiceCapture: () => ipcRenderer.invoke('voice:capture:arm'),
+  disarmVoiceCapture: () => ipcRenderer.invoke('voice:capture:disarm'),
   submitVoice: payload => ipcRenderer.invoke('voice:submit', payload),
   onCompanionStatus: callback => {
     if (typeof callback !== 'function') return () => {};

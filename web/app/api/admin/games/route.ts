@@ -10,21 +10,14 @@ function upstreamUrl() {
   }
 }
 
-async function forward(request: NextRequest, method: 'GET' | 'POST') {
+export async function GET(request: NextRequest) {
   const upstream = upstreamUrl();
   if (!upstream) return NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 });
   const token = request.headers.get('x-sentinel-admin-token');
   if (!token) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
-
   try {
-    const response = await fetch(`${upstream}/v1/admin/entitlements`, {
-      method,
-      headers: {
-        accept: 'application/json',
-        ...(method === 'POST' ? { 'content-type': 'application/json' } : {}),
-        'x-sentinel-admin-token': token,
-      },
-      body: method === 'POST' ? await request.text() : undefined,
+    const response = await fetch(`${upstream}/v1/admin/games`, {
+      headers: { 'x-sentinel-admin-token': token, accept: 'application/json' },
       cache: 'no-store',
     });
     return new NextResponse(await response.text(), {
@@ -34,12 +27,4 @@ async function forward(request: NextRequest, method: 'GET' | 'POST') {
   } catch {
     return NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 });
   }
-}
-
-export async function GET(request: NextRequest) {
-  return forward(request, 'GET');
-}
-
-export async function POST(request: NextRequest) {
-  return forward(request, 'POST');
 }

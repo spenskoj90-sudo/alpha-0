@@ -12,6 +12,8 @@
 - Electron launcher exists under `launcher/`.
 - WoW addon sources exist under `wow-addon/`.
 
+Existence of a source tree does not by itself establish that the surface is packaged, integrated or accepted in a real target environment.
+
 ## 2. Security and persistence baseline
 
 - Android device identity is Keystore-backed P-256 with SHA-256 fingerprinting.
@@ -20,43 +22,78 @@
 - PostgreSQL is the production persistence architecture when `DATABASE_URL` is configured; migration `004_p1_rls_force.sql` applies FORCE RLS.
 - Release signing controls and production/live deployment remain Owner-gated.
 
+The Web account-control boundary stores Core access/refresh tokens only in HttpOnly, SameSite=Strict cookies, applies same-origin checks to state-changing account/billing requests, rotates an expired access session through the existing one-time Core refresh endpoint, and does not expose opaque tokens to client-side JavaScript.
+
 These statements are orientation-level invariants. They do not replace inspection of the current implementation and tests.
 
 ## 3. Game integration architecture
 
 - Game Adapter Contract v1 is implemented as the canonical adapter boundary.
 - Unified Game State v1 is implemented with bounded Pydantic state validation, timezone-aware timestamp ordering, per-session duplicate/out-of-order rejection, capability observability guards, explicit stale-state degradation, and deterministic canonical replay.
-- Adapter Registry / Capability Registry v1 is implemented on `main` with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
-- The conservative WoW adapter boundary is implemented as passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
+- Adapter Registry / Capability Registry v1 is implemented with typed identity, capability evidence/status discipline, L3 enforcement for `AVAILABLE`, downgrade tracking, bounded normalized events, Core-side usable-capability guards, and contract/boundary tests.
+- The conservative WoW adapter boundary is passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
 - Transactional event-to-outbox persistence and the recoverable event runtime are implemented: lease ownership, `FOR UPDATE SKIP LOCKED` claims, bounded retry/backoff, durable terminal failure, explicit replay and monotonic character projection are covered by unit/PostgreSQL tests.
 - Companion protocol v1 is implemented with five-way compatibility negotiation, bounded envelopes and FIFO backpressure, explicit latency classes, and fail-closed mismatch handling.
-- Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding. Automated loopback tests exercise the composed socket path; a packaged production Companion host and live network environment remain unverified.
+- Server-side Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding. Automated loopback tests exercise the composed socket path. This does **not** by itself establish a packaged launcher-hosted production Companion process; that product/runtime composition remains a separate target.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation.
-- The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing, confidence/provenance, recommendation delivery and the web Command Center presentation. No external AI provider or credential is implied.
-- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` now provides bounded, atomically persisted local buffering with malformed-file isolation; exact WoW/private-server L3 validation remains **UNVERIFIED**.
+- The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing and confidence/provenance. The Web includes a bounded recommendation presentation component, but the current default card is a presentation baseline; a live end-to-end Web recommendation retrieval path must not be inferred from that component alone.
+- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` provides bounded, atomically persisted local buffering with malformed-file isolation; exact WoW/private-server L3 validation remains **UNVERIFIED**.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
-## 4. Telemetry and performance
+## 4. Billing, entitlement and account control
+
+- Core defines a provider-neutral plan catalog and persistent subscription lifecycle with `PENDING`, `ACTIVE`, `PAST_DUE`, `CANCELED` and `EXPIRED` states.
+- Caller-scoped `/v1/billing/plans` and `/v1/billing/subscriptions` APIs are protected by the existing server-authoritative policy engine; browser code does not receive additional scopes.
+- Billing webhook replay/idempotency and lifecycle transition checks are implemented. The current webhook authentication boundary is a generic configured token; this is not equivalent to a production payment-provider signature-verification adapter.
+- `/v1/entitlements/me` provides caller-scoped game-entitlement readback. Admin game catalog and entitlement grant/readback are Core-authoritative.
+- The Web control plane presents live plan, subscription and entitlement state through the secure cookie-session proxy and exposes subscription-intent creation without pretending that payment occurred. The browser provider value is constrained to the provider-neutral manual boundary; activation remains provider-confirmed.
+- Production provider credentials remain Owner-only. A concrete provider adapter/verifier, deterministic provider/reconciliation execution and explicit paid-feature entitlement enforcement remain internal productization targets where not implemented.
+
+## 5. Telemetry and performance
 
 - The telemetry contract is provider-neutral. Companion emits bounded privacy-safe runtime/transport events, exposes health and latency snapshots, supports fanout, and has opt-in PostgreSQL persistence/retention seams.
 - External telemetry-provider delivery and a deployed operator observability stack remain optional environment integrations, not implementation claims.
 - Performance budgets are represented as operation-scoped contracts with deterministic pass/fail evaluation; measured results remain acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
-- Block D adds deterministic privacy scrubbing for telemetry attributes and a canonical recovery matrix with fail-closed health outcomes; implementation evidence is covered by unit tests and the Block D contract.
+- Deterministic privacy scrubbing and a canonical recovery matrix with fail-closed health outcomes are implemented and covered by unit tests.
+- End-to-end correlation propagation, real metrics/tracing composition, benchmark/failure-injection measurements and launcher/addon operational telemetry remain separate implementation/evidence concerns when repository inspection does not prove them.
 - Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED** unless current repository evidence proves otherwise.
 
-## 5. Architecture work remaining
+## 6. Internal architecture work remaining
 
-The first six implementation passes and Blocks A–D closed the repository/CI re-baseline, monetization/entitlement, Companion experience, and observability/resilience verticals. Remaining work is external or Owner-gated activation only: exact WoW target validation, production credentials and ingress/database configuration, real-device/Companion-host acceptance, signed release-candidate execution, release publication and live deployment.
+The first six implementation passes and Blocks A-D produced substantial foundations, but the 2026-09-13 code-first rebaseline found that several earlier completion labels conflated **foundation complete** with **product/runtime complete**.
 
-Known evidence and environment gaps remain: exact WoW target validation, a real Companion host, live production ingress/database evidence, external provider credentials where selected, and signed/public release acceptance. Android `AuthApi` retains a `HttpURLConnection` implementation behind an injectable transport and coroutine I/O boundary; replacing that implementation is technical debt, not a current authorization bypass.
+Largest remaining internal targets include:
 
-This list is a planning aid, not a claim that the gaps have not changed. The next baseline must inspect the repository and tests before selecting work.
+1. Billing/account-control completion beyond the current Web product surface: provider adapter/signature-verification boundary, deterministic fake/test provider, reconciliation execution and explicit feature-entitlement enforcement where paid Companion/player capabilities depend on subscription state.
+2. Packaged launcher → Companion host composition: process lifecycle, local persistence/addon ingestion, reconnect/backpressure/capability negotiation/health/kill-switch composition and Core delivery, with deterministic launcher/addon evidence where possible.
+3. Actual player-facing Overlay/voice/connection/degraded/account UX and end-to-end runtime wiring. Provider-neutral STT/TTS or presentation models alone do not constitute a complete voice product.
+4. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
+5. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
 
-## 6. Governance
+These are internal engineering targets and must not be mislabeled as Owner/external blockers.
 
-The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and merges require exact-SHA successful required checks without bypassing security or repository protection.
+## 7. External / Owner-gated evidence
 
-## 7. Source-of-truth model
+Known external or protected items remain:
+
+- exact WoW target validation in the real 3.3.5a/private-server environment;
+- physical Android release-device acceptance;
+- real production Companion-host acceptance where exact-environment evidence is required;
+- production ingress/database credentials;
+- production payment-provider credentials;
+- signing-key/certificate custody;
+- signed release-candidate Owner execution;
+- release tag/publication and live production deployment.
+
+Firebase Test Lab issue #59 remains deferred/non-blocking while GitHub-hosted emulator instrumentation is the routine Android gate.
+
+## 8. Governance
+
+The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and GPT may merge only after exact-PR-HEAD required checks are successful without bypassing security or repository protection.
+
+Historical workflow or playbook documents that prohibit GPT merge are superseded where they conflict with that canonical operating system.
+
+## 9. Source-of-truth model
 
 Use each source for the kind of truth it actually owns:
 
@@ -71,13 +108,25 @@ Use each source for the kind of truth it actually owns:
 | This document | Orientation only; never a substitute for repository inspection |
 | Historical audits / handovers | Historical context only unless independently revalidated |
 
-## 8. Documentation rule
+## 10. Evidence classification
+
+For broad targets use evidence-scoped labels rather than one binary completion flag:
+
+- **IMPLEMENTED** — source implementation exists.
+- **INTEGRATION-TESTED** — automated integration evidence exercises the composed path.
+- **SIMULATED** — deterministic/fake/replay evidence exists but no real environment is implied.
+- **PRODUCTIZED** — the intended user/operator runtime surface is coherently wired and usable.
+- **ENVIRONMENT-UNVERIFIED** — implementation may exist, but the required exact external/runtime environment has not been exercised.
+- **MISSING** — required implementation surface is absent.
+- **TECHNICAL-DEBT** — current behavior works within accepted invariants but an internal engineering improvement remains.
+
+## 11. Documentation rule
 
 Ordinary code changes do **not** require a generated current-state commit or a documentation-only PR. Update this guide only when its semantic orientation materially changes. Never embed a mutable `main` HEAD or workflow-run mirror here.
 
 A document can describe an intended architecture or a historical observation, but it cannot prove that an implementation exists on current `main`. For implementation claims, inspect the repository and require evidence.
 
-## 9. Vertical-block completion rule
+## 12. Vertical-block completion rule
 
 A substantive SENTINEL block is complete only when its applicable concerns are completed as one coherent vertical slice:
 
@@ -93,12 +142,10 @@ A large architectural block may be delivered through several short-lived, indepe
 
 The completion gate is evidence-based: an item remains **UNVERIFIED** when the required repository, CI, runtime, device or exact-environment evidence does not exist.
 
-## 10. First complete SENTINEL vertical slice
+## 13. First complete SENTINEL vertical slice
 
-The approved implementation sequence is:
+The approved implementation sequence remains conservative:
 
 `UGS runtime validation → deterministic replay → conservative WoW adapter → Companion protocol/runtime → Policy Engine / Action Gateway → context/recommendation/confidence/provenance → Command Center/Overlay UX → observability/performance → real-device/integration acceptance`
 
-This sequence is the primary implementation program for the first complete SENTINEL path. The slice remains conservative: no autonomous combat, no premature broad game/version expansion, no production/live deployment, and no release publication. Exact-environment capabilities remain UNVERIFIED until L3 evidence exists.
-
-Each completed block becomes the verified foundation for the next block; do not create parallel long-lived unfinished implementations when the next stage depends on the current one.
+No autonomous combat, no premature broad game/version expansion, no production/live deployment, and no release publication are implied. Exact-environment capabilities remain UNVERIFIED until L3 evidence exists.

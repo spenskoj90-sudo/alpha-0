@@ -2,6 +2,7 @@
 
 const { randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
+const { sanitizePresentation } = require('./presentation-runtime');
 
 const HANDSHAKE = Object.freeze({
   protocol_version: '1.0',
@@ -179,6 +180,14 @@ class CompanionWorkerRuntime {
         accepted: message.payload.accepted === true,
         reason: typeof message.payload.reason === 'string' ? message.payload.reason : null,
       });
+      return;
+    }
+    if (message?.message_type === 'PRESENTATION') {
+      try {
+        this.send({ type: 'presentation', presentation: sanitizePresentation(message.payload) });
+      } catch (error) {
+        this.stop(String(error?.message || 'PRESENTATION_INVALID'));
+      }
     }
   }
 

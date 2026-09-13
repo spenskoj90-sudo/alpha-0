@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, st
 
 from .billing_provider_api import router as billing_provider_router
 from .companion_compatibility import negotiate_companion_compatibility
+from .companion_experience import CompanionExperienceRuntime, CompanionExperienceSnapshot
 from .companion_peer_auth import (
     AllowlistPeerAuthenticator,
     CompanionPeerAuthenticator,
@@ -339,7 +340,11 @@ def _wow_observation_ack(
     )
 
 
-def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> CompanionEnvelope:
+def _process_wow_observation(
+    envelope: CompanionEnvelope,
+    user_id: str,
+    experience: CompanionExperienceRuntime,
+) -> tuple[CompanionEnvelope, CompanionExperienceSnapshot | None]:
     raw_event_id = str(envelope.payload.get("event_id") or "unknown")[:128]
     try:
         observation = WowObservation.model_validate(envelope.payload)
@@ -348,11 +353,14 @@ def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> Compa
         )
         normalized = ConservativeWowAdapter().normalize(observation)
     except Exception:
-        return _wow_observation_ack(
-            envelope,
-            accepted=False,
-            event_id=raw_event_id,
-            reason="INVALID_WOW_OBSERVATION",
+        return (
+            _wow_observation_ack(
+                envelope,
+                accepted=False,
+                event_id=raw_event_id,
+                reason="INVALID_WOW_OBSERVATION",
+            ),
+            None,
         )
 
     from app.main import store
@@ -366,12 +374,29 @@ def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> Compa
         "reason_code": "PASSIVE_CHECKPOINT_ACCEPTED",
         "request_id": normalized.event_id,
     })
-    return _wow_observation_ack(
+    ack = _wow_observation_ack(
         envelope,
         accepted=True,
         event_id=normalized.event_id,
         reason="PASSIVE_CHECKPOINT_ACCEPTED",
     )
+    try:
+        snapshot = experience.process_observation(
+            observation,
+            session_id=f"companion:{user_id}"[:128],
+        )
+    except Exception:
+        store.add_audit({
+            "actor_user_id": user_id,
+            "actor_device_id": None,
+            "action": "companion:presentation",
+            "resource": "player-overlay",
+            "decision": "DENY",
+            "reason_code": "PRESENTATION_PIPELINE_FAILED",
+            "request_id": normalized.event_id,
+        })
+        return ack, None
+    return ack, snapshot
 
 
 @router.websocket("/v1/companion/ws")
@@ -390,6 +415,7 @@ async def companion_websocket(websocket: WebSocket) -> None:
         result = await transport.handshake()
         if not result.accepted:
             return
+        experience = CompanionExperienceRuntime(transport.session)
         while True:
             envelope = await transport.receive_envelope()
             if envelope is None:
@@ -403,8 +429,13 @@ async def companion_websocket(websocket: WebSocket) -> None:
             # outbound queue. Consume each after validation to avoid artificial buildup.
             transport.session.queue.pop()
             if envelope.message_type == CompanionMessageType.WOW_OBSERVATION:
-                ack = _process_wow_observation(envelope, user_id)
+                ack, snapshot = _process_wow_observation(envelope, user_id, experience)
                 await websocket.send_json(ack.model_dump(mode="json"))
+                if snapshot is not None:
+                    experience.enqueue_presentations(snapshot)
+                    while transport.session.queue.peek() is not None:
+                        if await transport.send() is None:
+                            return
     except WebSocketDisconnect:
         return
     finally:

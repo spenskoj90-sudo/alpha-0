@@ -24,6 +24,7 @@ let voiceRecorder = null;
 let voiceStream = null;
 let voiceChunks = [];
 let voiceCaptureTimer = null;
+let voiceCaptureDiscarded = false;
 let voiceBusy = false;
 
 function refreshButtons() {
@@ -186,12 +187,15 @@ async function submitVoiceBlob(blob) {
 async function finalizeVoiceCapture() {
   clearVoiceTimer();
   const chunks = voiceChunks;
+  const discarded = voiceCaptureDiscarded;
   voiceChunks = [];
+  voiceCaptureDiscarded = false;
   voiceRecorder = null;
   stopVoiceTracks();
   voiceBusy = true;
   refreshButtons();
   try {
+    if (discarded) throw new Error('VOICE_CAPTURE_DISCARDED');
     const blob = new Blob(chunks, { type: currentVoice.captureContentType || 'audio/webm;codecs=opus' });
     await submitVoiceBlob(blob);
   } catch (error) {
@@ -216,10 +220,12 @@ async function startVoiceCapture() {
       video: false,
     });
     voiceChunks = [];
+    voiceCaptureDiscarded = false;
     const recorder = new MediaRecorder(voiceStream, { mimeType, audioBitsPerSecond: 64000 });
     voiceRecorder = recorder;
     recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
     recorder.onerror = () => {
+      voiceCaptureDiscarded = true;
       showError(voiceResult, new Error('VOICE_CAPTURE_FAILED'));
       if (recorder.state !== 'inactive') recorder.stop();
     };
@@ -232,6 +238,7 @@ async function startVoiceCapture() {
   } catch (error) {
     stopVoiceTracks();
     voiceRecorder = null;
+    voiceCaptureDiscarded = false;
     throw error;
   } finally {
     voiceBusy = false;
@@ -248,6 +255,22 @@ function stopVoiceCapture() {
   }
 }
 
+function cancelVoiceCapture() {
+  clearVoiceTimer();
+  voiceCaptureDiscarded = true;
+  voiceChunks = [];
+  if (voiceRecorder && voiceRecorder.state !== 'inactive') {
+    voiceBusy = true;
+    refreshButtons();
+    voiceRecorder.stop();
+    return;
+  }
+  voiceRecorder = null;
+  stopVoiceTracks();
+  voiceBusy = false;
+  refreshButtons();
+}
+
 loginButton.onclick = async () => {
   loginButton.disabled = true;
   try {
@@ -262,7 +285,7 @@ loginButton.onclick = async () => {
 };
 
 logoutButton.onclick = async () => {
-  stopVoiceCapture();
+  cancelVoiceCapture();
   await window.sentinel.logout();
   setCompanion({ state: 'STOPPED', reason: 'ACCOUNT_LOGOUT' });
   setWowCheckpoint({ state: 'STOPPED', queueDepth: 0 });
@@ -278,7 +301,7 @@ startButton.onclick = async () => {
   } catch (error) { showError(companionStatus, error); refreshButtons(); }
 };
 stopButton.onclick = async () => {
-  stopVoiceCapture();
+  cancelVoiceCapture();
   setWowCheckpoint({ state: 'STOPPED' });
   setCompanion(await window.sentinel.stopCompanion());
 };

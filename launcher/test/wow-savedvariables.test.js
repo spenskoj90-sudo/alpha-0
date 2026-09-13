@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
+  MAX_QUEUE_BYTES,
   WowCheckpointBridge,
   WowObservationQueue,
   discoverSentinelSavedVariables,
@@ -61,6 +62,14 @@ test('durable observation queue is bounded, deduplicated and acknowledged FIFO',
   assert.equal(queue.peek().event_id, 'c');
   const reloaded = new WowObservationQueue({ filePath, maxItems: 2 });
   assert.equal(reloaded.peek().event_id, 'c');
+});
+
+test('durable observation queue refuses oversized persisted state before reading JSON', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sentinel-wow-oversized-'));
+  const filePath = path.join(dir, 'queue.json');
+  fs.writeFileSync(filePath, 'x'.repeat(MAX_QUEUE_BYTES + 1));
+  const queue = new WowObservationQueue({ filePath });
+  assert.equal(queue.depth, 0);
 });
 
 test('checkpoint bridge keeps data queued until Companion is active and ACKed', () => {
@@ -121,4 +130,12 @@ test('Classic and Retail addon sources persist only the bounded passive snapshot
     }
     assert.doesNotMatch(source, /io\.|require\(|socket|SendChatMessage\(|CastSpell|RunMacro/);
   }
+});
+
+test('Retail passive checkpoint ticker is lifecycle-owned and survives hidden overlay', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '..', '..', 'wow-addon', 'retail', 'Sentinel.lua'), 'utf8');
+  assert.match(source, /if not db\.overlayHidden then createOverlay\(\) end/);
+  assert.match(source, /frame:SetScript\("OnUpdate"/);
+  assert.doesNotMatch(source, /overlay:SetScript\("OnUpdate"/);
+  assert.match(source, /local function update\(\)[\s\S]*writeCheckpoint\(realm, ping\)[\s\S]*if not overlay then return end/);
 });

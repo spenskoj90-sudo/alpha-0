@@ -67,24 +67,62 @@ class CoreSessionManager {
   }
 
   async featureStatus() {
-    if (!this.#coreUrl || !this.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
-    let response = await this.#fetch(`${this.#coreUrl}/v1/billing/features`, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-    });
-    if (response.status === 401 && this.refreshToken) {
-      await this.refresh();
-      response = await this.#fetch(`${this.#coreUrl}/v1/billing/features`, {
-        headers: { Authorization: `Bearer ${this.accessToken}` },
-      });
-    }
-    const payload = await readJson(response);
-    if (!response.ok) throw new Error(errorCode(payload, 'FEATURE_LOOKUP_FAILED'));
-    return payload;
+    return this.#authorizedJson('/v1/billing/features', {}, 'FEATURE_LOOKUP_FAILED');
+  }
+
+  async voiceStatus() {
+    return this.#authorizedJson('/v1/companion/voice/status', {}, 'VOICE_STATUS_FAILED');
+  }
+
+  async transcribeVoice({ audioBase64, locale, recommendationId, consentGranted }) {
+    return this.#authorizedJson(
+      '/v1/companion/voice/transcribe',
+      {
+        method: 'POST',
+        body: {
+          audio_b64: audioBase64,
+          locale,
+          recommendation_id: recommendationId,
+          consent_granted: consentGranted === true,
+        },
+      },
+      'VOICE_TRANSCRIBE_FAILED',
+    );
+  }
+
+  async synthesizeVoice({ text, locale, consentGranted }) {
+    return this.#authorizedJson(
+      '/v1/companion/voice/synthesize',
+      { method: 'POST', body: { text, locale, consent_granted: consentGranted === true } },
+      'VOICE_SYNTHESIS_FAILED',
+    );
   }
 
   clear() {
     this.#session = null;
     this.#coreUrl = null;
+  }
+
+  async #authorizedJson(path, { method = 'GET', body = null } = {}, fallback = 'CORE_REQUEST_FAILED') {
+    if (!this.#coreUrl || !this.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
+    const send = () => {
+      const headers = { Authorization: `Bearer ${this.accessToken}` };
+      const init = { method, headers };
+      if (body !== null) {
+        headers['content-type'] = 'application/json';
+        init.body = JSON.stringify(body);
+      }
+      return this.#fetch(`${this.#coreUrl}${path}`, init);
+    };
+
+    let response = await send();
+    if (response.status === 401 && this.refreshToken) {
+      await this.refresh();
+      response = await send();
+    }
+    const payload = await readJson(response);
+    if (!response.ok) throw new Error(errorCode(payload, fallback));
+    return payload;
   }
 
   #setSession(coreUrl, payload) {
@@ -107,6 +145,7 @@ async function readJson(response) {
 }
 
 function errorCode(payload, fallback) {
+  if (payload && typeof payload.code === 'string' && payload.code) return payload.code;
   if (payload && typeof payload.detail === 'string' && payload.detail) return payload.detail;
   return fallback;
 }

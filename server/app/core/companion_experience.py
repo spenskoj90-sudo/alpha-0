@@ -3,9 +3,10 @@ from __future__ import annotations
 """Bounded Companion runtime composition for the first player experience slice.
 
 This module deliberately composes existing transport, WoW, UGS,
-recommendation, presentation, and interaction contracts.  It does not open a
-socket, call a provider, or execute game actions.  Those seams remain explicit
-so an integration can be tested without claiming a real WoW 3.3.5a runtime.
+recommendation, presentation, and interaction contracts. It does not open a
+socket or execute game actions. Provider seams remain explicit so repository
+integration can be tested without claiming external STT/TTS or exact WoW host
+evidence.
 """
 
 from dataclasses import dataclass
@@ -32,15 +33,18 @@ from .wow_vertical_slice import WowVerticalResult, WowVerticalSlice
 
 
 class VoiceBoundaryError(RuntimeError):
-    """A bounded voice operation was rejected before provider I/O."""
+    """A bounded voice operation was rejected before or during provider I/O."""
 
 
 class VoiceReasonCode(StrEnum):
     ACCEPTED = "VOICE_ACCEPTED"
     CONSENT_REQUIRED = "VOICE_CONSENT_REQUIRED"
+    AUDIO_INVALID = "VOICE_AUDIO_INVALID"
     AUDIO_TOO_LARGE = "VOICE_AUDIO_TOO_LARGE"
     TEXT_TOO_LARGE = "VOICE_TEXT_TOO_LARGE"
     PROVIDER_UNAVAILABLE = "VOICE_PROVIDER_UNAVAILABLE"
+    PROVIDER_FAILED = "VOICE_PROVIDER_FAILED"
+    SYNTHESIZED_AUDIO_TOO_LARGE = "VOICE_SYNTHESIZED_AUDIO_TOO_LARGE"
     ACTION_GATEWAY_REQUIRED = "ACTION_GATEWAY_REQUIRED"
     UNSUPPORTED_COMMAND = "VOICE_COMMAND_UNSUPPORTED"
 
@@ -59,11 +63,15 @@ class VoiceConfig:
 
 
 class SpeechToTextProvider(Protocol):
+    """Provider adapter contract. Input audio is bounded WebM/Opus bytes."""
+
     def transcribe(self, audio: bytes, *, locale: str) -> str:
         ...
 
 
 class TextToSpeechProvider(Protocol):
+    """Provider adapter contract. Output bytes must be a bounded WAV payload."""
+
     def synthesize(self, text: str, *, locale: str) -> bytes:
         ...
 
@@ -93,11 +101,18 @@ class VoiceBoundary:
     def transcribe(self, audio: bytes, *, locale: str, consent_granted: bool) -> str:
         if not consent_granted:
             raise VoiceBoundaryError(VoiceReasonCode.CONSENT_REQUIRED.value)
+        if not audio:
+            raise VoiceBoundaryError(VoiceReasonCode.AUDIO_INVALID.value)
         if len(audio) > self.config.max_audio_bytes:
             raise VoiceBoundaryError(VoiceReasonCode.AUDIO_TOO_LARGE.value)
         if self.stt is None:
             raise VoiceBoundaryError(VoiceReasonCode.PROVIDER_UNAVAILABLE.value)
-        transcript = self.stt.transcribe(bytes(audio), locale=locale).strip()
+        try:
+            transcript = self.stt.transcribe(bytes(audio), locale=locale).strip()
+        except VoiceBoundaryError:
+            raise
+        except Exception as exc:
+            raise VoiceBoundaryError(VoiceReasonCode.PROVIDER_FAILED.value) from exc
         if not transcript or len(transcript) > self.config.max_text_chars:
             raise VoiceBoundaryError(VoiceReasonCode.TEXT_TOO_LARGE.value)
         return transcript
@@ -110,9 +125,16 @@ class VoiceBoundary:
             raise VoiceBoundaryError(VoiceReasonCode.TEXT_TOO_LARGE.value)
         if self.tts is None:
             raise VoiceBoundaryError(VoiceReasonCode.PROVIDER_UNAVAILABLE.value)
-        result = bytes(self.tts.synthesize(normalized, locale=locale))
+        try:
+            result = bytes(self.tts.synthesize(normalized, locale=locale))
+        except VoiceBoundaryError:
+            raise
+        except Exception as exc:
+            raise VoiceBoundaryError(VoiceReasonCode.PROVIDER_FAILED.value) from exc
+        if not result:
+            raise VoiceBoundaryError(VoiceReasonCode.PROVIDER_FAILED.value)
         if len(result) > self.config.max_synthesized_bytes:
-            raise VoiceBoundaryError(VoiceReasonCode.TEXT_TOO_LARGE.value)
+            raise VoiceBoundaryError(VoiceReasonCode.SYNTHESIZED_AUDIO_TOO_LARGE.value)
         return result
 
     def classify(self, transcript: str, *, recommendation_id: str, locale: str = "en") -> VoiceCommandResult:
@@ -204,7 +226,8 @@ class CompanionExperienceRuntime:
             "wow-observation:implemented",
             "wow-addon:passive-telemetry-only",
             "overlay:presentation-contract",
-            "voice:provider-seam-unverified",
+            "voice:runtime-boundary-implemented",
+            "voice:provider-external-unverified",
             "wow-3.3.5a:external-environment-unverified",
         )
         return CompanionExperienceSnapshot(

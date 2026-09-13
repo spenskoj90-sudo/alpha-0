@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Iterable
+from typing import Callable, Iterable
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -49,12 +49,20 @@ class ActionGateway:
     """Fail-closed boundary between authorization and any future executor.
 
     Capability is a prerequisite signal, never an authorization source.
+    Optional feature entitlements are resolved server-side from a trusted
+    resolver; callers cannot self-assert paid grants in ActionRequest.
     The gateway has no execution method and therefore cannot directly mutate
     a game, process, entitlement, or external system.
     """
 
-    def __init__(self, authorization: AuthorizationEngine) -> None:
+    def __init__(
+        self,
+        authorization: AuthorizationEngine,
+        *,
+        entitlement_resolver: Callable[[str], Iterable[str]] | None = None,
+    ) -> None:
         self._authorization = authorization
+        self._entitlement_resolver = entitlement_resolver
 
     def authorize(
         self,
@@ -62,8 +70,10 @@ class ActionGateway:
         request: ActionRequest,
         *,
         required_capabilities: Iterable[str] = (),
+        required_entitlements: Iterable[str] = (),
     ) -> ActionDecisionResult:
         required = tuple(required_capabilities)
+        required_features = frozenset(required_entitlements)
         if request.mode is ActionMode.AUTOMATIC:
             return ActionDecisionResult(
                 decision=ActionDecision.DENY,
@@ -95,6 +105,25 @@ class ActionGateway:
                 decision=ActionDecision.DENY,
                 reason_code=reason,
             )
+
+        if required_features:
+            if self._entitlement_resolver is None:
+                return ActionDecisionResult(
+                    decision=ActionDecision.DENY,
+                    reason_code="ENTITLEMENT_RESOLVER_UNAVAILABLE",
+                )
+            try:
+                granted = frozenset(self._entitlement_resolver(principal.user_id))
+            except Exception:
+                return ActionDecisionResult(
+                    decision=ActionDecision.DENY,
+                    reason_code="ENTITLEMENT_RESOLUTION_FAILED",
+                )
+            if not required_features.issubset(granted):
+                return ActionDecisionResult(
+                    decision=ActionDecision.DENY,
+                    reason_code="FEATURE_ENTITLEMENT_REQUIRED",
+                )
 
         if request.mode is ActionMode.USER_CONFIRMED:
             return ActionDecisionResult(

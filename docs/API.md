@@ -53,14 +53,20 @@ Accepted character events are projected into the character store on a best-effor
 - `GET /v1/admin/entitlements` — list entitlements for an authorized administrator.
 - `POST /v1/admin/entitlements` — create an entitlement for a user and game.
 
-## Billing and account control (provider-neutral)
+## Billing and account control
 
 - `GET /v1/billing/plans` — list the canonical product-plan catalog; prices are metadata only and no provider is contacted.
 - `GET /v1/billing/subscriptions` — list subscriptions owned by the authenticated caller.
 - `POST /v1/billing/subscriptions` — create a pending subscription intent for the caller. Provider credentials and payment capture are Owner-only.
-- `POST /v1/billing/webhooks/{provider}` — accept a replay-safe lifecycle event only when `SENTINEL_BILLING_WEBHOOK_TOKEN` is configured; missing production configuration fails closed.
+- `GET /v1/billing/features` — return feature codes derived server-side from the caller's ACTIVE subscriptions only.
+- `POST /v1/billing/provider-webhooks/{provider}` — signed external-provider ingress. The configured generic adapter requires `X-Billing-Signature: t=<unix>,v1=<hmac-sha256>` over the exact raw request body and rejects stale or invalid signatures.
+- `POST /v1/billing/webhooks/{provider}` — legacy/internal shared-token ingress. `BillingService` restricts this path to the `manual` and `test` providers; it cannot activate an arbitrary external-provider subscription.
 
-Webhook deliveries are keyed by provider event ID and persisted with their subscription transition. Terminal `CANCELED` and `EXPIRED` states cannot be reactivated by a later event.
+Provider deliveries and deterministic reconciliation events are keyed by durable event IDs and pass through the same lifecycle state machine. Terminal `CANCELED` and `EXPIRED` states cannot be reactivated by a later event. The generic signed adapter is a concrete HMAC provider contract, not a claim of compatibility with Stripe or another vendor-specific wire format.
+
+## Companion
+
+- `WS /v1/companion/ws` — loopback-only Companion socket. Runtime activation requires a valid opaque Core session in the `Authorization: Bearer ...` header and an ACTIVE subscription-derived `companion` feature. Local peer authentication and protocol/capability negotiation remain additional fail-closed gates.
 
 ## World of Warcraft
 
@@ -70,8 +76,8 @@ Webhook deliveries are keyed by provider event ID and persisted with their subsc
 - `GET /v1/wow/realms/{realm_id}` — return a specific WoW realm.
 - `POST /v1/wow/realms/{realm_id}/observations` — accept an administrator-authorized realm observation.
 - `GET /v1/devices/me` — return the caller's currently bound device, when present.
-- `GET /v1/entitlements/me` — return the caller's entitlements with game metadata.
-- `GET /v1/entitlements/{entitlement_id}` — return one caller-owned entitlement with game metadata.
+- `GET /v1/entitlements/me` — return the caller's game entitlements with game metadata.
+- `GET /v1/entitlements/{entitlement_id}` — return one caller-owned game entitlement with game metadata.
 
 ## Recommendations
 
@@ -81,4 +87,4 @@ Webhook deliveries are keyed by provider event ID and persisted with their subsc
 
 ## Authentication notes
 
-Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures and raw private-key material are not returned in logs or audit metadata.
+Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures, provider secrets and raw private-key material are not returned in logs or audit metadata.

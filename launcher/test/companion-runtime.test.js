@@ -115,6 +115,49 @@ test('CompanionProcessManager passes token only to worker and sanitizes public s
   assert.equal(published.some(item => JSON.stringify(item).includes('rotated-access-token')), false);
 });
 
+test('CompanionProcessManager forwards only sanitized non-actionable presentations', () => {
+  const child = new FakeChild();
+  const presentations = [];
+  const manager = new CompanionProcessManager({
+    forkImpl: () => child,
+    onPresentation: value => presentations.push(value),
+  });
+  manager.start({ coreUrl: 'http://127.0.0.1:8080', sessionToken: 'access-token-0123456789' });
+  child.emit('message', {
+    type: 'presentation',
+    presentation: {
+      presentation_id: '11111111-1111-4111-8111-111111111111',
+      correlation_id: '22222222-2222-4222-8222-222222222222',
+      channel: 'OVERLAY',
+      kind: 'RECOMMENDATION',
+      text: 'Observe and stay defensive.',
+      confidence: 0.7,
+      provenance: ['sentinel-core'],
+      action_capable: false,
+      action: 'must-be-dropped',
+    },
+  });
+  assert.equal(presentations.length, 1);
+  assert.equal(presentations[0].text, 'Observe and stay defensive.');
+  assert.equal(presentations[0].action_capable, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(presentations[0], 'action'), false);
+
+  child.emit('message', {
+    type: 'presentation',
+    presentation: {
+      presentation_id: '33333333-3333-4333-8333-333333333333',
+      correlation_id: '44444444-4444-4444-8444-444444444444',
+      channel: 'OVERLAY',
+      kind: 'ALERT',
+      text: 'Unsafe payload',
+      provenance: [],
+      action_capable: true,
+    },
+  });
+  assert.equal(child.killed, true);
+  assert.deepEqual(manager.status, { state: 'STOPPED', reason: 'PRESENTATION_INVALID' });
+});
+
 test('sanitizeStatus allowlists fields and drops unexpected data', () => {
   assert.deepEqual(
     sanitizeStatus({ state: 'DEGRADED', reason: 'RECONNECT_SCHEDULED', retryInMs: 1000, token: 'secret' }),

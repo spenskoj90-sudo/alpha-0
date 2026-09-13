@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { fork } = require('node:child_process');
+const { sanitizePresentation } = require('./overlay-state');
 
 class CompanionProcessManager {
   constructor({
@@ -11,6 +12,7 @@ class CompanionProcessManager {
     onRefreshNeeded = async () => null,
     onObservationAck = () => {},
     onObservationDeferred = () => {},
+    onPresentation = () => {},
   } = {}) {
     this.workerPath = workerPath;
     this.forkImpl = forkImpl;
@@ -18,6 +20,7 @@ class CompanionProcessManager {
     this.onRefreshNeeded = onRefreshNeeded;
     this.onObservationAck = onObservationAck;
     this.onObservationDeferred = onObservationDeferred;
+    this.onPresentation = onPresentation;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
     this.expectedStop = false;
@@ -64,6 +67,11 @@ class CompanionProcessManager {
     if (!message || typeof message !== 'object') return;
     if (message.type === 'status' && message.status) {
       this.#publish(message.status);
+      return;
+    }
+    if (message.type === 'presentation') {
+      const presentation = sanitizePresentation(message.presentation);
+      if (presentation) this.onPresentation(presentation);
       return;
     }
     if (message.type === 'observation-ack') {

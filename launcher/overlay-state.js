@@ -45,11 +45,24 @@ class OverlayPresentationStore {
     if (this.items.length > this.maxItems) this.items = this.items.slice(-this.maxItems);
     return true;
   }
+  remove(presentationId) {
+    if (typeof presentationId !== 'string' || !presentationId) return false;
+    const before = this.items.length;
+    this.items = this.items.filter(item => item.presentation.presentationId !== presentationId);
+    return this.items.length !== before;
+  }
   clear() { this.items = []; }
   snapshot() {
     const cutoff = this.now() - this.ttlMs;
     this.items = this.items.filter(item => item.receivedAt >= cutoff);
     return this.items.map(item => item.presentation);
+  }
+  latestRecommendationId() {
+    const items = this.snapshot();
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      if (items[index].kind === 'RECOMMENDATION') return items[index].presentationId;
+    }
+    return 'companion-status';
   }
 }
 

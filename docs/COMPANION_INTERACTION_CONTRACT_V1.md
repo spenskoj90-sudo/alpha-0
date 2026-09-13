@@ -52,9 +52,13 @@ Voice is explicit push-to-talk, not background listening.
 
 - Consent defaults disabled and exists only in Electron main-process memory.
 - Sign-out and main-window close clear consent.
-- Electron permission handlers deny by default and grant `media` only to the trusted launcher main webContents while consent is active and the page is local `file://` content.
+- Consent alone does not grant ongoing microphone access. The trusted launcher renderer must explicitly arm a five-second main-process capture lease immediately before `getUserMedia`.
+- Voice IPC is sender-bound to the current main launcher `webContents`; the overlay and other renderers cannot arm/disarm/submit by reusing channel names.
+- Electron permission handlers deny by default and grant `media` only to the trusted launcher main webContents while both consent and the short-lived capture lease are active and the page is local `file://` content.
+- The lease is disarmed immediately after the `getUserMedia` request resolves or rejects, and is also cleared by submit, Companion stop, sign-out, entitlement revocation or shutdown.
 - Display/screen capture is explicitly denied.
 - Renderer capture requests audio only (`video: false`), fixed WebM/Opus, maximum six seconds and a bounded byte payload.
+- Capture errors, sign-out and Companion kill-switch discard partial audio instead of forwarding it.
 - Electron main validates audio/base64/locale again before Core transport.
 - Core repeats session, `game:read`, ACTIVE `companion` feature and explicit consent checks before provider I/O.
 - Raw audio and transcript are omitted from SENTINEL audit metadata; transcript is also omitted from the Core transcribe response.
@@ -64,12 +68,12 @@ Voice is explicit push-to-talk, not background listening.
 
 ## Provider boundary
 
-The Core provider-neutral `VoiceBoundary` is composed with an optional JSON-over-HTTP adapter. Non-loopback endpoints require HTTPS; optional credentials are process-environment inputs and are not exposed through voice status/results or audit metadata.
+The Core provider-neutral `VoiceBoundary` is composed with an optional JSON-over-HTTP adapter. Non-loopback endpoints require HTTPS; optional credentials are process-environment inputs, CR/LF header-injection values are rejected, and credentials are not exposed through voice status/results or audit metadata.
 
-No provider configured means `VOICE_PROVIDER_UNAVAILABLE`. Provider exceptions become bounded failure codes. There is no implicit browser/cloud speech fallback.
+No provider configured means `VOICE_PROVIDER_UNAVAILABLE`. Invalid provider configuration fails closed as bounded `VOICE_PROVIDER_CONFIGURATION_INVALID`; provider exceptions become bounded failure codes. There is no implicit browser/cloud speech fallback.
 
 ## Runtime status and evidence
 
-The read-only overlay and explicit-consent voice runtime are implemented as repository/runtime compositions. Automated tests cover protocol/type separation, bounded stores, stale-worker isolation, voice DTO sanitization, default-deny permission logic, capture bounds, session refresh, entitlement/consent enforcement, provider failures and transcript non-disclosure.
+The read-only overlay and explicit-consent voice runtime are implemented as repository/runtime compositions. Automated tests cover protocol/type separation, bounded stores, stale-worker isolation, voice DTO sanitization, sender-bound capture leases, default-deny permission logic, capture/discard bounds, session refresh, entitlement/consent enforcement, provider failures and transcript non-disclosure.
 
-This establishes **IMPLEMENTED / INTEGRATION-TESTED** repository evidence for the player interaction boundary. It does **not** establish a selected production STT/TTS vendor, production credentials, physical microphone/driver acceptance, acoustic/latency targets, signed desktop packaging, exact WoW/private-server compatibility or production-host acceptance. Those remain environment/external evidence gates.
+This establishes **IMPLEMENTED / INTEGRATION-TESTED** repository evidence for the player interaction boundary once the integrating exact-head CI passes. It does **not** establish a selected production STT/TTS vendor, production credentials, physical microphone/driver acceptance, acoustic/latency targets, signed desktop packaging, exact WoW/private-server compatibility or production-host acceptance. Those remain environment/external evidence gates.

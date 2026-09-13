@@ -9,7 +9,7 @@
 - Android client exists under `app/`.
 - FastAPI Core exists under `server/`.
 - Next.js control plane exists under `web/`.
-- Electron launcher exists under `launcher/`.
+- Electron launcher exists under `launcher/` and now exposes account/Companion runtime state in addition to local game launching.
 - WoW addon sources exist under `wow-addon/`.
 
 Existence of a source tree does not by itself establish that the surface is packaged, integrated or accepted in a real target environment.
@@ -24,6 +24,8 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 The Web account-control boundary stores Core access/refresh tokens only in HttpOnly, SameSite=Strict cookies, applies same-origin checks to state-changing account/billing requests, rotates an expired access session through the existing one-time Core refresh endpoint, and does not expose opaque tokens to client-side JavaScript.
 
+The Electron launcher follows a separate desktop boundary: Core access/refresh tokens remain in main-process memory and are not persisted in launcher configuration or returned through renderer status APIs. The isolated renderer can request sign-in/start/stop operations only through the preload bridge. The dedicated Companion worker receives the current access token over local process IPC; it does not receive the refresh token.
+
 These statements are orientation-level invariants. They do not replace inspection of the current implementation and tests.
 
 ## 3. Game integration architecture
@@ -34,7 +36,9 @@ These statements are orientation-level invariants. They do not replace inspectio
 - The conservative WoW adapter boundary is passive observation normalization only: explicit patch/server profiles, bounded latency and metadata, addon/launcher/entitlement observations, and UNVERIFIED-by-default capabilities. It has no action API and does not authorize or execute game actions.
 - Transactional event-to-outbox persistence and the recoverable event runtime are implemented: lease ownership, `FOR UPDATE SKIP LOCKED` claims, bounded retry/backoff, durable terminal failure, explicit replay and monotonic character projection are covered by unit/PostgreSQL tests.
 - Companion protocol v1 is implemented with five-way compatibility negotiation, bounded envelopes and FIFO backpressure, explicit latency classes, and fail-closed mismatch handling.
-- Server-side Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding. The Core WebSocket entrypoint additionally requires a valid Core session and an ACTIVE subscription-derived `companion` feature before the runtime can activate. Automated loopback tests exercise the composed socket path. This does **not** by itself establish a packaged launcher-hosted production Companion process; that product/runtime composition remains a separate target.
+- Server-side Companion runtime composition provides bounded lifecycle state, heartbeat freshness/watchdog degradation, deterministic reconnect/backoff, kill switch, queue/backpressure, peer-authentication and authorization ordering, TLS 1.2+ verification, optional certificate pinning, WebSocket/TCP transport seams and transport binding.
+- The Core WebSocket entrypoint requires loopback locality before account evaluation, a valid Core session and an ACTIVE subscription-derived `companion` feature. Browser-compatible launcher authentication may carry the opaque session token in a non-selected `sentinel.auth.<base64url>` WebSocket subprotocol so the token is not placed in the URL; Core selects only public `sentinel.v1`. ACTIVE feature state is revalidated on live Companion traffic so a transition such as `PAST_DUE` revokes an already-open session on the next heartbeat/envelope.
+- The Electron launcher now composes a dedicated Companion worker process: main-process account/session ownership, worker handshake/heartbeat, bounded reconnect/backoff, one-time refresh handoff, explicit stop/kill switch and player-visible `CONNECTING`/`ACTIVE`/`DEGRADED`/`STOPPED` state. Dedicated Node tests run in the routine Build & Test workflow. This is repository/runtime composition evidence, not signed desktop packaging or real-host acceptance.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation. Paid feature requirements are resolved server-side and fail closed when the resolver is missing, fails, or does not grant the required feature.
 - The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing and confidence/provenance. The Web includes a bounded recommendation presentation component, but the current default card is a presentation baseline; a live end-to-end Web recommendation retrieval path must not be inferred from that component alone.
 - Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` provides bounded, atomically persisted local buffering with malformed-file isolation; exact WoW/private-server L3 validation remains **UNVERIFIED**.
@@ -47,7 +51,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 - External provider events have a separate cryptographically verified ingress at `/v1/billing/provider-webhooks/{provider}`. The implemented generic adapter verifies `HMAC-SHA256 v1` over the exact raw body with bounded timestamp skew and constant-time comparison. It is a concrete signed-provider contract, not a claim of Stripe or another vendor-specific wire protocol.
 - The legacy `/v1/billing/webhooks/{provider}` shared-token path is restricted by `BillingService` to the internal `manual`/`test` providers and cannot activate an arbitrary external-provider subscription.
 - Provider snapshot reconciliation is deterministic: provider + subscription + provider revision + state derive an idempotent reconciliation event ID, and lifecycle transitions still pass through the same billing state machine.
-- Feature grants are derived only from `ACTIVE` subscriptions. `PENDING`, `PAST_DUE`, `CANCELED` and `EXPIRED` states grant no paid feature. `core-plus` currently grants `core` + `companion`; `/v1/companion/ws` enforces the `companion` grant before runtime activation.
+- Feature grants are derived only from `ACTIVE` subscriptions. `PENDING`, `PAST_DUE`, `CANCELED` and `EXPIRED` states grant no paid feature. `core-plus` currently grants `core` + `companion`; Companion connection startup and live traffic enforce the `companion` grant.
 - `/v1/entitlements/me` remains the caller-scoped game-entitlement readback; subscription-derived product features are separate from manually/admin-granted game entitlements.
 - The Web control plane presents live plan, subscription and game-entitlement state through the secure cookie-session proxy and exposes subscription-intent creation without pretending that payment occurred. The browser provider value is constrained to the provider-neutral manual boundary; activation remains provider-confirmed.
 - Production provider selection, vendor-specific protocol/network integration and payment credentials remain Owner/external activation work. No production provider credential is embedded in repository code.
@@ -58,8 +62,8 @@ These statements are orientation-level invariants. They do not replace inspectio
 - External telemetry-provider delivery and a deployed operator observability stack remain optional environment integrations, not implementation claims.
 - Performance budgets are represented as operation-scoped contracts with deterministic pass/fail evaluation; measured results remain acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state.
 - Deterministic privacy scrubbing and a canonical recovery matrix with fail-closed health outcomes are implemented and covered by unit tests.
-- End-to-end correlation propagation, real metrics/tracing composition, benchmark/failure-injection measurements and launcher/addon operational telemetry remain separate implementation/evidence concerns when repository inspection does not prove them.
-- Launcher/WoW-addon dedicated test and coverage evidence remains **UNVERIFIED** unless current repository evidence proves otherwise.
+- Launcher session/process/reconnect security and lifecycle behavior now has a dedicated deterministic CI job. WoW-addon ingestion/runtime evidence and launcher/addon operational telemetry remain separate implementation/evidence targets.
+- End-to-end correlation propagation, real metrics/tracing composition and benchmark/failure-injection measurements remain separate implementation/evidence concerns when repository inspection does not prove them.
 
 ## 6. Internal architecture work remaining
 
@@ -67,10 +71,11 @@ The first six implementation passes and Blocks A-D produced substantial foundati
 
 Largest remaining internal targets include:
 
-1. Packaged launcher → Companion host composition: process lifecycle, local persistence/addon ingestion, reconnect/backpressure/capability negotiation/health/kill-switch composition and Core delivery, with deterministic launcher/addon evidence where possible.
-2. Actual player-facing Overlay/voice/connection/degraded/account UX and end-to-end runtime wiring. Provider-neutral STT/TTS or presentation models alone do not constitute a complete voice product.
-3. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
-4. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
+1. Continue launcher/Companion/WoW composition from the now-tested account/process/socket lifecycle into local addon SavedVariables ingestion, bounded persistence/backpressure and conservative Core delivery of passive observations. Signed desktop packaging and real-host acceptance remain evidence targets after repository composition exists.
+2. Complete actual player-facing Overlay/voice runtime wiring beyond launcher connection/account state. Provider-neutral STT/TTS or presentation models alone do not constitute a complete voice product.
+3. Add deterministic WoW-addon contract/ingestion tests and preserve exact-environment evidence classification; repository tests must not be promoted to WoW 3.3.5a/private-server L3 validation.
+4. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
+5. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
 
 These are internal engineering targets and must not be mislabeled as Owner/external blockers.
 
@@ -80,7 +85,7 @@ Known external or protected items remain:
 
 - exact WoW target validation in the real 3.3.5a/private-server environment;
 - physical Android release-device acceptance;
-- real production Companion-host acceptance where exact-environment evidence is required;
+- real packaged Companion-host acceptance where exact-environment evidence is required;
 - production ingress/database credentials;
 - selected production payment-provider credentials and vendor-specific live integration;
 - signing-key/certificate custody;

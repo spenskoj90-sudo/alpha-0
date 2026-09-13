@@ -19,11 +19,31 @@ const catalog = [
 
 const session = new CoreSessionManager();
 let mainWindow = null;
+
+async function accountSnapshot() {
+  if (!session.status) return { session: null, features: [] };
+  try {
+    const payload = await session.featureStatus();
+    return { session: session.status, features: Array.isArray(payload.features) ? payload.features : [] };
+  } catch {
+    return { session: session.status, features: [] };
+  }
+}
+
+function publishAccountSnapshot() {
+  void accountSnapshot().then(snapshot => mainWindow?.webContents.send('account:status', snapshot));
+}
+
 const companion = new CompanionProcessManager({
-  onStatus: status => mainWindow?.webContents.send('companion:status', status),
+  onStatus: status => {
+    mainWindow?.webContents.send('companion:status', status);
+    if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(status.reason)) {
+      publishAccountSnapshot();
+    }
+  },
   onRefreshNeeded: async () => {
     await session.refresh();
-    mainWindow?.webContents.send('account:status', session.status);
+    publishAccountSnapshot();
     return session.accessToken;
   },
 });
@@ -74,16 +94,15 @@ ipcMain.handle('game:launch', (_, id) => {
 });
 
 ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
-  const status = await session.login({ coreUrl, email, password });
-  const features = await session.featureStatus();
-  return { session: status, features: features.features || [] };
+  await session.login({ coreUrl, email, password });
+  return accountSnapshot();
 });
 ipcMain.handle('account:logout', () => {
   companion.stop('ACCOUNT_LOGOUT');
   session.clear();
   return true;
 });
-ipcMain.handle('account:status', () => session.status);
+ipcMain.handle('account:status', () => accountSnapshot());
 ipcMain.handle('companion:status', () => companion.status);
 ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (!session.accessToken) throw new Error('AUTHENTICATION_REQUIRED');

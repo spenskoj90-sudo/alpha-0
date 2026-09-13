@@ -9,16 +9,23 @@ const startButton = $('companion-start');
 const stopButton = $('companion-stop');
 let signedIn = false;
 let companionState = 'STOPPED';
+let grantedFeatures = [];
+
+function refreshButtons() {
+  loginButton.disabled = signedIn;
+  logoutButton.disabled = !signedIn;
+  startButton.disabled = !signedIn || companionState !== 'STOPPED' || !grantedFeatures.includes('companion');
+  stopButton.disabled = companionState === 'STOPPED';
+}
 
 function setAccount(status, features = []) {
   signedIn = Boolean(status?.authenticated);
+  grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
   accountStatus.className = `status ${signedIn ? 'ok' : ''}`;
   accountStatus.textContent = signedIn
-    ? `ACCOUNT: AUTHENTICATED / ${features.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED'}`
+    ? `ACCOUNT: AUTHENTICATED / ${grantedFeatures.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED'}`
     : 'ACCOUNT: SIGNED OUT';
-  loginButton.disabled = signedIn;
-  logoutButton.disabled = !signedIn;
-  startButton.disabled = !signedIn || companionState !== 'STOPPED' || !features.includes('companion');
+  refreshButtons();
 }
 
 function setCompanion(status) {
@@ -26,9 +33,7 @@ function setCompanion(status) {
   const reason = status?.reason ? ` / ${status.reason}` : '';
   companionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : companionState === 'DEGRADED' ? 'warn' : ''}`;
   companionStatus.textContent = `COMPANION: ${companionState}${reason}`;
-  stopButton.disabled = companionState === 'STOPPED';
-  if (!signedIn) startButton.disabled = true;
-  else if (companionState !== 'STOPPED') startButton.disabled = true;
+  refreshButtons();
 }
 
 function showError(target, error) {
@@ -91,13 +96,16 @@ logoutButton.onclick = async () => {
 startButton.onclick = async () => {
   startButton.disabled = true;
   try { setCompanion(await window.sentinel.startCompanion($('core-url').value)); }
-  catch (error) { showError(companionStatus, error); startButton.disabled = false; }
+  catch (error) { showError(companionStatus, error); refreshButtons(); }
 };
 stopButton.onclick = async () => setCompanion(await window.sentinel.stopCompanion());
 
 window.sentinel.onCompanionStatus(setCompanion);
-window.sentinel.onAccountStatus(status => setAccount(status, signedIn ? ['companion'] : []));
+window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || []));
 
 Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), renderGames()])
-  .then(([account, companion]) => { setAccount(account, []); setCompanion(companion); })
+  .then(([snapshot, companion]) => {
+    setAccount(snapshot?.session, snapshot?.features || []);
+    setCompanion(companion);
+  })
   .catch(error => showError(companionStatus, error));

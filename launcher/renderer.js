@@ -214,11 +214,22 @@ async function startVoiceCapture() {
 
   voiceBusy = true;
   refreshButtons();
+  let armed = false;
   try {
-    voiceStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      video: false,
-    });
+    const lease = await window.sentinel.armVoiceCapture();
+    if (!lease?.armed || lease.actionCapable !== false) throw new Error('VOICE_CAPTURE_PERMISSION_DENIED');
+    armed = true;
+    try {
+      voiceStream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+    } finally {
+      if (armed) {
+        armed = false;
+        try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
+      }
+    }
     voiceChunks = [];
     voiceCaptureDiscarded = false;
     const recorder = new MediaRecorder(voiceStream, { mimeType, audioBitsPerSecond: 64000 });
@@ -236,6 +247,9 @@ async function startVoiceCapture() {
     voiceResult.className = 'status warn';
     voiceResult.textContent = `VOICE RESULT: CAPTURING / MAX ${Math.round(maxMs / 1000)}s`;
   } catch (error) {
+    if (armed) {
+      try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
+    }
     stopVoiceTracks();
     voiceRecorder = null;
     voiceCaptureDiscarded = false;

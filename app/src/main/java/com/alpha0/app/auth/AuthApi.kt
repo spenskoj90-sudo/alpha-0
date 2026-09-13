@@ -2,6 +2,11 @@ package com.alpha0.app.auth
 
 import android.content.Context
 import com.alpha0.app.diagnostics.DiagnosticLogger
+import com.alpha0.app.net.HttpMethod
+import com.alpha0.app.net.HttpRequest
+import com.alpha0.app.net.HttpResponse
+import com.alpha0.app.net.HttpTransport
+import com.alpha0.app.net.UrlConnectionHttpTransport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -13,7 +18,7 @@ interface RefreshClient {
 
 class AuthApi(
     private val baseUrl: String,
-    private val transport: AuthHttpTransport = UrlConnectionAuthHttpTransport(),
+    private val transport: HttpTransport = UrlConnectionHttpTransport(),
 ) : RefreshClient {
     data class Session(
         val accessToken: String,
@@ -61,9 +66,16 @@ class AuthApi(
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         return try {
-            val response = transport.postJson(
-                "$normalizedBase$path",
-                payload.toByteArray(Charsets.UTF_8),
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.POST,
+                    url = "$normalizedBase$path",
+                    headers = mapOf(
+                        "Content-Type" to "application/json",
+                        "Accept" to "application/json",
+                    ),
+                    body = payload.toByteArray(Charsets.UTF_8),
+                )
             )
             parseSessionResponse(response, op, t0)
         } catch (e: IOException) {
@@ -77,7 +89,7 @@ class AuthApi(
         }
     }
 
-    private fun parseSessionResponse(response: AuthHttpResponse, op: String, t0: Long): Result {
+    private fun parseSessionResponse(response: HttpResponse, op: String, t0: Long): Result {
         val json = runCatching { JSONObject(response.body) }.getOrNull()
         val duration = System.currentTimeMillis() - t0
         if (response.status !in 200..299 || json == null) {

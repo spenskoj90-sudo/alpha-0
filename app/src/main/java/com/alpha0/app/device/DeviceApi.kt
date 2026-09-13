@@ -2,15 +2,20 @@ package com.alpha0.app.device
 
 import android.content.Context
 import com.alpha0.app.diagnostics.DiagnosticLogger
+import com.alpha0.app.net.HttpMethod
+import com.alpha0.app.net.HttpRequest
+import com.alpha0.app.net.HttpTransport
+import com.alpha0.app.net.UrlConnectionHttpTransport
 import com.alpha0.app.security.DeviceIdentity
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Base64
 import java.util.UUID
 
-class DeviceApi(private val baseUrl: String) {
+class DeviceApi(
+    private val baseUrl: String,
+    private val transport: HttpTransport = UrlConnectionHttpTransport(),
+) {
     data class BindResult(
         val deviceId: String,
         val state: String,
@@ -49,15 +54,13 @@ class DeviceApi(private val baseUrl: String) {
     fun bind(accessToken: String, platform: String, publicKeyDerB64: String, fingerprintSha256: String): Result {
         require(accessToken.isNotBlank()) { "accessToken must not be blank" }
         val t0 = System.currentTimeMillis()
-        val connection = openJsonConnection("/v1/devices/bind", accessToken)
         return try {
             val payload = JSONObject().apply {
                 put("platform", platform)
                 put("public_key_der_b64", publicKeyDerB64)
                 put("fingerprint_sha256", fingerprintSha256)
             }.toString()
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            val response = readJsonResponse(connection)
+            val response = executeJson("/v1/devices/bind", payload, accessToken)
             val duration = System.currentTimeMillis() - t0
             if (response.status in 200..299 && response.json != null) {
                 val deviceId = response.json.optString("device_id")
@@ -91,8 +94,6 @@ class DeviceApi(private val baseUrl: String) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("DEVICE", "BIND", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             Result.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -100,10 +101,8 @@ class DeviceApi(private val baseUrl: String) {
         require(accessToken.isNotBlank()) { "accessToken must not be blank" }
         require(deviceId.isNotBlank()) { "deviceId must not be blank" }
         val t0 = System.currentTimeMillis()
-        val connection = openJsonConnection("/v1/devices/$deviceId/challenge", accessToken)
         return try {
-            connection.outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
-            val response = readJsonResponse(connection)
+            val response = executeJson("/v1/devices/$deviceId/challenge", "{}", accessToken)
             val duration = System.currentTimeMillis() - t0
             if (response.status in 200..299 && response.json != null) {
                 val challenge = response.json.optString("challenge")
@@ -126,8 +125,6 @@ class DeviceApi(private val baseUrl: String) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("DEVICE", "CHALLENGE", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             ChallengeResult.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -139,7 +136,6 @@ class DeviceApi(private val baseUrl: String) {
         val requestId = UUID.randomUUID().toString()
         val signedPayload = canonicalProofPayload(challenge, timestamp, requestId)
         val signature = Base64.getEncoder().encodeToString(deviceIdentity.sign(signedPayload))
-        val connection = openJsonConnection("/v1/devices/$deviceId/prove")
         return try {
             val payload = JSONObject().apply {
                 put("challenge", challenge)
@@ -147,8 +143,7 @@ class DeviceApi(private val baseUrl: String) {
                 put("request_id", requestId)
                 put("signature_b64", signature)
             }.toString()
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            val response = readJsonResponse(connection)
+            val response = executeJson("/v1/devices/$deviceId/prove", payload)
             val duration = System.currentTimeMillis() - t0
             if (response.status in 200..299 && response.json != null) {
                 val access = response.json.optString("session_token")
@@ -186,8 +181,6 @@ class DeviceApi(private val baseUrl: String) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("DEVICE", "PROVE", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             ProofResult.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -195,26 +188,24 @@ class DeviceApi(private val baseUrl: String) {
         fun errorCode(): String = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_$status"
     }
 
-    private fun openJsonConnection(path: String, accessToken: String? = null): HttpURLConnection {
+    private fun executeJson(path: String, payload: String, accessToken: String? = null): JsonResponse {
         val normalizedBase = baseUrl.trim().trimEnd('/')
-        return (URL("$normalizedBase$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-            if (!accessToken.isNullOrBlank()) {
-                setRequestProperty("Authorization", "Bearer $accessToken")
-            }
+        val headers = linkedMapOf(
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+        )
+        if (!accessToken.isNullOrBlank()) {
+            headers["Authorization"] = "Bearer $accessToken"
         }
-    }
-
-    private fun readJsonResponse(connection: HttpURLConnection): JsonResponse {
-        val status = connection.responseCode
-        val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-            ?.bufferedReader()?.use { it.readText() }.orEmpty()
-        return JsonResponse(status, runCatching { JSONObject(body) }.getOrNull())
+        val response = transport.execute(
+            HttpRequest(
+                method = HttpMethod.POST,
+                url = "$normalizedBase$path",
+                headers = headers,
+                body = payload.toByteArray(Charsets.UTF_8),
+            )
+        )
+        return JsonResponse(response.status, runCatching { JSONObject(response.body) }.getOrNull())
     }
 
     companion object {

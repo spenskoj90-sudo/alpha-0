@@ -1,10 +1,12 @@
 package com.alpha0.app.sync
 
+import com.alpha0.app.net.HttpMethod
+import com.alpha0.app.net.HttpRequest
+import com.alpha0.app.net.HttpTransport
+import com.alpha0.app.net.UrlConnectionHttpTransport
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -12,7 +14,10 @@ interface EventBatchClient {
     fun sendBatch(accessToken: String, events: List<OfflineEventQueue.Item>): EventSyncApi.Result
 }
 
-class EventSyncApi(private val baseUrl: String) : EventBatchClient {
+class EventSyncApi(
+    private val baseUrl: String,
+    private val transport: HttpTransport = UrlConnectionHttpTransport(),
+) : EventBatchClient {
     data class BatchResult(
         val accepted: Int,
         val duplicates: Int,
@@ -29,41 +34,40 @@ class EventSyncApi(private val baseUrl: String) : EventBatchClient {
         require(events.size <= 100) { "events must contain at most 100 items" }
 
         val normalizedBase = baseUrl.trim().trimEnd('/')
-        val connection = (URL("$normalizedBase/v1/events:batch").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            doOutput = true
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("X-Request-ID", UUID.randomUUID().toString())
-            setRequestProperty("Idempotency-Key", batchIdempotencyKey(events))
-        }
+        val payload = JSONObject().apply {
+            put("events", JSONArray().apply {
+                events.forEach { item ->
+                    put(JSONObject().apply {
+                        put("event_id", item.eventId)
+                        put("device_id", item.deviceId)
+                        put("type", item.type)
+                        put("schema_version", item.schemaVersion)
+                        put("occurred_at", item.occurredAt)
+                        put("sequence", item.sequence)
+                        put("payload", item.payload)
+                    })
+                }
+            })
+        }.toString()
 
         return try {
-            val payload = JSONObject().apply {
-                put("events", JSONArray().apply {
-                    events.forEach { item ->
-                        put(JSONObject().apply {
-                            put("event_id", item.eventId)
-                            put("device_id", item.deviceId)
-                            put("type", item.type)
-                            put("schema_version", item.schemaVersion)
-                            put("occurred_at", item.occurredAt)
-                            put("sequence", item.sequence)
-                            put("payload", item.payload)
-                        })
-                    }
-                })
-            }.toString()
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            val status = connection.responseCode
-            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            val json = runCatching { JSONObject(body) }.getOrNull()
-            if (status !in 200..299 || json == null) {
-                return Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_$status")
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.POST,
+                    url = "$normalizedBase/v1/events:batch",
+                    headers = mapOf(
+                        "Authorization" to "Bearer $accessToken",
+                        "Content-Type" to "application/json",
+                        "Accept" to "application/json",
+                        "X-Request-ID" to UUID.randomUUID().toString(),
+                        "Idempotency-Key" to batchIdempotencyKey(events),
+                    ),
+                    body = payload.toByteArray(Charsets.UTF_8),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            if (response.status !in 200..299 || json == null) {
+                return Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}")
             }
             val accepted = json.optInt("accepted", -1)
             val duplicates = json.optInt("duplicates", -1)
@@ -75,8 +79,6 @@ class EventSyncApi(private val baseUrl: String) : EventBatchClient {
             Result.Failure("NETWORK_ERROR")
         } catch (_: Exception) {
             Result.Failure("UNEXPECTED_ERROR")
-        } finally {
-            connection.disconnect()
         }
     }
 

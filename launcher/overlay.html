@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SENTINEL Overlay</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 12px; background: transparent; color: #eef3f7; overflow: hidden; pointer-events: none; }
+    .panel { min-height: 84px; border: 1px solid rgba(170, 204, 226, .28); border-radius: 14px; background: rgba(8, 13, 18, .86); box-shadow: 0 12px 36px rgba(0,0,0,.42); padding: 12px 14px; backdrop-filter: blur(10px); }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .brand { font-size: 12px; letter-spacing: .16em; font-weight: 750; }
+    .state { font-size: 11px; opacity: .76; }
+    .list { display: grid; gap: 7px; }
+    .item { border-left: 2px solid rgba(153, 210, 244, .64); padding-left: 9px; }
+    .kind { font-size: 10px; letter-spacing: .1em; opacity: .62; }
+    .text { margin-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+    .empty { font-size: 12px; opacity: .68; }
+  </style>
+</head>
+<body>
+  <section class="panel" aria-live="polite">
+    <div class="top"><div class="brand">SENTINEL</div><div id="state" class="state">STOPPED</div></div>
+    <div id="presentations" class="list"><div class="empty">Waiting for Companion presentation.</div></div>
+  </section>
+  <script src="overlay-renderer.js"></script>
+</body>
+</html>

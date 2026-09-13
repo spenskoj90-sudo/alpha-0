@@ -2,6 +2,7 @@
 
 const { randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
+const { sanitizePresentation } = require('./overlay-state');
 
 const HANDSHAKE = Object.freeze({
   protocol_version: '1.0',
@@ -11,6 +12,7 @@ const HANDSHAKE = Object.freeze({
   capability_profile: 'wow.passive.v1',
 });
 const TERMINAL_POLICY_REASONS = new Set(['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED']);
+const PRESENTATION_MESSAGE_TYPES = new Set(['HEALTH', 'UGS_UPDATE']);
 
 function requireLoopbackCore(value) {
   const url = new URL(String(value || ''));
@@ -47,6 +49,20 @@ function wowObservationEnvelope(observation, sequence) {
     latency_class: 'BACKGROUND',
     payload: observation,
   };
+}
+
+function normalizeServerPresentation(message) {
+  if (!message || typeof message !== 'object' || !PRESENTATION_MESSAGE_TYPES.has(message.message_type)) return null;
+  const payload = message.payload;
+  if (!payload || typeof payload !== 'object') return null;
+  return sanitizePresentation({
+    presentationId: payload.presentation_id,
+    channel: payload.channel,
+    kind: payload.kind,
+    text: payload.text,
+    confidence: payload.confidence ?? null,
+    provenance: Array.isArray(payload.provenance) ? payload.provenance : [],
+  });
 }
 
 class ReconnectPolicy {
@@ -179,7 +195,10 @@ class CompanionWorkerRuntime {
         accepted: message.payload.accepted === true,
         reason: typeof message.payload.reason === 'string' ? message.payload.reason : null,
       });
+      return;
     }
+    const presentation = normalizeServerPresentation(message);
+    if (presentation) this.send({ type: 'presentation', presentation });
   }
 
   #onClose(event) {
@@ -259,6 +278,7 @@ module.exports = {
   CompanionWorkerRuntime,
   ReconnectPolicy,
   authProtocols,
+  normalizeServerPresentation,
   requireLoopbackCore,
   websocketUrl,
   wowObservationEnvelope,

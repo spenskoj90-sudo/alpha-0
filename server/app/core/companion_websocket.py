@@ -5,25 +5,15 @@ import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Callable
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 
 from .billing_provider_api import router as billing_provider_router
 from .companion_compatibility import negotiate_companion_compatibility
-from .companion_peer_auth import (
-    AllowlistPeerAuthenticator,
-    CompanionPeerAuthenticator,
-    PeerAuthEvidence,
-)
-from .companion_protocol import (
-    CompanionEnvelope,
-    CompanionHandshake,
-    CompanionHandshakeResult,
-    CompanionMessageType,
-    CompanionMode,
-    CompanionQueue,
-    LatencyClass,
-)
+from .companion_interaction import CompanionPresentation, CompanionPresentationChannel, CompanionPresentationKind
+from .companion_peer_auth import AllowlistPeerAuthenticator, CompanionPeerAuthenticator, PeerAuthEvidence
+from .companion_protocol import CompanionEnvelope, CompanionHandshake, CompanionHandshakeResult, CompanionMessageType, CompanionMode, CompanionQueue, LatencyClass
 from .companion_runtime import CompanionRuntime
 from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
@@ -65,8 +55,6 @@ def offered_subprotocols(websocket: WebSocket) -> tuple[str, ...]:
 
 
 def authorization_from_subprotocol(websocket: WebSocket) -> str | None:
-    """Recover an opaque bearer token without putting it in the WebSocket URL."""
-
     for protocol in offered_subprotocols(websocket):
         if not protocol.startswith(_AUTH_SUBPROTOCOL_PREFIX):
             continue
@@ -85,33 +73,12 @@ def authorization_from_subprotocol(websocket: WebSocket) -> str | None:
 
 
 class CompanionWebSocketTransport:
-    """Concrete loopback WebSocket transport over the authenticated session seam."""
-
-    def __init__(
-        self,
-        websocket: WebSocket,
-        *,
-        compatibility: CompanionTransportCompatibility | None = None,
-        runtime: CompanionRuntime | None = None,
-        queue: CompanionQueue | None = None,
-        peer_authenticator: CompanionPeerAuthenticator | None = None,
-        peer_auth_evidence_factory: Callable[[str], PeerAuthEvidence] | None = None,
-    ) -> None:
+    def __init__(self, websocket: WebSocket, *, compatibility: CompanionTransportCompatibility | None = None, runtime: CompanionRuntime | None = None, queue: CompanionQueue | None = None, peer_authenticator: CompanionPeerAuthenticator | None = None, peer_auth_evidence_factory: Callable[[str], PeerAuthEvidence] | None = None) -> None:
         self.websocket = websocket
         self.compatibility = compatibility or CompanionTransportCompatibility()
         self.peer_authenticator = peer_authenticator
-        self.peer_auth_evidence_factory = peer_auth_evidence_factory or (
-            lambda host: PeerAuthEvidence(
-                mechanism="loopback",
-                peer_id=host,
-                authenticated=True,
-            )
-        )
-        self.session = CompanionTransportSession(
-            runtime or build_companion_runtime(),
-            queue,
-            peer_authenticator,
-        )
+        self.peer_auth_evidence_factory = peer_auth_evidence_factory or (lambda host: PeerAuthEvidence(mechanism="loopback", peer_id=host, authenticated=True))
+        self.session = CompanionTransportSession(runtime or build_companion_runtime(), queue, peer_authenticator)
         self._handshaken = False
         self._closed = False
 
@@ -132,10 +99,7 @@ class CompanionWebSocketTransport:
         try:
             self.session.connect(auth_evidence=self.peer_auth_evidence_factory(host))
         except (PermissionError, ValueError):
-            await self.websocket.close(
-                code=status.WS_1008_POLICY_VIOLATION,
-                reason="PEER_AUTHORIZATION_FAILED",
-            )
+            await self.websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="PEER_AUTHORIZATION_FAILED")
             self._closed = True
             return False
         selected = _PUBLIC_SUBPROTOCOL if _PUBLIC_SUBPROTOCOL in offered_subprotocols(self.websocket) else None
@@ -155,12 +119,7 @@ class CompanionWebSocketTransport:
             self._closed = True
             self.session.close()
             await self.websocket.close(code=status.WS_1002_PROTOCOL_ERROR, reason="INVALID_HANDSHAKE")
-            return CompanionHandshakeResult(
-                accepted=False,
-                reason_code="INVALID_HANDSHAKE",
-                mode=CompanionMode.STOPPED,
-            )
-
+            return CompanionHandshakeResult(accepted=False, reason_code="INVALID_HANDSHAKE", mode=CompanionMode.STOPPED)
         compatibility = negotiate_companion_compatibility(
             offered_protocol=offered.protocol_version,
             supported_protocols=self.compatibility.supported_protocols,
@@ -178,25 +137,14 @@ class CompanionWebSocketTransport:
         elif compatibility.reason_code == "CAPABILITY_PROFILE_UNSUPPORTED":
             reason_code = "CAPABILITY_PROFILE_MISMATCH"
         else:
-            negotiated_dimensions = (
+            dimensions = (
                 (offered.protocol_version, self.compatibility.supported_protocols, "PROTOCOL_VERSION_UNSUPPORTED"),
                 (offered.ugs_schema_version, self.compatibility.supported_ugs_schemas, "UGS_SCHEMA_MISMATCH"),
                 (offered.adapter_contract_version, self.compatibility.supported_adapter_contracts, "ADAPTER_CONTRACT_MISMATCH"),
                 (offered.core_protocol_version, self.compatibility.supported_core_protocols, "CORE_PROTOCOL_MISMATCH"),
             )
-            reason_code = next(
-                (
-                    reason
-                    for offered_version, supported, reason in negotiated_dimensions
-                    if not _has_compatible_version(offered_version, supported)
-                ),
-                "VERSION_NEGOTIATION_FAILED",
-            )
-        result = CompanionHandshakeResult(
-            accepted=compatibility.accepted,
-            reason_code=reason_code,
-            mode=CompanionMode.ACTIVE if compatibility.accepted else CompanionMode.STOPPED,
-        )
+            reason_code = next((reason for offered_version, supported, reason in dimensions if not _has_compatible_version(offered_version, supported)), "VERSION_NEGOTIATION_FAILED")
+        result = CompanionHandshakeResult(accepted=compatibility.accepted, reason_code=reason_code, mode=CompanionMode.ACTIVE if compatibility.accepted else CompanionMode.STOPPED)
         await self.websocket.send_json(result.model_dump(mode="json"))
         if not result.accepted:
             self._closed = True
@@ -259,7 +207,6 @@ class CompanionWebSocketTransport:
 def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
     try:
         from .companion_compatibility import negotiate_version
-
         return negotiate_version(offered, supported) is not None
     except ValueError:
         return False
@@ -267,75 +214,58 @@ def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
 
 def _companion_entitlement_active(user_id: str) -> bool:
     from app.main import billing_service
-
     return billing_service.has_feature(user_id, "companion")
 
 
 async def _authorize_companion_account(websocket: WebSocket) -> str | None:
-    """Bind Companion activation to a Core session and paid feature grant."""
-
     authorization = websocket.headers.get("authorization") or authorization_from_subprotocol(websocket)
     if not authorization:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="AUTHENTICATION_REQUIRED")
         return None
     from app.main import principal_from_token, require_bearer, store
-
     try:
         principal = principal_from_token(require_bearer(authorization))
     except HTTPException:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="INVALID_SESSION")
         return None
     if not _companion_entitlement_active(principal.user_id):
-        store.add_audit({
-            "actor_user_id": principal.user_id,
-            "actor_device_id": principal.device_id,
-            "action": "companion:connect",
-            "resource": "companion",
-            "decision": "DENY",
-            "reason_code": "COMPANION_ENTITLEMENT_REQUIRED",
-            "request_id": None,
-        })
+        store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "companion:connect", "resource": "companion", "decision": "DENY", "reason_code": "COMPANION_ENTITLEMENT_REQUIRED", "request_id": None})
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REQUIRED")
         return None
-    store.add_audit({
-        "actor_user_id": principal.user_id,
-        "actor_device_id": principal.device_id,
-        "action": "companion:connect",
-        "resource": "companion",
-        "decision": "ALLOW",
-        "reason_code": "COMPANION_ENTITLEMENT_ACTIVE",
-        "request_id": None,
-    })
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "companion:connect", "resource": "companion", "decision": "ALLOW", "reason_code": "COMPANION_ENTITLEMENT_ACTIVE", "request_id": None})
     return principal.user_id
 
 
 async def _revoke_companion_session(websocket: WebSocket, user_id: str) -> None:
     from app.main import store
-
-    store.add_audit({
-        "actor_user_id": user_id,
-        "actor_device_id": None,
-        "action": "companion:session",
-        "resource": "companion",
-        "decision": "DENY",
-        "reason_code": "COMPANION_ENTITLEMENT_REVOKED",
-        "request_id": None,
-    })
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "companion:session", "resource": "companion", "decision": "DENY", "reason_code": "COMPANION_ENTITLEMENT_REVOKED", "request_id": None})
     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REVOKED")
 
 
-def _wow_observation_ack(
-    envelope: CompanionEnvelope,
-    *,
-    accepted: bool,
-    event_id: str,
-    reason: str,
-) -> CompanionEnvelope:
+def _wow_observation_ack(envelope: CompanionEnvelope, *, accepted: bool, event_id: str, reason: str) -> CompanionEnvelope:
+    return CompanionEnvelope(sequence=envelope.sequence, message_type=CompanionMessageType.WOW_OBSERVATION_ACK, latency_class=LatencyClass.BACKGROUND, payload={"event_id": event_id, "accepted": accepted, "reason": reason})
+
+
+def _wow_observation_presentation(envelope: CompanionEnvelope) -> CompanionEnvelope:
+    presentation = CompanionPresentation(
+        channel=CompanionPresentationChannel.OVERLAY,
+        kind=CompanionPresentationKind.STATUS,
+        text="Passive WoW checkpoint accepted by Core.",
+        correlation_id=uuid4(),
+        provenance=("sentinel-core", "wow-passive-checkpoint"),
+    )
     return CompanionEnvelope(
         sequence=envelope.sequence,
-        message_type=CompanionMessageType.WOW_OBSERVATION_ACK,
-        latency_class=LatencyClass.BACKGROUND,
-        payload={"event_id": event_id, "accepted": accepted, "reason": reason},
+        message_type=CompanionMessageType.HEALTH,
+        latency_class=LatencyClass.RESPONSIVE,
+        payload={
+            "presentation_id": str(presentation.presentation_id),
+            "channel": presentation.channel.value,
+            "kind": presentation.kind.value,
+            "text": presentation.text,
+            "confidence": presentation.confidence,
+            "provenance": list(presentation.provenance),
+        },
     )
 
 
@@ -343,35 +273,13 @@ def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> Compa
     raw_event_id = str(envelope.payload.get("event_id") or "unknown")[:128]
     try:
         observation = WowObservation.model_validate(envelope.payload)
-        observation = observation.model_copy(
-            update={"launcher_associated": True, "account_entitled": True}
-        )
+        observation = observation.model_copy(update={"launcher_associated": True, "account_entitled": True})
         normalized = ConservativeWowAdapter().normalize(observation)
     except Exception:
-        return _wow_observation_ack(
-            envelope,
-            accepted=False,
-            event_id=raw_event_id,
-            reason="INVALID_WOW_OBSERVATION",
-        )
-
+        return _wow_observation_ack(envelope, accepted=False, event_id=raw_event_id, reason="INVALID_WOW_OBSERVATION")
     from app.main import store
-
-    store.add_audit({
-        "actor_user_id": user_id,
-        "actor_device_id": None,
-        "action": "companion:wow-observation",
-        "resource": "wow-passive-observation",
-        "decision": "ALLOW",
-        "reason_code": "PASSIVE_CHECKPOINT_ACCEPTED",
-        "request_id": normalized.event_id,
-    })
-    return _wow_observation_ack(
-        envelope,
-        accepted=True,
-        event_id=normalized.event_id,
-        reason="PASSIVE_CHECKPOINT_ACCEPTED",
-    )
+    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "companion:wow-observation", "resource": "wow-passive-observation", "decision": "ALLOW", "reason_code": "PASSIVE_CHECKPOINT_ACCEPTED", "request_id": normalized.event_id})
+    return _wow_observation_ack(envelope, accepted=True, event_id=normalized.event_id, reason="PASSIVE_CHECKPOINT_ACCEPTED")
 
 
 @router.websocket("/v1/companion/ws")
@@ -394,17 +302,16 @@ async def companion_websocket(websocket: WebSocket) -> None:
             envelope = await transport.receive_envelope()
             if envelope is None:
                 return
-            # Revalidate server-authoritative subscription state on live traffic.
-            # Launcher heartbeats bound revocation latency without trusting client state.
             if not _companion_entitlement_active(user_id):
                 await _revoke_companion_session(websocket, user_id)
                 return
-            # Incoming envelopes are bounded transient transport work, not the durable
-            # outbound queue. Consume each after validation to avoid artificial buildup.
             transport.session.queue.pop()
             if envelope.message_type == CompanionMessageType.WOW_OBSERVATION:
                 ack = _process_wow_observation(envelope, user_id)
                 await websocket.send_json(ack.model_dump(mode="json"))
+                if ack.payload.get("accepted") is True:
+                    presentation = _wow_observation_presentation(envelope)
+                    await websocket.send_json(presentation.model_dump(mode="json"))
     except WebSocketDisconnect:
         return
     finally:

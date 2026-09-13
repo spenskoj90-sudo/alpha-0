@@ -10,13 +10,21 @@ const main = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
 const preload = fs.readFileSync(path.join(root, 'preload.js'), 'utf8');
 const renderer = fs.readFileSync(path.join(root, 'renderer.js'), 'utf8');
 
+function functionBody(source, name, nextMarker) {
+  const start = source.indexOf(`function ${name}`);
+  const end = source.indexOf(nextMarker, start);
+  assert.ok(start >= 0 && end > start, `${name} boundary not found`);
+  return source.slice(start, end);
+}
+
 test('microphone permission requires short-lived main-process capture lease', () => {
+  const permissions = functionBody(main, 'configureVoicePermissions()', "ipcMain.handle('catalog'");
   assert.match(main, /VOICE_CAPTURE_PERMISSION_LEASE_MS\s*=\s*5000/);
   assert.match(main, /function voiceCapturePermissionArmed\(\)/);
   assert.match(main, /voiceCapturePermissionExpiresAt\s*>\s*Date\.now\(\)/);
-  assert.match(main, /consentGranted:\s*voiceCapturePermissionArmed\(\)/);
-  assert.doesNotMatch(main, /consentGranted:\s*voiceConsentGranted[,\n]/);
-  assert.match(main, /setDisplayMediaRequestHandler\(\(_request, callback\) => callback\(null\)\)/);
+  assert.match(permissions, /consentGranted:\s*voiceCapturePermissionArmed\(\)/);
+  assert.doesNotMatch(permissions, /consentGranted:\s*voiceConsentGranted[,\n]/);
+  assert.match(permissions, /setDisplayMediaRequestHandler\(\(_request, callback\) => callback\(null\)\)/);
 });
 
 test('voice IPC is sender-bound and capture lease is explicitly arm/disarm scoped', () => {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +29,10 @@ from .companion_transport import CompanionTransportSession
 router = APIRouter(tags=["companion"])
 router.include_router(billing_provider_router)
 
+_PUBLIC_SUBPROTOCOL = "sentinel.v1"
+_AUTH_SUBPROTOCOL_PREFIX = "sentinel.auth."
+_MAX_SESSION_TOKEN_LENGTH = 4096
+
 
 @dataclass(frozen=True, slots=True)
 class CompanionTransportCompatibility:
@@ -49,6 +54,31 @@ def is_loopback_peer(host: str | None) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def offered_subprotocols(websocket: WebSocket) -> tuple[str, ...]:
+    raw = websocket.headers.get("sec-websocket-protocol", "")
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
+def authorization_from_subprotocol(websocket: WebSocket) -> str | None:
+    """Recover an opaque bearer token without putting it in the WebSocket URL."""
+
+    for protocol in offered_subprotocols(websocket):
+        if not protocol.startswith(_AUTH_SUBPROTOCOL_PREFIX):
+            continue
+        encoded = protocol.removeprefix(_AUTH_SUBPROTOCOL_PREFIX)
+        if not encoded or len(encoded) > 5500:
+            return None
+        try:
+            padding = "=" * ((4 - len(encoded) % 4) % 4)
+            token = base64.urlsafe_b64decode(encoded + padding).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if not token or len(token) > _MAX_SESSION_TOKEN_LENGTH:
+            return None
+        return f"Bearer {token}"
+    return None
 
 
 class CompanionWebSocketTransport:
@@ -105,7 +135,8 @@ class CompanionWebSocketTransport:
             )
             self._closed = True
             return False
-        await self.websocket.accept()
+        selected = _PUBLIC_SUBPROTOCOL if _PUBLIC_SUBPROTOCOL in offered_subprotocols(self.websocket) else None
+        await self.websocket.accept(subprotocol=selected)
         return True
 
     async def handshake(self) -> CompanionHandshakeResult:
@@ -191,7 +222,6 @@ class CompanionWebSocketTransport:
         return envelope
 
     async def send(self) -> CompanionEnvelope | None:
-        """Send exactly one queued envelope and measure local transport-call latency."""
         if self._closed or not self._handshaken:
             return None
         queued = self.session.queue.peek()
@@ -232,32 +262,27 @@ def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
         return False
 
 
-async def _authorize_companion_account(websocket: WebSocket) -> bool:
-    """Bind Companion activation to a Core session and paid feature grant.
+def _companion_entitlement_active(user_id: str) -> bool:
+    from app.main import billing_service
 
-    Loopback/peer authentication protects the local transport. This additional
-    boundary binds the runtime to the server-authoritative account/subscription
-    state before CompanionRuntime is activated.
-    """
+    return billing_service.has_feature(user_id, "companion")
 
-    authorization = websocket.headers.get("authorization")
+
+async def _authorize_companion_account(websocket: WebSocket) -> str | None:
+    """Bind Companion activation to a Core session and paid feature grant."""
+
+    authorization = websocket.headers.get("authorization") or authorization_from_subprotocol(websocket)
     if not authorization:
-        await websocket.close(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="AUTHENTICATION_REQUIRED",
-        )
-        return False
-    from app.main import billing_service, principal_from_token, require_bearer, store
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="AUTHENTICATION_REQUIRED")
+        return None
+    from app.main import principal_from_token, require_bearer, store
 
     try:
         principal = principal_from_token(require_bearer(authorization))
     except HTTPException:
-        await websocket.close(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="INVALID_SESSION",
-        )
-        return False
-    if not billing_service.has_feature(principal.user_id, "companion"):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="INVALID_SESSION")
+        return None
+    if not _companion_entitlement_active(principal.user_id):
         store.add_audit({
             "actor_user_id": principal.user_id,
             "actor_device_id": principal.device_id,
@@ -267,11 +292,8 @@ async def _authorize_companion_account(websocket: WebSocket) -> bool:
             "reason_code": "COMPANION_ENTITLEMENT_REQUIRED",
             "request_id": None,
         })
-        await websocket.close(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="COMPANION_ENTITLEMENT_REQUIRED",
-        )
-        return False
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REQUIRED")
+        return None
     store.add_audit({
         "actor_user_id": principal.user_id,
         "actor_device_id": principal.device_id,
@@ -281,18 +303,32 @@ async def _authorize_companion_account(websocket: WebSocket) -> bool:
         "reason_code": "COMPANION_ENTITLEMENT_ACTIVE",
         "request_id": None,
     })
-    return True
+    return principal.user_id
+
+
+async def _revoke_companion_session(websocket: WebSocket, user_id: str) -> None:
+    from app.main import store
+
+    store.add_audit({
+        "actor_user_id": user_id,
+        "actor_device_id": None,
+        "action": "companion:session",
+        "resource": "companion",
+        "decision": "DENY",
+        "reason_code": "COMPANION_ENTITLEMENT_REVOKED",
+        "request_id": None,
+    })
+    await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REVOKED")
 
 
 @router.websocket("/v1/companion/ws")
 async def companion_websocket(websocket: WebSocket) -> None:
-    # Network locality is checked before account state so remote peers cannot
-    # use this endpoint as an account/session oracle.
     host = websocket.client.host if websocket.client else None
     if not is_loopback_peer(host):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="LOOPBACK_ONLY")
         return
-    if not await _authorize_companion_account(websocket):
+    user_id = await _authorize_companion_account(websocket)
+    if user_id is None:
         return
     transport = CompanionWebSocketTransport(websocket)
     if not await transport.accept():
@@ -304,6 +340,11 @@ async def companion_websocket(websocket: WebSocket) -> None:
         while True:
             envelope = await transport.receive_envelope()
             if envelope is None:
+                return
+            # Revalidate server-authoritative subscription state on live traffic.
+            # Launcher heartbeats bound revocation latency without trusting client state.
+            if not _companion_entitlement_active(user_id):
+                await _revoke_companion_session(websocket, user_id)
                 return
     except WebSocketDisconnect:
         return

@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('sentinel', {
   companionStatus: () => ipcRenderer.invoke('companion:status'),
   startCompanion: coreUrl => ipcRenderer.invoke('companion:start', coreUrl),
   stopCompanion: () => ipcRenderer.invoke('companion:stop'),
+  voiceStatus: () => ipcRenderer.invoke('voice:status'),
+  setVoiceConsent: granted => ipcRenderer.invoke('voice:consent:set', granted === true),
+  submitVoice: payload => ipcRenderer.invoke('voice:submit', payload),
   onCompanionStatus: callback => {
     if (typeof callback !== 'function') return () => {};
     const handler = (_event, status) => callback(status);
@@ -30,5 +33,11 @@ contextBridge.exposeInMainWorld('sentinel', {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on('wow:checkpoint-status', handler);
     return () => ipcRenderer.removeListener('wow:checkpoint-status', handler);
+  },
+  onVoiceStatus: callback => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on('voice:status', handler);
+    return () => ipcRenderer.removeListener('voice:status', handler);
   },
 });

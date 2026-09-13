@@ -269,6 +269,31 @@ def _wow_observation_presentation(envelope: CompanionEnvelope) -> CompanionEnvel
     )
 
 
+def _runtime_health_envelope(
+    envelope: CompanionEnvelope,
+    transport: CompanionWebSocketTransport,
+    connection_id: str,
+) -> CompanionEnvelope:
+    transport.session.runtime.record_heartbeat()
+    health = transport.health
+    return CompanionEnvelope(
+        sequence=envelope.sequence,
+        message_type=CompanionMessageType.HEALTH,
+        latency_class=LatencyClass.RESPONSIVE,
+        payload={
+            "health_kind": "runtime",
+            "connection_id": connection_id,
+            "heartbeat_message_id": str(envelope.message_id),
+            "mode": health.mode.value,
+            "reconnect_attempts": health.reconnect_attempts,
+            "queue_depth": health.queue_depth,
+            "dropped_events": health.dropped_events,
+            "kill_switch_active": health.kill_switch_active,
+            "peer_authenticated": health.peer_authenticated,
+        },
+    )
+
+
 def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> CompanionEnvelope:
     raw_event_id = str(envelope.payload.get("event_id") or "unknown")[:128]
     try:
@@ -294,6 +319,7 @@ async def companion_websocket(websocket: WebSocket) -> None:
     transport = CompanionWebSocketTransport(websocket)
     if not await transport.accept():
         return
+    connection_id = str(uuid4())
     try:
         result = await transport.handshake()
         if not result.accepted:
@@ -306,6 +332,10 @@ async def companion_websocket(websocket: WebSocket) -> None:
                 await _revoke_companion_session(websocket, user_id)
                 return
             transport.session.queue.pop()
+            if envelope.message_type == CompanionMessageType.HEARTBEAT:
+                runtime_health = _runtime_health_envelope(envelope, transport, connection_id)
+                await websocket.send_json(runtime_health.model_dump(mode="json"))
+                continue
             if envelope.message_type == CompanionMessageType.WOW_OBSERVATION:
                 ack = _process_wow_observation(envelope, user_id)
                 await websocket.send_json(ack.model_dump(mode="json"))

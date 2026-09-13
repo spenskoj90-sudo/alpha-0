@@ -10,7 +10,11 @@ function clear(node) {
 function render(snapshot) {
   const companionState = typeof snapshot?.companion?.state === 'string' ? snapshot.companion.state : 'STOPPED';
   const checkpointState = typeof snapshot?.wow?.state === 'string' ? snapshot.wow.state : null;
-  stateNode.textContent = checkpointState ? `${companionState} · ${checkpointState}` : companionState;
+  const p95 = Number.isFinite(snapshot?.runtime?.rtt?.p95Ms) ? Math.round(snapshot.runtime.rtt.p95Ms) : null;
+  const parts = [companionState];
+  if (checkpointState) parts.push(checkpointState);
+  if (p95 !== null) parts.push(`RTT p95 ${p95}ms`);
+  stateNode.textContent = parts.join(' · ');
   clear(listNode);
   const presentations = Array.isArray(snapshot?.presentations) ? snapshot.presentations.slice(-4) : [];
   if (!presentations.length) {

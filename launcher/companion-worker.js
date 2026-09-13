@@ -1,8 +1,10 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { performance } = require('node:perf_hooks');
 const { URL } = require('node:url');
 const { sanitizePresentation } = require('./overlay-state');
+const { CompanionRuntimeHealthTracker } = require('./runtime-health');
 
 const HANDSHAKE = Object.freeze({
   protocol_version: '1.0',
@@ -87,6 +89,7 @@ class CompanionWorkerRuntime {
     setIntervalImpl = setInterval,
     clearIntervalImpl = clearInterval,
     reconnectPolicy = new ReconnectPolicy(),
+    nowMs = () => performance.now(),
   } = {}) {
     if (typeof WebSocketImpl !== 'function') throw new Error('WEBSOCKET_UNAVAILABLE');
     this.WebSocketImpl = WebSocketImpl;
@@ -96,6 +99,7 @@ class CompanionWorkerRuntime {
     this.setIntervalImpl = setIntervalImpl;
     this.clearIntervalImpl = clearIntervalImpl;
     this.reconnectPolicy = reconnectPolicy;
+    this.runtimeHealth = new CompanionRuntimeHealthTracker({ nowMs });
     this.socket = null;
     this.reconnectTimer = null;
     this.heartbeatTimer = null;
@@ -118,6 +122,7 @@ class CompanionWorkerRuntime {
     this.coreUrl = coreUrl;
     this.token = sessionToken;
     this.attempt = 0;
+    this.runtimeHealth.resetPending();
     this.#connect();
   }
 
@@ -146,6 +151,7 @@ class CompanionWorkerRuntime {
   stop(reason = 'STOPPED_BY_USER') {
     this.running = false;
     this.killSwitch = true;
+    this.runtimeHealth.resetPending();
     this.#clearTimers();
     const socket = this.socket;
     this.socket = null;
@@ -156,6 +162,7 @@ class CompanionWorkerRuntime {
   #connect() {
     if (!this.running || this.killSwitch) return;
     this.#clearReconnect();
+    this.runtimeHealth.resetPending();
     this.#setState(this.attempt === 0 ? 'CONNECTING' : 'DEGRADED', this.attempt === 0 ? 'CONNECTING' : 'RECONNECTING');
     const socket = new this.WebSocketImpl(websocketUrl(this.coreUrl), authProtocols(this.token));
     this.socket = socket;
@@ -197,6 +204,13 @@ class CompanionWorkerRuntime {
       });
       return;
     }
+    if (message?.message_type === 'HEALTH') {
+      const health = this.runtimeHealth.accept(message.payload);
+      if (health) {
+        this.send({ type: 'runtime-health', health });
+        return;
+      }
+    }
     const presentation = normalizeServerPresentation(message);
     if (presentation) this.send({ type: 'presentation', presentation });
   }
@@ -204,6 +218,7 @@ class CompanionWorkerRuntime {
   #onClose(event) {
     this.socket = null;
     this.handshaken = false;
+    this.runtimeHealth.resetPending();
     this.#clearHeartbeat();
     const reason = String(event?.reason || 'TRANSPORT_CLOSED');
     if (!this.running || this.killSwitch) return;
@@ -234,8 +249,10 @@ class CompanionWorkerRuntime {
       const socket = this.socket;
       if (!socket || socket.readyState !== this.WebSocketImpl.OPEN || !this.handshaken) return;
       this.sequence += 1;
+      const messageId = randomUUID();
+      this.runtimeHealth.heartbeatSent(messageId);
       socket.send(JSON.stringify({
-        message_id: randomUUID(),
+        message_id: messageId,
         sequence: this.sequence,
         message_type: 'HEARTBEAT',
         latency_class: 'RESPONSIVE',

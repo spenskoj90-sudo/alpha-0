@@ -1,26 +1,103 @@
-async function render() {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const accountStatus = $('account-status');
+const companionStatus = $('companion-status');
+const loginButton = $('login');
+const logoutButton = $('logout');
+const startButton = $('companion-start');
+const stopButton = $('companion-stop');
+let signedIn = false;
+let companionState = 'STOPPED';
+
+function setAccount(status, features = []) {
+  signedIn = Boolean(status?.authenticated);
+  accountStatus.className = `status ${signedIn ? 'ok' : ''}`;
+  accountStatus.textContent = signedIn
+    ? `ACCOUNT: AUTHENTICATED / ${features.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED'}`
+    : 'ACCOUNT: SIGNED OUT';
+  loginButton.disabled = signedIn;
+  logoutButton.disabled = !signedIn;
+  startButton.disabled = !signedIn || companionState !== 'STOPPED' || !features.includes('companion');
+}
+
+function setCompanion(status) {
+  companionState = status?.state || 'STOPPED';
+  const reason = status?.reason ? ` / ${status.reason}` : '';
+  companionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : companionState === 'DEGRADED' ? 'warn' : ''}`;
+  companionStatus.textContent = `COMPANION: ${companionState}${reason}`;
+  stopButton.disabled = companionState === 'STOPPED';
+  if (!signedIn) startButton.disabled = true;
+  else if (companionState !== 'STOPPED') startButton.disabled = true;
+}
+
+function showError(target, error) {
+  target.className = 'status err';
+  target.textContent = String(error?.message || error || 'UNKNOWN_ERROR');
+}
+
+async function renderGames() {
   const [catalog, config] = await Promise.all([window.sentinel.catalog(), window.sentinel.getConfig()]);
-  const grid = document.getElementById('grid');
+  const grid = $('grid');
+  grid.replaceChildren();
   for (const game of catalog) {
     const card = document.createElement('section');
     card.className = 'card';
-    card.innerHTML = `<strong>${game.name}</strong><div class="sub">${game.platform.toUpperCase()}</div>`;
+    const title = document.createElement('strong');
+    title.textContent = game.name;
+    const platform = document.createElement('div');
+    platform.className = 'sub';
+    platform.textContent = String(game.platform || '').toUpperCase();
+    card.append(title, platform);
+
     const button = document.createElement('button');
     button.className = 'btn';
     button.textContent = game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH';
     button.disabled = game.platform === 'android';
     button.onclick = async () => {
-      try { await window.sentinel.launch(game.id); } catch (error) { alert(String(error.message || error)); }
+      try { await window.sentinel.launch(game.id); } catch (error) { window.alert(String(error?.message || error)); }
     };
     card.appendChild(button);
+
     if (game.platform === 'windows') {
-      const path = document.createElement('div');
-      path.className = 'sub';
-      path.style.marginTop = '12px';
-      path.textContent = config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED';
-      card.appendChild(path);
+      const configured = document.createElement('div');
+      configured.className = 'sub';
+      configured.style.marginTop = '12px';
+      configured.textContent = config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED';
+      card.appendChild(configured);
     }
     grid.appendChild(card);
   }
 }
-render().catch(error => { document.getElementById('grid').innerHTML = `<div class="err">${String(error.message || error)}</div>`; });
+
+loginButton.onclick = async () => {
+  loginButton.disabled = true;
+  try {
+    const result = await window.sentinel.login($('core-url').value, $('email').value, $('password').value);
+    $('password').value = '';
+    setAccount(result.session, result.features || []);
+  } catch (error) {
+    loginButton.disabled = false;
+    showError(accountStatus, error);
+  }
+};
+
+logoutButton.onclick = async () => {
+  await window.sentinel.logout();
+  setCompanion({ state: 'STOPPED', reason: 'ACCOUNT_LOGOUT' });
+  setAccount(null, []);
+};
+
+startButton.onclick = async () => {
+  startButton.disabled = true;
+  try { setCompanion(await window.sentinel.startCompanion($('core-url').value)); }
+  catch (error) { showError(companionStatus, error); startButton.disabled = false; }
+};
+stopButton.onclick = async () => setCompanion(await window.sentinel.stopCompanion());
+
+window.sentinel.onCompanionStatus(setCompanion);
+window.sentinel.onAccountStatus(status => setAccount(status, signedIn ? ['companion'] : []));
+
+Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), renderGames()])
+  .then(([account, companion]) => { setAccount(account, []); setCompanion(companion); })
+  .catch(error => showError(companionStatus, error));

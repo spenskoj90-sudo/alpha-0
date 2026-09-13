@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +29,10 @@ from .companion_transport import CompanionTransportSession
 router = APIRouter(tags=["companion"])
 router.include_router(billing_provider_router)
 
+_PUBLIC_SUBPROTOCOL = "sentinel.v1"
+_AUTH_SUBPROTOCOL_PREFIX = "sentinel.auth."
+_MAX_SESSION_TOKEN_LENGTH = 4096
+
 
 @dataclass(frozen=True, slots=True)
 class CompanionTransportCompatibility:
@@ -49,6 +54,37 @@ def is_loopback_peer(host: str | None) -> bool:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
+
+
+def offered_subprotocols(websocket: WebSocket) -> tuple[str, ...]:
+    raw = websocket.headers.get("sec-websocket-protocol", "")
+    return tuple(item.strip() for item in raw.split(",") if item.strip())
+
+
+def authorization_from_subprotocol(websocket: WebSocket) -> str | None:
+    """Recover an opaque bearer token without putting it in the WebSocket URL.
+
+    Browser-compatible WebSocket clients cannot set arbitrary Authorization
+    headers. The launcher therefore sends a base64url-encoded opaque session
+    token as a non-selected auth subprotocol. The server selects only the public
+    `sentinel.v1` protocol and never echoes the auth-bearing protocol back.
+    """
+
+    for protocol in offered_subprotocols(websocket):
+        if not protocol.startswith(_AUTH_SUBPROTOCOL_PREFIX):
+            continue
+        encoded = protocol.removeprefix(_AUTH_SUBPROTOCOL_PREFIX)
+        if not encoded or len(encoded) > 5500:
+            return None
+        try:
+            padding = "=" * ((4 - len(encoded) % 4) % 4)
+            token = base64.urlsafe_b64decode(encoded + padding).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+        if not token or len(token) > _MAX_SESSION_TOKEN_LENGTH:
+            return None
+        return f"Bearer {token}"
+    return None
 
 
 class CompanionWebSocketTransport:
@@ -105,7 +141,8 @@ class CompanionWebSocketTransport:
             )
             self._closed = True
             return False
-        await self.websocket.accept()
+        selected = _PUBLIC_SUBPROTOCOL if _PUBLIC_SUBPROTOCOL in offered_subprotocols(self.websocket) else None
+        await self.websocket.accept(subprotocol=selected)
         return True
 
     async def handshake(self) -> CompanionHandshakeResult:
@@ -233,14 +270,9 @@ def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
 
 
 async def _authorize_companion_account(websocket: WebSocket) -> bool:
-    """Bind Companion activation to a Core session and paid feature grant.
+    """Bind Companion activation to a Core session and paid feature grant."""
 
-    Loopback/peer authentication protects the local transport. This additional
-    boundary binds the runtime to the server-authoritative account/subscription
-    state before CompanionRuntime is activated.
-    """
-
-    authorization = websocket.headers.get("authorization")
+    authorization = websocket.headers.get("authorization") or authorization_from_subprotocol(websocket)
     if not authorization:
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,

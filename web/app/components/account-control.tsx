@@ -70,7 +70,6 @@ export function AccountControl() {
   const [busy, setBusy] = useState(false);
 
   const loadAccount = useCallback(async () => {
-    setMessage('');
     const plansResponse = await fetch('/api/billing/plans', { cache: 'no-store' });
     if (plansResponse.status === 401) {
       setPlans([]);

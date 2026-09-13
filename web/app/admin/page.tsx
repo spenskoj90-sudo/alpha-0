@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 type Game = {
@@ -101,7 +102,7 @@ export default function AdminPage() {
     <main className="shell">
       <header className="top">
         <div><div className="brand">SENTINEL ADMIN</div><div className="label">SECURITY CONTROL PLANE</div></div>
-        <div className="top-actions"><a className="badge" href="/">USER CONTROL</a><div className="badge">FAIL-CLOSED</div></div>
+        <div className="top-actions"><Link className="badge" href="/">USER CONTROL</Link><div className="badge">FAIL-CLOSED</div></div>
       </header>
 
       <section className="section">

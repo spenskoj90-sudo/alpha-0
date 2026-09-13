@@ -31,4 +31,10 @@ contextBridge.exposeInMainWorld('sentinel', {
     ipcRenderer.on('wow:checkpoint-status', handler);
     return () => ipcRenderer.removeListener('wow:checkpoint-status', handler);
   },
+  onOverlayStatus: callback => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on('overlay:status', handler);
+    return () => ipcRenderer.removeListener('overlay:status', handler);
+  },
 });

@@ -2,10 +2,10 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src 'self' blob:">
   <title>SENTINEL Launcher</title>
   <style>
-    body{margin:0;background:#070a0d;color:#e7edf2;font-family:system-ui;padding:32px}.brand{letter-spacing:.18em;font-weight:800}.sub{color:#8996a3}.panel{margin-top:24px;border:1px solid #1d2832;background:#0d1217;border-radius:16px;padding:20px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1}.field label{font-size:12px;color:#8996a3}.field input{background:#070a0d;color:#e7edf2;border:1px solid #2c3944;border-radius:8px;padding:10px}.status{margin-top:14px;padding:10px;border-radius:8px;background:#070a0d}.ok{color:#9acb52}.warn{color:#f3ba63}.err{color:#ff6b6b}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}.card{border:1px solid #1d2832;background:#0d1217;border-radius:16px;padding:20px}.btn{margin-top:14px;background:#9acb52;color:#070a0d;border:0;border-radius:10px;padding:10px 14px;font-weight:700}.btn.secondary{background:#28343d;color:#e7edf2}.btn:disabled{opacity:.5}.actions{display:flex;gap:10px;flex-wrap:wrap}@media(max-width:900px){.grid{grid-template-columns:1fr}.row{display:block}.field{margin-top:10px}}
+    body{margin:0;background:#070a0d;color:#e7edf2;font-family:system-ui;padding:32px}.brand{letter-spacing:.18em;font-weight:800}.sub{color:#8996a3}.panel{margin-top:24px;border:1px solid #1d2832;background:#0d1217;border-radius:16px;padding:20px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:6px;min-width:220px;flex:1}.field label{font-size:12px;color:#8996a3}.field input,.field select{background:#070a0d;color:#e7edf2;border:1px solid #2c3944;border-radius:8px;padding:10px}.status{margin-top:14px;padding:10px;border-radius:8px;background:#070a0d}.ok{color:#9acb52}.warn{color:#f3ba63}.err{color:#ff6b6b}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px}.card{border:1px solid #1d2832;background:#0d1217;border-radius:16px;padding:20px}.btn{margin-top:14px;background:#9acb52;color:#070a0d;border:0;border-radius:10px;padding:10px 14px;font-weight:700}.btn.secondary{background:#28343d;color:#e7edf2}.btn:disabled{opacity:.5}.actions{display:flex;gap:10px;flex-wrap:wrap}.voice-panel{margin-top:18px;padding-top:16px;border-top:1px solid #1d2832}.consent{display:flex;gap:9px;align-items:flex-start;margin-top:12px;color:#c8d1d9;font-size:13px;max-width:820px}.consent input{margin-top:2px}.voice-note{margin-top:10px;font-size:12px;color:#8996a3;line-height:1.5}@media(max-width:900px){.grid{grid-template-columns:1fr}.row{display:block}.field{margin-top:10px}}
   </style>
 </head>
 <body>
@@ -28,6 +28,21 @@
     <div id="account-status" class="status">ACCOUNT: SIGNED OUT</div>
     <div id="companion-status" class="status">COMPANION: STOPPED</div>
     <div id="wow-checkpoint-status" class="status">WOW CHECKPOINT: STOPPED</div>
+
+    <div class="voice-panel" aria-labelledby="voice-title">
+      <strong id="voice-title">VOICE / PUSH-TO-TALK</strong>
+      <label class="consent" for="voice-consent">
+        <input id="voice-consent" type="checkbox" disabled>
+        <span>I explicitly consent to microphone capture while push-to-talk is active. SENTINEL does not enable background listening; consent is kept only for this launcher session and is cleared on sign-out/window close.</span>
+      </label>
+      <div class="row">
+        <div class="field" style="max-width:180px"><label for="voice-locale">VOICE LOCALE</label><select id="voice-locale"><option value="en">English</option><option value="ru">Русский</option></select></div>
+        <div class="actions"><button id="voice-ptt" class="btn secondary" disabled>START PUSH-TO-TALK</button></div>
+      </div>
+      <div id="voice-status" class="status">VOICE: SIGNED OUT</div>
+      <div id="voice-result" class="status">VOICE RESULT: IDLE</div>
+      <div class="voice-note">Voice is presentation-only. Core may classify OBSERVE, ACKNOWLEDGE or DISMISS. Action-like language is rejected and never becomes gameplay authority. Capture is bounded to 6 seconds and the configured byte limit.</div>
+    </div>
   </section>
 
   <div id="grid" class="grid"></div>

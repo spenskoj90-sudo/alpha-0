@@ -41,7 +41,13 @@ def _boundary(request: Request) -> VoiceBoundary:
         return configured
     from .companion_voice_provider import configured_voice_boundary
 
-    boundary = configured_voice_boundary()
+    try:
+        boundary = configured_voice_boundary()
+    except RuntimeError as exc:
+        code = str(exc)
+        if code != "VOICE_PROVIDER_CONFIGURATION_INVALID":
+            code = "VOICE_PROVIDER_CONFIGURATION_INVALID"
+        raise HTTPException(status_code=503, detail=code) from exc
     request.app.state.companion_voice_boundary = boundary
     return boundary
 

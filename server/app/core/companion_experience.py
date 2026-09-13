@@ -3,8 +3,8 @@ from __future__ import annotations
 """Bounded Companion runtime composition for the first player experience slice.
 
 This module deliberately composes existing transport, WoW, UGS,
-recommendation, presentation, and interaction contracts.  It does not open a
-socket, call a provider, or execute game actions.  Those seams remain explicit
+recommendation, presentation, and interaction contracts. It does not open a
+socket, call a provider, or execute game actions. Those seams remain explicit
 so an integration can be tested without claiming a real WoW 3.3.5a runtime.
 """
 
@@ -15,7 +15,6 @@ from typing import Protocol
 from .companion_health_api import companion_health_response
 from .companion_interaction import (
     CompanionPresentation,
-    CompanionPresentationChannel,
     CompanionPresentationKind,
 )
 from .companion_presentation import health_presentation, recommendation_presentations
@@ -28,6 +27,7 @@ from .companion_protocol import (
 from .companion_transport import CompanionRuntimeHealth, CompanionTransportSession
 from .interaction_contract import InteractionIntent, InteractionMode, InteractionSurface
 from .models import RecommendationResponse
+from .wow_adapter import WowObservation
 from .wow_vertical_slice import WowVerticalResult, WowVerticalSlice
 
 
@@ -189,8 +189,39 @@ class CompanionExperienceRuntime:
             now=now,
         )
         recommendation = self.vertical.recommend(vertical_result, provider_id=provider_id)
+        return self._compose_snapshot(
+            vertical_result,
+            recommendation,
+            _payload_bool(envelope.payload.get("account_entitled")),
+        )
+
+    def process_observation(
+        self,
+        observation: WowObservation,
+        *,
+        session_id: str,
+        now=None,
+        provider_id: str | None = None,
+    ) -> CompanionExperienceSnapshot:
+        """Compose a server-validated passive observation into player presentations."""
+        health_before = self.session.health()
+        if not health_before.peer_authenticated:
+            raise PermissionError("PEER_AUTHENTICATION_REQUIRED")
+        vertical_result = self.vertical.ingest_observation(
+            observation,
+            session_id=session_id,
+            now=now,
+        )
+        recommendation = self.vertical.recommend(vertical_result, provider_id=provider_id)
+        return self._compose_snapshot(vertical_result, recommendation, observation.account_entitled)
+
+    def _compose_snapshot(
+        self,
+        vertical_result: WowVerticalResult,
+        recommendation: RecommendationResponse,
+        entitlement: bool | None,
+    ) -> CompanionExperienceSnapshot:
         health = self.session.health()
-        entitlement = _payload_bool(envelope.payload.get("account_entitled"))
         warnings: list[str] = []
         if entitlement is False:
             warnings.append("ACCOUNT_NOT_ENTITLED")
@@ -203,7 +234,7 @@ class CompanionExperienceRuntime:
         claims = (
             "wow-observation:implemented",
             "wow-addon:passive-telemetry-only",
-            "overlay:presentation-contract",
+            "overlay:presentation-runtime",
             "voice:provider-seam-unverified",
             "wow-3.3.5a:external-environment-unverified",
         )
@@ -219,24 +250,22 @@ class CompanionExperienceRuntime:
         )
 
     def enqueue_presentations(self, snapshot: CompanionExperienceSnapshot) -> int:
-        """Route presentation messages through the bounded outbound queue."""
+        """Route presentation-only messages through the bounded outbound queue."""
         accepted = 0
         for presentation in snapshot.presentations:
             envelope = CompanionEnvelope(
                 sequence=self._next_outbound_sequence,
-                message_type=(
-                    CompanionMessageType.HEALTH
-                    if presentation.kind is CompanionPresentationKind.STATUS
-                    else CompanionMessageType.UGS_UPDATE
-                ),
+                message_type=CompanionMessageType.PRESENTATION,
                 latency_class=LatencyClass.RESPONSIVE,
                 payload={
                     "presentation_id": str(presentation.presentation_id),
+                    "correlation_id": str(presentation.correlation_id),
                     "channel": presentation.channel.value,
                     "kind": presentation.kind.value,
                     "text": presentation.text,
                     "confidence": presentation.confidence,
                     "provenance": list(presentation.provenance),
+                    "action_capable": presentation.action_capable,
                 },
             )
             self._next_outbound_sequence += 1
@@ -256,4 +285,3 @@ def _payload_bool(value: object) -> bool | None:
     if isinstance(value, str) and value.lower() in {"true", "false"}:
         return value.lower() == "true"
     return None
-

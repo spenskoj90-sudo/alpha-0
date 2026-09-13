@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 const accountStatus = $('account-status');
 const companionStatus = $('companion-status');
 const wowCheckpointStatus = $('wow-checkpoint-status');
+const playerOverlayStatus = $('player-overlay-status');
 const loginButton = $('login');
 const logoutButton = $('logout');
 const startButton = $('companion-start');
@@ -45,6 +46,15 @@ function setWowCheckpoint(status) {
   const warning = ['WAITING_FOR_SAVEDVARIABLES', 'DEFERRED', 'DELIVERING'].includes(state);
   wowCheckpointStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'STOPPED' ? '' : 'err'}`;
   wowCheckpointStatus.textContent = `WOW CHECKPOINT: ${state}${depth}${reason}`;
+}
+
+function setOverlayStatus(status) {
+  const count = Number.isInteger(status?.count) && status.count >= 0 ? status.count : 0;
+  const visible = status?.visible === true && count > 0;
+  playerOverlayStatus.className = `status ${visible ? 'ok' : ''}`;
+  playerOverlayStatus.textContent = visible
+    ? `PLAYER OVERLAY: ACTIVE / ${count} ITEM${count === 1 ? '' : 'S'}`
+    : 'PLAYER OVERLAY: IDLE';
 }
 
 function showError(target, error) {
@@ -102,6 +112,7 @@ logoutButton.onclick = async () => {
   await window.sentinel.logout();
   setCompanion({ state: 'STOPPED', reason: 'ACCOUNT_LOGOUT' });
   setWowCheckpoint({ state: 'STOPPED', queueDepth: 0 });
+  setOverlayStatus({ visible: false, count: 0 });
   setAccount(null, []);
 };
 
@@ -112,17 +123,20 @@ startButton.onclick = async () => {
 };
 stopButton.onclick = async () => {
   setWowCheckpoint({ state: 'STOPPED' });
+  setOverlayStatus({ visible: false, count: 0 });
   setCompanion(await window.sentinel.stopCompanion());
 };
 
 window.sentinel.onCompanionStatus(setCompanion);
 window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || []));
 window.sentinel.onWowCheckpointStatus(setWowCheckpoint);
+window.sentinel.onOverlayStatus(setOverlayStatus);
 
 Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), renderGames()])
   .then(([snapshot, companion]) => {
     setAccount(snapshot?.session, snapshot?.features || []);
     setCompanion(companion);
     setWowCheckpoint({ state: 'STOPPED' });
+    setOverlayStatus({ visible: false, count: 0 });
   })
   .catch(error => showError(companionStatus, error));

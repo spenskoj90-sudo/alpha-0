@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { fork } = require('node:child_process');
+const { sanitizePresentation } = require('./presentation-runtime');
 
 class CompanionProcessManager {
   constructor({
@@ -11,6 +12,7 @@ class CompanionProcessManager {
     onRefreshNeeded = async () => null,
     onObservationAck = () => {},
     onObservationDeferred = () => {},
+    onPresentation = () => {},
   } = {}) {
     this.workerPath = workerPath;
     this.forkImpl = forkImpl;
@@ -18,6 +20,7 @@ class CompanionProcessManager {
     this.onRefreshNeeded = onRefreshNeeded;
     this.onObservationAck = onObservationAck;
     this.onObservationDeferred = onObservationDeferred;
+    this.onPresentation = onPresentation;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
     this.expectedStop = false;
@@ -76,6 +79,11 @@ class CompanionProcessManager {
     }
     if (message.type === 'observation-deferred') {
       if (typeof message.eventId === 'string') this.onObservationDeferred(message.eventId);
+      return;
+    }
+    if (message.type === 'presentation') {
+      try { this.onPresentation(sanitizePresentation(message.presentation)); }
+      catch { this.stop('PRESENTATION_INVALID'); }
       return;
     }
     if (message.type === 'refresh-needed') {

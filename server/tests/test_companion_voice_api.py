@@ -111,6 +111,14 @@ def test_voice_status_requires_session_and_active_companion_entitlement() -> Non
     assert denied.json()["code"] == "COMPANION_ENTITLEMENT_REQUIRED"
 
 
+def test_invalid_provider_configuration_is_bounded_503(monkeypatch) -> None:
+    token, _ = _register(entitled=True)
+    monkeypatch.setenv("SENTINEL_VOICE_PROVIDER_URL", "http://voice.example.com")
+    response = client.get("/v1/companion/voice/status", headers=_headers(token, "voice-config-invalid"))
+    assert response.status_code == 503
+    assert response.json()["code"] == "VOICE_PROVIDER_CONFIGURATION_INVALID"
+
+
 def test_voice_status_is_bounded_and_never_exposes_provider_credentials() -> None:
     token, _ = _register(entitled=True)
     app.state.companion_voice_boundary = VoiceBoundary(stt=StubStt(), tts=StubTts())

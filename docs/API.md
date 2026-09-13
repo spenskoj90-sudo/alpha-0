@@ -67,6 +67,11 @@ Provider deliveries and deterministic reconciliation events are keyed by durable
 ## Companion
 
 - `WS /v1/companion/ws` — loopback-only Companion socket. Runtime activation requires a valid opaque Core session in the `Authorization: Bearer ...` header and an ACTIVE subscription-derived `companion` feature. Local peer authentication and protocol/capability negotiation remain additional fail-closed gates.
+- `GET /v1/companion/voice/status` — caller-scoped voice capability/limit readback. Requires the existing `game:read` policy plus ACTIVE `companion` feature. Returns availability and bounds only; provider credentials are never exposed.
+- `POST /v1/companion/voice/transcribe` — consent-gated bounded WebM/Opus STT plus server-authoritative presentation-intent classification. The response intentionally omits the transcript and can produce only `OBSERVE`, `ACKNOWLEDGE`, `DISMISS` or a fail-closed reason such as `ACTION_GATEWAY_REQUIRED`.
+- `POST /v1/companion/voice/synthesize` — consent-gated bounded TTS. Output is validated as bounded WAV bytes and remains a presentation surface, not a gameplay action surface.
+
+The voice routes never grant `game:write`. Raw voice audio/transcripts are not stored in SENTINEL audit metadata. If no voice provider is configured, the routes report provider unavailability instead of silently falling back to a browser speech service. See `docs/COMPANION_VOICE_RUNTIME_V1.md`.
 
 ## World of Warcraft
 

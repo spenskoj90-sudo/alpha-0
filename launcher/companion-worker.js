@@ -10,6 +10,7 @@ const HANDSHAKE = Object.freeze({
   core_protocol_version: '1.0',
   capability_profile: 'wow.passive.v1',
 });
+const TERMINAL_POLICY_REASONS = new Set(['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED']);
 
 function requireLoopbackCore(value) {
   const url = new URL(String(value || ''));
@@ -140,7 +141,6 @@ class CompanionWorkerRuntime {
       } else {
         this.stop(String(message?.reason_code || 'HANDSHAKE_REJECTED'));
       }
-      return;
     }
   }
 
@@ -150,6 +150,11 @@ class CompanionWorkerRuntime {
     this.#clearHeartbeat();
     const reason = String(event?.reason || 'TRANSPORT_CLOSED');
     if (!this.running || this.killSwitch) return;
+    if (TERMINAL_POLICY_REASONS.has(reason)) {
+      this.running = false;
+      this.#setState('STOPPED', reason);
+      return;
+    }
     if (reason === 'INVALID_SESSION' || reason === 'AUTHENTICATION_REQUIRED') {
       this.#setState('DEGRADED', 'SESSION_REFRESH_REQUIRED');
       this.send({ type: 'refresh-needed' });
@@ -211,4 +216,4 @@ if (require.main === module) {
   process.on('SIGTERM', () => { runtime.stop('SIGTERM'); process.exit(0); });
 }
 
-module.exports = { CompanionWorkerRuntime, ReconnectPolicy, authProtocols, requireLoopbackCore, websocketUrl, HANDSHAKE };
+module.exports = { CompanionWorkerRuntime, ReconnectPolicy, authProtocols, requireLoopbackCore, websocketUrl, HANDSHAKE, TERMINAL_POLICY_REASONS };

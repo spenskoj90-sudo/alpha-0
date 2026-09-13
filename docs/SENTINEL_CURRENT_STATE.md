@@ -44,7 +44,7 @@ These statements are orientation-level invariants. They do not replace inspectio
 - WoW SavedVariables are checkpoint persistence rather than realtime addon IPC: disk updates depend on WoW's normal SavedVariables lifecycle such as logout/ReloadUI. Repository tests therefore prove parser/queue/protocol/addon-contract behavior, not live in-game streaming or exact-host compatibility.
 - Policy Engine / Action Gateway v1 is implemented as a fail-closed authorization boundary. Capability evidence can gate prerequisites but cannot grant authorization; automatic execution is disabled and user-confirmed intent is distinct from recommendation. Paid feature requirements are resolved server-side and fail closed when the resolver is missing, fails, or does not grant the required feature.
 - The deterministic intelligence path is implemented from bounded UGS context through knowledge derivation, provider-neutral routing and confidence/provenance. The Web includes a bounded recommendation presentation component, but the current default card is a presentation baseline; a live end-to-end Web recommendation retrieval path must not be inferred from that component alone.
-- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` provides bounded, atomically persisted local buffering with malformed-file isolation; exact WoW/private-server L3 validation remains **UNVERIFIED**.
+- Android implements device binding/proof to obtain a `game:write` device session and retry-safe, sequence-protected, idempotent `/v1/events:batch` delivery. `OfflineEventQueue` provides bounded, atomically persisted local buffering with malformed-file isolation. Auth, Device, Event Sync and Dashboard use one injectable `HttpTransport` boundary backed by the platform `HttpURLConnection`: common 10s/15s timeouts, platform HTTPS verification, HTTP(S)-only URLs, disabled implicit redirects, bounded response bodies, header-injection rejection and deterministic cleanup are centralized without adding automatic retries or changing server-authoritative scopes/device proof/idempotency rules. Exact WoW/private-server L3 validation remains **UNVERIFIED**.
 - Exact Retail and WotLK 3.3.5a/private-server validation remains **UNVERIFIED** until exact-environment L3 evidence exists.
 
 ## 4. Billing, entitlement and account control
@@ -76,8 +76,9 @@ Largest remaining internal targets include:
 
 1. Complete actual player-facing voice runtime wiring. The provider-neutral `VoiceBoundary` and presentation contracts are implemented/tested seams, but there is no production microphone capture, STT/TTS provider/device composition or voice UX acceptance yet.
 2. Preserve exact-environment evidence classification for addon/launcher behavior; repository parser/protocol/overlay tests must not be promoted to WoW 3.3.5a/private-server L3 or packaged-host acceptance.
-3. Android transport consolidation where it provides concrete engineering value. Several Android API surfaces still retain independent `HttpURLConnection` implementations; replacement is technical debt reduction, not a current authorization bypass.
-4. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
+3. Observability/performance runtime composition and measured evidence beyond deterministic contract tests.
+
+Android transport consolidation is implemented as a shared injectable boundary; future transport work should be driven by measured or platform-specific needs rather than reopening independent connection implementations.
 
 Signed desktop packaging and real-host acceptance remain evidence targets after repository composition exists; release signing/publication/deployment remain Owner-gated.
 

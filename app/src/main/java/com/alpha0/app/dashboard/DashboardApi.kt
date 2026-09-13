@@ -1,12 +1,17 @@
 package com.alpha0.app.dashboard
 
+import com.alpha0.app.net.HttpMethod
+import com.alpha0.app.net.HttpRequest
+import com.alpha0.app.net.HttpTransport
+import com.alpha0.app.net.UrlConnectionHttpTransport
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
-class DashboardApi(private val baseUrl: String) {
+class DashboardApi(
+    private val baseUrl: String,
+    private val transport: HttpTransport = UrlConnectionHttpTransport(),
+) {
     data class Device(
         val deviceId: String,
         val state: String,
@@ -130,36 +135,38 @@ class DashboardApi(private val baseUrl: String) {
     private fun <T> request(accessToken: String, path: String, parser: (JSONObject) -> T): Result<T> = request(accessToken, path, "GET", null, parser)
 
     private fun <T> request(accessToken: String, path: String, method: String, body: JSONObject? = null, parser: (JSONObject) -> T): Result<T> {
-        val connection = (URL("${baseUrl.trimEnd('/')}$path").openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Accept", "application/json")
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
-        }
         return try {
-            if (body != null) {
-                connection.outputStream.bufferedWriter().use { it.write(body.toString()) }
+            val normalizedBase = baseUrl.trim().trimEnd('/')
+            val headers = linkedMapOf(
+                "Authorization" to "Bearer $accessToken",
+                "Accept" to "application/json",
+            )
+            val requestBody = body?.toString()?.toByteArray(Charsets.UTF_8)
+            if (requestBody != null) {
+                headers["Content-Type"] = "application/json"
             }
-            val status = connection.responseCode
-            val bodyText = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            val json = runCatching { JSONObject(bodyText) }.getOrNull()
-            if (status in 200..299 && json != null) {
+            val response = transport.execute(
+                HttpRequest(
+                    method = when (method) {
+                        "GET" -> HttpMethod.GET
+                        "POST" -> HttpMethod.POST
+                        else -> throw IllegalArgumentException("unsupported method")
+                    },
+                    url = "$normalizedBase$path",
+                    headers = headers,
+                    body = requestBody,
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            if (response.status in 200..299 && json != null) {
                 Result.Success(parser(json))
             } else {
-                Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_$status")
+                Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}")
             }
-        } catch (e: IOException) {
-            Result.Failure("NETWORK_ERROR: ${e.javaClass.simpleName}: ${e.message}")
-        } catch (e: Exception) {
-            Result.Failure("UNEXPECTED_ERROR: ${e.javaClass.simpleName}: ${e.message}")
-        } finally {
-            connection.disconnect()
+        } catch (_: IOException) {
+            Result.Failure("NETWORK_ERROR")
+        } catch (_: Exception) {
+            Result.Failure("UNEXPECTED_ERROR")
         }
     }
 }

@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Callable
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
 
+from .billing_provider_api import router as billing_provider_router
 from .companion_compatibility import negotiate_companion_compatibility
 from .companion_peer_auth import (
     AllowlistPeerAuthenticator,
@@ -25,6 +26,7 @@ from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
 
 router = APIRouter(tags=["companion"])
+router.include_router(billing_provider_router)
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,8 +151,11 @@ class CompanionWebSocketTransport:
                 (offered.core_protocol_version, self.compatibility.supported_core_protocols, "CORE_PROTOCOL_MISMATCH"),
             )
             reason_code = next(
-                (reason for offered_version, supported, reason in negotiated_dimensions
-                 if not _has_compatible_version(offered_version, supported)),
+                (
+                    reason
+                    for offered_version, supported, reason in negotiated_dimensions
+                    if not _has_compatible_version(offered_version, supported)
+                ),
                 "VERSION_NEGOTIATION_FAILED",
             )
         result = CompanionHandshakeResult(
@@ -227,8 +232,68 @@ def _has_compatible_version(offered: str, supported: tuple[str, ...]) -> bool:
         return False
 
 
+async def _authorize_companion_account(websocket: WebSocket) -> bool:
+    """Bind Companion activation to a Core session and paid feature grant.
+
+    Loopback/peer authentication protects the local transport. This additional
+    boundary binds the runtime to the server-authoritative account/subscription
+    state before CompanionRuntime is activated.
+    """
+
+    authorization = websocket.headers.get("authorization")
+    if not authorization:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="AUTHENTICATION_REQUIRED",
+        )
+        return False
+    from app.main import billing_service, principal_from_token, require_bearer, store
+
+    try:
+        principal = principal_from_token(require_bearer(authorization))
+    except HTTPException:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="INVALID_SESSION",
+        )
+        return False
+    if not billing_service.has_feature(principal.user_id, "companion"):
+        store.add_audit({
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "companion:connect",
+            "resource": "companion",
+            "decision": "DENY",
+            "reason_code": "COMPANION_ENTITLEMENT_REQUIRED",
+            "request_id": None,
+        })
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="COMPANION_ENTITLEMENT_REQUIRED",
+        )
+        return False
+    store.add_audit({
+        "actor_user_id": principal.user_id,
+        "actor_device_id": principal.device_id,
+        "action": "companion:connect",
+        "resource": "companion",
+        "decision": "ALLOW",
+        "reason_code": "COMPANION_ENTITLEMENT_ACTIVE",
+        "request_id": None,
+    })
+    return True
+
+
 @router.websocket("/v1/companion/ws")
 async def companion_websocket(websocket: WebSocket) -> None:
+    # Network locality is checked before account state so remote peers cannot
+    # use this endpoint as an account/session oracle.
+    host = websocket.client.host if websocket.client else None
+    if not is_loopback_peer(host):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="LOOPBACK_ONLY")
+        return
+    if not await _authorize_companion_account(websocket):
+        return
     transport = CompanionWebSocketTransport(websocket)
     if not await transport.accept():
         return

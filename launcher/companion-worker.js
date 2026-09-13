@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { performance } = require('node:perf_hooks');
 const { URL } = require('node:url');
 const { sanitizePresentation } = require('./overlay-state');
 const { CompanionRuntimeHealthTracker } = require('./runtime-health');
@@ -88,7 +89,7 @@ class CompanionWorkerRuntime {
     setIntervalImpl = setInterval,
     clearIntervalImpl = clearInterval,
     reconnectPolicy = new ReconnectPolicy(),
-    nowMs = Date.now,
+    nowMs = () => performance.now(),
   } = {}) {
     if (typeof WebSocketImpl !== 'function') throw new Error('WEBSOCKET_UNAVAILABLE');
     this.WebSocketImpl = WebSocketImpl;

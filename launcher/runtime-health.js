@@ -1,5 +1,7 @@
 'use strict';
 
+const { performance } = require('node:perf_hooks');
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MODES = new Set(['ACTIVE', 'DEGRADED', 'STOPPED']);
 
@@ -59,7 +61,7 @@ class BoundedRttStats {
 }
 
 class CompanionRuntimeHealthTracker {
-  constructor({ nowMs = Date.now, maxPending = 8, maxSamples = 64 } = {}) {
+  constructor({ nowMs = () => performance.now(), maxPending = 8, maxSamples = 64 } = {}) {
     if (typeof nowMs !== 'function') throw new Error('INVALID_CLOCK');
     if (!Number.isInteger(maxPending) || maxPending < 1 || maxPending > 64) throw new Error('INVALID_PENDING_HEARTBEAT_LIMIT');
     this.nowMs = nowMs;

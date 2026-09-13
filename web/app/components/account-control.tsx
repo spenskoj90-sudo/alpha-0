@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type Plan = {
   code: string;
@@ -36,6 +36,11 @@ type Entitlement = {
 
 type ViewState = 'CHECKING' | 'SIGNED_OUT' | 'READY' | 'ERROR';
 
+type AccountSnapshot =
+  | { view: 'SIGNED_OUT'; message?: string }
+  | { view: 'ERROR'; message: string }
+  | { view: 'READY'; plans: Plan[]; subscriptions: Subscription[]; entitlements: Entitlement[] };
+
 function lifecycleText(status: Subscription['status']) {
   switch (status) {
     case 'PENDING': return 'Awaiting provider confirmation';
@@ -58,6 +63,30 @@ async function responseJson<T>(response: Response): Promise<T | null> {
   }
 }
 
+async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
+  const plansResponse = await fetch('/api/billing/plans', { cache: 'no-store' });
+  if (plansResponse.status === 401) return { view: 'SIGNED_OUT' };
+  if (!plansResponse.ok) return { view: 'ERROR', message: `Unable to load billing plans (${plansResponse.status}).` };
+  const plansPayload = await responseJson<{ plans: Plan[] }>(plansResponse);
+
+  const subscriptionsResponse = await fetch('/api/billing/subscriptions', { cache: 'no-store' });
+  if (subscriptionsResponse.status === 401) return { view: 'SIGNED_OUT' };
+  if (!subscriptionsResponse.ok) return { view: 'ERROR', message: `Unable to load subscriptions (${subscriptionsResponse.status}).` };
+  const subscriptionsPayload = await responseJson<{ subscriptions: Subscription[] }>(subscriptionsResponse);
+
+  const entitlementsResponse = await fetch('/api/account/entitlements', { cache: 'no-store' });
+  if (entitlementsResponse.status === 401) return { view: 'SIGNED_OUT' };
+  if (!entitlementsResponse.ok) return { view: 'ERROR', message: `Unable to load entitlements (${entitlementsResponse.status}).` };
+  const entitlementsPayload = await responseJson<{ entitlements: Entitlement[] }>(entitlementsResponse);
+
+  return {
+    view: 'READY',
+    plans: plansPayload?.plans ?? [],
+    subscriptions: subscriptionsPayload?.subscriptions ?? [],
+    entitlements: entitlementsPayload?.entitlements ?? [],
+  };
+}
+
 export function AccountControl() {
   const [view, setView] = useState<ViewState>('CHECKING');
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -69,47 +98,46 @@ export function AccountControl() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const loadAccount = useCallback(async () => {
-    const plansResponse = await fetch('/api/billing/plans', { cache: 'no-store' });
-    if (plansResponse.status === 401) {
+  function applySnapshot(snapshot: AccountSnapshot) {
+    if (snapshot.view === 'READY') {
+      setPlans(snapshot.plans);
+      setSubscriptions(snapshot.subscriptions);
+      setEntitlements(snapshot.entitlements);
+      setMessage('');
+      setView('READY');
+      return;
+    }
+    setPlans([]);
+    setSubscriptions([]);
+    setEntitlements([]);
+    setMessage(snapshot.message ?? '');
+    setView(snapshot.view);
+  }
+
+  async function reloadAccount() {
+    applySnapshot(await fetchAccountSnapshot());
+  }
+
+  useEffect(() => {
+    let active = true;
+    void fetchAccountSnapshot().then(snapshot => {
+      if (!active) return;
+      if (snapshot.view === 'READY') {
+        setPlans(snapshot.plans);
+        setSubscriptions(snapshot.subscriptions);
+        setEntitlements(snapshot.entitlements);
+        setMessage('');
+        setView('READY');
+        return;
+      }
       setPlans([]);
       setSubscriptions([]);
       setEntitlements([]);
-      setView('SIGNED_OUT');
-      return;
-    }
-    if (!plansResponse.ok) {
-      setView('ERROR');
-      setMessage(`Unable to load billing plans (${plansResponse.status}).`);
-      return;
-    }
-    const plansPayload = await responseJson<{ plans: Plan[] }>(plansResponse);
-
-    const subscriptionsResponse = await fetch('/api/billing/subscriptions', { cache: 'no-store' });
-    if (!subscriptionsResponse.ok) {
-      setView(subscriptionsResponse.status === 401 ? 'SIGNED_OUT' : 'ERROR');
-      setMessage(subscriptionsResponse.status === 401 ? '' : `Unable to load subscriptions (${subscriptionsResponse.status}).`);
-      return;
-    }
-    const subscriptionsPayload = await responseJson<{ subscriptions: Subscription[] }>(subscriptionsResponse);
-
-    const entitlementsResponse = await fetch('/api/account/entitlements', { cache: 'no-store' });
-    if (!entitlementsResponse.ok) {
-      setView(entitlementsResponse.status === 401 ? 'SIGNED_OUT' : 'ERROR');
-      setMessage(entitlementsResponse.status === 401 ? '' : `Unable to load entitlements (${entitlementsResponse.status}).`);
-      return;
-    }
-    const entitlementsPayload = await responseJson<{ entitlements: Entitlement[] }>(entitlementsResponse);
-
-    setPlans(plansPayload?.plans ?? []);
-    setSubscriptions(subscriptionsPayload?.subscriptions ?? []);
-    setEntitlements(entitlementsPayload?.entitlements ?? []);
-    setView('READY');
+      setMessage(snapshot.message ?? '');
+      setView(snapshot.view);
+    });
+    return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    void loadAccount();
-  }, [loadAccount]);
 
   const activePlanCodes = useMemo(() => new Set(
     subscriptions
@@ -134,7 +162,7 @@ export function AccountControl() {
         return;
       }
       setPassword('');
-      await loadAccount();
+      await reloadAccount();
     } finally {
       setBusy(false);
     }
@@ -168,7 +196,7 @@ export function AccountControl() {
         setMessage(payload?.code ?? payload?.error ?? `Subscription intent failed (${response.status}).`);
         return;
       }
-      await loadAccount();
+      await reloadAccount();
       setMessage('Subscription intent recorded. Activation remains provider-confirmed and server-authoritative.');
     } finally {
       setBusy(false);
@@ -205,7 +233,7 @@ export function AccountControl() {
       <article className="card account-panel" aria-label="SENTINEL account control unavailable">
         <div className="panel-heading"><div><div className="label">ACCOUNT CONTROL</div><h2>Control data unavailable</h2></div><span className="badge">FAIL-CLOSED</span></div>
         <p className="status-message" role="status">{message || 'Core account data could not be verified.'}</p>
-        <div className="button-row"><button className="ghost-btn" onClick={() => void loadAccount()} disabled={busy}>RETRY</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>CLEAR SESSION</button></div>
+        <div className="button-row"><button className="ghost-btn" onClick={() => void reloadAccount()} disabled={busy}>RETRY</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>CLEAR SESSION</button></div>
       </article>
     );
   }

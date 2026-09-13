@@ -35,6 +35,20 @@ function authProtocols(token) {
   return ['sentinel.v1', `sentinel.auth.${encoded}`];
 }
 
+function wowObservationEnvelope(observation, sequence) {
+  if (!observation || typeof observation !== 'object' || typeof observation.event_id !== 'string') {
+    throw new Error('INVALID_WOW_OBSERVATION');
+  }
+  if (!Number.isSafeInteger(sequence) || sequence < 0) throw new Error('INVALID_SEQUENCE');
+  return {
+    message_id: randomUUID(),
+    sequence,
+    message_type: 'WOW_OBSERVATION',
+    latency_class: 'BACKGROUND',
+    payload: observation,
+  };
+}
+
 class ReconnectPolicy {
   constructor({ baseMs = 1000, maxMs = 30000, maxAttempts = 8 } = {}) {
     this.baseMs = baseMs;
@@ -100,6 +114,19 @@ class CompanionWorkerRuntime {
     }
   }
 
+  sendWowObservation(observation) {
+    const eventId = typeof observation?.event_id === 'string' ? observation.event_id : null;
+    const socket = this.socket;
+    if (!eventId) return false;
+    if (!this.running || this.killSwitch || !this.handshaken || !socket || socket.readyState !== this.WebSocketImpl.OPEN) {
+      this.send({ type: 'observation-deferred', eventId });
+      return false;
+    }
+    this.sequence += 1;
+    socket.send(JSON.stringify(wowObservationEnvelope(observation, this.sequence)));
+    return true;
+  }
+
   stop(reason = 'STOPPED_BY_USER') {
     this.running = false;
     this.killSwitch = true;
@@ -141,6 +168,17 @@ class CompanionWorkerRuntime {
       } else {
         this.stop(String(message?.reason_code || 'HANDSHAKE_REJECTED'));
       }
+      return;
+    }
+    if (message?.message_type === 'WOW_OBSERVATION_ACK') {
+      const eventId = typeof message?.payload?.event_id === 'string' ? message.payload.event_id : null;
+      if (!eventId) return;
+      this.send({
+        type: 'observation-ack',
+        eventId,
+        accepted: message.payload.accepted === true,
+        reason: typeof message.payload.reason === 'string' ? message.payload.reason : null,
+      });
     }
   }
 
@@ -210,10 +248,20 @@ if (require.main === module) {
     if (!message || typeof message !== 'object') return;
     if (message.type === 'start') runtime.start(message);
     else if (message.type === 'session') runtime.updateSession(message.sessionToken);
+    else if (message.type === 'wow-observation') runtime.sendWowObservation(message.observation);
     else if (message.type === 'stop') runtime.stop(message.reason);
   });
   process.on('disconnect', () => runtime.stop('PARENT_DISCONNECTED'));
   process.on('SIGTERM', () => { runtime.stop('SIGTERM'); process.exit(0); });
 }
 
-module.exports = { CompanionWorkerRuntime, ReconnectPolicy, authProtocols, requireLoopbackCore, websocketUrl, HANDSHAKE, TERMINAL_POLICY_REASONS };
+module.exports = {
+  CompanionWorkerRuntime,
+  ReconnectPolicy,
+  authProtocols,
+  requireLoopbackCore,
+  websocketUrl,
+  wowObservationEnvelope,
+  HANDSHAKE,
+  TERMINAL_POLICY_REASONS,
+};

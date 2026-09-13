@@ -9,11 +9,15 @@ class CompanionProcessManager {
     forkImpl = fork,
     onStatus = () => {},
     onRefreshNeeded = async () => null,
+    onObservationAck = () => {},
+    onObservationDeferred = () => {},
   } = {}) {
     this.workerPath = workerPath;
     this.forkImpl = forkImpl;
     this.onStatus = onStatus;
     this.onRefreshNeeded = onRefreshNeeded;
+    this.onObservationAck = onObservationAck;
+    this.onObservationDeferred = onObservationDeferred;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
     this.expectedStop = false;
@@ -39,6 +43,13 @@ class CompanionProcessManager {
     if (this.child?.connected) this.child.send({ type: 'session', sessionToken });
   }
 
+  sendObservation(observation) {
+    if (!this.child?.connected || this.status.state !== 'ACTIVE') return false;
+    if (!observation || typeof observation.event_id !== 'string') return false;
+    this.child.send({ type: 'wow-observation', observation });
+    return true;
+  }
+
   stop(reason = 'STOPPED_BY_USER') {
     this.expectedStop = true;
     const child = this.child;
@@ -53,6 +64,18 @@ class CompanionProcessManager {
     if (!message || typeof message !== 'object') return;
     if (message.type === 'status' && message.status) {
       this.#publish(message.status);
+      return;
+    }
+    if (message.type === 'observation-ack') {
+      this.onObservationAck({
+        eventId: typeof message.eventId === 'string' ? message.eventId : null,
+        accepted: message.accepted === true,
+        reason: typeof message.reason === 'string' ? message.reason : null,
+      });
+      return;
+    }
+    if (message.type === 'observation-deferred') {
+      if (typeof message.eventId === 'string') this.onObservationDeferred(message.eventId);
       return;
     }
     if (message.type === 'refresh-needed') {

@@ -7,6 +7,7 @@ local securityText
 local patchText
 local paused = false
 local locked = false
+local snapshotSequence = 0
 
 local function clamp(v, lo, hi)
     if v < lo then return lo end
@@ -32,6 +33,42 @@ local function currentPatch()
         return C_AddOns.GetAddOnMetadata(ADDON, "Version") or "0.3.0"
     end
     return "0.3.0"
+end
+
+local function patchProfile()
+    local _, _, _, interfaceVersion = GetBuildInfo()
+    local interface = tonumber(interfaceVersion or 0) or 0
+    if interface >= 120000 then return "retail-12.0.5" end
+    if interface >= 100000 then return "dragonflight-10.2.7" end
+    if interface >= 90000 then return "shadowlands-9.2.7" end
+    if interface >= 80000 then return "bfa-8.3.7" end
+    if interface >= 70000 then return "legion-7.3.5" end
+    if interface >= 60000 then return "wod-6.2.4" end
+    if interface >= 50000 then return "mop-5.4.8" end
+    if interface >= 40000 then return "cataclysm-4.3.4" end
+    return "retail-12.0.5"
+end
+
+local function combatState()
+    if UnitAffectingCombat then return UnitAffectingCombat("player") and "COMBAT" or "IDLE" end
+    return "UNKNOWN"
+end
+
+local function writeCheckpoint(realm, ping)
+    if not db then return end
+    snapshotSequence = snapshotSequence + 1
+    db.snapshot_sequence = snapshotSequence
+    db.snapshot = {
+        schema_version = 1,
+        sequence = snapshotSequence,
+        observed_at_epoch = time(),
+        patch_profile = patchProfile(),
+        server_profile = "unknown",
+        realm_id = realm or GetRealmName() or "Unknown",
+        latency_ms = clamp(tonumber(ping or 0) or 0, 0, 60000),
+        addon_connected = true,
+        combat_state = combatState(),
+    }
 end
 
 local function makeText(parent, size, point, x, y)
@@ -60,9 +97,10 @@ local function setSecurity(state, reason)
 end
 
 local function update()
-    if not overlay then return end
     local name, realm = safeName()
     local ping = latency()
+    writeCheckpoint(realm, ping)
+    if not overlay then return end
     local patch = currentPatch()
     statusText:SetText(paused and "SENTINEL  /  PROTECTION PAUSED" or "SENTINEL  /  PROTECTION ACTIVE")
     statusText:SetTextColor(paused and 0.95 or 0.60, paused and 0.70 or 0.85, paused and 0.20 or 0.35, 1)
@@ -118,11 +156,6 @@ local function createOverlay()
     end)
     lock:SetPoint("LEFT", shot, "RIGHT", 6, 0)
 
-    overlay:SetScript("OnUpdate", function(self, elapsed)
-        self._t = (self._t or 0) + elapsed
-        if self._t >= 2 then self._t = 0; update() end
-    end)
-
     update()
 end
 
@@ -133,9 +166,17 @@ frame:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_LOGIN" then
         db = SentinelDB or {}
         SentinelDB = db
-        if db.overlayHidden then return end
-        createOverlay()
+        snapshotSequence = tonumber(db.snapshot_sequence or 0) or 0
+        if not db.overlayHidden then createOverlay() end
+        update()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        update()
+    end
+end)
+frame:SetScript("OnUpdate", function(self, elapsed)
+    self._sentinelElapsed = (self._sentinelElapsed or 0) + elapsed
+    if self._sentinelElapsed >= 2 then
+        self._sentinelElapsed = 0
         update()
     end
 end)
@@ -143,6 +184,8 @@ end)
 SLASH_SENTINEL1 = "/sentinel"
 SlashCmdList.SENTINEL = function(msg)
     msg = (msg or ""):lower()
+    SentinelDB = SentinelDB or {}
+    db = SentinelDB
     if msg == "hide" then
         if overlay then overlay:Hide() end
         SentinelDB.overlayHidden = true

@@ -42,6 +42,15 @@ def test_provider_url_requires_https_except_explicit_loopback() -> None:
         normalize_voice_provider_url("file:///tmp/provider")
 
 
+def test_provider_config_rejects_header_injection_and_invalid_timeout() -> None:
+    with pytest.raises(ValueError, match="VOICE_PROVIDER_TOKEN_INVALID"):
+        HttpVoiceProviderConfig(base_url="https://voice.example.com", bearer_token="token\r\nX-Evil: injected")
+    with pytest.raises(ValueError, match="VOICE_PROVIDER_TOKEN_INVALID"):
+        HttpVoiceProviderConfig(base_url="https://voice.example.com", bearer_token="")
+    with pytest.raises(ValueError, match="VOICE_PROVIDER_TIMEOUT_INVALID"):
+        HttpVoiceProviderConfig(base_url="https://voice.example.com", timeout_seconds=31.0)
+
+
 def test_http_voice_provider_sends_bounded_vendor_neutral_contract_without_url_credentials() -> None:
     calls: list[tuple[Request, float]] = []
 

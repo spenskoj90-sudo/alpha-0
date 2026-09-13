@@ -155,7 +155,7 @@ function createWindow() {
   mainWindow = win;
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null;
-    if (process.platform !== 'darwin' && overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
+    if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
   });
   win.webContents.on('did-finish-load', () => publishOverlaySnapshot());
   win.loadFile(path.join(__dirname, 'index.html'));

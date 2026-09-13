@@ -27,8 +27,48 @@ security:SetTextColor(0.20, 0.90, 0.35)
 
 local paused = false
 local locked = false
+local snapshotReady = false
+local snapshotSequence = 0
+
+local function clamp(v, lo, hi)
+    if v < lo then return lo end
+    if v > hi then return hi end
+    return v
+end
+
+local function patchProfile()
+    local _, _, _, interfaceVersion = GetBuildInfo()
+    local interface = tonumber(interfaceVersion or 0) or 0
+    if interface >= 30300 and interface < 40000 then return "wotlk-3.3.5a" end
+    if interface >= 20400 and interface < 30000 then return "tbc-2.4.3" end
+    return "vanilla-1.12"
+end
+
+local function combatState()
+    if UnitAffectingCombat then return UnitAffectingCombat("player") and "COMBAT" or "IDLE" end
+    return "UNKNOWN"
+end
+
+local function writeCheckpoint(realm, ping)
+    if not snapshotReady then return end
+    SentinelDB = SentinelDB or {}
+    snapshotSequence = snapshotSequence + 1
+    SentinelDB.snapshot_sequence = snapshotSequence
+    SentinelDB.snapshot = {
+        schema_version = 1,
+        sequence = snapshotSequence,
+        observed_at_epoch = time(),
+        patch_profile = patchProfile(),
+        server_profile = "unknown",
+        realm_id = realm or GetRealmName() or "Unknown",
+        latency_ms = clamp(tonumber(ping or 0) or 0, 0, 60000),
+        addon_connected = true,
+        combat_state = combatState(),
+    }
+end
+
 local function refresh()
-    local name, realm = UnitName("player")
+    local _, realm = UnitName("player")
     local ping = 0
     if GetNetStats then
         local _, _, home, world = GetNetStats()
@@ -54,6 +94,7 @@ local function refresh()
         security:SetText("● SECURE")
         security:SetTextColor(0.20, 0.90, 0.35)
     end
+    writeCheckpoint(realm, ping)
 end
 
 local function button(text, x, fn, width)
@@ -75,10 +116,33 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     if self._elapsed >= 2 then self._elapsed = 0; refresh() end
 end)
 
+local lifecycle = CreateFrame("Frame")
+lifecycle:RegisterEvent("PLAYER_LOGIN")
+lifecycle:SetScript("OnEvent", function()
+    SentinelDB = SentinelDB or {}
+    snapshotSequence = tonumber(SentinelDB.snapshot_sequence or 0) or 0
+    snapshotReady = true
+    if SentinelDB.overlayHidden then frame:Hide() end
+    refresh()
+end)
+
 SLASH_SENTINEL1 = "/sentinel"
 SlashCmdList.SENTINEL = function(msg)
     msg = (msg or ""):lower()
-    if msg == "hide" then frame:Hide() elseif msg == "show" then frame:Show() elseif msg == "lock" then locked=true; paused=true; refresh() else print("SENTINEL commands: /sentinel show | hide | lock") end
+    SentinelDB = SentinelDB or {}
+    if msg == "hide" then
+        frame:Hide()
+        SentinelDB.overlayHidden = true
+    elseif msg == "show" then
+        frame:Show()
+        SentinelDB.overlayHidden = false
+    elseif msg == "lock" then
+        locked=true
+        paused=true
+        refresh()
+    else
+        print("SENTINEL commands: /sentinel show | hide | lock")
+    end
 end
 
 refresh()

@@ -3,6 +3,7 @@
 const $ = id => document.getElementById(id);
 const accountStatus = $('account-status');
 const companionStatus = $('companion-status');
+const wowCheckpointStatus = $('wow-checkpoint-status');
 const loginButton = $('login');
 const logoutButton = $('logout');
 const startButton = $('companion-start');
@@ -34,6 +35,16 @@ function setCompanion(status) {
   companionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : companionState === 'DEGRADED' ? 'warn' : ''}`;
   companionStatus.textContent = `COMPANION: ${companionState}${reason}`;
   refreshButtons();
+}
+
+function setWowCheckpoint(status) {
+  const state = status?.state || 'STOPPED';
+  const depth = Number.isInteger(status?.queueDepth) ? ` / QUEUE ${status.queueDepth}` : '';
+  const reason = status?.reason ? ` / ${status.reason}` : '';
+  const healthy = ['READY', 'DELIVERED'].includes(state);
+  const warning = ['WAITING_FOR_SAVEDVARIABLES', 'DEFERRED', 'DELIVERING'].includes(state);
+  wowCheckpointStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'STOPPED' ? '' : 'err'}`;
+  wowCheckpointStatus.textContent = `WOW CHECKPOINT: ${state}${depth}${reason}`;
 }
 
 function showError(target, error) {
@@ -90,6 +101,7 @@ loginButton.onclick = async () => {
 logoutButton.onclick = async () => {
   await window.sentinel.logout();
   setCompanion({ state: 'STOPPED', reason: 'ACCOUNT_LOGOUT' });
+  setWowCheckpoint({ state: 'STOPPED', queueDepth: 0 });
   setAccount(null, []);
 };
 
@@ -98,14 +110,19 @@ startButton.onclick = async () => {
   try { setCompanion(await window.sentinel.startCompanion($('core-url').value)); }
   catch (error) { showError(companionStatus, error); refreshButtons(); }
 };
-stopButton.onclick = async () => setCompanion(await window.sentinel.stopCompanion());
+stopButton.onclick = async () => {
+  setWowCheckpoint({ state: 'STOPPED' });
+  setCompanion(await window.sentinel.stopCompanion());
+};
 
 window.sentinel.onCompanionStatus(setCompanion);
 window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || []));
+window.sentinel.onWowCheckpointStatus(setWowCheckpoint);
 
 Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), renderGames()])
   .then(([snapshot, companion]) => {
     setAccount(snapshot?.session, snapshot?.features || []);
     setCompanion(companion);
+    setWowCheckpoint({ state: 'STOPPED' });
   })
   .catch(error => showError(companionStatus, error));

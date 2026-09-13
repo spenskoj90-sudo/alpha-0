@@ -117,10 +117,11 @@ function feedbackTextForVoiceResult(result) {
 
 function mediaPermissionAllowed({ webContents, mainWebContents, permission, requestingOrigin, details, consentGranted }) {
   if (!consentGranted || permission !== 'media' || !webContents || webContents !== mainWebContents) return false;
-  const origin = String(details?.securityOrigin || requestingOrigin || '');
+  const origin = String(details?.securityOrigin || requestingOrigin || webContents.getURL?.() || '');
   if (origin !== 'file://' && !origin.startsWith('file:///')) return false;
   const mediaTypes = Array.isArray(details?.mediaTypes) ? details.mediaTypes : [];
-  return mediaTypes.includes('audio') && !mediaTypes.includes('video');
+  if (mediaTypes.includes('video')) return false;
+  return mediaTypes.length === 0 || mediaTypes.includes('audio');
 }
 
 module.exports = {

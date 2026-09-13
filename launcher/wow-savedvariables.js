@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const MAX_FILE_BYTES = 256 * 1024;
+const MAX_QUEUE_BYTES = 512 * 1024;
 const MAX_TOKENS = 10000;
 const MAX_DEPTH = 8;
 const ALLOWED_PATCHES = new Set([
@@ -185,7 +186,9 @@ class WowObservationQueue {
   get depth() { return this.items.length; }
   peek() { return this.items[0] || null; }
   enqueue(observation) {
-    if (!observation?.event_id) throw new Error('WOW_OBSERVATION_INVALID');
+    if (!observation?.event_id || typeof observation.event_id !== 'string' || observation.event_id.length > 128) {
+      throw new Error('WOW_OBSERVATION_INVALID');
+    }
     if (this.items.some(item => item.event_id === observation.event_id)) return false;
     if (this.items.length >= this.maxItems) { this.items.shift(); this.dropped += 1; }
     this.items.push(observation);
@@ -200,15 +203,27 @@ class WowObservationQueue {
   }
   #load() {
     try {
+      const stat = this.fs.statSync(this.filePath);
+      if (!stat.isFile() || stat.size > MAX_QUEUE_BYTES) {
+        this.items = [];
+        return;
+      }
       const parsed = JSON.parse(this.fs.readFileSync(this.filePath, 'utf8'));
-      if (Array.isArray(parsed)) this.items = parsed.filter(item => item && typeof item.event_id === 'string').slice(-this.maxItems);
-    } catch { this.items = []; }
+      if (!Array.isArray(parsed)) throw new Error('WOW_QUEUE_INVALID');
+      this.items = parsed
+        .filter(item => item && typeof item === 'object' && typeof item.event_id === 'string' && item.event_id.length <= 128)
+        .slice(-this.maxItems);
+    } catch {
+      this.items = [];
+    }
   }
   #persist() {
+    const encoded = JSON.stringify(this.items);
+    if (Buffer.byteLength(encoded, 'utf8') > MAX_QUEUE_BYTES) throw new Error('WOW_QUEUE_FILE_TOO_LARGE');
     const directory = path.dirname(this.filePath);
     this.fs.mkdirSync(directory, { recursive: true });
     const temp = `${this.filePath}.tmp`;
-    this.fs.writeFileSync(temp, JSON.stringify(this.items), { encoding: 'utf8', mode: 0o600 });
+    this.fs.writeFileSync(temp, encoded, { encoding: 'utf8', mode: 0o600 });
     this.fs.renameSync(temp, this.filePath);
     try { this.fs.chmodSync(this.filePath, 0o600); } catch {}
   }
@@ -222,18 +237,27 @@ function discoverSentinelSavedVariables(executablePath, overridePath = null, fsI
   if (!executablePath || !path.isAbsolute(executablePath)) return null;
   const accountRoot = path.join(path.dirname(executablePath), 'WTF', 'Account');
   let accounts;
-  try { accounts = fsImpl.readdirSync(accountRoot, { withFileTypes: true }); } catch { return null; }
+  try { accounts = fsImpl.readdirSync(accountRoot, { withFileTypes: true }).slice(0, 256); } catch { return null; }
   const candidates = [];
   for (const entry of accounts) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || entry.isSymbolicLink?.()) continue;
     const candidate = path.join(accountRoot, entry.name, 'SavedVariables', 'Sentinel.lua');
     try {
-      const stat = fsImpl.statSync(candidate);
-      if (stat.isFile() && stat.size <= MAX_FILE_BYTES) candidates.push({ candidate, mtimeMs: stat.mtimeMs });
+      const stat = thisStat(fsImpl, candidate);
+      if (stat.isFile() && !stat.isSymbolicLink && stat.size <= MAX_FILE_BYTES) candidates.push({ candidate, mtimeMs: stat.mtimeMs });
     } catch {}
   }
   candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return candidates[0]?.candidate || null;
+}
+
+function thisStat(fsImpl, candidate) {
+  if (typeof fsImpl.lstatSync === 'function') {
+    const stat = fsImpl.lstatSync(candidate);
+    return { isFile: () => stat.isFile(), isSymbolicLink: stat.isSymbolicLink(), size: stat.size, mtimeMs: stat.mtimeMs };
+  }
+  const stat = fsImpl.statSync(candidate);
+  return { isFile: () => stat.isFile(), isSymbolicLink: false, size: stat.size, mtimeMs: stat.mtimeMs };
 }
 
 class WowCheckpointBridge {
@@ -318,6 +342,7 @@ class WowCheckpointBridge {
 
 module.exports = {
   MAX_FILE_BYTES,
+  MAX_QUEUE_BYTES,
   WowCheckpointBridge,
   WowObservationQueue,
   discoverSentinelSavedVariables,

@@ -85,7 +85,7 @@ def _envelope(payload: dict[str, object], sequence: int = 1) -> dict[str, object
     ).model_dump(mode="json")
 
 
-def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_write_scope() -> None:
+def test_passive_wow_checkpoint_is_normalized_acknowledged_and_presented_without_game_write_scope() -> None:
     token, user_id = _entitled_session()
     with client.websocket_connect(
         "/v1/companion/ws",
@@ -95,6 +95,7 @@ def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_writ
         assert websocket.receive_json()["accepted"] is True
         websocket.send_json(_envelope(_observation()))
         ack = websocket.receive_json()
+        presentation = websocket.receive_json()
 
     assert ack["message_type"] == "WOW_OBSERVATION_ACK"
     assert ack["latency_class"] == "BACKGROUND"
@@ -102,6 +103,15 @@ def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_writ
         "event_id": "wow-checkpoint-test",
         "accepted": True,
         "reason": "PASSIVE_CHECKPOINT_ACCEPTED",
+    }
+    assert presentation["message_type"] == "HEALTH"
+    assert presentation["latency_class"] == "RESPONSIVE"
+    assert presentation["payload"]["channel"] == "OVERLAY"
+    assert presentation["payload"]["kind"] == "STATUS"
+    assert presentation["payload"]["text"] == "Passive WoW checkpoint accepted by Core."
+    assert presentation["payload"]["provenance"] == ["sentinel-core", "wow-passive-checkpoint"]
+    assert set(presentation["payload"]) == {
+        "presentation_id", "channel", "kind", "text", "confidence", "provenance"
     }
     audits = store.get_audit(user_id)
     assert any(
@@ -112,7 +122,7 @@ def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_writ
     )
 
 
-def test_invalid_wow_checkpoint_is_rejected_without_terminating_companion_session() -> None:
+def test_invalid_wow_checkpoint_is_rejected_without_presentation_or_terminating_companion_session() -> None:
     token, _ = _entitled_session()
     with client.websocket_connect(
         "/v1/companion/ws",
@@ -134,3 +144,6 @@ def test_invalid_wow_checkpoint_is_rejected_without_terminating_companion_sessio
         accepted = websocket.receive_json()
         assert accepted["payload"]["event_id"] == "valid-after-reject"
         assert accepted["payload"]["accepted"] is True
+        presentation = websocket.receive_json()
+        assert presentation["message_type"] == "HEALTH"
+        assert presentation["payload"]["channel"] == "OVERLAY"

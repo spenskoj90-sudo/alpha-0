@@ -52,7 +52,12 @@ class HttpVoiceProviderConfig:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "base_url", normalize_voice_provider_url(self.base_url))
-        if self.bearer_token is not None and (not self.bearer_token or len(self.bearer_token) > 4096):
+        if self.bearer_token is not None and (
+            not self.bearer_token
+            or len(self.bearer_token) > 4096
+            or "\r" in self.bearer_token
+            or "\n" in self.bearer_token
+        ):
             raise ValueError("VOICE_PROVIDER_TOKEN_INVALID")
         if not 0.1 <= self.timeout_seconds <= 30.0:
             raise ValueError("VOICE_PROVIDER_TIMEOUT_INVALID")

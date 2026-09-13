@@ -85,7 +85,7 @@ def _envelope(payload: dict[str, object], sequence: int = 1) -> dict[str, object
     ).model_dump(mode="json")
 
 
-def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_write_scope() -> None:
+def test_passive_wow_checkpoint_is_acknowledged_then_emits_non_actionable_overlay_presentations() -> None:
     token, user_id = _entitled_session()
     with client.websocket_connect(
         "/v1/companion/ws",
@@ -95,6 +95,7 @@ def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_writ
         assert websocket.receive_json()["accepted"] is True
         websocket.send_json(_envelope(_observation()))
         ack = websocket.receive_json()
+        presentations = [websocket.receive_json(), websocket.receive_json()]
 
     assert ack["message_type"] == "WOW_OBSERVATION_ACK"
     assert ack["latency_class"] == "BACKGROUND"
@@ -103,6 +104,17 @@ def test_passive_wow_checkpoint_is_normalized_and_acknowledged_without_game_writ
         "accepted": True,
         "reason": "PASSIVE_CHECKPOINT_ACCEPTED",
     }
+    assert {item["payload"]["kind"] for item in presentations} == {"STATUS", "RECOMMENDATION"}
+    for item in presentations:
+        assert item["message_type"] == "PRESENTATION"
+        assert item["latency_class"] == "RESPONSIVE"
+        assert item["payload"]["channel"] == "OVERLAY"
+        assert item["payload"]["action_capable"] is False
+        assert 0 < len(item["payload"]["text"]) <= 2000
+        assert isinstance(item["payload"]["presentation_id"], str)
+        assert isinstance(item["payload"]["correlation_id"], str)
+        assert "game:write" not in str(item["payload"])
+
     audits = store.get_audit(user_id)
     assert any(
         item.get("action") == "companion:wow-observation"

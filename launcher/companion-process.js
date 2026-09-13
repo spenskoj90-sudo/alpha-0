@@ -23,20 +23,18 @@ class CompanionProcessManager {
     this.onPresentation = onPresentation;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
-    this.expectedStop = false;
   }
 
   start({ coreUrl, sessionToken }) {
     if (this.child) throw new Error('COMPANION_ALREADY_RUNNING');
     if (!sessionToken) throw new Error('AUTHENTICATION_REQUIRED');
-    this.expectedStop = false;
     const child = this.forkImpl(this.workerPath, [], {
       stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
       windowsHide: true,
     });
     this.child = child;
-    child.on('message', message => this.#onMessage(message));
-    child.on('exit', (code, signal) => this.#onExit(code, signal));
+    child.on('message', message => this.#onMessage(child, message));
+    child.on('exit', (code, signal) => this.#onExit(child, code, signal));
     child.send({ type: 'start', coreUrl, sessionToken });
     this.#publish({ state: 'CONNECTING', reason: 'WORKER_STARTED' });
     return this.status;
@@ -54,7 +52,6 @@ class CompanionProcessManager {
   }
 
   stop(reason = 'STOPPED_BY_USER') {
-    this.expectedStop = true;
     const child = this.child;
     this.child = null;
     if (child?.connected) child.send({ type: 'stop', reason });
@@ -63,7 +60,8 @@ class CompanionProcessManager {
     return this.status;
   }
 
-  async #onMessage(message) {
+  async #onMessage(source, message) {
+    if (source !== this.child) return;
     if (!message || typeof message !== 'object') return;
     if (message.type === 'status' && message.status) {
       this.#publish(message.status);
@@ -90,18 +88,17 @@ class CompanionProcessManager {
       this.#publish({ state: 'DEGRADED', reason: 'SESSION_REFRESH_REQUIRED' });
       try {
         const token = await this.onRefreshNeeded();
-        if (!token) throw new Error('REFRESH_FAILED');
+        if (!token || source !== this.child) return;
         this.updateSession(token);
       } catch {
-        this.stop('SESSION_REFRESH_FAILED');
+        if (source === this.child) this.stop('SESSION_REFRESH_FAILED');
       }
     }
   }
 
-  #onExit(code, signal) {
-    if (!this.child) return;
+  #onExit(source, code, signal) {
+    if (source !== this.child) return;
     this.child = null;
-    if (this.expectedStop) return;
     this.#publish({
       state: 'STOPPED',
       reason: 'WORKER_EXITED',

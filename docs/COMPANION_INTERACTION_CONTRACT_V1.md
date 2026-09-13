@@ -24,9 +24,11 @@ Presentation is observational and user-facing only. The contract has no command,
 
 The launcher overlay implementation preserves that boundary end-to-end:
 
-- Core emits only bounded presentation payload fields over authenticated loopback Companion transport;
-- the Companion worker accepts presentation payloads only from known `HEALTH`/`UGS_UPDATE` envelopes and allowlist-normalizes them;
+- Core emits bounded presentation payload fields only on the dedicated `PRESENTATION` Companion envelope type over authenticated loopback transport;
+- `HEALTH` remains reserved for correlated runtime-health telemetry and `UGS_UPDATE` retains game-state/update semantics;
+- the Companion worker accepts overlay content only from `PRESENTATION` envelopes and allowlist-normalizes it; presentation-shaped `HEALTH` or `UGS_UPDATE` payloads are not inferred as overlay content;
 - Electron main sanitizes the normalized presentation again before storing it;
+- worker IPC and exit handling are bound to the currently active child process, so a stopped/replaced worker cannot publish stale presentation/status data or apply a delayed refresh result to a new worker;
 - the store is bounded and time-limited;
 - the overlay runs in a dedicated sandboxed, context-isolated, non-Node, non-focusable, click-through BrowserWindow;
 - its preload exposes only a one-way snapshot subscription, with no renderer-originated IPC action;
@@ -38,9 +40,11 @@ The overlay therefore does not authorize or execute gameplay actions and does no
 
 Invalid or unbounded text, confidence, provenance, channel or kind is rejected before rendering. Unknown payload fields are dropped rather than copied through. The launcher retains at most a small bounded set of recent presentations and expires them automatically.
 
+Presentation and runtime-health traffic are deliberately type-separated. Malformed or presentation-shaped telemetry cannot become overlay content merely by matching payload fields, and delayed IPC from a superseded worker is ignored by the parent process.
+
 ## Runtime status
 
-The read-only launcher overlay runtime is implemented for server-authored `OVERLAY` presentation messages, including the passive WoW checkpoint acceptance status emitted by Core. This establishes an end-to-end Core → Companion worker → Electron parent → isolated overlay presentation path.
+The read-only launcher overlay runtime is implemented for server-authored `OVERLAY` presentation messages, including the passive WoW checkpoint acceptance status emitted by Core. This establishes an end-to-end Core → Companion worker → Electron parent → isolated overlay presentation path while keeping runtime `HEALTH` evidence on its own protocol meaning.
 
 ## Scope boundary
 

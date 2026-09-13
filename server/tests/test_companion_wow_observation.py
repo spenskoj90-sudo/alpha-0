@@ -104,7 +104,7 @@ def test_passive_wow_checkpoint_is_normalized_acknowledged_and_presented_without
         "accepted": True,
         "reason": "PASSIVE_CHECKPOINT_ACCEPTED",
     }
-    assert presentation["message_type"] == "HEALTH"
+    assert presentation["message_type"] == "PRESENTATION"
     assert presentation["latency_class"] == "RESPONSIVE"
     assert presentation["payload"]["channel"] == "OVERLAY"
     assert presentation["payload"]["kind"] == "STATUS"
@@ -145,5 +145,5 @@ def test_invalid_wow_checkpoint_is_rejected_without_presentation_or_terminating_
         assert accepted["payload"]["event_id"] == "valid-after-reject"
         assert accepted["payload"]["accepted"] is True
         presentation = websocket.receive_json()
-        assert presentation["message_type"] == "HEALTH"
+        assert presentation["message_type"] == "PRESENTATION"
         assert presentation["payload"]["channel"] == "OVERLAY"

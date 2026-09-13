@@ -14,7 +14,6 @@ const HANDSHAKE = Object.freeze({
   capability_profile: 'wow.passive.v1',
 });
 const TERMINAL_POLICY_REASONS = new Set(['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED']);
-const PRESENTATION_MESSAGE_TYPES = new Set(['HEALTH', 'UGS_UPDATE']);
 
 function requireLoopbackCore(value) {
   const url = new URL(String(value || ''));
@@ -54,7 +53,7 @@ function wowObservationEnvelope(observation, sequence) {
 }
 
 function normalizeServerPresentation(message) {
-  if (!message || typeof message !== 'object' || !PRESENTATION_MESSAGE_TYPES.has(message.message_type)) return null;
+  if (!message || typeof message !== 'object' || message.message_type !== 'PRESENTATION') return null;
   const payload = message.payload;
   if (!payload || typeof payload !== 'object') return null;
   return sanitizePresentation({

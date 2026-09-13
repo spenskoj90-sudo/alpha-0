@@ -80,8 +80,8 @@ class CompanionProcessManager {
       windowsHide: true,
     });
     this.child = child;
-    child.on('message', message => this.#onMessage(message));
-    child.on('exit', (code, signal) => this.#onExit(code, signal));
+    child.on('message', message => this.#onMessage(child, message));
+    child.on('exit', (code, signal) => this.#onExit(child, code, signal));
     child.send({ type: 'start', coreUrl, sessionToken });
     this.#publish({ state: 'CONNECTING', reason: 'WORKER_STARTED' });
     return this.status;
@@ -108,8 +108,8 @@ class CompanionProcessManager {
     return this.status;
   }
 
-  async #onMessage(message) {
-    if (!message || typeof message !== 'object') return;
+  async #onMessage(source, message) {
+    if (source !== this.child || !message || typeof message !== 'object') return;
     if (message.type === 'status' && message.status) {
       this.#publish(message.status);
       return;
@@ -140,16 +140,17 @@ class CompanionProcessManager {
       this.#publish({ state: 'DEGRADED', reason: 'SESSION_REFRESH_REQUIRED' });
       try {
         const token = await this.onRefreshNeeded();
+        if (source !== this.child) return;
         if (!token) throw new Error('REFRESH_FAILED');
         this.updateSession(token);
       } catch {
-        this.stop('SESSION_REFRESH_FAILED');
+        if (source === this.child) this.stop('SESSION_REFRESH_FAILED');
       }
     }
   }
 
-  #onExit(code, signal) {
-    if (!this.child) return;
+  #onExit(source, code, signal) {
+    if (source !== this.child) return;
     this.child = null;
     if (this.expectedStop) return;
     this.#publish({

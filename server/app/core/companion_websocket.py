@@ -256,7 +256,7 @@ def _wow_observation_presentation(envelope: CompanionEnvelope) -> CompanionEnvel
     )
     return CompanionEnvelope(
         sequence=envelope.sequence,
-        message_type=CompanionMessageType.HEALTH,
+        message_type=CompanionMessageType.PRESENTATION,
         latency_class=LatencyClass.RESPONSIVE,
         payload={
             "presentation_id": str(presentation.presentation_id),

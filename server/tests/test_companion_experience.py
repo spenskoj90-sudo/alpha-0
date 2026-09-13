@@ -61,6 +61,12 @@ def test_authenticated_update_composes_state_recommendation_health_and_presentat
     assert "wow-3.3.5a:external-environment-unverified" in snapshot.capability_claims
     assert runtime.enqueue_presentations(snapshot) == len(snapshot.presentations)
 
+    queued: list[CompanionEnvelope] = []
+    while (item := runtime.session.queue.pop()) is not None:
+        queued.append(item)
+    assert queued
+    assert {item.message_type for item in queued} == {CompanionMessageType.PRESENTATION}
+
 
 def test_experience_requires_authenticated_transport() -> None:
     runtime = CompanionExperienceRuntime(CompanionTransportSession(CompanionRuntime()))

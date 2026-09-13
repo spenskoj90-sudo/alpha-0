@@ -224,11 +224,7 @@ class CompanionExperienceRuntime:
         for presentation in snapshot.presentations:
             envelope = CompanionEnvelope(
                 sequence=self._next_outbound_sequence,
-                message_type=(
-                    CompanionMessageType.HEALTH
-                    if presentation.kind is CompanionPresentationKind.STATUS
-                    else CompanionMessageType.UGS_UPDATE
-                ),
+                message_type=CompanionMessageType.PRESENTATION,
                 latency_class=LatencyClass.RESPONSIVE,
                 payload={
                     "presentation_id": str(presentation.presentation_id),
@@ -256,4 +252,3 @@ def _payload_bool(value: object) -> bool | None:
     if isinstance(value, str) and value.lower() in {"true", "false"}:
         return value.lower() == "true"
     return None
-

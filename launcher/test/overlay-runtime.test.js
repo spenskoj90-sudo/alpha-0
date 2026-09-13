@@ -42,18 +42,19 @@ test('overlay store is bounded, deduplicated and expires stale presentations', (
   assert.deepEqual(store.snapshot(), []);
 });
 
-test('worker normalizes only bounded Core presentation envelopes', () => {
+test('worker normalizes only dedicated bounded Core presentation envelopes', () => {
+  const payload = {
+    presentation_id: 'core-presentation-1',
+    channel: 'OVERLAY',
+    kind: 'STATUS',
+    text: 'Core status',
+    confidence: null,
+    provenance: ['sentinel-core'],
+    action: 'execute',
+  };
   const normalized = normalizeServerPresentation({
-    message_type: 'HEALTH',
-    payload: {
-      presentation_id: 'core-presentation-1',
-      channel: 'OVERLAY',
-      kind: 'STATUS',
-      text: 'Core status',
-      confidence: null,
-      provenance: ['sentinel-core'],
-      action: 'execute',
-    },
+    message_type: 'PRESENTATION',
+    payload,
   });
   assert.deepEqual(normalized, {
     presentationId: 'core-presentation-1',
@@ -63,8 +64,10 @@ test('worker normalizes only bounded Core presentation envelopes', () => {
     confidence: null,
     provenance: ['sentinel-core'],
   });
-  assert.equal(normalizeServerPresentation({ message_type: 'HEALTH', payload: { ...normalized, channel: 'VOICE' } }), null);
-  assert.equal(normalizeServerPresentation({ message_type: 'WOW_OBSERVATION_ACK', payload: normalized }), null);
+  assert.equal(normalizeServerPresentation({ message_type: 'PRESENTATION', payload: { ...payload, channel: 'VOICE' } }), null);
+  assert.equal(normalizeServerPresentation({ message_type: 'HEALTH', payload }), null);
+  assert.equal(normalizeServerPresentation({ message_type: 'UGS_UPDATE', payload }), null);
+  assert.equal(normalizeServerPresentation({ message_type: 'WOW_OBSERVATION_ACK', payload }), null);
 });
 
 test('dedicated overlay renderer is sandboxed, non-actionable and tied to main-window lifecycle', () => {

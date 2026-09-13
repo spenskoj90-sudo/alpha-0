@@ -115,6 +115,53 @@ test('CompanionProcessManager passes token only to worker and sanitizes public s
   assert.equal(published.some(item => JSON.stringify(item).includes('rotated-access-token')), false);
 });
 
+test('CompanionProcessManager ignores stale worker events and async refresh after restart', async () => {
+  const first = new FakeChild();
+  const second = new FakeChild();
+  const children = [first, second];
+  const presentations = [];
+  let resolveRefresh;
+  const refresh = new Promise(resolve => { resolveRefresh = resolve; });
+  const manager = new CompanionProcessManager({
+    forkImpl: () => children.shift(),
+    onPresentation: value => presentations.push(value),
+    onRefreshNeeded: () => refresh,
+  });
+
+  manager.start({ coreUrl: 'http://127.0.0.1:8080', sessionToken: 'access-first-0123456789' });
+  first.emit('message', { type: 'refresh-needed' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(manager.status, { state: 'DEGRADED', reason: 'SESSION_REFRESH_REQUIRED' });
+
+  manager.stop('RESTART');
+  manager.start({ coreUrl: 'http://127.0.0.1:8080', sessionToken: 'access-second-0123456789' });
+  assert.deepEqual(manager.status, { state: 'CONNECTING', reason: 'WORKER_STARTED' });
+
+  first.emit('message', { type: 'status', status: { state: 'ACTIVE', reason: 'STALE_STATUS' } });
+  first.emit('message', {
+    type: 'presentation',
+    presentation: {
+      presentationId: 'stale-presentation',
+      channel: 'OVERLAY',
+      kind: 'STATUS',
+      text: 'stale',
+      confidence: null,
+      provenance: ['stale-worker'],
+    },
+  });
+  first.emit('exit', 1, null);
+  resolveRefresh('stale-rotated-token-0123456789');
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(presentations.length, 0);
+  assert.equal(manager.child, second);
+  assert.deepEqual(manager.status, { state: 'CONNECTING', reason: 'WORKER_STARTED' });
+  assert.equal(second.messages.some(message => message.sessionToken === 'stale-rotated-token-0123456789'), false);
+
+  second.emit('message', { type: 'status', status: { state: 'ACTIVE', reason: 'HANDSHAKE_ACCEPTED' } });
+  assert.deepEqual(manager.status, { state: 'ACTIVE', reason: 'HANDSHAKE_ACCEPTED' });
+});
+
 test('sanitizeStatus allowlists fields and drops unexpected data', () => {
   assert.deepEqual(
     sanitizeStatus({ state: 'DEGRADED', reason: 'RECONNECT_SCHEDULED', retryInMs: 1000, token: 'secret' }),

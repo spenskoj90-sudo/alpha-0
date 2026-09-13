@@ -10,7 +10,7 @@ This contract defines the first player-facing voice runtime for the Electron Com
 
 The implemented repository path is:
 
-`explicit launcher consent → trusted main-renderer media permission → bounded push-to-talk WebM/Opus capture → Electron main validation → authenticated Core session → ACTIVE companion feature check → provider-neutral STT → server-authoritative intent classification → bounded presentation-only result → local overlay intent application → optional fixed-text provider-neutral TTS feedback`
+`explicit launcher consent → trusted main-renderer push-to-talk arm → short-lived microphone permission lease → bounded WebM/Opus capture → immediate permission disarm → Electron main validation → authenticated Core session → ACTIVE companion feature check → provider-neutral STT → server-authoritative intent classification → bounded presentation-only result → local overlay intent application → optional fixed-text provider-neutral TTS feedback`
 
 The renderer never receives the Core access or refresh token. It also cannot choose the recommendation/presentation identifier used for classification and it cannot submit arbitrary text to TTS. Electron main resolves the current bounded overlay presentation identifier and maps classified results to a fixed feedback phrase allowlist.
 
@@ -18,14 +18,18 @@ The renderer never receives the Core access or refresh token. It also cannot cho
 
 - Voice consent defaults to disabled and is held only in Electron main-process memory.
 - Sign-out and main-window close clear consent.
-- Electron permission handlers are default-deny. The `media` permission is granted only to the trusted launcher main `webContents` while consent is active and the request originates from the local `file://` launcher surface.
+- Consent by itself does **not** leave microphone permission enabled. Each explicit push-to-talk action first asks Electron main to arm a five-second capture-permission lease.
+- Voice IPC is sender-bound to the current launcher main `webContents`; the overlay or another renderer cannot arm/submit through the same channel names.
+- Electron permission handlers are default-deny. The `media` permission is granted only to the trusted launcher main `webContents` while consent **and** the short-lived capture lease are active and the request originates from the local `file://` launcher surface.
+- The renderer immediately disarms the lease after the `getUserMedia` request resolves or rejects. Submit, Companion stop, sign-out, entitlement revocation and application shutdown also clear the lease defensively.
 - Display/screen capture is explicitly denied by the launcher session handler.
 - Renderer code requests `audio` only and `video: false`.
 - Capture format is fixed to `audio/webm;codecs=opus`.
 - Capture duration is capped at six seconds and the byte payload is capped at 512,000 bytes before Core/provider I/O.
+- Capture errors, sign-out and Companion kill-switch discard partial audio instead of submitting it.
 - No background-listening loop exists. Capture begins only after the player invokes push-to-talk.
 
-Electron's `media` permission is a Chromium/Electron permission category and is not represented here as a stronger OS guarantee than the API provides. The implementation additionally constrains the trusted renderer capture request to audio-only.
+Electron's `media` permission is a Chromium/Electron permission category and is not represented here as a stronger OS guarantee than the API provides. The implementation additionally constrains the trusted renderer capture request to audio-only and narrows the permission request to a one-shot main-process lease.
 
 ## Core authority and privacy
 
@@ -54,9 +58,9 @@ Core exposes a vendor-neutral HTTP adapter when `SENTINEL_VOICE_PROVIDER_URL` is
 - `POST <provider>/v1/stt` receives bounded base64 WebM/Opus plus locale and returns `{ "transcript": "..." }`;
 - `POST <provider>/v1/tts` receives bounded text plus locale and returns bounded base64 WAV plus `content_type: audio/wav`.
 
-Non-loopback provider URLs must use HTTPS. Optional bearer credentials are injected through `SENTINEL_VOICE_PROVIDER_TOKEN`; they are not embedded in the repository, API response, renderer state or audit metadata. Loopback HTTP is permitted for deterministic/local integration.
+Non-loopback provider URLs must use HTTPS. Optional bearer credentials are injected through `SENTINEL_VOICE_PROVIDER_TOKEN`; newline/header-injection values are rejected and credentials are not embedded in the repository, API response, renderer state or audit metadata. Loopback HTTP is permitted for deterministic/local integration.
 
-If no provider is configured, the runtime reports `VOICE_PROVIDER_UNAVAILABLE` and performs no hidden browser speech-service fallback. Provider exceptions become bounded `VOICE_PROVIDER_FAILED` outcomes.
+If no provider is configured, the runtime reports `VOICE_PROVIDER_UNAVAILABLE` and performs no hidden browser speech-service fallback. Invalid provider configuration fails closed as bounded `VOICE_PROVIDER_CONFIGURATION_INVALID`; provider execution failures become bounded `VOICE_PROVIDER_FAILED` outcomes.
 
 ## Player feedback and TTS
 
@@ -70,7 +74,7 @@ Optional TTS feedback text is selected in Electron main from a fixed mapping suc
 
 ## Failure and resource behavior
 
-The runtime fails closed for missing session, missing entitlement, missing consent, invalid locale/base64, oversized audio/text/output, malformed provider responses, unavailable provider, provider failure and malformed Core responses. A TTS failure degrades feedback without converting an already classified STT intent into a game action or retrying arbitrary text.
+The runtime fails closed for missing session, missing entitlement, missing consent, untrusted renderer sender, expired/unarmed media permission, invalid locale/base64, oversized audio/text/output, malformed provider responses, invalid provider configuration, unavailable provider, provider failure and malformed Core responses. A TTS failure degrades feedback without converting an already classified STT intent into a game action or retrying arbitrary text.
 
 Core session calls use the existing one-time refresh rotation path after a single 401. Tokens remain in Electron main-process memory; voice request/status DTOs contain no token fields.
 
@@ -78,7 +82,7 @@ Core session calls use the existing one-time refresh rotation path after a singl
 
 Repository and routine CI can establish:
 
-- **IMPLEMENTED / INTEGRATION-TESTED:** consent state machine, permission handlers, bounded capture contract, authenticated voice API, entitlement enforcement, provider adapter, server-authoritative intent classification, local overlay intent application, TTS feedback composition and privacy/failure tests.
+- **IMPLEMENTED / INTEGRATION-TESTED:** consent state machine, sender-bound short-lived permission lease, default-deny permission handlers, bounded capture/discard contract, authenticated voice API, entitlement enforcement, provider adapter, server-authoritative intent classification, local overlay intent application, TTS feedback composition and privacy/failure tests.
 - **ENVIRONMENT-UNVERIFIED:** real microphone/driver behavior on the release host, selected production STT/TTS vendor/network behavior, acoustic quality/latency, signed desktop package behavior and exact WoW/private-server environment acceptance.
 - **OWNER/EXTERNAL GATE:** production provider credentials, signing material, release publication and live deployment.
 

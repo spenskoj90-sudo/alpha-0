@@ -91,14 +91,21 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  publish:
-    name: Verify signed candidate and publish release
+  verify-candidate:
+    name: Verify signed candidate before publication authority
     needs: presecret
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       actions: read
-      contents: write
+      contents: read
+    outputs:
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+      apk_sha256: ${{ steps.hashes.outputs.apk_sha256 }}
+      core_sha256: ${{ steps.hashes.outputs.core_sha256 }}
+      candidate_sha256: ${{ steps.hashes.outputs.candidate_sha256 }}
+      provenance_sha256: ${{ steps.hashes.outputs.provenance_sha256 }}
+      binding_sha256: ${{ steps.hashes.outputs.binding_sha256 }}
     steps:
       - name: Checkout exact release source SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -116,7 +123,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Reconfirm canonical evidence before publication
+      - name: Reconfirm canonical evidence before candidate verification
         env:
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.presecret.outputs.source_sha }}
@@ -166,7 +173,56 @@ jobs:
           echo "Release APK verification: PASS"
 
       - name: Build exact-source Core artifact
-        run: tar -czf sentinel-core-${GITHUB_REF_NAME}.tar.gz server docs docker-compose.yml
+        run: tar -czf release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz server docs docker-compose.yml
+
+      - name: Capture publication input hashes
+        id: hashes
+        run: |
+          set -euo pipefail
+          echo "apk_sha256=$(sha256sum release-input/app-release.apk | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "core_sha256=$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha256=$(sha256sum release-input/release-candidate.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "provenance_sha256=$(sha256sum release-input/release-candidate-provenance.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "binding_sha256=$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified publication input
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sentinel-release-publication-input-${{ needs.presecret.outputs.source_sha }}
+          path: release-input/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish preverified release
+    needs: [presecret, verify-candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download preverified publication input
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sentinel-release-publication-input-${{ needs.presecret.outputs.source_sha }}
+          path: release-input
+
+      - name: Recheck exact verified bytes before publication
+        env:
+          EXPECTED_APK_SHA256: ${{ needs.verify-candidate.outputs.apk_sha256 }}
+          EXPECTED_CORE_SHA256: ${{ needs.verify-candidate.outputs.core_sha256 }}
+          EXPECTED_CANDIDATE_SHA256: ${{ needs.verify-candidate.outputs.candidate_sha256 }}
+          EXPECTED_PROVENANCE_SHA256: ${{ needs.verify-candidate.outputs.provenance_sha256 }}
+          EXPECTED_BINDING_SHA256: ${{ needs.verify-candidate.outputs.binding_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$(sha256sum release-input/app-release.apk | awk '{print $1}')" = "$EXPECTED_APK_SHA256"
+          test "$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" = "$EXPECTED_CORE_SHA256"
+          test "$(sha256sum release-input/release-candidate.json | awk '{print $1}')" = "$EXPECTED_CANDIDATE_SHA256"
+          test "$(sha256sum release-input/release-candidate-provenance.json | awk '{print $1}')" = "$EXPECTED_PROVENANCE_SHA256"
+          test "$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" = "$EXPECTED_BINDING_SHA256"
 
       - name: Publish verified release lineage
         env:
@@ -175,7 +231,7 @@ jobs:
           set -euo pipefail
           gh release create "${GITHUB_REF_NAME}" \
             release-input/app-release.apk \
-            "sentinel-core-${GITHUB_REF_NAME}.tar.gz" \
+            "release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz" \
             release-input/release-candidate.json \
             release-input/release-candidate-provenance.json \
             release-input/release-presecret-binding.json \

@@ -25,6 +25,7 @@ app.whenReady().then(() => {
     // keeps the runtime module graph resolvable without node_modules or ASAR.
     require('./companion-process');
     require('./core-session');
+    require('./exact-environment-evidence');
     require('./runtime-health');
     require('./voice-runtime');
     require('./wow-savedvariables');
@@ -37,6 +38,7 @@ app.whenReady().then(() => {
       runtimeModulesLoaded: [
         'companion-process',
         'core-session',
+        'exact-environment-evidence',
         'runtime-health',
         'voice-runtime',
         'wow-savedvariables',

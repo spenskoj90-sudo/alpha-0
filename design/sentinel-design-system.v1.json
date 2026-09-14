@@ -1,0 +1,133 @@
+{
+  "schema": "sentinel.design-system.v1",
+  "status": "ACTIVE",
+  "figma": {
+    "fileName": "SENTINEL — Canonical Product Design System",
+    "fileKey": "vRIHsesWZNMEEEjNJu8TjB",
+    "url": "https://www.figma.com/design/vRIHsesWZNMEEEjNJu8TjB",
+    "authoredPages": ["00 Foundations", "01 Components"],
+    "note": "Figma is the visual design anchor. Repository manifests and tests are the executable anti-drift contract. Additional screen-page authoring may be continued when Figma MCP quota permits without changing the semantic contract."
+  },
+  "principles": [
+    "security-first",
+    "default-deny",
+    "server-authoritative state",
+    "observational recommendations",
+    "status is never color-only",
+    "keyboard and assistive-technology semantics are first-class",
+    "physical-device acceptance is a final pre-release gate"
+  ],
+  "semanticRoles": {
+    "background": "Primary application canvas",
+    "surface": "Elevated operational panel/card",
+    "border": "Structural separation without implying authority",
+    "primary": "Primary user action or product emphasis",
+    "signal": "Healthy/active/informational state",
+    "danger": "Destructive, denied, failed or terminal state",
+    "textPrimary": "Primary readable content",
+    "textSecondary": "Labels, metadata and secondary copy",
+    "focus": "Visible keyboard focus indication"
+  },
+  "surfaces": {
+    "web": {
+      "source": "web/app/globals.css",
+      "tokens": {
+        "background": "#070A0D",
+        "surface": "#0D1217",
+        "surfaceRaised": "#111820",
+        "border": "#1D2832",
+        "primary": "#9ACB52",
+        "signal": "#4CA3FF",
+        "danger": "#FF6B6B",
+        "textPrimary": "#E7EDF2",
+        "textSecondary": "#8996A3",
+        "focus": "#4CA3FF"
+      },
+      "shape": {"cardRadiusPx": 16, "nestedRadiusPx": 12, "controlRadiusPx": 10},
+      "responsiveCollapseMaxWidthPx": 800
+    },
+    "companion": {
+      "source": "launcher/index.html",
+      "overlaySource": "launcher/overlay.html",
+      "tokens": {
+        "background": "#070A0D",
+        "surface": "#0D1217",
+        "border": "#1D2832",
+        "primary": "#9ACB52",
+        "signal": "#4CA3FF",
+        "danger": "#FF6B6B",
+        "textPrimary": "#E7EDF2",
+        "textSecondary": "#8996A3",
+        "focus": "#4CA3FF"
+      },
+      "overlay": {
+        "background": "rgba(8, 13, 18, .86)",
+        "textPrimary": "#EEF3F7",
+        "radiusPx": 14,
+        "pointerEvents": "none",
+        "authority": "presentation-only"
+      }
+    },
+    "android": {
+      "source": "app/src/main/java/com/alpha0/app/ui/DesignTokens.kt",
+      "themeSource": "app/src/main/java/com/alpha0/app/ui/SentinelTheme.kt",
+      "tokens": {
+        "background": "#0D1117",
+        "surface": "#161B22",
+        "border": "#30363D",
+        "primary": "#B356FF",
+        "signal": "#00E5FF",
+        "danger": "#FF3366",
+        "textPrimary": "#F0F6FC",
+        "textSecondary": "#8B949E"
+      },
+      "typography": {"display": "Outfit", "body": "Inter", "data": "JetBrains Mono"},
+      "shape": {"sentinelCardRadiusDp": 4, "buttonRadiusDp": 14}
+    }
+  },
+  "components": {
+    "PrimaryAction": {
+      "web": ".btn",
+      "android": "PrimaryButton",
+      "companion": ".btn",
+      "semantics": ["enabled/disabled", "visible focus", "explicit text label"]
+    },
+    "DangerAction": {
+      "web": "danger state/action copy where applicable",
+      "android": "DangerButton",
+      "companion": "STOP / KILL SWITCH",
+      "semantics": ["destructive or terminal action is explicit", "no color-only meaning"]
+    },
+    "Status": {
+      "web": ".state / .status-message",
+      "android": "StatusBadge",
+      "companion": ".status",
+      "semantics": ["text label required", "aria/live-region or Compose semantics where dynamic"]
+    },
+    "OperationalCard": {
+      "web": ".card",
+      "android": "SentinelCard / Material Card",
+      "companion": ".panel / .card",
+      "semantics": ["structural only", "does not imply elevated authority"]
+    },
+    "RecommendationPresentation": {
+      "web": "RecommendationPanel",
+      "android": "presentation UI only",
+      "companion": "overlay.html presentation list",
+      "semantics": ["observational", "no game-write action", "source/authority boundary remains explicit"]
+    }
+  },
+  "accessibility": {
+    "web": ["skip navigation", "focus-visible", "main landmark", "live status", "forced-colors"],
+    "android": ["polite/assertive live region", "progress semantics", "button/card semantics", "API 35 instrumentation"],
+    "companion": ["skip navigation", "focus-visible", "live status", "forced-colors", "overlay polite live region"],
+    "physicalPreRelease": ["TalkBack", "NVDA/JAWS", "switch/keyboard on target hardware", "real packaged host overlay", "microphone/driver/acoustic acceptance"]
+  },
+  "authorityStates": {
+    "ACTIVE": "Authoritative state confirms the capability is currently granted/healthy.",
+    "PENDING": "No authority is inferred until the authoritative transition completes.",
+    "DENIED": "Fail closed; do not substitute stale or client-inferred authority.",
+    "OBSERVATIONAL": "Presentation/recommendation only; never maps to autonomous game action.",
+    "EXTERNAL": "Requires provider, environment, physical, credential or Owner evidence outside repository-only proof."
+  }
+}

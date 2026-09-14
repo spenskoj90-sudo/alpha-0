@@ -1,0 +1,105 @@
+name: Supply Chain Evidence
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  supply-chain-evidence:
+    name: Supply-chain SBOM evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SENTINEL_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SENTINEL_IMAGE: sentinel-core:supply-chain
+    steps:
+      - name: Checkout exact source SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.2
+
+      - name: Run supply-chain contract tests
+        run: python scripts/test_supply_chain_evidence.py
+
+      - name: Build exact-source Core runtime image
+        run: |
+          set -euo pipefail
+          docker build --build-arg SOURCE_DATE_EPOCH=0 -f server/Dockerfile -t "$SENTINEL_IMAGE" .
+          mkdir -p artifacts/supply-chain/inputs
+          docker image inspect "$SENTINEL_IMAGE" --format '{{.Id}}' > artifacts/supply-chain/inputs/container-image-id.txt
+          docker run --rm --entrypoint python "$SENTINEL_IMAGE" -m pip list --format=json > artifacts/supply-chain/inputs/python-runtime.json
+
+      - name: Generate Core container CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: sentinel-core:supply-chain
+          format: cyclonedx
+          output: artifacts/supply-chain/inputs/container.cdx.json
+          exit-code: 0
+
+      - name: Capture resolved Web Android and Companion inventories
+        run: |
+          set -euo pipefail
+          cp web/package-lock.json artifacts/supply-chain/inputs/web-package-lock.json
+          cp launcher/package.json artifacts/supply-chain/inputs/launcher-package.json
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:dependencies --configuration debugRuntimeClasspath > artifacts/supply-chain/inputs/android-debug-runtime.txt
+
+      - name: Build exact-SHA supply-chain evidence
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          python scripts/supply_chain_evidence.py build \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha "$SENTINEL_SOURCE_SHA" \
+            --version "$version" \
+            --python-runtime artifacts/supply-chain/inputs/python-runtime.json \
+            --web-lock artifacts/supply-chain/inputs/web-package-lock.json \
+            --gradle-deps artifacts/supply-chain/inputs/android-debug-runtime.txt \
+            --launcher-package artifacts/supply-chain/inputs/launcher-package.json \
+            --container-sbom artifacts/supply-chain/inputs/container.cdx.json \
+            --container-image-id artifacts/supply-chain/inputs/container-image-id.txt \
+            --output-dir artifacts/supply-chain
+
+      - name: Verify supply-chain evidence independently
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          python scripts/supply_chain_evidence.py verify \
+            --input-dir artifacts/supply-chain \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SENTINEL_SOURCE_SHA" \
+            --expected-version "$version"
+
+      - name: Upload exact-SHA supply-chain evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sentinel-supply-chain-evidence-${{ env.SENTINEL_SOURCE_SHA }}
+          path: artifacts/supply-chain/
+          if-no-files-found: error
+          retention-days: 90

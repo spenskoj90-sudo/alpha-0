@@ -7,7 +7,10 @@ const test = require('node:test');
 const {
   REQUIRED_APP_FILES,
   inspectPackagedLayout,
+  readPackagedBuildProvenance,
 } = require('../packaged-runtime');
+
+const SOURCE_SHA = 'a'.repeat(40);
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sentinel-packaged-runtime-'));
@@ -31,6 +34,18 @@ function fixture() {
     }),
     'utf8',
   );
+  fs.writeFileSync(
+    path.join(appDir, 'build-provenance.json'),
+    JSON.stringify({
+      schema: 'sentinel.packaged-companion-runtime.v1',
+      sourceSha: SOURCE_SHA,
+      target: 'win32-x64',
+      packageVersion: '0.2.0',
+      electronVersion: '37.2.0',
+      signed: false,
+    }),
+    'utf8',
+  );
 
   return { root, resourcesPath, appDir };
 }
@@ -49,6 +64,23 @@ test('accepts the bounded unpacked Windows Companion payload', () => {
     assert.equal(result.electronVersion, '37.2.0');
     assert.equal(result.applicationPayload, 'resources/app');
     assert.equal(result.signed, false);
+    assert.equal(result.sourceSha, SOURCE_SHA);
+    assert.equal(result.sourceBound, true);
+    assert.match(result.provenanceFileSha256, /^[0-9a-f]{64}$/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('reads bounded embedded build provenance', () => {
+  const { root, appDir } = fixture();
+  try {
+    const result = readPackagedBuildProvenance(appDir);
+    assert.equal(result.schema, 'sentinel.packaged-companion-runtime.v1');
+    assert.equal(result.sourceSha, SOURCE_SHA);
+    assert.equal(result.sourceBound, true);
+    assert.equal(result.target, 'win32-x64');
+    assert.match(result.provenanceFileSha256, /^[0-9a-f]{64}$/);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -134,5 +166,34 @@ test('rejects non-Windows evidence and executable renaming drift', () => {
     );
   } finally {
     fs.rmSync(second.root, { recursive: true, force: true });
+  }
+});
+
+test('rejects packaged provenance drift', () => {
+  const { root, resourcesPath, appDir } = fixture();
+  try {
+    fs.writeFileSync(
+      path.join(appDir, 'build-provenance.json'),
+      JSON.stringify({
+        schema: 'sentinel.packaged-companion-runtime.v1',
+        sourceSha: SOURCE_SHA,
+        target: 'win32-x64',
+        packageVersion: '0.1.0',
+        electronVersion: '37.2.0',
+        signed: false,
+      }),
+      'utf8',
+    );
+    assert.throws(
+      () => inspectPackagedLayout({
+        resourcesPath,
+        electronVersion: '37.2.0',
+        platform: 'win32',
+        executablePath: path.join(root, 'SENTINEL Companion.exe'),
+      }),
+      /provenance package version mismatch/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

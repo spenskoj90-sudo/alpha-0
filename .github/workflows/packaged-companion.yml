@@ -1,0 +1,125 @@
+name: Packaged Companion Host
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packaged-companion:
+    name: Packaged Companion host evidence
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      SENTINEL_SOURCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Run launcher regression tests
+        working-directory: launcher
+        shell: pwsh
+        run: npm test
+
+      - name: Build unsigned package A
+        shell: pwsh
+        run: |
+          ./launcher/scripts/package-windows.ps1 `
+            -OutputDir "$env:RUNNER_TEMP\sentinel-package-a" `
+            -EvidenceDir "$env:RUNNER_TEMP\sentinel-evidence-a" `
+            -CacheDir "$env:RUNNER_TEMP\sentinel-electron-cache"
+
+      - name: Build unsigned package B independently
+        shell: pwsh
+        run: |
+          ./launcher/scripts/package-windows.ps1 `
+            -OutputDir "$env:RUNNER_TEMP\sentinel-package-b" `
+            -EvidenceDir "$env:RUNNER_TEMP\sentinel-evidence-b" `
+            -CacheDir "$env:RUNNER_TEMP\sentinel-electron-cache"
+
+      - name: Verify exact-SHA provenance and reproducible filesystem
+        shell: pwsh
+        run: |
+          $evidenceA = Get-Content -Raw "$env:RUNNER_TEMP\sentinel-evidence-a\build-evidence.json" | ConvertFrom-Json
+          $evidenceB = Get-Content -Raw "$env:RUNNER_TEMP\sentinel-evidence-b\build-evidence.json" | ConvertFrom-Json
+          if ($evidenceA.status -ne "pass" -or $evidenceB.status -ne "pass") {
+            throw "packaging evidence is not PASS"
+          }
+          if ($evidenceA.sourceSha -ne $env:SENTINEL_SOURCE_SHA -or $evidenceB.sourceSha -ne $env:SENTINEL_SOURCE_SHA) {
+            throw "packaging evidence is not bound to exact source SHA $env:SENTINEL_SOURCE_SHA"
+          }
+          if ($evidenceA.signed -ne $false -or $evidenceB.signed -ne $false) {
+            throw "ordinary CI package must remain unsigned"
+          }
+          $manifestA = Get-Content -Raw "$env:RUNNER_TEMP\sentinel-evidence-a\package-manifest.sha256"
+          $manifestB = Get-Content -Raw "$env:RUNNER_TEMP\sentinel-evidence-b\package-manifest.sha256"
+          if ($manifestA -cne $manifestB) {
+            Compare-Object `
+              (Get-Content "$env:RUNNER_TEMP\sentinel-evidence-a\package-manifest.sha256") `
+              (Get-Content "$env:RUNNER_TEMP\sentinel-evidence-b\package-manifest.sha256")
+            throw "independent packaged filesystems are not reproducible"
+          }
+          Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\sentinel-evidence-a\package-manifest.sha256"
+
+      - name: Run packaged Electron runtime smoke
+        shell: pwsh
+        run: |
+          $smokeEvidence = "$env:RUNNER_TEMP\sentinel-evidence-a\smoke-evidence.json"
+          $env:SENTINEL_PACKAGE_SMOKE_OUTPUT = $smokeEvidence
+          & "$env:RUNNER_TEMP\sentinel-package-a\SENTINEL Companion.exe" `
+            --disable-gpu `
+            "$env:RUNNER_TEMP\sentinel-package-a\resources\app\package-smoke.js"
+          if ($LASTEXITCODE -ne 0) {
+            throw "packaged Electron runtime smoke exited with $LASTEXITCODE"
+          }
+          $smoke = Get-Content -Raw $smokeEvidence | ConvertFrom-Json
+          if ($smoke.status -ne "pass") {
+            throw "packaged runtime smoke did not pass"
+          }
+          if ($smoke.sourceSha -ne $env:SENTINEL_SOURCE_SHA) {
+            throw "runtime smoke evidence is not bound to exact source SHA $env:SENTINEL_SOURCE_SHA"
+          }
+          if ($smoke.electronVersion -ne "37.2.0") {
+            throw "unexpected packaged Electron version $($smoke.electronVersion)"
+          }
+          if ($smoke.signed -ne $false) {
+            throw "ordinary CI runtime evidence must remain unsigned"
+          }
+          $smoke | ConvertTo-Json -Depth 6
+
+      - name: Archive deterministic package
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "$env:RUNNER_TEMP\sentinel-package-a\*" `
+            -DestinationPath "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip" `
+            -CompressionLevel Optimal
+          Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip" |
+            Format-List | Out-String |
+            Set-Content -Encoding utf8 "$env:RUNNER_TEMP\sentinel-evidence-a\archive-sha256.txt"
+
+      - name: Upload exact-SHA packaged Companion evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: packaged-companion-host-${{ env.SENTINEL_SOURCE_SHA }}
+          path: |
+            ${{ runner.temp }}\sentinel-companion-win32-x64.zip
+            ${{ runner.temp }}\sentinel-evidence-a\build-evidence.json
+            ${{ runner.temp }}\sentinel-evidence-a\package-manifest.sha256
+            ${{ runner.temp }}\sentinel-evidence-a\smoke-evidence.json
+            ${{ runner.temp }}\sentinel-evidence-a\archive-sha256.txt
+          if-no-files-found: error
+          retention-days: 14

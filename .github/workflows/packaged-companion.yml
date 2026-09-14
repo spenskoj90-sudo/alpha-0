@@ -78,12 +78,19 @@ jobs:
         shell: pwsh
         run: |
           $smokeEvidence = "$env:RUNNER_TEMP\sentinel-evidence-a\smoke-evidence.json"
+          $smokeScript = "$env:RUNNER_TEMP\sentinel-package-a\resources\app\package-smoke.js"
+          $companionExe = "$env:RUNNER_TEMP\sentinel-package-a\SENTINEL Companion.exe"
           $env:SENTINEL_PACKAGE_SMOKE_OUTPUT = $smokeEvidence
-          & "$env:RUNNER_TEMP\sentinel-package-a\SENTINEL Companion.exe" `
-            --disable-gpu `
-            "$env:RUNNER_TEMP\sentinel-package-a\resources\app\package-smoke.js"
-          if ($LASTEXITCODE -ne 0) {
-            throw "packaged Electron runtime smoke exited with $LASTEXITCODE"
+          $process = Start-Process `
+            -FilePath $companionExe `
+            -ArgumentList @("--disable-gpu", $smokeScript) `
+            -PassThru `
+            -Wait
+          if ($process.ExitCode -ne 0) {
+            throw "packaged Electron runtime smoke exited with $($process.ExitCode)"
+          }
+          if (-not (Test-Path $smokeEvidence -PathType Leaf)) {
+            throw "packaged Electron runtime did not emit smoke evidence"
           }
           $smoke = Get-Content -Raw $smokeEvidence | ConvertFrom-Json
           if ($smoke.status -ne "pass") {

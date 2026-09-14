@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { getProcessExactEnvironmentEvidenceRecorder } = require('./exact-environment-evidence');
 
 const MAX_FILE_BYTES = 256 * 1024;
 const MAX_QUEUE_BYTES = 512 * 1024;
@@ -271,12 +272,13 @@ function checkpointEvidence(source, raw, observation) {
 }
 
 class WowCheckpointBridge {
-  constructor({ queue, resolvePath, sendObservation, onStatus = () => {}, onAcceptedCheckpoint = () => {}, fsImpl = fs, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, intervalMs = 5000 } = {}) {
+  constructor({ queue, resolvePath, sendObservation, onStatus = () => {}, onAcceptedCheckpoint = () => {}, evidenceRecorder = undefined, fsImpl = fs, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, intervalMs = 5000 } = {}) {
     this.queue = queue;
     this.resolvePath = resolvePath;
     this.sendObservation = sendObservation;
     this.onStatus = onStatus;
     this.onAcceptedCheckpoint = onAcceptedCheckpoint;
+    this.evidenceRecorder = evidenceRecorder === undefined ? getProcessExactEnvironmentEvidenceRecorder() : evidenceRecorder;
     this.fs = fsImpl;
     this.setIntervalImpl = setIntervalImpl;
     this.clearIntervalImpl = clearIntervalImpl;
@@ -347,7 +349,7 @@ class WowCheckpointBridge {
     const evidence = this.evidence.get(eventId) || null;
     this.evidence.delete(eventId);
     if (accepted && evidence) {
-      this.onAcceptedCheckpoint({
+      const acceptedEvidence = {
         ...evidence,
         coreAck: {
           eventId,
@@ -355,7 +357,9 @@ class WowCheckpointBridge {
           reason: typeof reason === 'string' ? reason : 'PASSIVE_CHECKPOINT_ACCEPTED',
           acknowledgedAt: new Date().toISOString(),
         },
-      });
+      };
+      this.evidenceRecorder?.acceptCheckpoint(acceptedEvidence);
+      this.onAcceptedCheckpoint(acceptedEvidence);
     }
     this.#publish(accepted ? 'DELIVERED' : 'CORE_REJECTED', { eventId, reason });
     this.flush();

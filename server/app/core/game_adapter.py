@@ -83,12 +83,85 @@ class CapabilityChange(BaseModel):
     changed_at: datetime
 
 
+_L3_ADMISSION_AUTHORITY = object()
+
+
+class _L3CapabilityAdmission:
+    """Internal proof that exact-environment evidence passed the L3 validator.
+
+    Callers must not construct this directly. The exact-environment evidence
+    module issues admissions only after validating a bounded evidence bundle.
+    This is a process-integrity boundary, not a cryptographic trust primitive.
+    """
+
+    __slots__ = (
+        "adapter_id",
+        "capability_name",
+        "capability",
+        "environment_id",
+        "evidence_id",
+        "evidence_digest_sha256",
+        "_authority",
+    )
+
+    def __init__(
+        self,
+        *,
+        adapter_id: str,
+        capability_name: str,
+        capability: Capability,
+        environment_id: str,
+        evidence_id: str,
+        evidence_digest_sha256: str,
+        _authority: object,
+    ) -> None:
+        if _authority is not _L3_ADMISSION_AUTHORITY:
+            raise TypeError("L3 admissions may only be issued by the exact-environment validator")
+        self.adapter_id = adapter_id
+        self.capability_name = capability_name
+        self.capability = capability
+        self.environment_id = environment_id
+        self.evidence_id = evidence_id
+        self.evidence_digest_sha256 = evidence_digest_sha256
+        self._authority = _authority
+
+    def is_validated(self) -> bool:
+        return self._authority is _L3_ADMISSION_AUTHORITY
+
+
+def _issue_l3_capability_admission(
+    *,
+    adapter_id: str,
+    capability_name: str,
+    capability: Capability,
+    environment_id: str,
+    evidence_id: str,
+    evidence_digest_sha256: str,
+) -> _L3CapabilityAdmission:
+    if capability.status != CapabilityStatus.AVAILABLE or capability.evidence_level != EvidenceLevel.L3:
+        raise ValueError("L3 admission requires AVAILABLE capability with L3 evidence")
+    if not adapter_id or not capability_name or not environment_id or not evidence_id:
+        raise ValueError("L3 admission identity fields are required")
+    if len(evidence_digest_sha256) != 64 or any(ch not in "0123456789abcdef" for ch in evidence_digest_sha256):
+        raise ValueError("L3 admission requires a lowercase SHA-256 evidence digest")
+    return _L3CapabilityAdmission(
+        adapter_id=adapter_id,
+        capability_name=capability_name,
+        capability=capability,
+        environment_id=environment_id,
+        evidence_id=evidence_id,
+        evidence_digest_sha256=evidence_digest_sha256,
+        _authority=_L3_ADMISSION_AUTHORITY,
+    )
+
+
 class AdapterRegistry:
     """In-memory registry for validated adapter identities and capabilities.
 
     This registry is deliberately not an authorization store. It only records
-    what an adapter claims it can observe and enforces the contract's evidence
-    rules at the Core boundary.
+    what an adapter can observe and enforces the contract's evidence rules at
+    the Core boundary. A raw caller cannot self-label a capability AVAILABLE:
+    that transition requires a validated exact-environment L3 admission.
     """
 
     def __init__(self) -> None:
@@ -114,11 +187,34 @@ class AdapterRegistry:
         if not capability_name or len(capability_name) > 128:
             raise ValueError("invalid capability name")
 
-        # AVAILABLE is an evidence claim, not a default. L3 is mandatory for
-        # environment-specific availability as required by Contract v1.
-        if capability.status == CapabilityStatus.AVAILABLE and capability.evidence_level != EvidenceLevel.L3:
-            raise ValueError("AVAILABLE capability requires L3 evidence")
+        # AVAILABLE is an exact-environment acceptance claim. EvidenceLevel.L3
+        # alone is insufficient because a caller could otherwise fabricate the
+        # label. Only _admit_l3_capability may cross this boundary.
+        if capability.status == CapabilityStatus.AVAILABLE:
+            raise ValueError("AVAILABLE capability requires validated exact-environment L3 admission")
 
+        return self._store_capability(adapter_id, capability_name, capability)
+
+    def _admit_l3_capability(self, admission: _L3CapabilityAdmission) -> CapabilityChange | None:
+        if not isinstance(admission, _L3CapabilityAdmission) or not admission.is_validated():
+            raise ValueError("invalid L3 capability admission")
+        identity = self._identities.get(admission.adapter_id)
+        if identity is None:
+            raise KeyError(f"adapter is not registered: {admission.adapter_id}")
+        if not identity.environment_id or identity.environment_id != admission.environment_id:
+            raise ValueError("L3 admission environment does not match registered adapter identity")
+        if admission.capability.status != CapabilityStatus.AVAILABLE:
+            raise ValueError("L3 admission capability must be AVAILABLE")
+        if admission.capability.evidence_level != EvidenceLevel.L3:
+            raise ValueError("L3 admission capability must carry L3 evidence")
+        return self._store_capability(admission.adapter_id, admission.capability_name, admission.capability)
+
+    def _store_capability(
+        self,
+        adapter_id: str,
+        capability_name: str,
+        capability: Capability,
+    ) -> CapabilityChange | None:
         current = self._capabilities[adapter_id].get(capability_name)
         previous_status = current.status if current else CapabilityStatus.UNAVAILABLE
         self._capabilities[adapter_id][capability_name] = capability

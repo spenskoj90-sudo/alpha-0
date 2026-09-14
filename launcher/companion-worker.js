@@ -66,6 +66,20 @@ function normalizeServerPresentation(message) {
   });
 }
 
+function handshakeEvidence(acceptedAt = new Date()) {
+  if (!(acceptedAt instanceof Date) || !Number.isFinite(acceptedAt.getTime())) throw new Error('INVALID_HANDSHAKE_EVIDENCE_TIME');
+  return Object.freeze({
+    acceptedAt: acceptedAt.toISOString(),
+    accepted: true,
+    mode: 'ACTIVE',
+    protocolVersion: HANDSHAKE.protocol_version,
+    ugsSchemaVersion: HANDSHAKE.ugs_schema_version,
+    adapterContractVersion: HANDSHAKE.adapter_contract_version,
+    coreProtocolVersion: HANDSHAKE.core_protocol_version,
+    capabilityProfile: HANDSHAKE.capability_profile,
+  });
+}
+
 class ReconnectPolicy {
   constructor({ baseMs = 1000, maxMs = 30000, maxAttempts = 8 } = {}) {
     this.baseMs = baseMs;
@@ -185,6 +199,7 @@ class CompanionWorkerRuntime {
     if (!this.handshaken) {
       if (message?.accepted === true && message?.mode === 'ACTIVE') {
         this.handshaken = true;
+        this.send({ type: 'handshake-evidence', handshake: handshakeEvidence() });
         this.#setState('ACTIVE', 'HANDSHAKE_ACCEPTED');
         this.#startHeartbeat();
       } else {
@@ -294,6 +309,7 @@ module.exports = {
   CompanionWorkerRuntime,
   ReconnectPolicy,
   authProtocols,
+  handshakeEvidence,
   normalizeServerPresentation,
   requireLoopbackCore,
   websocketUrl,

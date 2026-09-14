@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { getProcessExactEnvironmentEvidenceRecorder } = require('./exact-environment-evidence');
 
 const MAX_FILE_BYTES = 256 * 1024;
 const MAX_QUEUE_BYTES = 512 * 1024;
@@ -260,12 +261,24 @@ function thisStat(fsImpl, candidate) {
   return { isFile: () => stat.isFile(), isSymbolicLink: false, size: stat.size, mtimeMs: stat.mtimeMs };
 }
 
+function checkpointEvidence(source, raw, observation) {
+  return Object.freeze({
+    checkpointSha256: crypto.createHash('sha256').update(raw).digest('hex'),
+    checkpointSizeBytes: Buffer.byteLength(raw),
+    pathFingerprintSha256: crypto.createHash('sha256').update(path.resolve(source).toLowerCase()).digest('hex'),
+    capturedAt: new Date().toISOString(),
+    observation: Object.freeze({ ...observation }),
+  });
+}
+
 class WowCheckpointBridge {
-  constructor({ queue, resolvePath, sendObservation, onStatus = () => {}, fsImpl = fs, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, intervalMs = 5000 } = {}) {
+  constructor({ queue, resolvePath, sendObservation, onStatus = () => {}, onAcceptedCheckpoint = () => {}, evidenceRecorder = undefined, fsImpl = fs, setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, intervalMs = 5000 } = {}) {
     this.queue = queue;
     this.resolvePath = resolvePath;
     this.sendObservation = sendObservation;
     this.onStatus = onStatus;
+    this.onAcceptedCheckpoint = onAcceptedCheckpoint;
+    this.evidenceRecorder = evidenceRecorder === undefined ? getProcessExactEnvironmentEvidenceRecorder() : evidenceRecorder;
     this.fs = fsImpl;
     this.setIntervalImpl = setIntervalImpl;
     this.clearIntervalImpl = clearIntervalImpl;
@@ -275,6 +288,7 @@ class WowCheckpointBridge {
     this.signature = null;
     this.inFlight = null;
     this.companionActive = false;
+    this.evidence = new Map();
   }
   start() {
     if (this.running) return;
@@ -287,6 +301,7 @@ class WowCheckpointBridge {
     if (this.timer) this.clearIntervalImpl(this.timer);
     this.timer = null;
     this.inFlight = null;
+    this.evidence.clear();
     this.#publish('STOPPED');
   }
   onCompanionStatus(status) {
@@ -303,10 +318,14 @@ class WowCheckpointBridge {
       if (!stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error('SAVEDVARIABLES_FILE_TOO_LARGE');
       const signature = `${stat.size}:${stat.mtimeMs}`;
       if (signature !== this.signature) {
-        const parsed = parseSavedVariables(this.fs.readFileSync(source, 'utf8'));
+        const raw = this.fs.readFileSync(source, 'utf8');
+        const parsed = parseSavedVariables(raw);
         const observation = normalizeSnapshot(parsed);
         this.signature = signature;
-        this.queue.enqueue(observation);
+        if (this.queue.enqueue(observation)) {
+          this.evidence.set(observation.event_id, checkpointEvidence(source, raw, observation));
+          while (this.evidence.size > 128) this.evidence.delete(this.evidence.keys().next().value);
+        }
       }
       this.#publish('READY');
       this.flush();
@@ -327,6 +346,21 @@ class WowCheckpointBridge {
     if (!eventId || this.inFlight !== eventId) return false;
     this.queue.acknowledge(eventId);
     this.inFlight = null;
+    const evidence = this.evidence.get(eventId) || null;
+    this.evidence.delete(eventId);
+    if (accepted && evidence) {
+      const acceptedEvidence = {
+        ...evidence,
+        coreAck: {
+          eventId,
+          accepted: true,
+          reason: typeof reason === 'string' ? reason : 'PASSIVE_CHECKPOINT_ACCEPTED',
+          acknowledgedAt: new Date().toISOString(),
+        },
+      };
+      this.evidenceRecorder?.acceptCheckpoint(acceptedEvidence);
+      this.onAcceptedCheckpoint(acceptedEvidence);
+    }
     this.#publish(accepted ? 'DELIVERED' : 'CORE_REJECTED', { eventId, reason });
     this.flush();
     return true;
@@ -345,6 +379,7 @@ module.exports = {
   MAX_QUEUE_BYTES,
   WowCheckpointBridge,
   WowObservationQueue,
+  checkpointEvidence,
   discoverSentinelSavedVariables,
   normalizeSnapshot,
   parseSavedVariables,

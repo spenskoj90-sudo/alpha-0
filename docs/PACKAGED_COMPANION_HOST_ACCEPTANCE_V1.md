@@ -29,10 +29,13 @@ The unpacked application payload is deliberate. The launcher starts the Companio
 3. rejects the runtime when its SHA-256 differs from the pinned digest;
 4. stages the official runtime without signing or modifying security controls;
 5. replaces Electron's default application with the bounded SENTINEL application payload;
-6. produces a sorted SHA-256 manifest for every staged file;
-7. writes build evidence bound to `SENTINEL_SOURCE_SHA`.
+6. writes `resources/app/build-provenance.json` containing the package/source identity available to the running Companion;
+7. includes that embedded provenance file in the sorted SHA-256 manifest for every staged file;
+8. writes external build evidence bound to `SENTINEL_SOURCE_SHA`.
 
-The browser/player cannot influence the runtime version, upstream asset URL, expected digest, packaged source list, or evidence source SHA.
+The embedded runtime provenance contains the exact source SHA, target, launcher version, Electron version and signing state. `launcher/packaged-runtime.js` bounds and validates the file and computes its SHA-256 digest. A package built without an exact source SHA may remain usable for local development but is marked `local-unbound` and is rejected by exact-environment L3 capture.
+
+The browser/player cannot influence the runtime version, upstream asset URL, expected digest, packaged source list, evidence source SHA, or embedded build provenance through renderer IPC.
 
 ## CI evidence
 
@@ -44,9 +47,10 @@ The browser/player cannot influence the runtime version, upstream asset URL, exp
 4. requires identical canonical file-content manifests;
 5. verifies both build-evidence documents are bound to the exact PR HEAD SHA (or push SHA on `main`);
 6. starts the staged `SENTINEL Companion.exe` with the packaged smoke entrypoint;
-7. requires the running Electron process to report version `37.2.0` and resolve the Companion runtime module graph from `resources/app`;
-8. records exact-SHA smoke evidence;
-9. uploads the unsigned Windows package plus manifests and evidence.
+7. requires the running Electron process to report version `37.2.0`, validate embedded source provenance and resolve the Companion runtime module graph from `resources/app`;
+8. explicitly loads the exact-environment evidence recorder module as part of packaged smoke;
+9. records exact-SHA smoke evidence;
+10. uploads the unsigned Windows package plus manifests and evidence.
 
 Reproducibility means equality of the staged runtime filesystem contents. The compressed ZIP archive is a transport artifact; ZIP metadata is not used as the reproducibility criterion.
 
@@ -58,15 +62,23 @@ Packaging or smoke evidence fails when any of the following occurs:
 - Electron dependency/version drift;
 - non-Windows packaged-runtime evidence;
 - missing required Companion runtime source;
+- missing or malformed embedded build provenance;
+- embedded package/Electron provenance drift;
 - unexpected executable name;
 - bundled `node_modules` or launcher test sources;
 - package A/B file-content manifest mismatch;
-- evidence source SHA differs from the exact PR HEAD/push SHA;
+- external evidence source SHA differs from the exact PR HEAD/push SHA;
 - packaged Electron process fails to start or load the required runtime module graph;
 - ordinary CI evidence claims the package is signed.
 
+## Relationship to exact-environment L3 evidence
+
+The packaged host is the source-provenance anchor for `docs/EXACT_ENVIRONMENT_L3_EVIDENCE_V1.md`. When L3 capture is explicitly enabled on a real target host, the recorder consumes the embedded source-bound provenance and combines it only with sanitized accepted Companion handshake/health and Core-ACKed WoW checkpoint evidence.
+
+The package itself does not establish L3. CI package smoke does not establish L3. A source SHA embedded in a package does not establish L3. The real exact game/client/server run remains a separate environment acceptance event.
+
 ## Acceptance level after this block
 
-A green exact-SHA workflow proves **repository-produced unsigned packaged-host evidence** on a GitHub Windows runner. It upgrades the Companion from source-only launcher evidence to packaged-host CI evidence.
+A green exact-SHA workflow proves **repository-produced unsigned packaged-host evidence** on a GitHub Windows runner. It upgrades the Companion from source-only launcher evidence to packaged-host CI evidence and gives real-host acceptance a source-bound runtime identity.
 
 It does not upgrade game capabilities to L3 and does not replace physical target-PC acceptance. Exact Windows machine behavior, real WoW/private-server observation, physical audio, signing, installer UX, and production release remain separate evidence gates.

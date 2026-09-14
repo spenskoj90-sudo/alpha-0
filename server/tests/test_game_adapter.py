@@ -53,27 +53,21 @@ def test_registry_registers_identity_and_capabilities() -> None:
     assert change.current == CapabilityStatus.LIMITED
 
 
-def test_available_requires_l3_evidence() -> None:
+def test_available_requires_validated_exact_environment_admission() -> None:
     registry = AdapterRegistry()
     registry.register(identity())
 
-    with pytest.raises(ValueError, match="L3 evidence"):
+    with pytest.raises(ValueError, match="validated exact-environment L3 admission"):
         registry.set_capability("wow-retail", "player.state", capability(CapabilityStatus.AVAILABLE, EvidenceLevel.L2))
 
-
-def test_l3_available_is_usable() -> None:
-    registry = AdapterRegistry()
-    registry.register(identity())
-
-    registry.set_capability("wow-retail", "player.state", capability(CapabilityStatus.AVAILABLE, EvidenceLevel.L3))
-
-    assert registry.require_usable("wow-retail", "player.state").is_usable()
+    with pytest.raises(ValueError, match="validated exact-environment L3 admission"):
+        registry.set_capability("wow-retail", "player.state", capability(CapabilityStatus.AVAILABLE, EvidenceLevel.L3))
 
 
 def test_capability_can_downgrade() -> None:
     registry = AdapterRegistry()
     registry.register(identity())
-    registry.set_capability("wow-retail", "target.state", capability(CapabilityStatus.AVAILABLE, EvidenceLevel.L3))
+    registry.set_capability("wow-retail", "target.state", capability(CapabilityStatus.LIMITED, EvidenceLevel.L2))
 
     change = registry.set_capability("wow-retail", "target.state", capability(CapabilityStatus.UNAVAILABLE))
 

@@ -44,6 +44,13 @@ local function patchProfile()
     return "vanilla-1.12"
 end
 
+local function serverProfile()
+    SentinelDB = SentinelDB or {}
+    local value = tostring(SentinelDB.server_profile or "unknown"):lower()
+    if value == "official" or value == "private" then return value end
+    return "unknown"
+end
+
 local function combatState()
     if UnitAffectingCombat then return UnitAffectingCombat("player") and "COMBAT" or "IDLE" end
     return "UNKNOWN"
@@ -59,7 +66,7 @@ local function writeCheckpoint(realm, ping)
         sequence = snapshotSequence,
         observed_at_epoch = time(),
         patch_profile = patchProfile(),
-        server_profile = "unknown",
+        server_profile = serverProfile(),
         realm_id = realm or GetRealmName() or "Unknown",
         latency_ms = clamp(tonumber(ping or 0) or 0, 0, 60000),
         addon_connected = true,
@@ -130,7 +137,16 @@ SLASH_SENTINEL1 = "/sentinel"
 SlashCmdList.SENTINEL = function(msg)
     msg = (msg or ""):lower()
     SentinelDB = SentinelDB or {}
-    if msg == "hide" then
+    local profile = msg:match("^server%s+(%a+)$")
+    if profile then
+        if profile == "official" or profile == "private" or profile == "unknown" then
+            SentinelDB.server_profile = profile
+            print("SENTINEL: server profile set to " .. profile .. ". This is an operator label and does not by itself establish L3 evidence.")
+            refresh()
+        else
+            print("SENTINEL: server profile must be official, private, or unknown.")
+        end
+    elseif msg == "hide" then
         frame:Hide()
         SentinelDB.overlayHidden = true
     elseif msg == "show" then
@@ -141,7 +157,7 @@ SlashCmdList.SENTINEL = function(msg)
         paused=true
         refresh()
     else
-        print("SENTINEL commands: /sentinel show | hide | lock")
+        print("SENTINEL commands: /sentinel show | hide | lock | server official|private|unknown")
     end
 end
 

@@ -2,10 +2,18 @@
 
 const path = require('node:path');
 const { fork } = require('node:child_process');
+const { getProcessExactEnvironmentEvidenceRecorder } = require('./exact-environment-evidence');
 const { sanitizePresentation } = require('./overlay-state');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MODES = new Set(['ACTIVE', 'DEGRADED', 'STOPPED']);
+const EXPECTED_HANDSHAKE = Object.freeze({
+  protocolVersion: '1.0',
+  ugsSchemaVersion: '1.0',
+  adapterContractVersion: '1.0',
+  coreProtocolVersion: '1.0',
+  capabilityProfile: 'wow.passive.v1',
+});
 
 function safeCount(value, max = 1_000_000) {
   return Number.isSafeInteger(value) && value >= 0 && value <= max ? value : null;
@@ -13,6 +21,21 @@ function safeCount(value, max = 1_000_000) {
 
 function safeMs(value) {
   return Number.isFinite(value) && value >= 0 && value <= 60_000 ? value : null;
+}
+
+function sanitizeHandshakeEvidence(value) {
+  if (!value || typeof value !== 'object' || value.accepted !== true || value.mode !== 'ACTIVE') return null;
+  const acceptedAt = new Date(value.acceptedAt);
+  if (!Number.isFinite(acceptedAt.getTime())) return null;
+  for (const [key, expected] of Object.entries(EXPECTED_HANDSHAKE)) {
+    if (value[key] !== expected) return null;
+  }
+  return Object.freeze({
+    acceptedAt: acceptedAt.toISOString(),
+    accepted: true,
+    mode: 'ACTIVE',
+    ...EXPECTED_HANDSHAKE,
+  });
 }
 
 function sanitizeRuntimeHealth(health) {
@@ -57,6 +80,8 @@ class CompanionProcessManager {
     onObservationDeferred = () => {},
     onPresentation = () => {},
     onRuntimeHealth = () => {},
+    onHandshakeEvidence = () => {},
+    evidenceRecorder = undefined,
   } = {}) {
     this.workerPath = workerPath;
     this.forkImpl = forkImpl;
@@ -66,6 +91,8 @@ class CompanionProcessManager {
     this.onObservationDeferred = onObservationDeferred;
     this.onPresentation = onPresentation;
     this.onRuntimeHealth = onRuntimeHealth;
+    this.onHandshakeEvidence = onHandshakeEvidence;
+    this.evidenceRecorder = evidenceRecorder === undefined ? getProcessExactEnvironmentEvidenceRecorder() : evidenceRecorder;
     this.child = null;
     this.status = { state: 'STOPPED', reason: 'NOT_STARTED' };
     this.expectedStop = false;
@@ -114,6 +141,14 @@ class CompanionProcessManager {
       this.#publish(message.status);
       return;
     }
+    if (message.type === 'handshake-evidence') {
+      const handshake = sanitizeHandshakeEvidence(message.handshake);
+      if (handshake) {
+        this.evidenceRecorder?.acceptHandshake(handshake);
+        this.onHandshakeEvidence(handshake);
+      }
+      return;
+    }
     if (message.type === 'presentation') {
       const presentation = sanitizePresentation(message.presentation);
       if (presentation) this.onPresentation(presentation);
@@ -121,7 +156,10 @@ class CompanionProcessManager {
     }
     if (message.type === 'runtime-health') {
       const health = sanitizeRuntimeHealth(message.health);
-      if (health) this.onRuntimeHealth(health);
+      if (health) {
+        this.evidenceRecorder?.acceptHealth(health);
+        this.onRuntimeHealth(health);
+      }
       return;
     }
     if (message.type === 'observation-ack') {
@@ -176,4 +214,9 @@ function sanitizeStatus(status) {
   return output;
 }
 
-module.exports = { CompanionProcessManager, sanitizeRuntimeHealth, sanitizeStatus };
+module.exports = {
+  CompanionProcessManager,
+  sanitizeHandshakeEvidence,
+  sanitizeRuntimeHealth,
+  sanitizeStatus,
+};

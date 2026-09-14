@@ -198,6 +198,12 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertEqual(fetched["candidateDigest"], candidate["candidateDigest"])
         self.assertEqual(files[APK_FILE], apk)
         self.assertEqual(provenance["artifactDigest"], artifact["digest"])
+        self.assertEqual(provenance["sourceSha"], SHA)
+        self.assertNotIn("workflowRunId", provenance)
+        self.assertNotIn("workflowRunAttempt", provenance)
+        self.assertNotIn("artifactId", provenance)
+        self.assertIn("workflowMetadataDigest", provenance)
+        self.assertIn("artifactMetadataDigest", provenance)
 
     def test_fetch_candidate_rejects_packaged_stale_binding(self):
         binding = valid_binding()
@@ -248,6 +254,18 @@ class ReleaseLineageTests(unittest.TestCase):
                 downloader=lambda *_args: archive,
             )
 
+    def test_persisted_binding_hashes_authenticated_metadata(self):
+        binding = valid_binding()
+        evidence = binding["releaseEvidence"]
+        self.assertNotIn("generatedAt", binding)
+        self.assertNotIn("runId", evidence["workflow"])
+        self.assertNotIn("runAttempt", evidence["workflow"])
+        self.assertNotIn("id", evidence["artifact"])
+        self.assertNotIn("sizeBytes", evidence["artifact"])
+        self.assertRegex(evidence["workflowMetadataDigest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertRegex(evidence["artifactMetadataDigest"], r"^sha256:[0-9a-f]{64}$")
+        self.assertRegex(evidence["manifestDigest"], r"^sha256:[0-9a-f]{64}$")
+
     def test_python_lineage_boundary_never_handles_github_credentials(self):
         source = Path("scripts/release_lineage.py").read_text(encoding="utf-8")
         self.assertNotIn("GITHUB_TOKEN", source)
@@ -258,6 +276,7 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertIn("stderr=subprocess.DEVNULL", source)
         self.assertNotIn("bindingDigest']}", source)
         self.assertNotIn("candidateDigest']}", source)
+        self.assertNotIn("print(f", source)
 
     def test_workflows_enforce_presecret_boundary_and_no_release_resigning(self):
         rc = Path(".github/workflows/release-candidate.yml").read_text(encoding="utf-8")

@@ -104,7 +104,6 @@ jobs:
       apk_sha256: ${{ steps.hashes.outputs.apk_sha256 }}
       core_sha256: ${{ steps.hashes.outputs.core_sha256 }}
       candidate_sha256: ${{ steps.hashes.outputs.candidate_sha256 }}
-      provenance_sha256: ${{ steps.hashes.outputs.provenance_sha256 }}
       binding_sha256: ${{ steps.hashes.outputs.binding_sha256 }}
     steps:
       - name: Checkout exact release source SHA
@@ -182,7 +181,6 @@ jobs:
           echo "apk_sha256=$(sha256sum release-input/app-release.apk | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "core_sha256=$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "candidate_sha256=$(sha256sum release-input/release-candidate.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-          echo "provenance_sha256=$(sha256sum release-input/release-candidate-provenance.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "binding_sha256=$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Upload verified publication input
@@ -214,14 +212,12 @@ jobs:
           EXPECTED_APK_SHA256: ${{ needs.verify-candidate.outputs.apk_sha256 }}
           EXPECTED_CORE_SHA256: ${{ needs.verify-candidate.outputs.core_sha256 }}
           EXPECTED_CANDIDATE_SHA256: ${{ needs.verify-candidate.outputs.candidate_sha256 }}
-          EXPECTED_PROVENANCE_SHA256: ${{ needs.verify-candidate.outputs.provenance_sha256 }}
           EXPECTED_BINDING_SHA256: ${{ needs.verify-candidate.outputs.binding_sha256 }}
         run: |
           set -euo pipefail
           test "$(sha256sum release-input/app-release.apk | awk '{print $1}')" = "$EXPECTED_APK_SHA256"
           test "$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" = "$EXPECTED_CORE_SHA256"
           test "$(sha256sum release-input/release-candidate.json | awk '{print $1}')" = "$EXPECTED_CANDIDATE_SHA256"
-          test "$(sha256sum release-input/release-candidate-provenance.json | awk '{print $1}')" = "$EXPECTED_PROVENANCE_SHA256"
           test "$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" = "$EXPECTED_BINDING_SHA256"
 
       - name: Publish verified release lineage
@@ -233,7 +229,6 @@ jobs:
             release-input/app-release.apk \
             "release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz" \
             release-input/release-candidate.json \
-            release-input/release-candidate-provenance.json \
             release-input/release-presecret-binding.json \
             --generate-notes \
             --title "SENTINEL ${GITHUB_REF_NAME}"

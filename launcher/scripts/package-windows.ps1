@@ -75,6 +75,7 @@ if (Test-Path $DefaultApp) {
 $AppDir = Join-Path $OutputDir "resources/app"
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 $ApplicationSources = @(
+  "bootstrap.js",
   "companion-process.js",
   "companion-worker.js",
   "core-session.js",

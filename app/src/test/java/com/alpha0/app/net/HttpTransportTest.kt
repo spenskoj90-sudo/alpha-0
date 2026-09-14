@@ -12,6 +12,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 
 class HttpTransportTest {
     private class FakeConnection(
@@ -51,6 +52,7 @@ class HttpTransportTest {
             connectTimeoutMs = 123,
             readTimeoutMs = 456,
             maxResponseBytes = 1_024,
+            requestIdFactory = { "11111111-1111-1111-1111-111111111111" },
             connectionFactory = { url ->
                 opens += 1
                 FakeConnection(url, 200, "{\"ok\":true}".toByteArray()).also { connection = it }
@@ -74,8 +76,36 @@ class HttpTransportTest {
         assertEquals(456, connection.readTimeout)
         assertFalse(connection.instanceFollowRedirects)
         assertEquals("Bearer opaque", connection.getRequestProperty("Authorization"))
+        assertEquals("11111111-1111-1111-1111-111111111111", connection.getRequestProperty("X-Request-ID"))
         assertEquals("{}", connection.written.toString(Charsets.UTF_8.name()))
         assertTrue(connection.disconnected)
+    }
+
+    @Test
+    fun generatedCorrelationIdIsUuidWhenCallerDoesNotProvideOne() {
+        lateinit var connection: FakeConnection
+        val transport = UrlConnectionHttpTransport(
+            connectionFactory = { url -> FakeConnection(url, 200, ByteArray(0)).also { connection = it } },
+        )
+        transport.execute(HttpRequest(HttpMethod.GET, "https://example.test/resource"))
+        UUID.fromString(connection.getRequestProperty("X-Request-ID"))
+    }
+
+    @Test
+    fun explicitCorrelationIdIsPreservedForIdempotentCallerFlows() {
+        lateinit var connection: FakeConnection
+        val transport = UrlConnectionHttpTransport(
+            requestIdFactory = { "generated-must-not-replace-explicit" },
+            connectionFactory = { url -> FakeConnection(url, 200, ByteArray(0)).also { connection = it } },
+        )
+        transport.execute(
+            HttpRequest(
+                HttpMethod.GET,
+                "https://example.test/resource",
+                headers = mapOf("X-Request-ID" to "event-sync-explicit-id"),
+            )
+        )
+        assertEquals("event-sync-explicit-id", connection.getRequestProperty("X-Request-ID"))
     }
 
     @Test

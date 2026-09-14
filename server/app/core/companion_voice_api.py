@@ -8,6 +8,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from .companion_experience import VoiceBoundary, VoiceBoundaryError, VoiceReasonCode
+from .operational_observability import current_request_id, current_trace_id, operational_registry
 
 router = APIRouter(tags=["companion-voice"])
 
@@ -35,6 +36,17 @@ class VoiceSynthesizeRequest(BaseModel):
     consent_granted: bool
 
 
+def _record_voice(operation: str, outcome: str, rid: str | None = None) -> None:
+    trace_id = current_trace_id()
+    operational_registry.record(
+        component="voice",
+        operation=operation,
+        outcome=outcome,
+        trace_id=trace_id,
+        request_id=rid or current_request_id(),
+    )
+
+
 def _boundary(request: Request) -> VoiceBoundary:
     configured = getattr(request.app.state, "companion_voice_boundary", None)
     if isinstance(configured, VoiceBoundary):
@@ -47,6 +59,7 @@ def _boundary(request: Request) -> VoiceBoundary:
         code = str(exc)
         if code != "VOICE_PROVIDER_CONFIGURATION_INVALID":
             code = "VOICE_PROVIDER_CONFIGURATION_INVALID"
+        _record_voice("provider_configuration", "invalid")
         raise HTTPException(status_code=503, detail=code) from exc
     request.app.state.companion_voice_boundary = boundary
     return boundary
@@ -81,6 +94,7 @@ def _require_voice_access(request: Request, authorization_header: str, supplied_
             "reason_code": "COMPANION_ENTITLEMENT_REQUIRED",
             "request_id": rid,
         })
+        _record_voice("access", "entitlement_required", rid)
         raise HTTPException(status_code=403, detail="COMPANION_ENTITLEMENT_REQUIRED")
     return principal, rid, store
 
@@ -109,6 +123,7 @@ def _raise_voice_boundary(error: VoiceBoundaryError, *, store: Any, principal: A
         VoiceReasonCode.SYNTHESIZED_AUDIO_TOO_LARGE.value: 502,
     }.get(code, 400)
     _audit(store, principal, action=action, decision="DENY", reason_code=code, request_id=rid)
+    _record_voice(action.removeprefix("companion:voice:"), code.lower(), rid)
     raise HTTPException(status_code=status, detail=code) from error
 
 
@@ -121,6 +136,7 @@ def voice_status(
     principal, rid, store = _require_voice_access(request, authorization_header, x_request_id)
     boundary = _boundary(request)
     _audit(store, principal, action="companion:voice:status", decision="ALLOW", reason_code="VOICE_STATUS_READ", request_id=rid)
+    _record_voice("status", "available" if boundary.stt is not None else "provider_unavailable", rid)
     return {
         "stt_available": boundary.stt is not None,
         "tts_available": boundary.tts is not None,
@@ -155,6 +171,7 @@ def voice_transcribe(
         audio = base64.b64decode(payload.audio_b64, validate=True)
     except (ValueError, binascii.Error) as exc:
         _audit(store, principal, action="companion:voice:transcribe", decision="DENY", reason_code=VoiceReasonCode.AUDIO_INVALID.value, request_id=rid)
+        _record_voice("transcribe", "audio_invalid", rid)
         raise HTTPException(status_code=400, detail=VoiceReasonCode.AUDIO_INVALID.value) from exc
     try:
         transcript = boundary.transcribe(audio, locale=payload.locale, consent_granted=True)
@@ -173,6 +190,7 @@ def voice_transcribe(
         reason_code=result.reason_code.value,
         request_id=rid,
     )
+    _record_voice("transcribe", "accepted" if result.accepted else result.reason_code.value.lower(), rid)
     return {
         "accepted": result.accepted,
         "reason_code": result.reason_code.value,
@@ -196,6 +214,7 @@ def voice_synthesize(
     except VoiceBoundaryError as exc:
         _raise_voice_boundary(exc, store=store, principal=principal, action="companion:voice:synthesize", rid=rid)
     _audit(store, principal, action="companion:voice:synthesize", decision="ALLOW", reason_code="VOICE_SYNTHESIS_ACCEPTED", request_id=rid)
+    _record_voice("synthesize", "accepted", rid)
     return {
         "audio_b64": base64.b64encode(audio).decode("ascii"),
         "content_type": _SYNTHESIS_CONTENT_TYPE,

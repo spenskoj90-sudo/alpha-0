@@ -10,6 +10,7 @@ from starlette.websockets import WebSocketDisconnect
 from app.core.billing import BillingWebhookEvent
 from app.core.companion_protocol import CompanionEnvelope, CompanionHandshake, CompanionMessageType, LatencyClass
 from app.core.companion_websocket import CompanionTransportCompatibility, is_loopback_peer
+from app.core.operational_observability import operational_registry
 from app.core.p1_runtime import BillingState
 from app.main import app, billing_service, principal_from_token
 
@@ -108,7 +109,9 @@ def test_websocket_rejects_authenticated_account_without_companion_entitlement()
 
 
 def test_websocket_handshake_and_heartbeat_health_are_real_socket_level_integration() -> None:
-    with client.websocket_connect("/v1/companion/ws", headers=entitled_headers()) as websocket:
+    operational_registry.clear()
+    headers = entitled_headers()
+    with client.websocket_connect("/v1/companion/ws", headers=headers) as websocket:
         websocket.send_json(handshake())
         result = websocket.receive_json()
 
@@ -133,6 +136,16 @@ def test_websocket_handshake_and_heartbeat_health_are_real_socket_level_integrat
         assert health["payload"]["queue_depth"] == 0
         assert "peer_id" not in health["payload"]
         assert "authorization" not in health["payload"]
+
+    snapshot = operational_registry.snapshot()
+    series = {(item["component"], item["operation"], item["outcome"]) for item in snapshot["series"]}
+    assert ("companion_ws", "auth", "allowed") in series
+    assert ("companion_ws", "handshake", "accepted") in series
+    assert ("companion_ws", "heartbeat", "accepted") in series
+    assert ("companion_ws", "session", "closed") in series
+    serialized = str(snapshot)
+    assert headers["Authorization"].removeprefix("Bearer ") not in serialized
+    assert "127.0.0.1" not in serialized
 
 
 def test_websocket_handshake_rejects_incompatible_profile_fail_closed() -> None:

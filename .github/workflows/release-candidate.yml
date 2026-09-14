@@ -11,6 +11,7 @@ on:
 permissions:
   actions: read
   contents: read
+  attestations: read
 
 concurrency:
   group: release-candidate

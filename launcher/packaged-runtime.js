@@ -8,6 +8,7 @@ const REQUIRED_APP_FILES = Object.freeze([
   'companion-process.js',
   'companion-worker.js',
   'core-session.js',
+  'exact-environment-evidence.js',
   'index.html',
   'main.js',
   'overlay-preload.js',

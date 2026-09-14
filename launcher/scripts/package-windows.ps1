@@ -102,6 +102,29 @@ foreach ($RelativePath in $ApplicationSources) {
   Copy-Item -LiteralPath $SourcePath -Destination (Join-Path $AppDir $RelativePath)
 }
 
+$SourceSha = if (-not [string]::IsNullOrWhiteSpace($env:SENTINEL_SOURCE_SHA)) {
+  $env:SENTINEL_SOURCE_SHA
+} elseif (-not [string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
+  $env:GITHUB_SHA
+} else {
+  "local-unbound"
+}
+
+$RuntimeProvenance = [ordered]@{
+  schema = "sentinel.packaged-companion-runtime.v1"
+  sourceSha = $SourceSha
+  target = "win32-x64"
+  packageVersion = [string]$PackageMetadata.version
+  electronVersion = $ElectronVersion
+  signed = $false
+}
+$RuntimeProvenancePath = Join-Path $AppDir "build-provenance.json"
+[System.IO.File]::WriteAllText(
+  $RuntimeProvenancePath,
+  (($RuntimeProvenance | ConvertTo-Json -Depth 4) + "`n"),
+  [System.Text.UTF8Encoding]::new($false)
+)
+
 if (Test-Path (Join-Path $AppDir "node_modules")) {
   throw "node_modules must not be packaged"
 }
@@ -128,13 +151,6 @@ $ManifestPath = Join-Path $EvidenceDir "package-manifest.sha256"
   [System.Text.UTF8Encoding]::new($false)
 )
 
-$SourceSha = if (-not [string]::IsNullOrWhiteSpace($env:SENTINEL_SOURCE_SHA)) {
-  $env:SENTINEL_SOURCE_SHA
-} elseif (-not [string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
-  $env:GITHUB_SHA
-} else {
-  "local-unbound"
-}
 $Evidence = [ordered]@{
   schema = "sentinel.packaged-companion-build.v1"
   status = "pass"
@@ -145,7 +161,8 @@ $Evidence = [ordered]@{
   electronAsset = $AssetName
   electronAssetSha256 = $ActualSha256
   applicationPayload = "resources/app"
-  applicationFileCount = $ApplicationSources.Count
+  applicationFileCount = $ApplicationSources.Count + 1
+  embeddedRuntimeProvenance = "resources/app/build-provenance.json"
   packageManifest = "package-manifest.sha256"
   signed = $false
 }
@@ -158,4 +175,5 @@ $EvidencePath = Join-Path $EvidenceDir "build-evidence.json"
 
 Write-Host "Packaged SENTINEL Companion $($PackageMetadata.version) using Electron $ElectronVersion"
 Write-Host "Runtime SHA-256: $ActualSha256"
+Write-Host "Embedded provenance: $RuntimeProvenancePath"
 Write-Host "Canonical manifest: $ManifestPath"

@@ -36,14 +36,16 @@ jobs:
           python-version: "3.12"
 
       - name: Run release-evidence contract tests
-        run: python scripts/test_release_evidence.py
+        run: |
+          python scripts/test_release_evidence.py
+          python scripts/test_release_evidence_supply_chain.py
 
       - name: Collect exact-SHA workflow and artifact evidence
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          python scripts/release_evidence.py collect \
+          python scripts/release_evidence_entrypoint.py collect \
             --repository "$GITHUB_REPOSITORY" \
             --sha "$SENTINEL_SOURCE_SHA" \
             --event "$SENTINEL_EVENT" \
@@ -55,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           version="$(tr -d '[:space:]' < VERSION)"
-          python scripts/release_evidence.py verify \
+          python scripts/release_evidence_entrypoint.py verify \
             --input release-evidence.json \
             --expected-repository "$GITHUB_REPOSITORY" \
             --expected-sha "$SENTINEL_SOURCE_SHA" \

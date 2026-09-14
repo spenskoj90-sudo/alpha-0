@@ -65,6 +65,10 @@ class ConservativeWowAdapter:
         "wow.passive_telemetry",
     )
 
+    @classmethod
+    def capability_names(cls) -> tuple[str, ...]:
+        return cls._capability_names
+
     def identity(self, *, patch_profile: WowPatchProfile, server_profile: WowServerProfile = WowServerProfile.UNKNOWN, environment_id: str | None = None) -> AdapterIdentity:
         return AdapterIdentity(
             adapter_id=self.adapter_id,

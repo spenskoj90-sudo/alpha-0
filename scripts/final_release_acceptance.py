@@ -61,10 +61,19 @@ MEDIA_TYPES = {
 }
 MAX_JSON_BYTES = 256 * 1024
 MAX_EVIDENCE_BYTES = 2 * 1024 * 1024 * 1024
+HASH_CHUNK_BYTES = 1024 * 1024
 
 
 def _sha256(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(HASH_CHUNK_BYTES), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
 
 
 def _canonical_digest(document: dict[str, Any], digest_field: str) -> str:
@@ -177,7 +186,7 @@ def build_gate(
     size = evidence_path.stat().st_size
     if size <= 0 or size > MAX_EVIDENCE_BYTES:
         raise ValueError("evidence file size is invalid")
-    digest = _sha256(evidence_path.read_bytes())
+    digest = _sha256_file(evidence_path)
     return {
         "schema": GATE_SCHEMA,
         "id": gate_id,
@@ -348,6 +357,9 @@ def _load_candidate_and_apk(candidate_path: Path, apk_path: Path) -> tuple[dict[
     candidate = _read_json(candidate_path, "release candidate")
     if apk_path.is_symlink() or not apk_path.is_file():
         raise ValueError("APK must be a regular non-symlink file")
+    size = apk_path.stat().st_size
+    if size <= 0 or size > release_lineage.MAX_APK_BYTES:
+        raise ValueError("APK size is invalid")
     apk = apk_path.read_bytes()
     return candidate, apk
 

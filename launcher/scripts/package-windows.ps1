@@ -108,7 +108,7 @@ if (Test-Path (Join-Path $AppDir "test")) {
   throw "launcher tests must not be packaged"
 }
 
-$RootPrefixLength = $OutputDir.TrimEnd('\', '/').Length + 1
+$RootPrefixLength = $OutputDir.TrimEnd([char[]]@('\', '/')).Length + 1
 $ManifestLines = Get-ChildItem -Path $OutputDir -File -Recurse |
   ForEach-Object {
     $RelativePath = $_.FullName.Substring($RootPrefixLength).Replace('\', '/')
@@ -127,7 +127,13 @@ $ManifestPath = Join-Path $EvidenceDir "package-manifest.sha256"
   [System.Text.UTF8Encoding]::new($false)
 )
 
-$SourceSha = if ([string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) { "local-unbound" } else { $env:GITHUB_SHA }
+$SourceSha = if (-not [string]::IsNullOrWhiteSpace($env:SENTINEL_SOURCE_SHA)) {
+  $env:SENTINEL_SOURCE_SHA
+} elseif (-not [string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
+  $env:GITHUB_SHA
+} else {
+  "local-unbound"
+}
 $Evidence = [ordered]@{
   schema = "sentinel.packaged-companion-build.v1"
   status = "pass"

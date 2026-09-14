@@ -43,6 +43,9 @@ check 'Deployment docs' test -f docs/DEPLOYMENT.md
 check 'Contributing docs' test -f docs/CONTRIBUTING.md
 check 'Changelog' test -f docs/CHANGELOG.md
 check 'Document authority map' test -f docs/DOCUMENT_STATUS.md
+check 'Design system contract' test -f docs/DESIGN_SYSTEM_V1.md
+check 'Design system manifest' test -f design/sentinel-design-system.v1.json
+check 'Design system tests' test -f scripts/test_design_system.py
 check 'Repository policy verifier' test -f scripts/verify_repository.py
 check 'Release evidence verifier' test -f scripts/release_evidence.py
 check 'Release evidence policy entrypoint' test -f scripts/release_evidence_entrypoint.py
@@ -68,12 +71,13 @@ if command -v python >/dev/null 2>&1; then
     scripts/release_evidence.py scripts/release_evidence_entrypoint.py \
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
     scripts/release_lineage.py scripts/test_release_lineage.py \
-    scripts/test_artifact_attestations.py
+    scripts/test_artifact_attestations.py scripts/test_design_system.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
+  check 'Design system invariants' python scripts/test_design_system.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

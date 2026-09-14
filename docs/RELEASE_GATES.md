@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Canonical version:** root `VERSION` file  
-**Evidence rule:** every applicable gate must pass on the exact commit selected for release. Missing, stale, skipped, unattested where required, or different-SHA evidence is not a pass.
+**Evidence rule:** every applicable gate must pass on the exact commit selected for release. Missing, stale, skipped, unattested where required, different-SHA or different-candidate evidence is not a pass.
 
 ## Routine pull-request gates
 
@@ -19,7 +19,7 @@ Routine PR validation must not load release-signing material or receive attestat
 9. `Dependency audit` — Python and npm dependency audits.
 10. `Secret and image scan` — secret-pattern checks and Trivy filesystem scan with no HIGH/CRITICAL finding, including findings without a published fix.
 11. `P1 evidence artifacts` — dependency and P1 performance/test evidence.
-12. `Repository verification` — immutable Action references, deterministic dependency metadata, signing/attestation boundaries, version and governance invariants.
+12. `Repository verification` — immutable Action references, deterministic dependency metadata, signing/attestation/final-acceptance boundaries, version and governance invariants.
 
 The exact required context names are controlled by protected-branch policy. GPT must inspect the live policy before merge and must not change it autonomously.
 
@@ -48,30 +48,65 @@ Signing is intentionally separated from routine PR CI, attestation authority and
 - The signing job has `needs: presecret`, repeats the attestation/live binding checks before the first signing-secret reference, then builds and verifies the signed non-debuggable APK.
 - The signed artifact is retained as `sentinel-release-candidate-<sha>` and contains the APK plus `sentinel.release-candidate.v1` and pre-secret lineage evidence.
 - The signing job exports hashes of those exact three files. A separate downstream job receives no keystore/password secrets; it rechecks those hashes and creates GitHub/Sigstore provenance for the APK and both lineage documents.
-- `.github/workflows/release.yml` runs only for an Owner-created version tag and **does not re-sign**. Its read-only stages verify the tag/version, the protected-main release-evidence attestation/live lineage, and all three candidate attestations before validating the APK signer/non-debuggable state and producing the publication input.
-- The final `publish` job is the only job with `contents: write`; it has no checkout, no repository Python execution and no attestation/OIDC write authority.
 - Release keystore values and signing custody remain Owner-only. A successful debug PR build or non-secret main attestation is not signed-release evidence.
 
 The machine-verifiable details are defined in `docs/RELEASE_LINEAGE_V1.md` and `docs/ARTIFACT_ATTESTATION_V1.md`.
 
-Before publication, the exact tagged SHA must therefore have canonical protected-main release evidence, a valid release-evidence attestation, and a successful Owner signed release-candidate workflow whose exact retained candidate bytes carry valid attestations for the same SHA. Publication itself remains an Owner gate.
+## Final physical/environment acceptance binding
 
-## Environment-level gates
+Physical and exact-environment tests are deliberately performed only in the final pre-release phase. Their late timing does not permit evidence from different builds to be mixed.
 
-Before production traffic, additionally verify:
+`docs/FINAL_RELEASE_ACCEPTANCE_V1.md` and `scripts/final_release_acceptance.py` define `sentinel.final-release-acceptance.v1`. Every recorded gate is bound to the same:
 
-- TLS certificate and HSTS behavior at the real ingress.
-- GitHub Secret Scanning and push protection are enabled.
-- Production enrollment secret and database credentials are injected externally.
-- WAF/API-gateway rate limiting is enabled if more than one Core replica is used.
-- Backup and restore has been exercised against the target PostgreSQL service.
-- OWASP ZAP/Burp or equivalent runtime penetration testing is complete for the deployed endpoint.
-- Required Companion host, physical Android device and exact target WoW environment acceptance is recorded where those surfaces are in release scope.
+- repository/source SHA/version;
+- signed release-candidate digest;
+- signed Android APK SHA-256; and
+- protected-main Packaged Companion archive SHA-256.
 
-## Owner publication step
+The profiles are monotonic:
 
-After the Owner selects the release version, the exact commit has protected-main attested release evidence, and the Owner has run the manual signed release-candidate workflow for that exact SHA, the Owner creates and pushes an annotated tag matching `VERSION`, prefixed with `v` (for example, `v1.0.0-rc2`).
+- `publication` — physical Android, real Companion host, exact WoW L3, voice/acoustic and final accessibility/visual acceptance;
+- `deployment` — publication plus selected payment/voice/observability provider network, production database recovery and ingress-readiness evidence;
+- `production-traffic` — deployment plus target runtime penetration/security evidence.
 
-That tag invokes the publication workflow, which must consume the existing verified and attested signed candidate; it cannot create a replacement signed APK. The GitHub Release includes the verified APK, exact-source Core bundle and lineage evidence.
+Firebase Test Lab remains optional while GitHub Emulator instrumentation is the routine Android gate.
 
-GPT may prepare, test, review and merge all repository machinery up to this boundary but must not provide production signing credentials, execute the signed-RC gate, create/push the release tag, publish the GitHub Release or deploy production.
+After the real tests exist, `.github/workflows/final-release-acceptance.yml` may be run by the Human Owner from the exact selected `main` SHA. It contains no signing/production secrets and no repository write authority. It independently verifies the protected-main release evidence, retained signed candidate and packaged Companion attestations, rejects source/candidate/package drift, uploads `sentinel-final-release-acceptance-<sha>`, and a separate OIDC job attests the final manifest.
+
+Repository tests of this machinery are synthetic and do not count as physical/environment acceptance.
+
+## Publication gate
+
+`.github/workflows/release.yml` runs only for an Owner-created version tag and **does not re-sign**. Its read-only stages verify:
+
+1. tag/version and exact source identity;
+2. protected-main Release Evidence attestation/live lineage;
+3. all retained signed-candidate attestations and APK signer/non-debuggable state;
+4. the latest successful attested Final Release Acceptance artifact for the same exact source;
+5. final-acceptance binding against the currently selected candidate/APK and canonical packaged Companion bytes at a minimum `publication` profile.
+
+The accepted `final-release-acceptance.json` is copied into the preverified publication input and byte-hashed with the APK/Core/candidate/binding. The final `publish` job is still the only job with `contents: write`; it has no checkout, repository Python execution or attestation/OIDC write authority, rechecks all exact hashes, and publishes the final-acceptance manifest as release lineage evidence.
+
+Therefore a version tag alone is insufficient: publication fails closed if final real acceptance is missing, stale, unattested or bound to another candidate/package.
+
+## Deployment and production-traffic gates
+
+`.github/workflows/deploy.yml` no longer permits remote rollout as an automatic side effect of `release: published`.
+
+- Release publication may invoke exact-tag image publication only after at least `publication` acceptance is reverified.
+- Manual deploy requires an exact existing `v*.*.*` tag; generic `latest` input is not accepted as source identity.
+- Remote rollout can run only on a separate Owner `workflow_dispatch`, only when Owner configuration has `DEPLOY_ENABLED=true`, and only after an attested `deployment` profile for the exact release set passes.
+- Only the remote job references the Owner-managed host/user/key secrets, and only after the read-only acceptance job succeeds.
+- `production-traffic` is a stronger recorded state requiring runtime penetration/security evidence. The repository does not autonomously enable production traffic.
+
+Environment-level evidence includes, as applicable, TLS/HSTS and ingress behavior, externally injected enrollment/database credentials, WAF/rate-limiting readiness, target PostgreSQL backup/restore, selected production provider network behavior, runtime observability delivery, and final runtime security testing. Do not convert configuration intent into a PASS without corresponding real evidence.
+
+## Owner publication and deployment steps
+
+After the Owner selects the release version, protected-main attested release evidence exists, the Owner has run the signed release-candidate workflow for that exact SHA, and the real final tests have produced an attested `publication` profile for those exact candidate/package bytes, the Owner creates and pushes an annotated tag matching `VERSION`, prefixed with `v` (for example, `v1.0.0-rc2`).
+
+That tag invokes the publication workflow, which consumes the existing verified/attested candidate and final acceptance; it cannot create a replacement signed APK or manufacture physical evidence.
+
+A live remote rollout is a separate Owner action: after deployment-profile evidence exists, the Owner may explicitly dispatch `Deploy` for that exact published tag with the required Owner-managed deployment configuration/secrets. Publication alone never authorizes remote rollout.
+
+GPT may prepare, test, review and merge all repository machinery up to these boundaries but must not provide production signing/deployment credentials, execute the signed-RC or final real-device acceptance gates, create/push the release tag, publish the GitHub Release, dispatch live remote rollout or enable production traffic.

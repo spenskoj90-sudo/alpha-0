@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REQUIRED_APP_FILES = Object.freeze([
+  'bootstrap.js',
   'companion-process.js',
   'companion-worker.js',
   'core-session.js',
@@ -23,8 +24,7 @@ const REQUIRED_APP_FILES = Object.freeze([
 
 function readPackageMetadata(appDir) {
   const packagePath = path.join(appDir, 'package.json');
-  const parsed = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-  return parsed;
+  return JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 }
 
 function inspectPackagedLayout({
@@ -61,7 +61,7 @@ function inspectPackagedLayout({
       `packaged Electron version mismatch: expected ${expectedElectronVersion}, got ${electronVersion}`,
     );
   }
-  if (metadata.main !== 'main.js') {
+  if (metadata.main !== 'bootstrap.js') {
     throw new Error(`unexpected packaged main entrypoint: ${metadata.main}`);
   }
 

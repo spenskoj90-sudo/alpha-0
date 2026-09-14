@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Setup Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -117,19 +119,67 @@ jobs:
             -Path "$env:RUNNER_TEMP\sentinel-package-a\*" `
             -DestinationPath "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip" `
             -CompressionLevel Optimal
-          Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip" |
-            Format-List | Out-String |
-            Set-Content -Encoding utf8 "$env:RUNNER_TEMP\sentinel-evidence-a\archive-sha256.txt"
+          $archiveSha = (Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip").Hash.ToLowerInvariant()
+          Set-Content -Encoding utf8 "$env:RUNNER_TEMP\sentinel-evidence-a\archive-sha256.txt" $archiveSha
+
+      - name: Stage immutable packaged evidence
+        shell: pwsh
+        run: |
+          $stage = "artifacts\packaged-companion"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\sentinel-companion-win32-x64.zip" "$stage\sentinel-companion-win32-x64.zip"
+          Copy-Item "$env:RUNNER_TEMP\sentinel-evidence-a\build-evidence.json" "$stage\build-evidence.json"
+          Copy-Item "$env:RUNNER_TEMP\sentinel-evidence-a\package-manifest.sha256" "$stage\package-manifest.sha256"
+          Copy-Item "$env:RUNNER_TEMP\sentinel-evidence-a\smoke-evidence.json" "$stage\smoke-evidence.json"
+          Copy-Item "$env:RUNNER_TEMP\sentinel-evidence-a\archive-sha256.txt" "$stage\archive-sha256.txt"
 
       - name: Upload exact-SHA packaged Companion evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packaged-companion-host-${{ env.SENTINEL_SOURCE_SHA }}
-          path: |
-            ${{ runner.temp }}\sentinel-companion-win32-x64.zip
-            ${{ runner.temp }}\sentinel-evidence-a\build-evidence.json
-            ${{ runner.temp }}\sentinel-evidence-a\package-manifest.sha256
-            ${{ runner.temp }}\sentinel-evidence-a\smoke-evidence.json
-            ${{ runner.temp }}\sentinel-evidence-a\archive-sha256.txt
+          path: artifacts/packaged-companion/
           if-no-files-found: error
           retention-days: 14
+
+  attest-packaged-companion:
+    name: Attest protected-main packaged Companion evidence
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: packaged-companion
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      SENTINEL_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Download verified packaged Companion evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packaged-companion-host-${{ env.SENTINEL_SOURCE_SHA }}
+          path: attestation-input
+
+      - name: Require canonical packaged subjects
+        run: |
+          set -euo pipefail
+          test -s attestation-input/sentinel-companion-win32-x64.zip
+          test -s attestation-input/build-evidence.json
+          test -s attestation-input/package-manifest.sha256
+          test -s attestation-input/smoke-evidence.json
+          test -s attestation-input/archive-sha256.txt
+          expected="$(tr -d '[:space:]' < attestation-input/archive-sha256.txt)"
+          actual="$(sha256sum attestation-input/sentinel-companion-win32-x64.zip | awk '{print $1}')"
+          test "$actual" = "$expected"
+
+      - name: Attest exact protected-main packaged Companion evidence
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            attestation-input/sentinel-companion-win32-x64.zip
+            attestation-input/build-evidence.json
+            attestation-input/package-manifest.sha256
+            attestation-input/smoke-evidence.json
+            attestation-input/archive-sha256.txt

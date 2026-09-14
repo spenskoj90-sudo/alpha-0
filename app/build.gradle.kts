@@ -92,6 +92,8 @@ dependencies {
     // Initialized only when BuildConfig.SENTRY_DSN is non-empty (release CI).
     implementation("io.sentry:sentry-android:8.54.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    // createComposeRule() uses the Compose test-host ComponentActivity declared by this debug manifest.
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
     // Local JVM unit tests must use a real org.json implementation; the Android mock jar
     // intentionally throws from JSONObject mutators outside an Android runtime.

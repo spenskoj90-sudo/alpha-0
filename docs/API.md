@@ -73,6 +73,15 @@ Provider deliveries and deterministic reconciliation events are keyed by durable
 
 The voice routes never grant `game:write`. Raw voice audio/transcripts are not stored in SENTINEL audit metadata. If no voice provider is configured, the routes report provider unavailability instead of silently falling back to a browser speech service. See `docs/COMPANION_VOICE_RUNTIME_V1.md`.
 
+## Operational observability
+
+Every HTTP response carries a normalized `X-Request-ID` and a server-generated `X-Sentinel-Trace-ID`. Route-template/method/status-class operational metrics are bounded and never use request/trace IDs as metric labels.
+
+- `GET /v1/admin/observability` — existing admin-token-protected bounded JSON operational snapshot: counters, local p50/p95/max latency, capacity/overflow evidence and a small recent correlation ring.
+- `GET /v1/admin/metrics` — existing admin-token-protected OpenMetrics-compatible plaintext representation of the bounded operational series.
+
+These endpoints are not public metrics surfaces and do not expose a production telemetry-provider credential. They describe process-local operational evidence; a deployed external telemetry backend and production SLOs remain environment concerns. See `docs/BLOCK_D_OBSERVABILITY_RESILIENCE_V1.md`.
+
 ## World of Warcraft
 
 - `GET /v1/wow/patches` — list known WoW patches.

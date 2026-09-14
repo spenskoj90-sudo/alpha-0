@@ -1,5 +1,6 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
 
 function normalizeCoreUrl(value) {
@@ -18,6 +19,8 @@ function publicSession(session) {
     scopes: Array.isArray(session.scopes) ? [...session.scopes] : [],
   };
 }
+
+function requestId() { return randomUUID(); }
 
 class CoreSessionManager {
   #fetch;
@@ -39,9 +42,10 @@ class CoreSessionManager {
     if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
       throw new Error('CREDENTIALS_REQUIRED');
     }
+    const rid = requestId();
     const response = await this.#fetch(`${normalized}/v1/auth/login`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
       body: JSON.stringify({ email: email.trim(), password }),
     });
     const payload = await readJson(response);
@@ -50,11 +54,11 @@ class CoreSessionManager {
     return this.status;
   }
 
-  async refresh() {
+  async refresh(rid = requestId()) {
     if (!this.#coreUrl || !this.refreshToken) throw new Error('REFRESH_UNAVAILABLE');
     const response = await this.#fetch(`${this.#coreUrl}/v1/sessions/refresh`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
       body: JSON.stringify({ refresh_token: this.refreshToken }),
     });
     const payload = await readJson(response);
@@ -105,8 +109,9 @@ class CoreSessionManager {
 
   async #authorizedJson(path, { method = 'GET', body = null } = {}, fallback = 'CORE_REQUEST_FAILED') {
     if (!this.#coreUrl || !this.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
+    const rid = requestId();
     const send = () => {
-      const headers = { Authorization: `Bearer ${this.accessToken}` };
+      const headers = { Authorization: `Bearer ${this.accessToken}`, 'X-Request-ID': rid };
       const init = { method, headers };
       if (body !== null) {
         headers['content-type'] = 'application/json';
@@ -117,7 +122,7 @@ class CoreSessionManager {
 
     let response = await send();
     if (response.status === 401 && this.refreshToken) {
-      await this.refresh();
+      await this.refresh(rid);
       response = await send();
     }
     const payload = await readJson(response);
@@ -150,4 +155,4 @@ function errorCode(payload, fallback) {
   return fallback;
 }
 
-module.exports = { CoreSessionManager, normalizeCoreUrl, publicSession };
+module.exports = { CoreSessionManager, normalizeCoreUrl, publicSession, requestId };

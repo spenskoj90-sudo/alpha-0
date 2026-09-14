@@ -1,33 +1,108 @@
-# SENTINEL Block D — Observability, Performance, Resilience and RC Readiness
+# SENTINEL Block D — Operational Observability, Performance and Resilience v1
 
 **Status:** ACTIVE IMPLEMENTATION CONTRACT
 
-## Observability
+## Scope
 
-`CompanionTelemetryEvent.create()` canonicalizes attribute keys and redacts credential, authorization, cookie, transcript, audio, email and IP fields before they enter local or persistent sinks. The bounded sink retains only a fixed number of operational events. This is a privacy boundary, not a claim that every external provider has been audited.
+Block D productizes the existing observability/performance/resilience foundations into one bounded operational plane. It does not introduce a production telemetry vendor or production SLO claim.
 
-The authenticated loopback Companion path also carries a bounded runtime-health correlation. Every launcher heartbeat has an opaque UUID. Core records that heartbeat into the live `CompanionRuntime`, returns a `HEALTH` envelope correlated to the exact heartbeat UUID and exposes only allowlisted runtime counters plus an opaque per-connection UUID. The response deliberately excludes peer identity, IP addresses, tokens and account/game payloads.
+The implemented repository path is:
 
-The launcher accepts runtime HEALTH only when it matches one of at most eight pending heartbeat UUIDs. It measures local loopback round-trip time with its own monotonic execution clock, retains at most 64 samples and computes count/min/max/average/nearest-rank-p95. The worker and Electron parent independently allowlist the health object before the read-only overlay may display p95 RTT. This path is operational evidence only; it is not an authorization or action channel.
+`client X-Request-ID → Core normalization → request-scoped server trace id → bounded low-cardinality metrics/recent traces → Companion/voice operational outcomes → admin-only snapshot/OpenMetrics readback → exact-SHA CI failure/performance evidence artifact`
 
-## Measurable budgets
+## Core-wide HTTP correlation
 
-`PerformanceBudget` and `evaluate_budget()` compare a local callable sample to an explicit operation-scoped millisecond budget. Results are deterministic and fail closed on operation mismatch. Existing Core latency statistics and launcher loopback RTT statistics retain bounded sample windows.
+Core installs a global HTTP middleware before request handlers execute. The middleware:
 
-The launcher RTT evidence measures only the authenticated local Companion WebSocket round trip on the running host. It does **not** claim Internet, provider, physical-device, production ingress or end-to-end game latency. Production SLOs require measurements tied to the actual selected runtime and exact release commit.
+- accepts only bounded `X-Request-ID` values matching the public correlation alphabet;
+- replaces malformed/missing values with a UUID before downstream handlers inspect headers;
+- generates a separate 128-bit server trace id for every HTTP request;
+- returns `X-Request-ID` and `X-Sentinel-Trace-ID` response headers;
+- records route-template/method/status-class latency without query strings, request bodies, credentials or user/game identifiers.
 
-## Failure/recovery matrix
+Request and trace identifiers are intentionally excluded from metric labels. They are retained only in a small bounded recent-trace ring so they cannot create unbounded metric cardinality.
 
-The canonical matrix covers heartbeat timeout, transport failure, failed peer authentication, local kill switch and queue backpressure. Each case names its expected outcome and explicit recovery action. `assess_health()` maps a runtime health snapshot to `READY`, `DEGRADED`, `AUTH_REQUIRED`, or `STOPPED`; kill-switch and authentication failures take precedence over convenience paths.
+## Operational registry
 
-Runtime-health correlation is fail closed: malformed health payloads, unknown heartbeat UUIDs, stale/replayed acknowledgements, negative RTT values and RTT values above the bounded 60-second evidence range are rejected rather than incorporated into statistics. Pending correlation state is cleared on reconnect/stop so one connection cannot satisfy another connection's heartbeat evidence.
+`BoundedOperationalRegistry` is process-local and provider-neutral. It has explicit caps for:
 
-## Remaining Block D scope
+- metric series;
+- per-series latency samples;
+- recent trace records.
 
-This increment makes Companion heartbeat liveness and local RTT operational rather than serializer-only. Block D remains incomplete until the remaining applicable runtime evidence is implemented or explicitly scoped out with evidence. In particular, Core-wide HTTP request/correlation propagation, deployed metrics/tracing composition, broader benchmark/failure-injection measurements and addon/launcher telemetry beyond this Companion link remain separate targets where absent.
+When the series cap is exhausted, new series are dropped and an overflow counter increments. When the trace ring is full, the oldest trace is evicted and a dropped-trace counter increments. No active series is silently expanded to accommodate attacker-controlled labels.
 
-No external Prometheus/OpenTelemetry/vendor service is implied by the internal bounded metrics path.
+The registry exposes count, nearest-rank p50/p95 and maximum latency for bounded local samples. Labels are intentionally limited to low-cardinality operational dimensions such as component, route-template/operation and bounded outcome.
 
-## Release-candidate boundary
+## Operator boundary
 
-Automated CI remains the evidence source for core, PostgreSQL, web, Android, launcher, security, container reproducibility and instrumentation gates. Signed release execution, production secrets/payment credentials, external WoW 3.3.5a/private-server validation, real-device/packaged-host acceptance and live deployment remain Owner-gated. No Block D contract changes that authority boundary.
+Operational readback is available only through the existing protected admin control plane:
+
+- `GET /v1/admin/observability` — bounded JSON snapshot including recent trace correlation and capacity counters;
+- `GET /v1/admin/metrics` — OpenMetrics-compatible plaintext counters and local latency summaries.
+
+Both routes require the existing `X-Sentinel-Admin-Token` policy and remain subject to existing admin lockout/audit controls. No public unauthenticated metrics endpoint is added.
+
+An external Prometheus/OpenTelemetry/vendor collector is optional environment integration. The repository does not embed a telemetry credential, select a vendor or claim a deployed monitoring backend.
+
+## Companion and voice runtime telemetry
+
+The authenticated loopback Companion WebSocket records fixed operational outcomes for connection/authentication, handshake, heartbeat, passive WoW observation, entitlement revocation and session closure. The labels contain no token, user id, IP address, realm or raw game payload.
+
+The voice HTTP path adds provider/runtime outcomes such as status availability, consent/provider failures, action rejection and accepted STT/TTS presentation flow. Raw audio, transcript and arbitrary synthesis text remain excluded from operational telemetry and existing audit metadata.
+
+The existing heartbeat `HEALTH` envelope remains a separate runtime evidence channel. Launcher RTT evidence still measures only authenticated local loopback WebSocket round trip and is not promoted to Internet/provider/end-to-end latency.
+
+## Client correlation propagation
+
+The repository transports preserve one logical correlation id across the main product surfaces:
+
+- Electron launcher generates `X-Request-ID` in main-process Core session calls; a 401 → refresh → retry chain reuses one id;
+- the Next.js secure Core proxy preserves a safe incoming id or generates one and reuses it for refresh/retry; bounded Core correlation response headers are copied back without exposing session cookies/tokens;
+- Android `UrlConnectionHttpTransport` supplies a UUID fallback when a caller did not provide `X-Request-ID`, while preserving explicit EventSync correlation/idempotency flow.
+
+Correlation propagation does not alter authentication, entitlement, device proof, idempotency or retry authority.
+
+## Failure-injection evidence
+
+`run_operational_failure_matrix()` is an isolated deterministic harness. It verifies:
+
+1. unsafe correlation input is replaced rather than propagated;
+2. metric-series cardinality saturation remains bounded and increments overflow evidence;
+3. recent-trace overflow evicts within the configured bound and reports drops;
+4. request/trace identifiers never become metric labels.
+
+The harness operates on standalone registries and does not expose a runtime fault-injection endpoint or production chaos toggle.
+
+## CI-local performance evidence
+
+`server/scripts/block_d_evidence.py` performs deterministic local regression measurements for correlation normalization, registry recording and snapshot generation. The Build & Test workflow stores the JSON as an exact-SHA `block-d-operational-evidence-*` artifact and fails if deliberately generous regression budgets are exceeded or the failure matrix fails.
+
+These measurements are **CI-local regression guards, not production SLOs**. They do not claim network, provider, physical-device, database-at-scale, packaged-host or real-game latency. Production SLOs require measured evidence in the selected deployment tied to an exact release commit.
+
+## Existing recovery model
+
+The canonical Companion recovery matrix continues to cover heartbeat timeout, transport failure, peer-auth failure, local kill switch and queue backpressure. `assess_health()` remains fail closed and maps runtime health to `READY`, `DEGRADED`, `AUTH_REQUIRED` or `STOPPED`.
+
+## Evidence classification
+
+After the integrating exact-head CI passes, repository evidence may classify the following as **IMPLEMENTED / INTEGRATION-TESTED**:
+
+- Core-wide HTTP correlation middleware and response propagation;
+- bounded operational metric/trace registry;
+- admin-only JSON/OpenMetrics readback;
+- Companion and voice operational outcome instrumentation;
+- launcher/Web/Android correlation propagation;
+- deterministic failure-injection harness;
+- exact-SHA CI-local performance evidence artifact.
+
+The following remain **ENVIRONMENT-UNVERIFIED / EXTERNAL**:
+
+- deployed Prometheus/OpenTelemetry/vendor backend;
+- production alerting/on-call integration;
+- production SLOs and real-load benchmark evidence;
+- selected production voice/provider network behavior;
+- physical-device/packaged-host performance;
+- exact WoW/private-server environment acceptance.
+
+Release signing, publication, production secrets and live deployment remain Owner-only gates.

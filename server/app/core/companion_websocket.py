@@ -4,6 +4,7 @@ import base64
 import ipaddress
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from .companion_protocol import CompanionEnvelope, CompanionHandshake, Companion
 from .companion_runtime import CompanionRuntime
 from .companion_runtime_builder import build_companion_runtime
 from .companion_transport import CompanionTransportSession
+from .operational_observability import new_trace_id, operational_registry
 from .wow_adapter import ConservativeWowAdapter, WowObservation
 
 router = APIRouter(tags=["companion"])
@@ -25,6 +27,16 @@ router.include_router(billing_provider_router)
 _PUBLIC_SUBPROTOCOL = "sentinel.v1"
 _AUTH_SUBPROTOCOL_PREFIX = "sentinel.auth."
 _MAX_SESSION_TOKEN_LENGTH = 4096
+
+
+def _record_ws(trace_id: str, operation: str, outcome: str, *, elapsed_ms: float | None = None) -> None:
+    operational_registry.record(
+        component="companion_ws",
+        operation=operation,
+        outcome=outcome,
+        elapsed_ms=elapsed_ms,
+        trace_id=trace_id,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,28 +229,38 @@ def _companion_entitlement_active(user_id: str) -> bool:
     return billing_service.has_feature(user_id, "companion")
 
 
-async def _authorize_companion_account(websocket: WebSocket) -> str | None:
+async def _authorize_companion_account(websocket: WebSocket, trace_id: str | None = None) -> str | None:
     authorization = websocket.headers.get("authorization") or authorization_from_subprotocol(websocket)
     if not authorization:
+        if trace_id:
+            _record_ws(trace_id, "auth", "authentication_required")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="AUTHENTICATION_REQUIRED")
         return None
     from app.main import principal_from_token, require_bearer, store
     try:
         principal = principal_from_token(require_bearer(authorization))
     except HTTPException:
+        if trace_id:
+            _record_ws(trace_id, "auth", "invalid_session")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="INVALID_SESSION")
         return None
     if not _companion_entitlement_active(principal.user_id):
         store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "companion:connect", "resource": "companion", "decision": "DENY", "reason_code": "COMPANION_ENTITLEMENT_REQUIRED", "request_id": None})
+        if trace_id:
+            _record_ws(trace_id, "auth", "entitlement_required")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REQUIRED")
         return None
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "companion:connect", "resource": "companion", "decision": "ALLOW", "reason_code": "COMPANION_ENTITLEMENT_ACTIVE", "request_id": None})
+    if trace_id:
+        _record_ws(trace_id, "auth", "allowed")
     return principal.user_id
 
 
-async def _revoke_companion_session(websocket: WebSocket, user_id: str) -> None:
+async def _revoke_companion_session(websocket: WebSocket, user_id: str, trace_id: str | None = None) -> None:
     from app.main import store
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "companion:session", "resource": "companion", "decision": "DENY", "reason_code": "COMPANION_ENTITLEMENT_REVOKED", "request_id": None})
+    if trace_id:
+        _record_ws(trace_id, "entitlement", "revoked")
     await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="COMPANION_ENTITLEMENT_REVOKED")
 
 
@@ -309,40 +331,52 @@ def _process_wow_observation(envelope: CompanionEnvelope, user_id: str) -> Compa
 
 @router.websocket("/v1/companion/ws")
 async def companion_websocket(websocket: WebSocket) -> None:
+    trace_id = new_trace_id()
+    started = perf_counter()
     host = websocket.client.host if websocket.client else None
     if not is_loopback_peer(host):
+        _record_ws(trace_id, "connection", "loopback_denied")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="LOOPBACK_ONLY")
         return
-    user_id = await _authorize_companion_account(websocket)
+    user_id = await _authorize_companion_account(websocket, trace_id)
     if user_id is None:
         return
     transport = CompanionWebSocketTransport(websocket)
     if not await transport.accept():
+        _record_ws(trace_id, "connection", "transport_denied")
         return
+    _record_ws(trace_id, "connection", "accepted")
     connection_id = str(uuid4())
     try:
         result = await transport.handshake()
+        _record_ws(trace_id, "handshake", "accepted" if result.accepted else result.reason_code.lower())
         if not result.accepted:
             return
         while True:
             envelope = await transport.receive_envelope()
             if envelope is None:
+                _record_ws(trace_id, "envelope", "invalid_or_closed")
                 return
             if not _companion_entitlement_active(user_id):
-                await _revoke_companion_session(websocket, user_id)
+                await _revoke_companion_session(websocket, user_id, trace_id)
                 return
             transport.session.queue.pop()
             if envelope.message_type == CompanionMessageType.HEARTBEAT:
                 runtime_health = _runtime_health_envelope(envelope, transport, connection_id)
                 await websocket.send_json(runtime_health.model_dump(mode="json"))
+                _record_ws(trace_id, "heartbeat", "accepted")
                 continue
             if envelope.message_type == CompanionMessageType.WOW_OBSERVATION:
                 ack = _process_wow_observation(envelope, user_id)
                 await websocket.send_json(ack.model_dump(mode="json"))
-                if ack.payload.get("accepted") is True:
+                accepted = ack.payload.get("accepted") is True
+                _record_ws(trace_id, "wow_observation", "accepted" if accepted else "invalid")
+                if accepted:
                     presentation = _wow_observation_presentation(envelope)
                     await websocket.send_json(presentation.model_dump(mode="json"))
     except WebSocketDisconnect:
+        _record_ws(trace_id, "connection", "disconnect")
         return
     finally:
         transport._fail_transport()
+        _record_ws(trace_id, "session", "closed", elapsed_ms=(perf_counter() - started) * 1000.0)

@@ -9,6 +9,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
+from app.core.operational_observability import install_operational_plane
 from app.core.security import Principal
 
 
@@ -21,6 +22,8 @@ def install_game_state_routes(
     authorize_request: Callable[[Principal, str, str, str], None],
     request_id: Callable[..., str],
 ) -> None:
+    install_operational_plane(app, store=store)
+
     @app.get("/v1/characters")
     def list_characters(
         request: Request,

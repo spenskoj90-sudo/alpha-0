@@ -5,6 +5,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.UUID
 
 enum class HttpMethod {
     GET,
@@ -37,12 +38,14 @@ interface HttpTransport {
  * - redirects are not followed implicitly, avoiding cross-origin credential forwarding;
  * - connect/read timeouts are bounded;
  * - response bodies are bounded before conversion to text;
+ * - every request has an X-Request-ID fallback while caller-supplied correlation is preserved;
  * - no automatic retry is performed here; caller-specific idempotency policy remains authoritative.
  */
 class UrlConnectionHttpTransport(
     private val connectTimeoutMs: Int = 10_000,
     private val readTimeoutMs: Int = 15_000,
     private val maxResponseBytes: Int = 1_048_576,
+    private val requestIdFactory: () -> String = { UUID.randomUUID().toString() },
     private val connectionFactory: (URL) -> HttpURLConnection = { url ->
         (url.openConnection() as? HttpURLConnection)
             ?: throw IOException("unsupported URL connection")
@@ -68,7 +71,11 @@ class UrlConnectionHttpTransport(
             connection.readTimeout = readTimeoutMs
             connection.instanceFollowRedirects = false
             connection.doInput = true
-            request.headers.forEach { (name, value) ->
+            val headers = LinkedHashMap(request.headers)
+            if (headers.keys.none { it.equals("X-Request-ID", ignoreCase = true) }) {
+                headers["X-Request-ID"] = requestIdFactory()
+            }
+            headers.forEach { (name, value) ->
                 validateHeader(name, value)
                 connection.setRequestProperty(name, value)
             }

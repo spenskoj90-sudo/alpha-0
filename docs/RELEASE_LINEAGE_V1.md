@@ -25,6 +25,8 @@ The lineage is:
 8. rejects PR evidence even if its internal structure is otherwise valid;
 9. emits deterministic `sentinel.release-presecret-binding.v1` evidence.
 
+GitHub authentication is deliberately outside the Python lineage process. The workflow exposes the ephemeral GitHub Actions credential only to the `gh` process through its environment; `scripts/release_lineage.py` does not read, accept, serialize or log GitHub tokens. It invokes only fixed-form `gh api` GET requests, consumes bounded stdout bytes, discards CLI stderr on transport failure, and independently validates all returned metadata, archive sizes, archive digests and manifest contents before those values can enter release lineage evidence. This credential-transport separation is part of the release security boundary, not merely an implementation detail.
+
 The binding records the release-evidence workflow run/attempt, artifact identity and GitHub archive digest, internal release-evidence digest, exact source identity and explicit false claims for signing, publication and deployment. Its `bindingDigest` covers the canonical binding document.
 
 The binding deliberately derives `generatedAt` from the immutable release-evidence manifest so repeated verification of the same evidence yields the same binding digest.

@@ -132,7 +132,7 @@ class ReleaseLineageTests(unittest.TestCase):
             expected_signer_sha256=SIGNER,
         )
         self.assertTrue(candidate["claims"]["signedReleaseArtifact"])
-        self.assertEqual(candidate["presecretBinding"]["bindingDigest"], binding["bindingDigest"])
+        self.assertEqual(candidate["presecretBinding"], {"bindingDigest": binding["bindingDigest"]})
 
     def test_candidate_rejects_apk_tamper(self):
         binding = valid_binding()
@@ -140,14 +140,13 @@ class ReleaseLineageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "APK metadata mismatch"):
             verify_candidate_manifest(candidate, b"apk-two", expected_binding=binding, expected_signer_sha256=SIGNER)
 
-    def test_candidate_rejects_stale_binding(self):
+    def test_candidate_rejects_stale_binding_digest(self):
         binding = valid_binding()
         candidate = create_candidate_manifest(binding, b"apk", SIGNER)
-        changed = copy.deepcopy(binding)
-        changed["releaseEvidence"]["workflowMetadataDigest"] = "sha256:" + ("2" * 64)
-        changed["bindingDigest"] = canonical_digest(changed, "bindingDigest")
+        candidate["presecretBinding"]["bindingDigest"] = "sha256:" + ("2" * 64)
+        candidate["candidateDigest"] = canonical_digest(candidate, "candidateDigest")
         with self.assertRaisesRegex(ValueError, "lineage does not match"):
-            verify_candidate_manifest(candidate, b"apk", expected_binding=changed, expected_signer_sha256=SIGNER)
+            verify_candidate_manifest(candidate, b"apk", expected_binding=binding, expected_signer_sha256=SIGNER)
 
     def test_fetch_candidate_verifies_github_archive_and_current_binding(self):
         binding = valid_binding()
@@ -186,7 +185,7 @@ class ReleaseLineageTests(unittest.TestCase):
                 return {"artifacts": [artifact]}
             raise AssertionError(endpoint)
 
-        fetched, files, provenance = fetch_candidate_package(
+        fetched, files = fetch_candidate_package(
             REPO,
             SHA,
             VERSION,
@@ -197,25 +196,17 @@ class ReleaseLineageTests(unittest.TestCase):
         )
         self.assertEqual(fetched["candidateDigest"], candidate["candidateDigest"])
         self.assertEqual(files[APK_FILE], apk)
-        self.assertEqual(provenance["artifactDigest"], artifact["digest"])
-        self.assertEqual(provenance["sourceSha"], SHA)
-        self.assertNotIn("workflowRunId", provenance)
-        self.assertNotIn("workflowRunAttempt", provenance)
-        self.assertNotIn("artifactId", provenance)
-        self.assertIn("workflowMetadataDigest", provenance)
-        self.assertIn("artifactMetadataDigest", provenance)
 
-    def test_fetch_candidate_rejects_packaged_stale_binding(self):
+    def test_fetch_candidate_rejects_tampered_packaged_binding(self):
         binding = valid_binding()
-        stale = copy.deepcopy(binding)
-        stale["releaseEvidence"]["artifactMetadataDigest"] = "sha256:" + ("3" * 64)
-        stale["bindingDigest"] = canonical_digest(stale, "bindingDigest")
+        tampered = copy.deepcopy(binding)
+        tampered["bindingDigest"] = "sha256:" + ("3" * 64)
         apk = b"signed apk payload"
-        candidate = create_candidate_manifest(stale, apk, SIGNER)
+        candidate = create_candidate_manifest(binding, apk, SIGNER)
         archive = make_zip(
             {
                 APK_FILE: apk,
-                PRESECRET_FILE: (json.dumps(stale, sort_keys=True) + "\n").encode(),
+                PRESECRET_FILE: (json.dumps(tampered, sort_keys=True) + "\n").encode(),
                 CANDIDATE_FILE: (json.dumps(candidate, sort_keys=True) + "\n").encode(),
             }
         )
@@ -243,7 +234,7 @@ class ReleaseLineageTests(unittest.TestCase):
                 return {"workflow_runs": [run]}
             return {"artifacts": [artifact]}
 
-        with self.assertRaisesRegex(ValueError, "stale or different"):
+        with self.assertRaisesRegex(ValueError, "binding digest mismatch"):
             fetch_candidate_package(
                 REPO,
                 SHA,
@@ -254,17 +245,26 @@ class ReleaseLineageTests(unittest.TestCase):
                 downloader=lambda *_args: archive,
             )
 
-    def test_persisted_binding_hashes_authenticated_metadata(self):
+    def test_persisted_binding_contains_no_authenticated_api_metadata(self):
         binding = valid_binding()
         evidence = binding["releaseEvidence"]
-        self.assertNotIn("generatedAt", binding)
-        self.assertNotIn("runId", evidence["workflow"])
-        self.assertNotIn("runAttempt", evidence["workflow"])
-        self.assertNotIn("id", evidence["artifact"])
-        self.assertNotIn("sizeBytes", evidence["artifact"])
-        self.assertRegex(evidence["workflowMetadataDigest"], r"^sha256:[0-9a-f]{64}$")
-        self.assertRegex(evidence["artifactMetadataDigest"], r"^sha256:[0-9a-f]{64}$")
-        self.assertRegex(evidence["manifestDigest"], r"^sha256:[0-9a-f]{64}$")
+        serialized = json.dumps(binding, sort_keys=True)
+        self.assertEqual(set(evidence), {"workflow", "artifact"})
+        self.assertEqual(
+            evidence["artifact"],
+            {"name": f"sentinel-release-evidence-{SHA}", "headSha": SHA},
+        )
+        for field in (
+            "generatedAt",
+            "runId",
+            "runAttempt",
+            "artifactId",
+            "sizeBytes",
+            "workflowMetadataDigest",
+            "artifactMetadataDigest",
+            "manifestDigest",
+        ):
+            self.assertNotIn(field, serialized)
 
     def test_python_lineage_boundary_never_handles_github_credentials(self):
         source = Path("scripts/release_lineage.py").read_text(encoding="utf-8")
@@ -274,9 +274,8 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertNotIn("Bearer", source)
         self.assertIn('["gh", "api", "--method", "GET", endpoint]', source)
         self.assertIn("stderr=subprocess.DEVNULL", source)
-        self.assertNotIn("bindingDigest']}", source)
-        self.assertNotIn("candidateDigest']}", source)
         self.assertNotIn("print(f", source)
+        self.assertNotIn("release-candidate-provenance.json", source)
 
     def test_workflows_enforce_presecret_boundary_and_no_release_resigning(self):
         rc = Path(".github/workflows/release-candidate.yml").read_text(encoding="utf-8")
@@ -295,6 +294,7 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertIn("release_lineage.py fetch-candidate", release)
         self.assertNotIn("ANDROID_KEYSTORE_BASE64", release)
         self.assertNotIn("assembleRelease", release)
+        self.assertNotIn("release-candidate-provenance.json", release)
         prepublish = release.split("  presecret:", 1)[1].split("  publish:", 1)[0]
         self.assertNotIn("contents: write", prepublish)
         self.assertNotIn("secrets.", prepublish)

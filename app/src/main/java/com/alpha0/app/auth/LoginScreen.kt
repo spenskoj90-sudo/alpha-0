@@ -31,6 +31,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.assertiveStatusSemantics
+import com.alpha0.app.ui.progressStatusSemantics
 import kotlinx.coroutines.launch
 
 @Composable
@@ -123,7 +125,12 @@ fun LoginScreen(
             )
 
             if (error != null) {
-                Text(error!!, color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    error!!,
+                    modifier = Modifier.assertiveStatusSemantics(),
+                    color = SentinelColors.Danger,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
             Button(
@@ -136,7 +143,16 @@ fun LoginScreen(
                     contentColor = SentinelColors.TextPrimary,
                 ),
             ) {
-                if (busy) CircularProgressIndicator(strokeWidth = 2.dp) else Text(if (registerMode) "Create account" else "Sign in")
+                if (busy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.progressStatusSemantics(
+                            if (registerMode) "Creating account" else "Signing in"
+                        ),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(if (registerMode) "Create account" else "Sign in")
+                }
             }
 
             OutlinedButton(

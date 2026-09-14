@@ -84,26 +84,35 @@ export function RecommendationPanel() {
   const confidence = recommendation ? `${Math.round(recommendation.confidence * 100)}%` : '—';
 
   return (
-    <article className="card recommendation-panel" aria-label="SENTINEL recommendation">
+    <article
+      className="card recommendation-panel"
+      aria-label="SENTINEL recommendation"
+      aria-busy={view === 'LOADING'}
+    >
       <div className="recommendation-heading">
         <div>
           <div className="label">INTELLIGENCE / {recommendation?.kind.toUpperCase() ?? 'LIVE CORE'}</div>
           <h2>Recommendation</h2>
         </div>
-        <span className="confidence">{confidence}</span>
+        <span className="confidence" aria-label={`Confidence ${confidence}`}>{confidence}</span>
       </div>
 
       {view === 'READY' && recommendation ? (
-        <>
+        <div role="status" aria-live="polite" aria-atomic="true">
           <p className="recommendation-text">{recommendation.text}</p>
           <div className="recommendation-meta">
             <div><span className="label">PROVIDER</span><strong>{recommendation.provider_id ?? 'unreported'}</strong></div>
             <div><span className="label">MODEL</span><strong>{recommendation.model_id ?? 'unreported'}</strong></div>
             <div><span className="label">PROVENANCE</span><strong>{recommendation.provenance.join(' · ') || 'none'}</strong></div>
           </div>
-        </>
+        </div>
       ) : (
-        <p className="muted" role="status">
+        <p
+          className="muted"
+          role={view === 'ERROR' ? 'alert' : 'status'}
+          aria-live={view === 'ERROR' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+        >
           {view === 'LOADING' ? 'Requesting bounded intelligence from Core…' : message || 'Request a live recommendation through the authenticated Core boundary.'}
         </p>
       )}
@@ -117,7 +126,7 @@ export function RecommendationPanel() {
       </div>
 
       <div className="recommendation-boundary">
-        <span className="info">●</span> Observational only · no action execution
+        <span className="info" aria-hidden="true">●</span> Observational only · no action execution
       </div>
     </article>
   );

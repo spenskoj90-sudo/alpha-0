@@ -90,7 +90,13 @@ class ArtifactAttestationContractTests(unittest.TestCase):
         publish = workflow.split("  publish:", 1)[1]
         self.assertIn("verify_release_evidence_attestation.sh", presecret)
         self.assertIn("attestations: read", presecret)
-        self.assertGreaterEqual(verify.count("verify_github_attestation.sh"), 3)
+        self.assertIn("verify_github_attestation.sh", verify)
+        for subject in (
+            "release-input/app-release.apk",
+            "release-input/release-candidate.json",
+            "release-input/release-presecret-binding.json",
+        ):
+            self.assertIn(subject, verify)
         self.assertIn(".github/workflows/release-candidate.yml", verify)
         self.assertIn("refs/heads/main", verify)
         self.assertNotIn("contents: write", presecret + verify)

@@ -16,6 +16,22 @@ def _measure_ms(fn) -> float:
     return round((perf_counter() - started) * 1000.0, 3)
 
 
+def _evidence_sha() -> str:
+    explicit = os.getenv("SENTINEL_EVIDENCE_SHA")
+    if explicit:
+        return explicit
+    event_path = os.getenv("GITHUB_EVENT_PATH")
+    if event_path:
+        try:
+            event = json.loads(Path(event_path).read_text(encoding="utf-8"))
+            head = event.get("pull_request", {}).get("head", {}).get("sha")
+            if isinstance(head, str) and len(head) == 40:
+                return head
+        except (OSError, ValueError, TypeError):
+            pass
+    return os.getenv("GITHUB_SHA", "LOCAL")
+
+
 def build_evidence() -> dict[str, object]:
     normalize_iterations = 20_000
     registry_iterations = 20_000
@@ -48,11 +64,10 @@ def build_evidence() -> dict[str, object]:
         item["passed"] = item["observed_ms"] <= item["budget_ms"]
 
     failure_matrix = [item.as_dict() for item in run_operational_failure_matrix()]
-    evidence_sha = os.getenv("SENTINEL_EVIDENCE_SHA") or os.getenv("GITHUB_SHA", "LOCAL")
     return {
         "schema": "sentinel.block-d.evidence.v1",
         "evidence_scope": "ci-local-regression-guard-not-production-slo",
-        "commit": evidence_sha,
+        "commit": _evidence_sha(),
         "budgets": budgets,
         "failure_injection": failure_matrix,
         "registry_capacity": registry.snapshot()["capacity"],

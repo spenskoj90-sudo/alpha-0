@@ -29,6 +29,8 @@ GitHub authentication is owned by the `gh` process supplied by the workflow envi
 
 The binding records exact source identity and explicit false claims for signing, publication and deployment. Its `bindingDigest` covers the canonical binding document. Repeated verification of the same protected-main evidence therefore yields the same binding digest without persisting data-derived log values or raw authenticated metadata.
 
+Repository regression tests lock this privacy boundary: persisted bindings/candidate provenance must omit raw authenticated run/artifact identifiers, metadata must remain digest-projected, and the Python CLI must not emit data-derived values in success/failure logs.
+
 ## Manual release-candidate signing
 
 `.github/workflows/release-candidate.yml` remains an Owner-only manual workflow. It now requires an explicit `source_sha` and must itself be dispatched from `main`.

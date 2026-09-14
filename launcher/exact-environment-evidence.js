@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { readPackagedBuildProvenance } = require('./packaged-runtime');
 
 const ENVIRONMENT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const GIT_SHA_RE = /^[0-9a-f]{40}$/;
@@ -15,6 +16,8 @@ const EXPECTED_HANDSHAKE = Object.freeze({
   coreProtocolVersion: '1.0',
   capabilityProfile: 'wow.passive.v1',
 });
+let processRecorderInitialized = false;
+let processRecorder = null;
 
 function isoNow(now) {
   const value = now();
@@ -244,12 +247,37 @@ class ExactEnvironmentEvidenceRecorder {
   }
 }
 
+function getProcessExactEnvironmentEvidenceRecorder({ appDir = __dirname, env = process.env } = {}) {
+  if (processRecorderInitialized) return processRecorder;
+  processRecorderInitialized = true;
+  const outputPath = String(env.SENTINEL_L3_EVIDENCE_OUTPUT || '').trim();
+  const environmentId = String(env.SENTINEL_L3_ENVIRONMENT_ID || '').trim();
+  if (!outputPath && !environmentId) return null;
+  if (!outputPath || !environmentId) throw new Error('L3_CAPTURE_REQUIRES_OUTPUT_AND_ENVIRONMENT_ID');
+  if (String(env.SENTINEL_WOW_SAVEDVARIABLES_PATH || '').trim()) {
+    throw new Error('L3_CAPTURE_REJECTS_SAVEDVARIABLES_OVERRIDE');
+  }
+  processRecorder = new ExactEnvironmentEvidenceRecorder({
+    outputPath,
+    environmentId,
+    packagedProvenance: readPackagedBuildProvenance(appDir),
+  });
+  return processRecorder;
+}
+
+function resetProcessExactEnvironmentEvidenceRecorderForTests() {
+  processRecorderInitialized = false;
+  processRecorder = null;
+}
+
 module.exports = {
   ExactEnvironmentEvidenceRecorder,
   atomicWriteJson,
   deriveCapabilityClaims,
+  getProcessExactEnvironmentEvidenceRecorder,
   normalizeAcceptedCheckpoint,
   normalizeHandshake,
   normalizeHealth,
   normalizePackagedProvenance,
+  resetProcessExactEnvironmentEvidenceRecorderForTests,
 };

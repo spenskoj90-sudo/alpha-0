@@ -43,7 +43,9 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.2
 
       - name: Run supply-chain contract tests
-        run: python scripts/test_supply_chain_evidence.py
+        run: |
+          python scripts/test_supply_chain_evidence.py
+          python scripts/test_artifact_attestations.py
 
       - name: Build exact-source Core runtime image
         run: |
@@ -103,3 +105,39 @@ jobs:
           path: artifacts/supply-chain/
           if-no-files-found: error
           retention-days: 90
+
+  attest-supply-chain:
+    name: Attest protected-main supply-chain evidence
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: supply-chain-evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      SENTINEL_SOURCE_SHA: ${{ github.sha }}
+    steps:
+      - name: Download verified supply-chain evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sentinel-supply-chain-evidence-${{ env.SENTINEL_SOURCE_SHA }}
+          path: attestation-input
+
+      - name: Require canonical attestation subjects
+        run: |
+          set -euo pipefail
+          test -s attestation-input/supply-chain-evidence.json
+          test -s attestation-input/sentinel-application.cdx.json
+          test -s attestation-input/sentinel-core-container.cdx.json
+
+      - name: Attest exact protected-main supply-chain evidence
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: |
+            attestation-input/supply-chain-evidence.json
+            attestation-input/sentinel-application.cdx.json
+            attestation-input/sentinel-core-container.cdx.json

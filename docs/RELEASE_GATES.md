@@ -25,15 +25,25 @@ The exact required context names are controlled by protected-branch policy. GPT 
 
 In addition to the protected contexts, the release-readiness evidence program requires the exact-SHA `Supply Chain Evidence` workflow to pass. It builds a Core container SBOM and a cross-surface resolved dependency BOM, verifies the `sentinel.supply-chain-evidence.v1` manifest and uploads `sentinel-supply-chain-evidence-<sha>`. `Release Evidence Preflight` treats that artifact as mandatory and records GitHub's server-side SHA-256 digest. This evidence is descriptive provenance/SBOM data, not release signing or a cryptographic attestation.
 
+## Canonical protected-main evidence gate
+
+A commit is eligible for Owner-gated release signing only after its protected-`main` push has a successful `Release Evidence Preflight` manifest for that exact SHA and version. The release lineage verifier downloads that GitHub artifact, verifies its server-side ZIP digest/size and internal manifest, and produces deterministic `sentinel.release-presecret-binding.v1` evidence.
+
+PR evidence cannot substitute for this protected-main evidence. A stale successful main SHA cannot substitute for the explicitly selected release SHA.
+
 ## Release-specific artifact gate
 
-Signing is intentionally separated from routine PR CI:
+Signing is intentionally separated from routine PR CI and from publication:
 
-- `.github/workflows/release-candidate.yml` is manual and builds a retained, signed, non-debuggable APK for an explicitly selected commit.
-- `.github/workflows/release.yml` runs only for an Owner-created version tag, verifies that the tag matches `VERSION`, verifies the signed release APK and then publishes the GitHub Release.
+- `.github/workflows/release-candidate.yml` is manual, must be dispatched from `main`, requires an explicit exact `source_sha`, and verifies canonical protected-main evidence in a read-only `presecret` job.
+- The signing job has `needs: presecret`, regenerates the same binding before the first signing-secret reference, then builds and verifies the signed non-debuggable APK.
+- The signed artifact is retained as `sentinel-release-candidate-<sha>` and contains the APK plus `sentinel.release-candidate.v1` and pre-secret lineage evidence.
+- `.github/workflows/release.yml` runs only for an Owner-created version tag and **does not re-sign**. It verifies the tag/version and canonical main evidence, downloads the already-signed candidate for the same exact SHA, verifies GitHub's artifact digest, candidate/APK lineage, signer certificate and non-debuggable state, then publishes that exact APK.
 - Release keystore values and signing custody remain Owner-only. A successful debug PR build is not signed-release evidence.
 
-Before publication, record the selected exact SHA and successful release-candidate artifact run. Publication itself remains an Owner gate.
+The machine-verifiable details are defined in `docs/RELEASE_LINEAGE_V1.md`.
+
+Before publication, the exact tagged SHA must therefore have both canonical protected-main release evidence and a successful Owner release-candidate artifact for the same SHA. Publication itself remains an Owner gate.
 
 ## Environment-level gates
 
@@ -49,6 +59,8 @@ Before production traffic, additionally verify:
 
 ## Owner publication step
 
-After the Owner selects the release version and the exact commit has all applicable evidence, the Owner creates and pushes an annotated tag matching `VERSION`, prefixed with `v` (for example, `v1.0.0-rc2`). That tag invokes the release workflow, which publishes only the verified release APK and Core source bundle.
+After the Owner selects the release version, the exact commit has protected-main evidence, and the Owner has run the manual signed release-candidate workflow for that exact SHA, the Owner creates and pushes an annotated tag matching `VERSION`, prefixed with `v` (for example, `v1.0.0-rc2`).
 
-GPT may prepare and validate everything up to this boundary but must not create the release tag or publish the GitHub Release.
+That tag invokes the publication workflow, which must consume the existing verified signed candidate; it cannot create a replacement signed APK. The GitHub Release includes the verified APK, exact-source Core bundle and lineage evidence.
+
+GPT may prepare, test, review and merge all repository machinery up to this boundary but must not provide production signing credentials, execute the signed-RC gate, create/push the release tag, publish the GitHub Release or deploy production.

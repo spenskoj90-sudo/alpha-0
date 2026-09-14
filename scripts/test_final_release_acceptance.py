@@ -16,6 +16,7 @@ VERSION = "1.0.0-rc-test"
 SIGNER = "AA" * 32
 COMPANION = "sha256:" + "b" * 64
 RECORDED_AT = "2026-09-14T19:00:00Z"
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class FinalReleaseAcceptanceTests(unittest.TestCase):
@@ -136,6 +137,50 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
         broken["acceptanceDigest"] = acceptance._canonical_digest(broken, "acceptanceDigest")
         with self.assertRaisesRegex(ValueError, "unexpected fields"):
             acceptance.verify_manifest(broken, self.candidate, self.apk, COMPANION)
+
+
+class FinalReleaseAcceptanceWorkflowTests(unittest.TestCase):
+    def read(self, relative: str) -> str:
+        return (ROOT / relative).read_text(encoding="utf-8")
+
+    def test_acceptance_workflow_is_no_secret_and_exact_sha_bound(self) -> None:
+        workflow = self.read(".github/workflows/final-release-acceptance.yml")
+        self.assertNotIn("secrets.", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertIn('test "$GITHUB_SHA" = "$SOURCE_SHA"', workflow)
+        self.assertIn("verify_release_upstream_attestations.sh", workflow)
+        self.assertIn("verify signed candidate artifact attestations".lower(), workflow.lower())
+        self.assertIn("actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6", workflow)
+        self.assertIn("id-token: write", workflow)
+        self.assertIn("attestations: write", workflow)
+
+    def test_release_publication_requires_final_acceptance(self) -> None:
+        workflow = self.read(".github/workflows/release.yml")
+        self.assertIn("verify_final_release_acceptance_live.sh", workflow)
+        self.assertIn("publication", workflow)
+        self.assertIn("final-release-acceptance.json", workflow)
+        self.assertIn("EXPECTED_ACCEPTANCE_SHA256", workflow)
+        self.assertIn("release-input/final-release-acceptance.json", workflow)
+
+    def test_remote_rollout_is_owner_dispatch_only_and_stronger_profile(self) -> None:
+        workflow = self.read(".github/workflows/deploy.yml")
+        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+        self.assertIn("needs.deployment-acceptance.result == 'success'", workflow)
+        self.assertIn("verify_final_release_acceptance_live.sh", workflow)
+        self.assertIn("deployment", workflow)
+        self.assertNotIn('default: "latest"', workflow)
+
+    def test_live_verifier_rechecks_candidate_package_and_acceptance_attestations(self) -> None:
+        helper = self.read("scripts/verify_final_release_acceptance_live.sh")
+        for required in (
+            "verify_release_evidence_attestation.sh",
+            "release_lineage.py fetch-candidate",
+            "verify_github_attestation.sh",
+            "verify_release_upstream_attestations.sh",
+            "verify_final_release_acceptance_attestation.sh",
+            "final_release_acceptance.py verify",
+        ):
+            self.assertIn(required, helper)
 
 
 if __name__ == "__main__":

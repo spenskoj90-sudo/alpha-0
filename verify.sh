@@ -50,19 +50,30 @@ check 'Release evidence tests' test -f scripts/test_release_evidence.py
 check 'Release supply-chain evidence tests' test -f scripts/test_release_evidence_supply_chain.py
 check 'Release lineage verifier' test -f scripts/release_lineage.py
 check 'Release lineage tests' test -f scripts/test_release_lineage.py
+check 'Artifact attestation tests' test -f scripts/test_artifact_attestations.py
+check 'GitHub attestation verifier' test -f scripts/verify_github_attestation.sh
+check 'Protected-main release attestation verifier' test -f scripts/verify_release_evidence_attestation.sh
+check 'Release upstream attestation verifier' test -f scripts/verify_release_upstream_attestations.sh
 check 'Release evidence contract' test -f docs/RELEASE_EVIDENCE_PREFLIGHT_V1.md
 check 'Release lineage contract' test -f docs/RELEASE_LINEAGE_V1.md
+
+check 'Artifact attestation shell syntax' bash -n \
+  scripts/verify_github_attestation.sh \
+  scripts/verify_release_evidence_attestation.sh \
+  scripts/verify_release_upstream_attestations.sh
 
 if command -v python >/dev/null 2>&1; then
   check 'Python compile' python -m compileall -q \
     server/app server/migrate.py \
     scripts/release_evidence.py scripts/release_evidence_entrypoint.py \
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
-    scripts/release_lineage.py scripts/test_release_lineage.py
+    scripts/release_lineage.py scripts/test_release_lineage.py \
+    scripts/test_artifact_attestations.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py
+  check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

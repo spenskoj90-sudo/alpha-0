@@ -20,6 +20,10 @@ jobs:
     name: Verify exact-SHA release evidence before publication authority
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      attestations: read
     outputs:
       source_sha: ${{ steps.identity.outputs.source_sha }}
       binding_digest: ${{ steps.binding.outputs.digest }}
@@ -56,6 +60,18 @@ jobs:
           python scripts/test_release_evidence.py
           python scripts/test_release_evidence_supply_chain.py
           python scripts/test_release_lineage.py
+          python scripts/test_artifact_attestations.py
+
+      - name: Verify protected-main release-evidence attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify_release_evidence_attestation.sh \
+            "$GITHUB_REPOSITORY" \
+            "$SOURCE_SHA" \
+            "$RUNNER_TEMP/release-evidence-attestation"
 
       - name: Verify canonical protected-main evidence
         env:
@@ -100,6 +116,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      attestations: read
     outputs:
       artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
       apk_sha256: ${{ steps.hashes.outputs.apk_sha256 }}
@@ -122,6 +139,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Reconfirm protected-main release-evidence attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.presecret.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify_release_evidence_attestation.sh \
+            "$GITHUB_REPOSITORY" \
+            "$SOURCE_SHA" \
+            "$RUNNER_TEMP/release-evidence-attestation"
 
       - name: Reconfirm canonical evidence before candidate verification
         env:
@@ -157,6 +185,25 @@ jobs:
             --binding release-presecret-binding.json \
             --expected-signer-sha256 "$SENTINEL_RELEASE_SIGNER_SHA256" \
             --output-dir release-input
+
+      - name: Verify signed candidate artifact attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.presecret.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          for subject in \
+            release-input/app-release.apk \
+            release-input/release-candidate.json \
+            release-input/release-presecret-binding.json
+          do
+            bash scripts/verify_github_attestation.sh \
+              "$subject" \
+              "$GITHUB_REPOSITORY" \
+              ".github/workflows/release-candidate.yml" \
+              "$SOURCE_SHA" \
+              "refs/heads/main"
+          done
 
       - name: Verify signed release APK independently
         run: |

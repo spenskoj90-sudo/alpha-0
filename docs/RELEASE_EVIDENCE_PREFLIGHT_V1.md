@@ -7,7 +7,7 @@
 
 This contract defines a repository-internal, exact-SHA release-readiness evidence boundary that runs before any Owner-gated signing, release publication or production deployment.
 
-It consolidates already-produced GitHub Actions evidence into one machine-verifiable manifest. It does **not** rebuild or republish the product and it does not elevate CI evidence into physical/environment acceptance.
+It consolidates already-produced GitHub Actions evidence into one machine-verifiable manifest. For protected-main pushes it additionally requires cryptographic GitHub/Sigstore attestations for the supply-chain and packaged-Companion evidence subjects selected by that manifest. It does **not** rebuild or republish the product and it does not elevate CI evidence into physical/environment acceptance.
 
 Schema: `sentinel.release-evidence.v1`.
 
@@ -37,6 +37,8 @@ It also requires the GitHub Advanced Security check named `CodeQL`, from app slu
 
 The required job set includes Core tests/coverage, PostgreSQL recovery, Android build/tests, API 35 emulator instrumentation, Web build, Launcher runtime tests, Block D evidence, container build/reproducibility/deployment smoke, security scans, both workflow CodeQL language jobs, P1 evidence, packaged Companion evidence, supply-chain SBOM evidence and standalone Android APK validation.
 
+PR evidence does not mint artifact attestations. This keeps pull-request execution free of `id-token: write` and `attestations: write` authority.
+
 ## Required protected-main evidence
 
 For a `push` to `main`, the preflight requires the exact-SHA post-merge runs for:
@@ -48,6 +50,8 @@ For a `push` to `main`, the preflight requires the exact-SHA post-merge runs for
 - `Supply Chain Evidence`.
 
 `ALPHA-0 Android CI` is PR-only and therefore is not invented as a post-merge requirement. The Build & Test API 35 emulator job remains required.
+
+On protected-main, the Supply Chain and Packaged Companion workflows also contain downstream no-secret attestation jobs. Their workflow conclusion cannot be `success` until those jobs have created GitHub/Sigstore provenance for the canonical subjects.
 
 ## Required artifacts
 
@@ -70,6 +74,20 @@ Each required artifact must:
 
 Additional workflow artifacts may be recorded, but they cannot substitute for a required artifact.
 
+## Protected-main attestation gate
+
+After the exact-SHA collector returns a protected-main manifest and before `release-evidence.json` is uploaded, `scripts/verify_release_upstream_attestations.sh`:
+
+1. reads the exact Supply Chain and Packaged Companion run IDs from the generated manifest;
+2. downloads those exact named GitHub Actions artifacts from those exact runs;
+3. reruns `scripts/supply_chain_evidence.py verify` on the downloaded supply-chain evidence;
+4. rechecks packaged build/smoke source identity, unsigned claims and the archive SHA-256;
+5. verifies every canonical subject with `gh attestation verify` using the expected repository, exact signer workflow, exact source SHA, `refs/heads/main` and `--deny-self-hosted-runners`.
+
+The accepted subjects are defined in `docs/ARTIFACT_ATTESTATION_V1.md`. A missing, tampered, wrong-workflow, wrong-SHA, wrong-ref or self-hosted attestation fails the preflight and prevents release-evidence artifact upload.
+
+Once the protected-main release-evidence artifact is uploaded, a separate no-secret downstream job attests the single `release-evidence.json` subject. Therefore the whole `Release Evidence Preflight` workflow reaches `success` on main only after upstream attestations were verified and the final release-evidence manifest itself was attested.
+
 ## Manifest integrity
 
 The manifest includes:
@@ -82,6 +100,8 @@ The manifest includes:
 - an evidence digest computed over canonical JSON excluding only the digest field itself.
 
 `scripts/release_evidence_entrypoint.py verify` enables the active Supply Chain Evidence policy, delegates to `scripts/release_evidence.py`, recomputes the digest and revalidates the evidence structure fail-closed.
+
+Attestation verification remains an execution gate around the v1 manifest rather than a self-asserted manifest claim. This prevents the JSON document from claiming a signature before the downstream OIDC attestation has actually been created.
 
 ## Explicit non-claims
 
@@ -112,14 +132,14 @@ Those remain separate Owner/external gates.
 
 `.github/workflows/release-evidence.yml` runs concurrently with ordinary PR/main workflows and waits, with a bounded timeout, for the required sibling workflows on the exact source SHA. It never selects an older successful SHA to compensate for a newer failure.
 
-If a required workflow is missing, pending beyond the timeout, failed, cancelled, stale, or has incomplete artifact evidence, the preflight fails. Ordinary CI remediation must fix/rerun the failed source workflow; the evidence boundary must not be weakened to obtain PASS.
+If a required workflow is missing, pending beyond the timeout, failed, cancelled, stale, has incomplete artifact evidence, or fails the protected-main attestation gate, the preflight fails. Ordinary CI remediation must fix/rerun the failed source workflow; the evidence boundary must not be weakened to obtain PASS.
 
 The workflow itself is not automatically added to branch protection. Branch-protection changes remain an Owner-only governance gate. GPT may nevertheless treat the preflight as an additional voluntary merge/release-readiness gate once the workflow is present on the PR head.
 
 ## Relation to release workflows
 
-The preflight is the canonical repository-internal input to `docs/RELEASE_LINEAGE_V1.md`.
+The preflight is the canonical repository-internal input to `docs/RELEASE_LINEAGE_V1.md` and `docs/ARTIFACT_ATTESTATION_V1.md`.
 
-`release-candidate.yml` and `release.yml` remain Owner-gated paths because they involve signing authority and/or publication authority, but neither may accept unbound source state. `scripts/release_lineage.py` downloads the protected-main preflight artifact, verifies GitHub's archive digest and the internal manifest, and emits a deterministic pre-secret binding before those authorities are reachable.
+`release-candidate.yml` and `release.yml` remain Owner-gated paths because they involve signing authority and/or publication authority, but neither may accept unbound source state. Before signing or publication authority is reachable, those workflows first verify the protected-main `release-evidence.json` attestation, then `scripts/release_lineage.py` independently downloads the same protected-main preflight artifact, verifies GitHub's archive digest and the internal manifest, and applies the deterministic pre-secret binding rules.
 
-The manual release-candidate workflow may reference Android signing material only in a job that depends on successful pre-secret verification. The tag publication workflow does not re-sign: it consumes an already-signed exact-SHA release candidate and independently revalidates its lineage and APK signature before publication.
+The manual release-candidate workflow may reference Android signing material only in a job that depends on successful pre-secret verification. The tag publication workflow does not re-sign: it consumes an already-signed exact-SHA release candidate, verifies its GitHub/Sigstore attestation plus lineage/APK signature, and only then permits the separate publication-authority job to run.

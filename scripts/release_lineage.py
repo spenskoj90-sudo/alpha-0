@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Exact-SHA release lineage with a credential-free Python boundary.
+"""Exact-SHA release lineage with transient authenticated GitHub verification.
 
 GitHub authentication belongs to the ``gh`` subprocess inherited from the
 workflow environment. Python never reads, receives, serializes, or logs the
-credential. Persisted lineage contains only canonical source identity,
-constants, local cryptographic digests, and hashes of authenticated metadata.
+credential. Authenticated workflow/artifact metadata is validated transiently
+and is never persisted in release-lineage JSON.
 """
 from __future__ import annotations
 
@@ -53,15 +53,11 @@ def _sha256(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def _json_digest(value: Any) -> str:
-    data = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return _sha256(data)
-
-
 def canonical_digest(document: dict[str, Any], digest_field: str) -> str:
     payload = copy.deepcopy(document)
     payload.pop(digest_field, None)
-    return _json_digest(payload)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return _sha256(encoded)
 
 
 def normalize_fingerprint(value: str) -> str:
@@ -137,30 +133,18 @@ def _verify_archive_metadata(
     archive: bytes,
     *,
     expected_sha: str | None = None,
-) -> tuple[str, str]:
+) -> None:
     if artifact.get("expired") is not False:
         raise ValueError("artifact is expired")
     github_digest = _require_digest(artifact.get("digest"), "artifact metadata")
     size = int(artifact.get("size_in_bytes", 0))
     if size <= 0 or size != len(archive):
         raise ValueError("artifact archive size does not match GitHub metadata")
-    actual_digest = _sha256(archive)
-    if actual_digest != github_digest:
+    if _sha256(archive) != github_digest:
         raise ValueError("artifact archive digest does not match GitHub metadata")
     workflow_run = _mapping(artifact.get("workflow_run") or {}, "artifact workflow binding")
     if expected_sha is not None and workflow_run.get("head_sha") != expected_sha:
         raise ValueError("artifact workflow source SHA mismatch")
-    metadata_digest = _json_digest(
-        {
-            "artifactId": int(artifact.get("id", 0)),
-            "artifactName": artifact.get("name"),
-            "artifactSizeBytes": size,
-            "githubDigest": github_digest,
-            "workflowRunId": int(workflow_run.get("id", 0)),
-            "workflowHeadSha": workflow_run.get("head_sha"),
-        }
-    )
-    return actual_digest, metadata_digest
 
 
 def _read_zip_exact(
@@ -273,12 +257,13 @@ def build_presecret_binding(
     _validate_identity(repository, sha, version)
     run = _latest_release_evidence_run(repository, sha, api_get)
     artifact = _release_evidence_artifact(repository, run, sha, api_get)
-    artifact_id = int(artifact["id"])
-    archive = downloader(_artifact_archive_endpoint(repository, artifact_id), MAX_PREFLIGHT_ARCHIVE_BYTES)
-    archive_digest, artifact_metadata_digest = _verify_archive_metadata(artifact, archive, expected_sha=sha)
+    archive = downloader(
+        _artifact_archive_endpoint(repository, int(artifact["id"])),
+        MAX_PREFLIGHT_ARCHIVE_BYTES,
+    )
+    _verify_archive_metadata(artifact, archive, expected_sha=sha)
     files = _read_zip_exact(archive, {RELEASE_EVIDENCE_FILE})
-    manifest_bytes = files[RELEASE_EVIDENCE_FILE]
-    manifest = _json_object(manifest_bytes, "release evidence")
+    manifest = _json_object(files[RELEASE_EVIDENCE_FILE], "release evidence")
 
     enable_supply_chain_evidence()
     release_evidence.verify_manifest(
@@ -290,17 +275,6 @@ def build_presecret_binding(
     if _mapping(manifest.get("source") or {}, "release evidence source").get("event") != "push":
         raise ValueError("Owner-gated release actions require protected-main push evidence")
 
-    workflow_metadata_digest = _json_digest(
-        {
-            "runId": int(run["id"]),
-            "runAttempt": int(run["run_attempt"]),
-            "name": run.get("name"),
-            "path": run.get("path"),
-            "event": run.get("event"),
-            "headBranch": run.get("head_branch"),
-            "headSha": run.get("head_sha"),
-        }
-    )
     binding: dict[str, Any] = {
         "schema": PRESECRET_SCHEMA,
         "status": "PASS",
@@ -314,12 +288,8 @@ def build_presecret_binding(
             },
             "artifact": {
                 "name": f"sentinel-release-evidence-{sha}",
-                "digest": archive_digest,
                 "headSha": sha,
             },
-            "manifestDigest": _sha256(manifest_bytes),
-            "workflowMetadataDigest": workflow_metadata_digest,
-            "artifactMetadataDigest": artifact_metadata_digest,
         },
         "claims": {
             "signingMaterialAccessed": False,
@@ -371,12 +341,14 @@ def verify_presecret_binding(
         "headBranch": "main",
     }:
         raise ValueError("invalid release-evidence workflow binding")
-    if artifact.get("name") != f"sentinel-release-evidence-{sha}" or artifact.get("headSha") != sha:
+    if artifact != {
+        "name": f"sentinel-release-evidence-{sha}",
+        "headSha": sha,
+    }:
         raise ValueError("invalid release-evidence artifact binding")
-    _require_digest(artifact.get("digest"), "release-evidence artifact")
-    _require_digest(evidence.get("manifestDigest"), "release-evidence manifest")
-    _require_digest(evidence.get("workflowMetadataDigest"), "release-evidence workflow metadata")
-    _require_digest(evidence.get("artifactMetadataDigest"), "release-evidence artifact metadata")
+    if set(evidence) != {"workflow", "artifact"}:
+        raise ValueError("unexpected persisted release-evidence metadata")
+
     digest = _require_digest(binding.get("bindingDigest"), "pre-secret binding")
     if digest != canonical_digest(binding, "bindingDigest"):
         raise ValueError("pre-secret binding digest mismatch")
@@ -387,18 +359,11 @@ def create_candidate_manifest(binding: dict[str, Any], apk: bytes, signer_sha256
     if not apk or len(apk) > MAX_APK_BYTES:
         raise ValueError("release APK size is invalid")
     signer = normalize_fingerprint(signer_sha256)
-    evidence = binding["releaseEvidence"]
     manifest: dict[str, Any] = {
         "schema": CANDIDATE_SCHEMA,
         "status": "PASS",
         "source": dict(binding["source"]),
-        "presecretBinding": {
-            "bindingDigest": binding["bindingDigest"],
-            "releaseEvidenceManifestDigest": evidence["manifestDigest"],
-            "releaseEvidenceArtifactDigest": evidence["artifact"]["digest"],
-            "releaseEvidenceWorkflowMetadataDigest": evidence["workflowMetadataDigest"],
-            "releaseEvidenceArtifactMetadataDigest": evidence["artifactMetadataDigest"],
-        },
+        "presecretBinding": {"bindingDigest": binding["bindingDigest"]},
         "artifact": {
             "name": APK_FILE,
             "sizeBytes": len(apk),
@@ -462,15 +427,9 @@ def verify_candidate_manifest(
         raise ValueError("release-candidate signer fingerprint mismatch")
 
     lineage = _mapping(manifest.get("presecretBinding"), "release-candidate pre-secret lineage")
-    lineage_keys = (
-        "bindingDigest",
-        "releaseEvidenceManifestDigest",
-        "releaseEvidenceArtifactDigest",
-        "releaseEvidenceWorkflowMetadataDigest",
-        "releaseEvidenceArtifactMetadataDigest",
-    )
-    for key in lineage_keys:
-        _require_digest(lineage.get(key), f"release-candidate lineage {key}")
+    _require_digest(lineage.get("bindingDigest"), "release-candidate binding")
+    if set(lineage) != {"bindingDigest"}:
+        raise ValueError("unexpected release-candidate lineage metadata")
     if expected_binding is not None:
         verify_presecret_binding(
             expected_binding,
@@ -478,16 +437,9 @@ def verify_candidate_manifest(
             expected_sha=sha,
             expected_version=version,
         )
-        evidence = expected_binding["releaseEvidence"]
-        expected_lineage = {
-            "bindingDigest": expected_binding["bindingDigest"],
-            "releaseEvidenceManifestDigest": evidence["manifestDigest"],
-            "releaseEvidenceArtifactDigest": evidence["artifact"]["digest"],
-            "releaseEvidenceWorkflowMetadataDigest": evidence["workflowMetadataDigest"],
-            "releaseEvidenceArtifactMetadataDigest": evidence["artifactMetadataDigest"],
-        }
-        if lineage != expected_lineage:
+        if lineage != {"bindingDigest": expected_binding["bindingDigest"]}:
             raise ValueError("release-candidate lineage does not match current pre-secret binding")
+
     digest = _require_digest(manifest.get("candidateDigest"), "release-candidate")
     if digest != canonical_digest(manifest, "candidateDigest"):
         raise ValueError("release-candidate digest mismatch")
@@ -497,15 +449,19 @@ def _find_candidate_artifact(
     repository: str,
     sha: str,
     api_get: ApiGet,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> dict[str, Any]:
     query = urllib.parse.urlencode({"event": "workflow_dispatch", "branch": "main", "per_page": 100})
     payload = _mapping(
         api_get(f"/repos/{repository}/actions/workflows/release-candidate.yml/runs?{query}"),
-        "release-candidate workflow runs response",
+        "release-candidate runs response",
     )
+    runs = payload.get("workflow_runs", [])
     expected_name = f"sentinel-release-candidate-{sha}"
-    runs = (item for item in payload.get("workflow_runs", []) if isinstance(item, dict))
-    for run in sorted(runs, key=lambda item: int(item.get("id", 0)), reverse=True):
+    for run in sorted(
+        (item for item in runs if isinstance(item, dict)),
+        key=lambda item: int(item.get("id", 0)),
+        reverse=True,
+    ):
         if (
             run.get("name") != RELEASE_CANDIDATE_WORKFLOW
             or run.get("path") != RELEASE_CANDIDATE_WORKFLOW_PATH
@@ -516,13 +472,13 @@ def _find_candidate_artifact(
         run_id = int(run.get("id", 0))
         if run_id <= 0:
             continue
-        artifact_payload = _mapping(
+        artifacts_payload = _mapping(
             api_get(f"/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"),
             "release-candidate artifact response",
         )
         matches = [
             artifact
-            for artifact in artifact_payload.get("artifacts", [])
+            for artifact in artifacts_payload.get("artifacts", [])
             if isinstance(artifact, dict) and artifact.get("name") == expected_name
         ]
         if not matches:
@@ -532,10 +488,10 @@ def _find_candidate_artifact(
             raise ValueError("latest matching release-candidate workflow run is not successful")
         if artifact.get("expired") is not False or int(artifact.get("id", 0)) <= 0:
             raise ValueError("release-candidate artifact is unavailable")
-        workflow_run = _mapping(artifact.get("workflow_run") or {}, "release-candidate workflow binding")
+        workflow_run = _mapping(artifact.get("workflow_run") or {}, "release-candidate artifact workflow binding")
         if int(workflow_run.get("id", 0)) != run_id:
             raise ValueError("release-candidate artifact workflow identity mismatch")
-        return run, artifact
+        return artifact
     raise ValueError("no successful Owner release-candidate artifact exists for source SHA")
 
 
@@ -548,12 +504,15 @@ def fetch_candidate_package(
     *,
     api_get: ApiGet = _gh_api_get,
     downloader: Downloader = _gh_api_download,
-) -> tuple[dict[str, Any], dict[str, bytes], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, bytes]]:
     _validate_identity(repository, sha, version)
     verify_presecret_binding(binding, expected_repository=repository, expected_sha=sha, expected_version=version)
-    run, artifact = _find_candidate_artifact(repository, sha, api_get)
-    archive = downloader(_artifact_archive_endpoint(repository, int(artifact["id"])), MAX_CANDIDATE_ARCHIVE_BYTES)
-    archive_digest, artifact_metadata_digest = _verify_archive_metadata(artifact, archive)
+    artifact = _find_candidate_artifact(repository, sha, api_get)
+    archive = downloader(
+        _artifact_archive_endpoint(repository, int(artifact["id"])),
+        MAX_CANDIDATE_ARCHIVE_BYTES,
+    )
+    _verify_archive_metadata(artifact, archive)
     files = _read_zip_exact(archive, {APK_FILE, PRESECRET_FILE, CANDIDATE_FILE})
 
     packaged_binding = _json_object(files[PRESECRET_FILE], "packaged pre-secret binding")
@@ -565,6 +524,7 @@ def fetch_candidate_package(
     )
     if packaged_binding["bindingDigest"] != binding["bindingDigest"]:
         raise ValueError("packaged pre-secret binding is stale or different from current canonical evidence")
+
     candidate = _json_object(files[CANDIDATE_FILE], "release candidate")
     verify_candidate_manifest(
         candidate,
@@ -575,23 +535,7 @@ def fetch_candidate_package(
         expected_version=version,
         expected_signer_sha256=expected_signer_sha256,
     )
-
-    provenance = {
-        "sourceSha": sha,
-        "workflowMetadataDigest": _json_digest(
-            {
-                "runId": int(run["id"]),
-                "runAttempt": int(run.get("run_attempt", 1)),
-                "name": run.get("name"),
-                "path": run.get("path"),
-                "event": run.get("event"),
-                "headBranch": run.get("head_branch"),
-            }
-        ),
-        "artifactMetadataDigest": artifact_metadata_digest,
-        "artifactDigest": archive_digest,
-    }
-    return candidate, files, provenance
+    return candidate, files
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
@@ -688,7 +632,7 @@ def main() -> int:
         else:
             version = Path(args.version_file).read_text(encoding="utf-8").strip()
             binding = _read_json(Path(args.binding))
-            _, files, provenance = fetch_candidate_package(
+            _, files = fetch_candidate_package(
                 args.repository,
                 args.sha,
                 version,
@@ -699,7 +643,6 @@ def main() -> int:
             output_dir.mkdir(parents=True, exist_ok=True)
             for name in (APK_FILE, PRESECRET_FILE, CANDIDATE_FILE):
                 (output_dir / name).write_bytes(files[name])
-            _write_json(output_dir / "release-candidate-provenance.json", provenance)
             print("release candidate package verified")
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError):
         print("release lineage FAIL", file=sys.stderr)

@@ -1,32 +1,37 @@
 package com.alpha0.app
 
 import android.app.Application
-import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
-import io.sentry.protocol.User
 
 /**
- * Application entry for optional Sentry initialization.
+ * Optional Android runtime crash reporting.
  *
- * DSN is supplied exclusively via BuildConfig.SENTRY_DSN (populated from
- * the CI secret SENTRY_DSN for release builds only). Debug / PR builds
- * receive an empty string and never contact Sentry.
- *
- * Privacy: beforeSend strips user identity, emails, and any token-like
- * values so only technical crash context is transmitted.
+ * Telemetry stays disabled unless the Owner-managed DSN, exact source SHA and an
+ * allowlisted runtime environment are all present. That makes every emitted
+ * release event attributable to one repository source instead of a floating
+ * build label.
  */
 class SentinelApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
         val dsn = BuildConfig.SENTRY_DSN.trim()
-        if (dsn.isEmpty()) {
+        val sourceSha = BuildConfig.SENTINEL_SOURCE_SHA.trim()
+        val environment = BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT.trim()
+        if (dsn.isEmpty() || !SOURCE_SHA.matches(sourceSha) || environment !in ALLOWED_ENVIRONMENTS) {
             return
         }
+
+        val releaseIdentity =
+            "com.alpha0.app@${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}.${sourceSha.take(12)}"
         SentryAndroid.init(this) { options ->
             options.dsn = dsn
+            options.release = releaseIdentity
+            options.environment = environment
+            options.setTag("sentinel.component", "android")
+            options.setTag("sentinel.source_sha", sourceSha)
             options.isEnableUncaughtExceptionHandler = true
             options.isSendDefaultPii = false
             options.isAttachScreenshot = false
@@ -38,46 +43,23 @@ class SentinelApplication : Application() {
     }
 
     companion object {
-        /** Remove PII / credentials before any event leaves the device. */
+        private val SOURCE_SHA = Regex("[0-9a-f]{40}")
+        private val ALLOWED_ENVIRONMENTS =
+            setOf("development", "ci", "release-candidate", "production")
+
+        /**
+         * Data minimization before any event leaves the device.
+         *
+         * Runtime crash diagnostics keep the exception/stack trace and static
+         * release/component correlation configured above. Identity, request
+         * payloads/headers, arbitrary breadcrumbs and extras are removed as a
+         * whole rather than relying on a growing sensitive-key denylist.
+         */
         fun scrubEvent(event: SentryEvent): SentryEvent? {
             event.user = null
-            event.request?.headers?.clear()
-            event.breadcrumbs?.forEach { crumb ->
-                crumb.data?.keys?.toList()?.forEach { key ->
-                    val lower = key.lowercase()
-                    if (lower.contains("email") ||
-                        lower.contains("token") ||
-                        lower.contains("password") ||
-                        lower.contains("authorization") ||
-                        lower.contains("user") ||
-                        lower.contains("session") ||
-                        lower.contains("device_id") ||
-                        lower.contains("fingerprint")
-                    ) {
-                        crumb.data?.remove(key)
-                    }
-                }
-            }
-            event.extras?.keys?.toList()?.forEach { key ->
-                val lower = key.lowercase()
-                if (lower.contains("email") ||
-                    lower.contains("token") ||
-                    lower.contains("password") ||
-                    lower.contains("authorization") ||
-                    lower.contains("user") ||
-                    lower.contains("session") ||
-                    lower.contains("device_id") ||
-                    lower.contains("fingerprint")
-                ) {
-                    event.removeExtra(key)
-                }
-            }
-            // Drop any user object that might have been set later
-            event.user = User()
-            event.user?.email = null
-            event.user?.id = null
-            event.user?.username = null
-            event.user?.ipAddress = null
+            event.request = null
+            event.breadcrumbs?.clear()
+            event.extras?.keys?.toList()?.forEach(event::removeExtra)
             return event
         }
     }

@@ -1,8 +1,10 @@
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const REQUIRED_APP_FILES = Object.freeze([
   'bootstrap.js',
+  'build-provenance.json',
   'companion-process.js',
   'companion-worker.js',
   'core-session.js',
@@ -22,9 +24,42 @@ const REQUIRED_APP_FILES = Object.freeze([
   'wow-savedvariables.js',
 ]);
 
+const SOURCE_SHA_RE = /^[0-9a-f]{40}$/;
+const MAX_PROVENANCE_BYTES = 16 * 1024;
+
 function readPackageMetadata(appDir) {
   const packagePath = path.join(appDir, 'package.json');
   return JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+}
+
+function readPackagedBuildProvenance(appDir) {
+  const provenancePath = path.join(appDir, 'build-provenance.json');
+  const stat = fs.statSync(provenancePath, { throwIfNoEntry: false });
+  if (!stat?.isFile()) throw new Error('packaged build provenance is missing');
+  if (stat.size < 2 || stat.size > MAX_PROVENANCE_BYTES) throw new Error('packaged build provenance size is invalid');
+  const raw = fs.readFileSync(provenancePath);
+  let value;
+  try { value = JSON.parse(raw.toString('utf8')); } catch { throw new Error('packaged build provenance is invalid JSON'); }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('packaged build provenance must be an object');
+  const allowed = new Set(['schema', 'sourceSha', 'target', 'packageVersion', 'electronVersion', 'signed']);
+  if (Object.keys(value).some(key => !allowed.has(key))) throw new Error('packaged build provenance contains unexpected fields');
+  if (value.schema !== 'sentinel.packaged-companion-runtime.v1') throw new Error('packaged build provenance schema mismatch');
+  const sourceSha = String(value.sourceSha || '');
+  if (sourceSha !== 'local-unbound' && !SOURCE_SHA_RE.test(sourceSha)) throw new Error('packaged build provenance source SHA is invalid');
+  if (value.target !== 'win32-x64') throw new Error('packaged build provenance target mismatch');
+  if (typeof value.packageVersion !== 'string' || !value.packageVersion || value.packageVersion.length > 64) throw new Error('packaged build provenance package version is invalid');
+  if (typeof value.electronVersion !== 'string' || !value.electronVersion || value.electronVersion.length > 32) throw new Error('packaged build provenance Electron version is invalid');
+  if (typeof value.signed !== 'boolean') throw new Error('packaged build provenance signed flag is invalid');
+  return Object.freeze({
+    schema: value.schema,
+    sourceSha,
+    sourceBound: SOURCE_SHA_RE.test(sourceSha),
+    target: value.target,
+    packageVersion: value.packageVersion,
+    electronVersion: value.electronVersion,
+    signed: value.signed,
+    provenanceFileSha256: crypto.createHash('sha256').update(raw).digest('hex'),
+  });
 }
 
 function inspectPackagedLayout({
@@ -84,6 +119,14 @@ function inspectPackagedLayout({
     throw new Error(`unexpected packaged executable name: ${executableName}`);
   }
 
+  const provenance = readPackagedBuildProvenance(appDir);
+  if (provenance.packageVersion !== String(metadata.version || '')) {
+    throw new Error('packaged build provenance package version mismatch');
+  }
+  if (provenance.electronVersion !== expectedElectronVersion) {
+    throw new Error('packaged build provenance Electron version mismatch');
+  }
+
   return {
     status: 'pass',
     platform,
@@ -95,7 +138,10 @@ function inspectPackagedLayout({
     nodeModulesBundled: false,
     testSourcesBundled: false,
     applicationPayload: 'resources/app',
-    signed: false,
+    signed: provenance.signed,
+    sourceSha: provenance.sourceSha,
+    sourceBound: provenance.sourceBound,
+    provenanceFileSha256: provenance.provenanceFileSha256,
   };
 }
 
@@ -103,4 +149,5 @@ module.exports = {
   REQUIRED_APP_FILES,
   inspectPackagedLayout,
   readPackageMetadata,
+  readPackagedBuildProvenance,
 };

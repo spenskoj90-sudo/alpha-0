@@ -23,6 +23,9 @@ import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 import com.alpha0.app.ui.StatusBadge
+import com.alpha0.app.ui.assertiveStatusSemantics
+import com.alpha0.app.ui.buttonCardSemantics
+import com.alpha0.app.ui.progressStatusSemantics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -58,7 +61,10 @@ fun DashboardScreen(
     Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
         if (loading) {
             Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                CircularProgressIndicator(color = SentinelColors.Primary)
+                CircularProgressIndicator(
+                    modifier = Modifier.progressStatusSemantics("Loading SENTINEL status"),
+                    color = SentinelColors.Primary,
+                )
                 Text("Loading SENTINEL status…", color = SentinelColors.TextSecondary)
             }
             return@Surface
@@ -73,12 +79,20 @@ fun DashboardScreen(
                 Text("Device security and game access", style = MaterialTheme.typography.bodyLarge, color = SentinelColors.TextSecondary)
             }
             if (error != null) {
-                item { Text("Load failed: $error", color = SentinelColors.Danger) }
+                item {
+                    Text(
+                        "Load failed: $error",
+                        modifier = Modifier.assertiveStatusSemantics(),
+                        color = SentinelColors.Danger,
+                    )
+                }
             }
             device?.let { current ->
                 item {
                     SentinelCard(
-                        modifier = Modifier.clickable { onDeviceClick() },
+                        modifier = Modifier
+                            .buttonCardSemantics("Open device security details")
+                            .clickable { onDeviceClick() },
                         scan = true,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,7 +110,11 @@ fun DashboardScreen(
                 item { Text("No entitlements are currently assigned to this account.", color = SentinelColors.TextSecondary) }
             } else {
                 items(entitlements, key = { it.id }) { entitlement ->
-                    SentinelCard(modifier = Modifier.clickable { onGameClick(entitlement.id) }) {
+                    SentinelCard(
+                        modifier = Modifier
+                            .buttonCardSemantics("Open ${entitlement.gameName} access details")
+                            .clickable { onGameClick(entitlement.id) }
+                    ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(entitlement.gameName, style = MaterialTheme.typography.titleMedium)
                             StatusBadge(entitlement.status, active = entitlement.status.equals("ACTIVE", ignoreCase = true))

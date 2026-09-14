@@ -17,7 +17,7 @@ esac
 command -v gh >/dev/null 2>&1 || { echo "gh CLI is required" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 2; }
 
-runs="$(gh api --method GET "/repos/$repository/actions/workflows/release-evidence.yml/runs?branch=main&event=push&head_sha=$source_sha&per_page=100")"
+runs="$(gh api --method GET "/repos/$repository/actions/runs?head_sha=$source_sha&event=push&branch=main&per_page=100")"
 run_id="$(printf '%s' "$runs" | jq -er --arg sha "$source_sha" '
   [.workflow_runs[]
     | select(.name == "Release Evidence Preflight")

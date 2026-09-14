@@ -25,11 +25,9 @@ The lineage is:
 8. rejects PR evidence even if its internal structure is otherwise valid;
 9. emits deterministic `sentinel.release-presecret-binding.v1` evidence.
 
-GitHub authentication is deliberately outside the Python lineage process. The workflow exposes the ephemeral GitHub Actions credential only to the `gh` process through its environment; `scripts/release_lineage.py` does not read, accept, serialize or log GitHub tokens. It invokes only fixed-form `gh api` GET requests, consumes bounded stdout bytes, discards CLI stderr on transport failure, and independently validates all returned metadata, archive sizes, archive digests and manifest contents before those values can enter release lineage evidence. This credential-transport separation is part of the release security boundary, not merely an implementation detail.
+GitHub authentication is owned by the `gh` process supplied by the workflow environment. The Python lineage module never reads, receives, serializes, or logs the GitHub credential. It validates the authenticated workflow/artifact metadata and persists only canonical source identity, deterministic public workflow/artifact names, locally computed archive/manifest SHA-256 values, and SHA-256 projections of the authenticated workflow/artifact metadata. Raw authenticated API metadata such as run IDs and artifact IDs is not persisted in clear text.
 
-The binding records the release-evidence workflow run/attempt, artifact identity and GitHub archive digest, internal release-evidence digest, exact source identity and explicit false claims for signing, publication and deployment. Its `bindingDigest` covers the canonical binding document.
-
-The binding deliberately derives `generatedAt` from the immutable release-evidence manifest so repeated verification of the same evidence yields the same binding digest.
+The binding records exact source identity and explicit false claims for signing, publication and deployment. Its `bindingDigest` covers the canonical binding document. Repeated verification of the same protected-main evidence therefore yields the same binding digest without persisting data-derived log values or raw authenticated metadata.
 
 ## Manual release-candidate signing
 
@@ -41,8 +39,9 @@ After independent `apksigner` fingerprint and non-debuggable verification, the w
 
 - repository, exact source SHA and version;
 - pre-secret binding digest;
-- release-evidence manifest digest;
-- GitHub release-evidence artifact digest and run ID;
+- release-evidence manifest-file SHA-256;
+- verified GitHub release-evidence artifact ZIP SHA-256;
+- SHA-256 projections of authenticated workflow/artifact metadata;
 - signed APK byte size and SHA-256;
 - expected signer certificate SHA-256.
 
@@ -61,7 +60,7 @@ Signing-key custody, secret provisioning and execution of this workflow remain O
 The workflow has three authority stages:
 
 1. `presecret` has `actions: read` and `contents: read`. It resolves the tag to its exact commit, verifies that the tag version equals root `VERSION`, and independently verifies protected-main release evidence for that commit.
-2. `verify-candidate` also has only read permissions. It regenerates the same binding, locates the newest successful `Release Candidate Artifact` workflow on `main` containing `sentinel-release-candidate-<sha>`, verifies the GitHub candidate ZIP digest/size and safe member set, validates the packaged binding/candidate/APK hashes, independently runs `apksigner`, rejects a debuggable APK, builds the exact-source Core archive, records byte hashes and uploads one preverified publication-input artifact.
+2. `verify-candidate` also has only read permissions. It regenerates the same binding, locates the newest successful `Release Candidate Artifact` workflow on `main` containing `sentinel-release-candidate-<sha>`, verifies the GitHub candidate ZIP digest/size and safe member set, validates the packaged binding/candidate/APK hashes, independently runs `apksigner`, rejects a debuggable APK, builds the exact-source Core archive, records byte hashes and uploads one preverified publication-input artifact. Candidate provenance persists the exact source SHA plus verified archive SHA-256 and hashed workflow/artifact metadata, not raw authenticated API identifiers.
 3. `publish` is the **only** job with `contents: write`. It has no repository checkout and executes no repository Python code. It downloads the prior job's publication-input artifact with an immutable pinned official `actions/download-artifact` commit, rechecks the SHA-256 of every release asset against read-only job outputs, and only then calls `gh release create`.
 
 The published assets are the already-signed APK, exact-source Core archive, release-candidate manifest, release-candidate artifact provenance and pre-secret binding.

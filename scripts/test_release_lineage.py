@@ -144,7 +144,7 @@ class ReleaseLineageTests(unittest.TestCase):
         binding = valid_binding()
         candidate = create_candidate_manifest(binding, b"apk", SIGNER)
         changed = copy.deepcopy(binding)
-        changed["generatedAt"] = "2026-09-15T00:00:00Z"
+        changed["releaseEvidence"]["workflowMetadataDigest"] = "sha256:" + ("2" * 64)
         changed["bindingDigest"] = canonical_digest(changed, "bindingDigest")
         with self.assertRaisesRegex(ValueError, "lineage does not match"):
             verify_candidate_manifest(candidate, b"apk", expected_binding=changed, expected_signer_sha256=SIGNER)
@@ -202,7 +202,7 @@ class ReleaseLineageTests(unittest.TestCase):
     def test_fetch_candidate_rejects_packaged_stale_binding(self):
         binding = valid_binding()
         stale = copy.deepcopy(binding)
-        stale["generatedAt"] = "2026-09-16T00:00:00Z"
+        stale["releaseEvidence"]["artifactMetadataDigest"] = "sha256:" + ("3" * 64)
         stale["bindingDigest"] = canonical_digest(stale, "bindingDigest")
         apk = b"signed apk payload"
         candidate = create_candidate_manifest(stale, apk, SIGNER)
@@ -256,6 +256,8 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertNotIn("Bearer", source)
         self.assertIn('["gh", "api", "--method", "GET", endpoint]', source)
         self.assertIn("stderr=subprocess.DEVNULL", source)
+        self.assertNotIn("bindingDigest']}", source)
+        self.assertNotIn("candidateDigest']}", source)
 
     def test_workflows_enforce_presecret_boundary_and_no_release_resigning(self):
         rc = Path(".github/workflows/release-candidate.yml").read_text(encoding="utf-8")

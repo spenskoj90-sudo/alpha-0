@@ -1,5 +1,8 @@
 # SENTINEL Release Evidence Preflight v1
 
+**Status:** ACTIVE  
+**Purpose:** define the repository-internal exact-SHA evidence boundary before Owner-gated signing, publication or production deployment.
+
 ## Purpose
 
 This contract defines a repository-internal, exact-SHA release-readiness evidence boundary that runs before any Owner-gated signing, release publication or production deployment.

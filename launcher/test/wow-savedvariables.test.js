@@ -15,14 +15,15 @@ const {
 } = require('../wow-savedvariables');
 const { wowObservationEnvelope } = require('../companion-worker');
 
-function savedVariables(sequence = 7) {
-  return `SentinelDB = {\n  ["snapshot_sequence"] = ${sequence},\n  ["snapshot"] = {\n    ["schema_version"] = 1,\n    ["sequence"] = ${sequence},\n    ["observed_at_epoch"] = 1789290000,\n    ["patch_profile"] = "wotlk-3.3.5a",\n    ["server_profile"] = "unknown",\n    ["realm_id"] = "Example Realm",\n    ["latency_ms"] = 84,\n    ["addon_connected"] = true,\n    ["combat_state"] = "IDLE",\n  },\n}\n`;
+function savedVariables(sequence = 7, serverProfile = 'unknown') {
+  return `SentinelDB = {\n  ["snapshot_sequence"] = ${sequence},\n  ["snapshot"] = {\n    ["schema_version"] = 1,\n    ["sequence"] = ${sequence},\n    ["observed_at_epoch"] = 1789290000,\n    ["patch_profile"] = "wotlk-3.3.5a",\n    ["server_profile"] = "${serverProfile}",\n    ["realm_id"] = "Example Realm",\n    ["latency_ms"] = 84,\n    ["addon_connected"] = true,\n    ["combat_state"] = "IDLE",\n  },\n}\n`;
 }
 
 test('strict SavedVariables parser extracts only passive Sentinel checkpoint data', () => {
   const parsed = parseSavedVariables(savedVariables());
   const observation = normalizeSnapshot(parsed);
   assert.equal(observation.patch_profile, 'wotlk-3.3.5a');
+  assert.equal(observation.server_profile, 'unknown');
   assert.equal(observation.realm_id, 'Example Realm');
   assert.equal(observation.latency_ms, 84);
   assert.equal(observation.addon_connected, true);
@@ -30,6 +31,12 @@ test('strict SavedVariables parser extracts only passive Sentinel checkpoint dat
   assert.equal(observation.data_quality, 'LOW');
   assert.match(observation.event_id, /^wow-checkpoint-[0-9a-f]{32}$/);
   assert.equal(JSON.stringify(observation).includes('player'), false);
+});
+
+test('strict SavedVariables parser preserves an explicit bounded private server profile', () => {
+  const observation = normalizeSnapshot(parseSavedVariables(savedVariables(8, 'private')));
+  assert.equal(observation.server_profile, 'private');
+  assert.equal(observation.patch_profile, 'wotlk-3.3.5a');
 });
 
 test('SavedVariables parser rejects executable Lua instead of evaluating it', () => {
@@ -130,6 +137,15 @@ test('Classic and Retail addon sources persist only the bounded passive snapshot
     }
     assert.doesNotMatch(source, /io\.|require\(|socket|SendChatMessage\(|CastSpell|RunMacro/);
   }
+});
+
+test('Classic server profile is an explicit bounded operator label, not an L3 claim', () => {
+  const source = fs.readFileSync(path.resolve(__dirname, '..', '..', 'wow-addon', 'classic', 'Sentinel.lua'), 'utf8');
+  assert.match(source, /SentinelDB\.server_profile\s*=\s*profile/);
+  assert.match(source, /profile == "official" or profile == "private" or profile == "unknown"/);
+  assert.match(source, /does not by itself establish L3 evidence/);
+  assert.match(source, /server_profile\s*=\s*serverProfile\(\)/);
+  assert.doesNotMatch(source, /server_profile\s*=\s*"private"/);
 });
 
 test('Retail passive checkpoint ticker is lifecycle-owned and survives hidden overlay', () => {

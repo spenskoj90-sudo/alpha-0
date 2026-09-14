@@ -2,7 +2,7 @@
   "name": "sentinel-launcher",
   "version": "0.2.0",
   "private": true,
-  "main": "main.js",
+  "main": "bootstrap.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",

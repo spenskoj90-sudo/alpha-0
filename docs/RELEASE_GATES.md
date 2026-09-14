@@ -23,6 +23,8 @@ Routine PR validation must not load release-signing material. The protected-bran
 
 The exact required context names are controlled by protected-branch policy. GPT must inspect the live policy before merge and must not change it autonomously.
 
+In addition to the protected contexts, the release-readiness evidence program requires the exact-SHA `Supply Chain Evidence` workflow to pass. It builds a Core container SBOM and a cross-surface resolved dependency BOM, verifies the `sentinel.supply-chain-evidence.v1` manifest and uploads `sentinel-supply-chain-evidence-<sha>`. `Release Evidence Preflight` treats that artifact as mandatory and records GitHub's server-side SHA-256 digest. This evidence is descriptive provenance/SBOM data, not release signing or a cryptographic attestation.
+
 ## Release-specific artifact gate
 
 Signing is intentionally separated from routine PR CI:

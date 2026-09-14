@@ -137,6 +137,15 @@ def test_valid_live_exact_environment_bundle_is_admitted() -> None:
     assert summary.capability_names == sorted(ConservativeWowAdapter.capability_names())
 
 
+def test_packaged_host_external_schema_key_is_preserved() -> None:
+    bundle = valid_bundle()
+
+    dumped = bundle.model_dump(mode="json", by_alias=True)
+
+    assert dumped["packaged_host"]["schema"] == "sentinel.packaged-companion-runtime.v1"
+    assert "schema_name" not in dumped["packaged_host"]
+
+
 def test_valid_bundle_is_only_path_to_available_l3_capabilities() -> None:
     registry = AdapterRegistry()
 
@@ -227,12 +236,34 @@ def test_checkpoint_requires_live_launcher_and_addon_provenance() -> None:
         validate_exact_environment_evidence(bundle)
 
 
-def test_checkpoint_sequence_and_source_digest_must_advance() -> None:
+def test_checkpoint_event_ids_must_be_unique() -> None:
     bundle = valid_bundle()
-    duplicate = checkpoint(10, 60, "b")
-    bundle = bundle.model_copy(update={"checkpoints": [bundle.checkpoints[0], duplicate]})
+    second = bundle.checkpoints[1]
+    duplicate_id = bundle.checkpoints[0].observation.event_id
+    observation = second.observation.model_copy(update={"event_id": duplicate_id})
+    ack = second.core_ack.model_copy(update={"event_id": duplicate_id})
+    second = second.model_copy(update={"observation": observation, "core_ack": ack})
+    bundle = bundle.model_copy(update={"checkpoints": [bundle.checkpoints[0], second]})
 
-    with pytest.raises(ValueError, match="distinct source digests|strictly increasing"):
+    with pytest.raises(ValueError, match="unique event IDs"):
+        validate_exact_environment_evidence(bundle)
+
+
+def test_checkpoint_source_digests_must_be_distinct() -> None:
+    bundle = valid_bundle()
+    second = checkpoint(11, 60, "b")
+    bundle = bundle.model_copy(update={"checkpoints": [bundle.checkpoints[0], second]})
+
+    with pytest.raises(ValueError, match="distinct source digests"):
+        validate_exact_environment_evidence(bundle)
+
+
+def test_checkpoint_sequence_must_strictly_increase() -> None:
+    bundle = valid_bundle()
+    second = checkpoint(9, 60, "c")
+    bundle = bundle.model_copy(update={"checkpoints": [bundle.checkpoints[0], second]})
+
+    with pytest.raises(ValueError, match="strictly increasing"):
         validate_exact_environment_evidence(bundle)
 
 

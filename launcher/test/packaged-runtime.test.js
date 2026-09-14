@@ -25,7 +25,7 @@ function fixture() {
     JSON.stringify({
       name: 'sentinel-launcher',
       version: '0.2.0',
-      main: 'main.js',
+      main: 'bootstrap.js',
       dependencies: { electron: '37.2.0' },
       sentinelPackaging: { electronVersion: '37.2.0' },
     }),
@@ -45,6 +45,7 @@ test('accepts the bounded unpacked Windows Companion payload', () => {
       executablePath: path.join(root, 'SENTINEL Companion.exe'),
     });
     assert.equal(result.status, 'pass');
+    assert.equal(result.main, 'bootstrap.js');
     assert.equal(result.electronVersion, '37.2.0');
     assert.equal(result.applicationPayload, 'resources/app');
     assert.equal(result.signed, false);

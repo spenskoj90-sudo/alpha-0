@@ -3,6 +3,8 @@ import copy
 import hashlib
 import io
 import json
+import subprocess
+import tempfile
 import unittest
 import zipfile
 from pathlib import Path
@@ -92,6 +94,27 @@ class ReleaseLineageTests(unittest.TestCase):
         second = valid_binding()
         self.assertEqual(first["bindingDigest"], second["bindingDigest"])
         self.assertEqual(first, second)
+
+    def test_shell_binding_writer_matches_python_canonical_contract(self):
+        expected = valid_binding()
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / PRESECRET_FILE
+            subprocess.run(
+                [
+                    "bash",
+                    "scripts/write_release_presecret_binding.sh",
+                    REPO,
+                    SHA,
+                    VERSION,
+                    str(output),
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            actual = json.loads(output.read_text(encoding="utf-8"))
+        verify_presecret_binding(actual, expected_repository=REPO, expected_sha=SHA, expected_version=VERSION)
+        self.assertEqual(actual, expected)
 
     def test_presecret_rejects_archive_digest_mismatch(self):
         _, artifact, archive, api_get, _ = release_evidence_fixture()
@@ -266,8 +289,9 @@ class ReleaseLineageTests(unittest.TestCase):
         ):
             self.assertNotIn(field, serialized)
 
-    def test_python_lineage_boundary_never_handles_github_credentials(self):
+    def test_python_lineage_boundary_never_handles_github_credentials_or_presecret_persistence(self):
         source = Path("scripts/release_lineage.py").read_text(encoding="utf-8")
+        writer = Path("scripts/write_release_presecret_binding.sh").read_text(encoding="utf-8")
         self.assertNotIn("GITHUB_TOKEN", source)
         self.assertNotIn("GH_TOKEN", source)
         self.assertNotIn("Authorization", source)
@@ -276,6 +300,14 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertIn("stderr=subprocess.DEVNULL", source)
         self.assertNotIn("print(f", source)
         self.assertNotIn("release-candidate-provenance.json", source)
+        self.assertNotIn("_write_presecret_binding", source)
+        self.assertNotIn('presecret.add_argument("--output"', source)
+        self.assertIn("verify_live_presecret(args.repository, args.sha, version)", source)
+        self.assertIn("jq -cSj", writer)
+        self.assertIn("sha256sum", writer)
+        self.assertNotIn("GITHUB_TOKEN", writer)
+        self.assertNotIn("GH_TOKEN", writer)
+        self.assertNotIn("secrets.", writer)
 
     def test_workflows_enforce_presecret_boundary_and_no_release_resigning(self):
         rc = Path(".github/workflows/release-candidate.yml").read_text(encoding="utf-8")
@@ -285,10 +317,13 @@ class ReleaseLineageTests(unittest.TestCase):
         presecret_block = rc.split("  presecret:", 1)[1].split("  release-candidate:", 1)[0]
         self.assertNotIn("secrets.", presecret_block)
         self.assertIn("release_lineage.py presecret", presecret_block)
+        self.assertIn("write_release_presecret_binding.sh", presecret_block)
+        self.assertIn("release_lineage.py verify-binding", presecret_block)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", presecret_block)
         signing_block = rc.split("  release-candidate:", 1)[1]
         self.assertIn("ANDROID_KEYSTORE_BASE64", signing_block)
         self.assertIn("release_lineage.py create-candidate", signing_block)
+        self.assertGreaterEqual(rc.count("write_release_presecret_binding.sh"), 2)
 
         self.assertIn("needs: presecret", release)
         self.assertIn("release_lineage.py fetch-candidate", release)
@@ -299,6 +334,8 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertNotIn("contents: write", prepublish)
         self.assertNotIn("secrets.", prepublish)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", prepublish)
+        self.assertGreaterEqual(release.count("write_release_presecret_binding.sh"), 2)
+        self.assertGreaterEqual(release.count("release_lineage.py verify-binding"), 2)
 
 
 if __name__ == "__main__":

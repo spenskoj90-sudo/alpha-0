@@ -34,6 +34,7 @@ check 'CI build workflow' test -f .github/workflows/build.yml
 check 'CI security workflow' test -f .github/workflows/security.yml
 check 'CI deploy workflow' test -f .github/workflows/deploy.yml
 check 'CI release workflow' test -f .github/workflows/release.yml
+check 'CI release-candidate workflow' test -f .github/workflows/release-candidate.yml
 check 'CI release evidence workflow' test -f .github/workflows/release-evidence.yml
 check 'API docs' test -f docs/API.md
 check 'Security docs' test -f docs/SECURITY.md
@@ -44,13 +45,24 @@ check 'Changelog' test -f docs/CHANGELOG.md
 check 'Document authority map' test -f docs/DOCUMENT_STATUS.md
 check 'Repository policy verifier' test -f scripts/verify_repository.py
 check 'Release evidence verifier' test -f scripts/release_evidence.py
+check 'Release evidence policy entrypoint' test -f scripts/release_evidence_entrypoint.py
 check 'Release evidence tests' test -f scripts/test_release_evidence.py
+check 'Release supply-chain evidence tests' test -f scripts/test_release_evidence_supply_chain.py
+check 'Release lineage verifier' test -f scripts/release_lineage.py
+check 'Release lineage tests' test -f scripts/test_release_lineage.py
 check 'Release evidence contract' test -f docs/RELEASE_EVIDENCE_PREFLIGHT_V1.md
+check 'Release lineage contract' test -f docs/RELEASE_LINEAGE_V1.md
 
 if command -v python >/dev/null 2>&1; then
-  check 'Python compile' python -m compileall -q server/app server/migrate.py scripts/release_evidence.py scripts/test_release_evidence.py
+  check 'Python compile' python -m compileall -q \
+    server/app server/migrate.py \
+    scripts/release_evidence.py scripts/release_evidence_entrypoint.py \
+    scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
+    scripts/release_lineage.py scripts/test_release_lineage.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
+  check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
+  check 'Release lineage invariants' python scripts/test_release_lineage.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

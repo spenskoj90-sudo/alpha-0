@@ -2,20 +2,139 @@ name: Release Candidate Artifact
 
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact protected-main commit SHA to sign"
+        required: true
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
   group: release-candidate
   cancel-in-progress: false
 
+env:
+  SENTINEL_RELEASE_SIGNER_SHA256: "2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
+
 jobs:
+  presecret:
+    name: Verify exact-SHA release evidence before signing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      binding_digest: ${{ steps.binding.outputs.digest }}
+    steps:
+      - name: Require dispatch from main
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main"
+          case "${{ inputs.source_sha }}" in
+            *[!0-9a-f]*|'') echo "source_sha must be lowercase hexadecimal"; exit 1 ;;
+          esac
+          test "${#SOURCE_SHA}" -eq 40
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+
+      - name: Checkout selected source SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+
+      - name: Verify checkout identity
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Run release-lineage contract tests
+        run: |
+          python scripts/test_release_evidence.py
+          python scripts/test_release_evidence_supply_chain.py
+          python scripts/test_release_lineage.py
+
+      - name: Verify canonical protected-main evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          python scripts/release_lineage.py presecret \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha "$SOURCE_SHA"
+          bash scripts/write_release_presecret_binding.sh \
+            "$GITHUB_REPOSITORY" "$SOURCE_SHA" "$version" release-presecret-binding.json
+          python scripts/release_lineage.py verify-binding \
+            --input release-presecret-binding.json \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SOURCE_SHA" \
+            --expected-version "$version"
+
+      - name: Export deterministic binding digest
+        id: binding
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          value = json.load(open("release-presecret-binding.json", encoding="utf-8"))
+          print("digest=" + value["bindingDigest"])
+          PY
+
+      - name: Upload pre-secret release binding
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sentinel-release-presecret-binding-${{ inputs.source_sha }}
+          path: release-presecret-binding.json
+          if-no-files-found: error
+          retention-days: 90
+
   release-candidate:
     name: Build and retain verified signed release APK
+    needs: presecret
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Checkout exact selected source SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Reconfirm canonical evidence before secret access
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          EXPECTED_BINDING_DIGEST: ${{ needs.presecret.outputs.binding_digest }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          version="$(tr -d '[:space:]' < VERSION)"
+          python scripts/release_lineage.py presecret \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha "$SOURCE_SHA"
+          bash scripts/write_release_presecret_binding.sh \
+            "$GITHUB_REPOSITORY" "$SOURCE_SHA" "$version" release-presecret-binding.json
+          python scripts/release_lineage.py verify-binding \
+            --input release-presecret-binding.json \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SOURCE_SHA" \
+            --expected-version "$version"
+          actual="$(python -c 'import json; print(json.load(open("release-presecret-binding.json", encoding="utf-8"))["bindingDigest"])')"
+          test "$actual" = "$EXPECTED_BINDING_DIGEST"
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
@@ -52,6 +171,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
+          set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
 
@@ -67,9 +187,8 @@ jobs:
           apksigner="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
           test -x "$apksigner"
           "$apksigner" verify --verbose --print-certs "$apk"
-          expected="2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"
           actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/.*SHA-256 digest: //p' | head -1)"
-          expected_norm="$(printf '%s' "$expected" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          expected_norm="$(printf '%s' "$SENTINEL_RELEASE_SIGNER_SHA256" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           actual_norm="$(printf '%s' "$actual" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           test "$actual_norm" = "$expected_norm"
           aapt="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name aapt2 | sort -V | tail -1)"
@@ -81,11 +200,34 @@ jobs:
           fi
           echo "Verified release APK: $apk"
 
-      - name: Upload verified release APK
+      - name: Build release-candidate lineage package
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          mkdir -p release-candidate-package
+          cp app/build/outputs/apk/release/app-release.apk release-candidate-package/app-release.apk
+          cp release-presecret-binding.json release-candidate-package/release-presecret-binding.json
+          python scripts/release_lineage.py create-candidate \
+            --binding release-presecret-binding.json \
+            --apk release-candidate-package/app-release.apk \
+            --signer-sha256 "$SENTINEL_RELEASE_SIGNER_SHA256" \
+            --output release-candidate-package/release-candidate.json
+          python scripts/release_lineage.py verify-candidate \
+            --input release-candidate-package/release-candidate.json \
+            --binding release-presecret-binding.json \
+            --apk release-candidate-package/app-release.apk \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SOURCE_SHA" \
+            --expected-version "$version" \
+            --expected-signer-sha256 "$SENTINEL_RELEASE_SIGNER_SHA256"
+
+      - name: Upload verified signed release candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: sentinel-release-apk-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-release.apk
+          name: sentinel-release-candidate-${{ inputs.source_sha }}
+          path: release-candidate-package/*
           if-no-files-found: error
           retention-days: 90
 

@@ -84,10 +84,44 @@ def check_workflow_boundaries(checks: Checks) -> None:
     candidate = workflow_text["release-candidate.yml"]
     checks.require("workflow_dispatch:" in candidate, "release-candidate workflow is manual")
     checks.require("pull_request:" not in candidate and "branches:" not in candidate, "release-candidate workflow is not routine branch CI")
+    checks.require("source_sha:" in candidate, "release-candidate requires an explicit exact source SHA")
+    checks.require("needs: presecret" in candidate, "release signing depends on the pre-secret evidence gate")
+    try:
+        candidate_presecret = candidate.split("  presecret:", 1)[1].split("  release-candidate:", 1)[0]
+        candidate_signing = candidate.split("  release-candidate:", 1)[1]
+    except IndexError:
+        candidate_presecret = ""
+        candidate_signing = ""
+    checks.require(bool(candidate_presecret), "release-candidate has a distinct pre-secret job")
+    checks.require("secrets." not in candidate_presecret, "release-candidate pre-secret job references no repository secrets")
+    checks.require("release_lineage.py presecret" in candidate_presecret, "release-candidate pre-secret job verifies canonical main evidence")
+    checks.require("ANDROID_KEYSTORE_BASE64" in candidate_signing, "release-candidate signing material is confined to the dependent signing job")
+    checks.require(
+        candidate_signing.find("Reconfirm canonical evidence before secret access")
+        < candidate_signing.find("Decode release keystore")
+        and candidate_signing.find("Reconfirm canonical evidence before secret access") >= 0,
+        "release-candidate reconfirms evidence before first signing-secret access",
+    )
 
     release = workflow_text["release.yml"]
     checks.require('tags: ["v*.*.*"]' in release, "release publication is version-tag scoped")
-    checks.require("Verify release tag matches canonical version" in release, "release tag is checked against VERSION")
+    checks.require("verify release tag version" in release.lower(), "release tag is checked against VERSION")
+    checks.require("ANDROID_KEYSTORE_BASE64" not in release and "assembleRelease" not in release, "tag publication never re-signs the Android APK")
+    checks.require("  verify-candidate:" in release and "  publish:" in release, "release separates candidate verification from publication authority")
+    try:
+        release_presecret = release.split("  presecret:", 1)[1].split("  verify-candidate:", 1)[0]
+        release_verify = release.split("  verify-candidate:", 1)[1].split("  publish:", 1)[0]
+        release_publish = release.split("  publish:", 1)[1]
+    except IndexError:
+        release_presecret = ""
+        release_verify = ""
+        release_publish = ""
+    checks.require("contents: write" not in release_presecret + release_verify, "release preflight/candidate verification have no publication authority")
+    checks.require("secrets." not in release_presecret + release_verify, "release preflight/candidate verification reference no repository secrets")
+    checks.require("release_lineage.py fetch-candidate" in release_verify, "read-only release job verifies the signed candidate lineage")
+    checks.require("contents: write" in release_publish, "only final release publication job receives contents write authority")
+    checks.require("release_lineage.py" not in release_publish and "actions/checkout@" not in release_publish, "publication-authority job executes no repository code")
+    checks.require("actions/download-artifact@" in release_publish, "publication-authority job consumes only preverified workflow artifact input")
 
     security = workflow_text["security.yml"]
     checks.require("ignore-unfixed: false" in security, "Trivy includes unfixed HIGH/CRITICAL findings")

@@ -30,11 +30,12 @@ Before a PR can be treated as release-preflight-clean, the collector requires th
 - `Security`;
 - `P1 Evidence`;
 - `Packaged Companion Host`;
+- `Supply Chain Evidence`;
 - `ALPHA-0 Android CI`.
 
 It also requires the GitHub Advanced Security check named `CodeQL`, from app slug `github-advanced-security`, to be successful on the exact PR head SHA.
 
-The required job set includes Core tests/coverage, PostgreSQL recovery, Android build/tests, API 35 emulator instrumentation, Web build, Launcher runtime tests, Block D evidence, container build/reproducibility/deployment smoke, security scans, both workflow CodeQL language jobs, P1 evidence, packaged Companion evidence and standalone Android APK validation.
+The required job set includes Core tests/coverage, PostgreSQL recovery, Android build/tests, API 35 emulator instrumentation, Web build, Launcher runtime tests, Block D evidence, container build/reproducibility/deployment smoke, security scans, both workflow CodeQL language jobs, P1 evidence, packaged Companion evidence, supply-chain SBOM evidence and standalone Android APK validation.
 
 ## Required protected-main evidence
 
@@ -43,7 +44,8 @@ For a `push` to `main`, the preflight requires the exact-SHA post-merge runs for
 - `Build & Test`;
 - `Security`;
 - `P1 Evidence`;
-- `Packaged Companion Host`.
+- `Packaged Companion Host`;
+- `Supply Chain Evidence`.
 
 `ALPHA-0 Android CI` is PR-only and therefore is not invented as a post-merge requirement. The Build & Test API 35 emulator job remains required.
 
@@ -55,6 +57,7 @@ The collector requires and records GitHub artifact metadata for:
 - `block-d-operational-evidence-<sha>`;
 - `sentinel-p1-evidence-<sha>`;
 - `packaged-companion-host-<sha>`;
+- `sentinel-supply-chain-evidence-<sha>`;
 - on pull requests only, `alpha-0-debug-apk-<sha>`.
 
 Each required artifact must:
@@ -78,7 +81,7 @@ The manifest includes:
 - applicable external GitHub Advanced Security evidence;
 - an evidence digest computed over canonical JSON excluding only the digest field itself.
 
-`scripts/release_evidence.py verify` recomputes the digest and revalidates the evidence structure fail-closed.
+`scripts/release_evidence_entrypoint.py verify` enables the active Supply Chain Evidence policy, delegates to `scripts/release_evidence.py`, recomputes the digest and revalidates the evidence structure fail-closed.
 
 ## Explicit non-claims
 
@@ -115,4 +118,8 @@ The workflow itself is not automatically added to branch protection. Branch-prot
 
 ## Relation to release workflows
 
-`release-candidate.yml` and `release.yml` remain separate protected paths because they require signing material and/or publication authority. This contract is intentionally usable without production credentials or signing keys and prepares a trustworthy evidence handoff for those later Owner-gated actions.
+The preflight is the canonical repository-internal input to `docs/RELEASE_LINEAGE_V1.md`.
+
+`release-candidate.yml` and `release.yml` remain Owner-gated paths because they involve signing authority and/or publication authority, but neither may accept unbound source state. `scripts/release_lineage.py` downloads the protected-main preflight artifact, verifies GitHub's archive digest and the internal manifest, and emits a deterministic pre-secret binding before those authorities are reachable.
+
+The manual release-candidate workflow may reference Android signing material only in a job that depends on successful pre-secret verification. The tag publication workflow does not re-sign: it consumes an already-signed exact-SHA release candidate and independently revalidates its lineage and APK signature before publication.

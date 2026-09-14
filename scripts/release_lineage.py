@@ -246,15 +246,15 @@ def _release_evidence_artifact(
     return artifact
 
 
-def build_presecret_binding(
+def _verify_live_release_evidence(
     repository: str,
     sha: str,
     version: str,
     *,
-    api_get: ApiGet = _gh_api_get,
-    downloader: Downloader = _gh_api_download,
-) -> dict[str, Any]:
-    _validate_identity(repository, sha, version)
+    api_get: ApiGet,
+    downloader: Downloader,
+) -> None:
+    """Validate authenticated GitHub evidence without returning persistable data."""
     run = _latest_release_evidence_run(repository, sha, api_get)
     artifact = _release_evidence_artifact(repository, run, sha, api_get)
     archive = downloader(
@@ -275,6 +275,10 @@ def build_presecret_binding(
     if _mapping(manifest.get("source") or {}, "release evidence source").get("event") != "push":
         raise ValueError("Owner-gated release actions require protected-main push evidence")
 
+
+def _binding_from_identity(repository: str, sha: str, version: str) -> dict[str, Any]:
+    """Create the deterministic persistable binding from public source identity only."""
+    _validate_identity(repository, sha, version)
     binding: dict[str, Any] = {
         "schema": PRESECRET_SCHEMA,
         "status": "PASS",
@@ -301,6 +305,25 @@ def build_presecret_binding(
     binding["bindingDigest"] = canonical_digest(binding, "bindingDigest")
     verify_presecret_binding(binding, expected_repository=repository, expected_sha=sha, expected_version=version)
     return binding
+
+
+def build_presecret_binding(
+    repository: str,
+    sha: str,
+    version: str,
+    *,
+    api_get: ApiGet = _gh_api_get,
+    downloader: Downloader = _gh_api_download,
+) -> dict[str, Any]:
+    _validate_identity(repository, sha, version)
+    _verify_live_release_evidence(
+        repository,
+        sha,
+        version,
+        api_get=api_get,
+        downloader=downloader,
+    )
+    return _binding_from_identity(repository, sha, version)
 
 
 def verify_presecret_binding(

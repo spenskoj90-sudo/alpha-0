@@ -2,15 +2,20 @@
   "name": "sentinel-launcher",
   "version": "0.2.0",
   "private": true,
-  "main": "main.js",
+  "main": "bootstrap.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1"
   },
   "engines": {
     "node": ">=22"
   },
   "dependencies": {
-    "electron": "^37.2.0"
+    "electron": "37.2.0"
+  },
+  "sentinelPackaging": {
+    "electronVersion": "37.2.0",
+    "electronWin32X64Sha256": "4d4451179993fa22a1125bbc0130858903bc16e5c87900a969fa7bbac5c8f6a3"
   }
 }

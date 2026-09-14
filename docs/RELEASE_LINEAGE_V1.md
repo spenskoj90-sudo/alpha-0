@@ -9,7 +9,7 @@ A release action is valid only for one exact source commit that already has a su
 
 The lineage is:
 
-`protected-main source SHA -> Release Evidence Preflight artifact -> pre-secret binding -> Owner-signed release candidate -> Owner tag -> publication`
+`protected-main source SHA -> Release Evidence Preflight artifact -> pre-secret binding -> Owner-signed release candidate -> Owner tag -> read-only candidate verification -> publication authority`
 
 ## Pre-secret binding
 
@@ -56,20 +56,15 @@ Signing-key custody, secret provisioning and execution of this workflow remain O
 
 `.github/workflows/release.yml` remains triggered only by an Owner-created `v*.*.*` tag. It no longer decodes a keystore and no longer runs `assembleRelease`.
 
-The read-only `presecret` job resolves the tag to its exact commit, verifies that the tag version equals root `VERSION`, and independently verifies protected-main release evidence for that commit.
+The workflow has three authority stages:
 
-Only the dependent `publish` job receives `contents: write`. Before publication it:
+1. `presecret` has `actions: read` and `contents: read`. It resolves the tag to its exact commit, verifies that the tag version equals root `VERSION`, and independently verifies protected-main release evidence for that commit.
+2. `verify-candidate` also has only read permissions. It regenerates the same binding, locates the newest successful `Release Candidate Artifact` workflow on `main` containing `sentinel-release-candidate-<sha>`, verifies the GitHub candidate ZIP digest/size and safe member set, validates the packaged binding/candidate/APK hashes, independently runs `apksigner`, rejects a debuggable APK, builds the exact-source Core archive, records byte hashes and uploads one preverified publication-input artifact.
+3. `publish` is the **only** job with `contents: write`. It has no repository checkout and executes no repository Python code. It downloads the prior job's publication-input artifact with an immutable pinned official `actions/download-artifact` commit, rechecks the SHA-256 of every release asset against read-only job outputs, and only then calls `gh release create`.
 
-1. regenerates the same deterministic pre-secret binding;
-2. locates the newest successful `Release Candidate Artifact` workflow on `main` containing `sentinel-release-candidate-<sha>`;
-3. downloads the candidate ZIP and verifies its GitHub server-side SHA-256 and size;
-4. rejects nested, duplicate, unexpected or oversized ZIP members;
-5. verifies the packaged pre-secret binding is identical by digest to current canonical evidence;
-6. verifies the candidate manifest, APK SHA-256 and signer identity;
-7. independently runs `apksigner` and rejects a debuggable APK;
-8. publishes that already-signed APK together with source and lineage evidence.
+The published assets are the already-signed APK, exact-source Core archive, release-candidate manifest, release-candidate artifact provenance and pre-secret binding.
 
-A tag therefore cannot cause the publication workflow to manufacture a new signed binary. A valid Owner-signed release-candidate artifact for the exact tagged source SHA must already exist.
+A tag therefore cannot cause the publication workflow to manufacture a new signed binary. A valid Owner-signed release-candidate artifact for the exact tagged source SHA must already exist, and write authority is not granted until candidate verification has completed successfully.
 
 ## Fail-closed behavior
 

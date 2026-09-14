@@ -5,6 +5,10 @@ The pre-secret boundary verifies the GitHub-hosted Release Evidence Preflight
 artifact before a signing job can reference signing material. The release
 publication boundary consumes an already-signed release-candidate artifact and
 never requires the Android signing key.
+
+GitHub authentication is intentionally owned by the ``gh`` process. This
+module never reads, receives, stores, serializes, or logs GitHub credentials;
+it only consumes bounded API response bytes returned by ``gh api``.
 """
 from __future__ import annotations
 
@@ -13,12 +17,10 @@ import copy
 import hashlib
 import io
 import json
-import os
 import re
+import subprocess
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
@@ -40,10 +42,14 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 FINGERPRINT_RE = re.compile(r"^[0-9A-F]{64}$")
+MAX_API_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_PREFLIGHT_ARCHIVE_BYTES = 4 * 1024 * 1024
 MAX_CANDIDATE_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_JSON_BYTES = 4 * 1024 * 1024
 MAX_APK_BYTES = 200 * 1024 * 1024
+
+ApiGet = Callable[[str], Any]
+Downloader = Callable[[str, int], bytes]
 
 
 def canonical_digest(document: dict[str, Any], digest_field: str) -> str:
@@ -69,62 +75,51 @@ def _validate_identity(repository: str, sha: str, version: str) -> None:
         raise ValueError("version is empty")
 
 
-def _headers(token: str) -> dict[str, str]:
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "sentinel-release-lineage/1",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
+def _run_gh_api(endpoint: str, max_bytes: int, timeout: float) -> bytes:
+    """Run a fixed-form GitHub API GET without moving credentials into Python.
 
-
-def _api_get(url: str, token: str, timeout: float = 20.0) -> Any:
-    request = urllib.request.Request(url, headers=_headers(token))
+    Authentication is supplied to ``gh`` by the workflow environment. stderr is
+    intentionally discarded so a failed CLI invocation cannot echo sensitive
+    authentication or transport context into the release workflow log.
+    """
+    if not endpoint.startswith("/repos/") or any(char in endpoint for char in "\r\n"):
+        raise ValueError("invalid GitHub API endpoint")
+    if max_bytes <= 0:
+        raise ValueError("invalid GitHub API response limit")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read(8 * 1024 * 1024 + 1)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(4096).decode("utf-8", "replace")
-        raise RuntimeError(f"GitHub API HTTP {exc.code}: {detail[:1000]}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"GitHub API network error: {exc.reason}") from exc
-    if len(body) > 8 * 1024 * 1024:
-        raise RuntimeError("GitHub API response exceeds safety limit")
-    return json.loads(body)
-
-
-class _CrossHostCredentialStrippingRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
-        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
-        if redirected is None:
-            return None
-        old_host = urllib.parse.urlparse(req.full_url).netloc.lower()
-        new_host = urllib.parse.urlparse(newurl).netloc.lower()
-        if old_host != new_host:
-            redirected.remove_header("Authorization")
-        return redirected
-
-
-def _download(url: str, token: str, max_bytes: int, timeout: float = 60.0) -> bytes:
-    opener = urllib.request.build_opener(_CrossHostCredentialStrippingRedirect())
-    request = urllib.request.Request(url, headers=_headers(token))
-    try:
-        with opener.open(request, timeout=timeout) as response:
-            body = response.read(max_bytes + 1)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read(4096).decode("utf-8", "replace")
-        raise RuntimeError(f"artifact download HTTP {exc.code}: {detail[:1000]}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"artifact download network error: {exc.reason}") from exc
+        completed = subprocess.run(
+            ["gh", "api", "--method", "GET", endpoint],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError("GitHub API request failed") from exc
+    if completed.returncode != 0:
+        raise RuntimeError("GitHub API request failed")
+    body = completed.stdout
     if len(body) > max_bytes:
-        raise RuntimeError("artifact archive exceeds safety limit")
+        raise RuntimeError("GitHub API response exceeds safety limit")
     return body
 
 
-def _artifact_archive_url(repository: str, artifact_id: int) -> str:
-    return f"https://api.github.com/repos/{repository}/actions/artifacts/{artifact_id}/zip"
+def _gh_api_get(endpoint: str) -> Any:
+    body = _run_gh_api(endpoint, MAX_API_RESPONSE_BYTES, 20.0)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("GitHub API returned invalid JSON") from exc
+
+
+def _gh_api_download(endpoint: str, max_bytes: int) -> bytes:
+    return _run_gh_api(endpoint, max_bytes, 60.0)
+
+
+def _artifact_archive_endpoint(repository: str, artifact_id: int) -> str:
+    if not REPO_RE.fullmatch(repository) or artifact_id <= 0:
+        raise ValueError("invalid artifact archive identity")
+    return f"/repos/{repository}/actions/artifacts/{artifact_id}/zip"
 
 
 def _verify_archive_metadata(artifact: dict[str, Any], archive: bytes, *, expected_sha: str | None = None) -> str:
@@ -177,6 +172,8 @@ def _read_zip_exact(archive: bytes, expected_files: set[str], *, max_apk_bytes: 
 
 
 def _json_object(data: bytes, label: str) -> dict[str, Any]:
+    if not data or len(data) > MAX_JSON_BYTES:
+        raise ValueError(f"invalid {label} size")
     try:
         value = json.loads(data.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -186,13 +183,20 @@ def _json_object(data: bytes, label: str) -> dict[str, Any]:
     return value
 
 
-def _latest_release_evidence_run(repository: str, sha: str, token: str, api_get: Callable[[str, str], Any]) -> dict[str, Any]:
+def _mapping(payload: Any, label: str) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError(f"invalid GitHub {label} response")
+    return payload
+
+
+def _latest_release_evidence_run(repository: str, sha: str, api_get: ApiGet) -> dict[str, Any]:
     query = urllib.parse.urlencode({"head_sha": sha, "event": "push", "per_page": 100})
-    payload = api_get(f"https://api.github.com/repos/{repository}/actions/runs?{query}", token)
+    payload = _mapping(api_get(f"/repos/{repository}/actions/runs?{query}"), "workflow runs")
     candidates = [
         run
         for run in payload.get("workflow_runs", [])
-        if run.get("name") == RELEASE_EVIDENCE_WORKFLOW
+        if isinstance(run, dict)
+        and run.get("name") == RELEASE_EVIDENCE_WORKFLOW
         and run.get("path") == RELEASE_EVIDENCE_WORKFLOW_PATH
         and run.get("head_sha") == sha
         and run.get("head_branch") == "main"
@@ -208,11 +212,15 @@ def _latest_release_evidence_run(repository: str, sha: str, token: str, api_get:
     return run
 
 
-def _release_evidence_artifact(repository: str, run: dict[str, Any], sha: str, token: str, api_get: Callable[[str, str], Any]) -> dict[str, Any]:
+def _release_evidence_artifact(repository: str, run: dict[str, Any], sha: str, api_get: ApiGet) -> dict[str, Any]:
     run_id = int(run["id"])
-    payload = api_get(f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100", token)
+    payload = _mapping(api_get(f"/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"), "artifacts")
     expected_name = f"sentinel-release-evidence-{sha}"
-    candidates = [artifact for artifact in payload.get("artifacts", []) if artifact.get("name") == expected_name]
+    candidates = [
+        artifact
+        for artifact in payload.get("artifacts", [])
+        if isinstance(artifact, dict) and artifact.get("name") == expected_name
+    ]
     if not candidates:
         raise ValueError("exact-SHA release-evidence artifact is missing")
     artifact = max(candidates, key=lambda item: int(item.get("id", 0)))
@@ -228,18 +236,15 @@ def build_presecret_binding(
     repository: str,
     sha: str,
     version: str,
-    token: str,
     *,
-    api_get: Callable[[str, str], Any] = _api_get,
-    downloader: Callable[[str, str, int], bytes] = _download,
+    api_get: ApiGet = _gh_api_get,
+    downloader: Downloader = _gh_api_download,
 ) -> dict[str, Any]:
     _validate_identity(repository, sha, version)
-    if not token:
-        raise ValueError("GitHub token is required")
-    run = _latest_release_evidence_run(repository, sha, token, api_get)
-    artifact = _release_evidence_artifact(repository, run, sha, token, api_get)
+    run = _latest_release_evidence_run(repository, sha, api_get)
+    artifact = _release_evidence_artifact(repository, run, sha, api_get)
     artifact_id = int(artifact["id"])
-    archive = downloader(_artifact_archive_url(repository, artifact_id), token, MAX_PREFLIGHT_ARCHIVE_BYTES)
+    archive = downloader(_artifact_archive_endpoint(repository, artifact_id), MAX_PREFLIGHT_ARCHIVE_BYTES)
     artifact_digest = _verify_archive_metadata(artifact, archive, expected_sha=sha)
     files = _read_zip_exact(archive, {RELEASE_EVIDENCE_FILE})
     manifest = _json_object(files[RELEASE_EVIDENCE_FILE], "release evidence")
@@ -478,14 +483,15 @@ def verify_candidate_manifest(
         raise ValueError("release-candidate digest mismatch")
 
 
-def _find_candidate_artifact(repository: str, sha: str, token: str, api_get: Callable[[str, str], Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _find_candidate_artifact(repository: str, sha: str, api_get: ApiGet) -> tuple[dict[str, Any], dict[str, Any]]:
     query = urllib.parse.urlencode({"event": "workflow_dispatch", "branch": "main", "per_page": 100})
-    runs = api_get(
-        f"https://api.github.com/repos/{repository}/actions/workflows/release-candidate.yml/runs?{query}",
-        token,
-    ).get("workflow_runs", [])
+    payload = _mapping(
+        api_get(f"/repos/{repository}/actions/workflows/release-candidate.yml/runs?{query}"),
+        "release-candidate workflow runs",
+    )
+    runs = payload.get("workflow_runs", [])
     expected_name = f"sentinel-release-candidate-{sha}"
-    for run in sorted(runs, key=lambda item: int(item.get("id", 0)), reverse=True):
+    for run in sorted((item for item in runs if isinstance(item, dict)), key=lambda item: int(item.get("id", 0)), reverse=True):
         if (
             run.get("name") != RELEASE_CANDIDATE_WORKFLOW
             or run.get("path") != RELEASE_CANDIDATE_WORKFLOW_PATH
@@ -496,11 +502,15 @@ def _find_candidate_artifact(repository: str, sha: str, token: str, api_get: Cal
         run_id = int(run.get("id", 0))
         if run_id <= 0:
             continue
-        artifacts = api_get(
-            f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100",
-            token,
-        ).get("artifacts", [])
-        matches = [artifact for artifact in artifacts if artifact.get("name") == expected_name]
+        artifacts_payload = _mapping(
+            api_get(f"/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100"),
+            "release-candidate artifacts",
+        )
+        matches = [
+            artifact
+            for artifact in artifacts_payload.get("artifacts", [])
+            if isinstance(artifact, dict) and artifact.get("name") == expected_name
+        ]
         if not matches:
             continue
         artifact = max(matches, key=lambda item: int(item.get("id", 0)))
@@ -521,19 +531,16 @@ def fetch_candidate_package(
     repository: str,
     sha: str,
     version: str,
-    token: str,
     binding: dict[str, Any],
     expected_signer_sha256: str,
     *,
-    api_get: Callable[[str, str], Any] = _api_get,
-    downloader: Callable[[str, str, int], bytes] = _download,
+    api_get: ApiGet = _gh_api_get,
+    downloader: Downloader = _gh_api_download,
 ) -> tuple[dict[str, Any], dict[str, bytes], dict[str, Any]]:
     _validate_identity(repository, sha, version)
-    if not token:
-        raise ValueError("GitHub token is required")
     verify_presecret_binding(binding, expected_repository=repository, expected_sha=sha, expected_version=version)
-    run, artifact = _find_candidate_artifact(repository, sha, token, api_get)
-    archive = downloader(_artifact_archive_url(repository, int(artifact["id"])), token, MAX_CANDIDATE_ARCHIVE_BYTES)
+    run, artifact = _find_candidate_artifact(repository, sha, api_get)
+    archive = downloader(_artifact_archive_endpoint(repository, int(artifact["id"])), MAX_CANDIDATE_ARCHIVE_BYTES)
     artifact_digest = _verify_archive_metadata(artifact, archive)
     files = _read_zip_exact(archive, {APK_FILE, PRESECRET_FILE, CANDIDATE_FILE})
     packaged_binding = _json_object(files[PRESECRET_FILE], "packaged pre-secret binding")
@@ -571,10 +578,11 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must contain a JSON object")
-    return value
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"unable to read {path}") from exc
+    return _json_object(data, str(path))
 
 
 def _parse_args() -> argparse.Namespace:
@@ -584,7 +592,6 @@ def _parse_args() -> argparse.Namespace:
     presecret = sub.add_parser("presecret")
     presecret.add_argument("--repository", required=True)
     presecret.add_argument("--sha", required=True)
-    presecret.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     presecret.add_argument("--version-file", default="VERSION")
     presecret.add_argument("--output", required=True)
 
@@ -612,7 +619,6 @@ def _parse_args() -> argparse.Namespace:
     fetch_candidate = sub.add_parser("fetch-candidate")
     fetch_candidate.add_argument("--repository", required=True)
     fetch_candidate.add_argument("--sha", required=True)
-    fetch_candidate.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     fetch_candidate.add_argument("--version-file", default="VERSION")
     fetch_candidate.add_argument("--binding", required=True)
     fetch_candidate.add_argument("--expected-signer-sha256", required=True)
@@ -625,7 +631,7 @@ def main() -> int:
     try:
         if args.command == "presecret":
             version = Path(args.version_file).read_text(encoding="utf-8").strip()
-            binding = build_presecret_binding(args.repository, args.sha, version, args.token)
+            binding = build_presecret_binding(args.repository, args.sha, version)
             _write_json(Path(args.output), binding)
             print(f"pre-secret release binding PASS: {binding['bindingDigest']}")
         elif args.command == "verify-binding":
@@ -664,7 +670,6 @@ def main() -> int:
                 args.repository,
                 args.sha,
                 version,
-                args.token,
                 binding,
                 args.expected_signer_sha256,
             )

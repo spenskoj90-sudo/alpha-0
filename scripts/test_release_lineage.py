@@ -61,14 +61,14 @@ def release_evidence_fixture(manifest: dict | None = None):
         "run_attempt": 1,
     }
 
-    def api_get(url: str, _token: str):
-        if "/actions/runs?" in url:
+    def api_get(endpoint: str):
+        if "/actions/runs?" in endpoint:
             return {"workflow_runs": [run]}
-        if "/actions/runs/7001/artifacts" in url:
+        if "/actions/runs/7001/artifacts" in endpoint:
             return {"artifacts": [artifact]}
-        raise AssertionError(url)
+        raise AssertionError(endpoint)
 
-    def downloader(_url: str, _token: str, _max_bytes: int):
+    def downloader(_endpoint: str, _max_bytes: int):
         return archive
 
     return run, artifact, archive, api_get, downloader
@@ -76,7 +76,7 @@ def release_evidence_fixture(manifest: dict | None = None):
 
 def valid_binding():
     _, _, _, api_get, downloader = release_evidence_fixture()
-    return build_presecret_binding(REPO, SHA, VERSION, "token", api_get=api_get, downloader=downloader)
+    return build_presecret_binding(REPO, SHA, VERSION, api_get=api_get, downloader=downloader)
 
 
 class ReleaseLineageTests(unittest.TestCase):
@@ -101,7 +101,6 @@ class ReleaseLineageTests(unittest.TestCase):
                 REPO,
                 SHA,
                 VERSION,
-                "token",
                 api_get=api_get,
                 downloader=lambda *_args: archive,
             )
@@ -110,14 +109,14 @@ class ReleaseLineageTests(unittest.TestCase):
         run, _, _, api_get, downloader = release_evidence_fixture()
         run["head_branch"] = "feature"
         with self.assertRaisesRegex(ValueError, "no protected-main"):
-            build_presecret_binding(REPO, SHA, VERSION, "token", api_get=api_get, downloader=downloader)
+            build_presecret_binding(REPO, SHA, VERSION, api_get=api_get, downloader=downloader)
 
     def test_presecret_rejects_pull_request_manifest(self):
         enable_supply_chain_evidence()
         manifest = valid_manifest("pull_request")
         _, _, _, api_get, downloader = release_evidence_fixture(manifest)
         with self.assertRaisesRegex(ValueError, "protected-main push evidence"):
-            build_presecret_binding(REPO, SHA, VERSION, "token", api_get=api_get, downloader=downloader)
+            build_presecret_binding(REPO, SHA, VERSION, api_get=api_get, downloader=downloader)
 
     def test_candidate_manifest_binds_apk_and_presecret_evidence(self):
         binding = valid_binding()
@@ -180,18 +179,17 @@ class ReleaseLineageTests(unittest.TestCase):
             "workflow_run": {"id": 9001, "head_sha": "b" * 40},
         }
 
-        def api_get(url: str, _token: str):
-            if "/actions/workflows/release-candidate.yml/runs?" in url:
+        def api_get(endpoint: str):
+            if "/actions/workflows/release-candidate.yml/runs?" in endpoint:
                 return {"workflow_runs": [run]}
-            if "/actions/runs/9001/artifacts" in url:
+            if "/actions/runs/9001/artifacts" in endpoint:
                 return {"artifacts": [artifact]}
-            raise AssertionError(url)
+            raise AssertionError(endpoint)
 
         fetched, files, provenance = fetch_candidate_package(
             REPO,
             SHA,
             VERSION,
-            "token",
             binding,
             SIGNER,
             api_get=api_get,
@@ -234,8 +232,8 @@ class ReleaseLineageTests(unittest.TestCase):
             "workflow_run": {"id": 9001},
         }
 
-        def api_get(url: str, _token: str):
-            if "/actions/workflows/release-candidate.yml/runs?" in url:
+        def api_get(endpoint: str):
+            if "/actions/workflows/release-candidate.yml/runs?" in endpoint:
                 return {"workflow_runs": [run]}
             return {"artifacts": [artifact]}
 
@@ -244,12 +242,20 @@ class ReleaseLineageTests(unittest.TestCase):
                 REPO,
                 SHA,
                 VERSION,
-                "token",
                 binding,
                 SIGNER,
                 api_get=api_get,
                 downloader=lambda *_args: archive,
             )
+
+    def test_python_lineage_boundary_never_handles_github_credentials(self):
+        source = Path("scripts/release_lineage.py").read_text(encoding="utf-8")
+        self.assertNotIn("GITHUB_TOKEN", source)
+        self.assertNotIn("GH_TOKEN", source)
+        self.assertNotIn("Authorization", source)
+        self.assertNotIn("Bearer", source)
+        self.assertIn('["gh", "api", "--method", "GET", endpoint]', source)
+        self.assertIn("stderr=subprocess.DEVNULL", source)
 
     def test_workflows_enforce_presecret_boundary_and_no_release_resigning(self):
         rc = Path(".github/workflows/release-candidate.yml").read_text(encoding="utf-8")
@@ -259,6 +265,7 @@ class ReleaseLineageTests(unittest.TestCase):
         presecret_block = rc.split("  presecret:", 1)[1].split("  release-candidate:", 1)[0]
         self.assertNotIn("secrets.", presecret_block)
         self.assertIn("release_lineage.py presecret", presecret_block)
+        self.assertIn("GITHUB_TOKEN: ${{ github.token }}", presecret_block)
         signing_block = rc.split("  release-candidate:", 1)[1]
         self.assertIn("ANDROID_KEYSTORE_BASE64", signing_block)
         self.assertIn("release_lineage.py create-candidate", signing_block)
@@ -270,6 +277,7 @@ class ReleaseLineageTests(unittest.TestCase):
         prepublish = release.split("  presecret:", 1)[1].split("  publish:", 1)[0]
         self.assertNotIn("contents: write", prepublish)
         self.assertNotIn("secrets.", prepublish)
+        self.assertIn("GITHUB_TOKEN: ${{ github.token }}", prepublish)
 
 
 if __name__ == "__main__":

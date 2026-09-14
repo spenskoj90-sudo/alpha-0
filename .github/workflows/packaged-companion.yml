@@ -78,12 +78,12 @@ jobs:
         shell: pwsh
         run: |
           $smokeEvidence = "$env:RUNNER_TEMP\sentinel-evidence-a\smoke-evidence.json"
-          $smokeScript = "$env:RUNNER_TEMP\sentinel-package-a\resources\app\package-smoke.js"
           $companionExe = "$env:RUNNER_TEMP\sentinel-package-a\SENTINEL Companion.exe"
           $env:SENTINEL_PACKAGE_SMOKE_OUTPUT = $smokeEvidence
+          $env:SENTINEL_PACKAGED_HOST_SMOKE = "1"
           $process = Start-Process `
             -FilePath $companionExe `
-            -ArgumentList @("--disable-gpu", $smokeScript) `
+            -ArgumentList @("--disable-gpu") `
             -PassThru `
             -Wait
           if ($process.ExitCode -ne 0) {
@@ -101,6 +101,9 @@ jobs:
           }
           if ($smoke.electronVersion -ne "37.2.0") {
             throw "unexpected packaged Electron version $($smoke.electronVersion)"
+          }
+          if ($smoke.main -ne "bootstrap.js") {
+            throw "packaged runtime did not boot through bootstrap.js"
           }
           if ($smoke.signed -ne $false) {
             throw "ordinary CI runtime evidence must remain unsigned"

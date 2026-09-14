@@ -307,6 +307,25 @@ def _binding_from_identity(repository: str, sha: str, version: str) -> dict[str,
     return binding
 
 
+def verify_live_presecret(
+    repository: str,
+    sha: str,
+    version: str,
+    *,
+    api_get: ApiGet = _gh_api_get,
+    downloader: Downloader = _gh_api_download,
+) -> None:
+    """Verify current protected-main evidence without producing persistent output."""
+    _validate_identity(repository, sha, version)
+    _verify_live_release_evidence(
+        repository,
+        sha,
+        version,
+        api_get=api_get,
+        downloader=downloader,
+    )
+
+
 def build_presecret_binding(
     repository: str,
     sha: str,
@@ -315,8 +334,7 @@ def build_presecret_binding(
     api_get: ApiGet = _gh_api_get,
     downloader: Downloader = _gh_api_download,
 ) -> dict[str, Any]:
-    _validate_identity(repository, sha, version)
-    _verify_live_release_evidence(
+    verify_live_presecret(
         repository,
         sha,
         version,
@@ -561,13 +579,6 @@ def fetch_candidate_package(
     return candidate, files
 
 
-def _write_presecret_binding(path: Path, repository: str, sha: str, version: str) -> None:
-    """Persist only the deterministic public-identity binding document."""
-    value = _binding_from_identity(repository, sha, version)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def _write_candidate_manifest(path: Path, binding: dict[str, Any], apk: bytes, signer_sha256: str) -> None:
     """Persist a candidate manifest derived only from validated local release inputs."""
     value = create_candidate_manifest(binding, apk, signer_sha256)
@@ -591,7 +602,6 @@ def _parse_args() -> argparse.Namespace:
     presecret.add_argument("--repository", required=True)
     presecret.add_argument("--sha", required=True)
     presecret.add_argument("--version-file", default="VERSION")
-    presecret.add_argument("--output", required=True)
 
     verify_binding = sub.add_parser("verify-binding")
     verify_binding.add_argument("--input", required=True)
@@ -629,9 +639,8 @@ def main() -> int:
     try:
         if args.command == "presecret":
             version = Path(args.version_file).read_text(encoding="utf-8").strip()
-            build_presecret_binding(args.repository, args.sha, version)
-            _write_presecret_binding(Path(args.output), args.repository, args.sha, version)
-            print("pre-secret release binding PASS")
+            verify_live_presecret(args.repository, args.sha, version)
+            print("pre-secret release evidence PASS")
         elif args.command == "verify-binding":
             binding = _read_json(Path(args.input))
             verify_presecret_binding(

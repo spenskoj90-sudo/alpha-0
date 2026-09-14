@@ -1,0 +1,70 @@
+name: Release Evidence Preflight
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-evidence:
+    name: Release evidence preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SENTINEL_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SENTINEL_EVENT: ${{ github.event_name }}
+    steps:
+      - name: Checkout exact source SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Run release-evidence contract tests
+        run: python scripts/test_release_evidence.py
+
+      - name: Collect exact-SHA workflow and artifact evidence
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python scripts/release_evidence.py collect \
+            --repository "$GITHUB_REPOSITORY" \
+            --sha "$SENTINEL_SOURCE_SHA" \
+            --event "$SENTINEL_EVENT" \
+            --output release-evidence.json \
+            --wait-seconds 1200 \
+            --poll-seconds 15
+
+      - name: Verify generated evidence independently
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          python scripts/release_evidence.py verify \
+            --input release-evidence.json \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SENTINEL_SOURCE_SHA" \
+            --expected-version "$version"
+
+      - name: Upload exact-SHA release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sentinel-release-evidence-${{ env.SENTINEL_SOURCE_SHA }}
+          path: release-evidence.json
+          if-no-files-found: error
+          retention-days: 90

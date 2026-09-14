@@ -48,10 +48,11 @@ def build_evidence() -> dict[str, object]:
         item["passed"] = item["observed_ms"] <= item["budget_ms"]
 
     failure_matrix = [item.as_dict() for item in run_operational_failure_matrix()]
+    evidence_sha = os.getenv("SENTINEL_EVIDENCE_SHA") or os.getenv("GITHUB_SHA", "LOCAL")
     return {
         "schema": "sentinel.block-d.evidence.v1",
         "evidence_scope": "ci-local-regression-guard-not-production-slo",
-        "commit": os.getenv("GITHUB_SHA", "LOCAL"),
+        "commit": evidence_sha,
         "budgets": budgets,
         "failure_injection": failure_matrix,
         "registry_capacity": registry.snapshot()["capacity"],

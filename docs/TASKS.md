@@ -29,6 +29,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 - [x] **Android client platform consolidation.** Auth, Device, Event Sync and Dashboard now share one injectable `HttpTransport`/`UrlConnectionHttpTransport` boundary. The common implementation centralizes 10s/15s timeouts, platform TLS defaults, HTTP(S)-only scheme validation, disabled implicit redirects, bounded response reads, header injection rejection and deterministic connection cleanup without adding automatic retries or changing server-authoritative auth/device/idempotency rules. API-level fake transports and transport-level JVM tests cover the seam; GitHub Emulator remains the routine device gate.
 - [x] **WoW-addon deterministic repository evidence.** Routine launcher CI now covers the strict SavedVariables parser, bounded durable queue, Companion envelope generation and static Classic/Retail passive snapshot contract. This is repository evidence only; exact WoW 3.3.5a/private-server L3 behavior remains environment-unverified.
 - [x] **Cross-surface accessibility baseline.** Android Compose exposes reusable polite/assertive live-region, progress and button-card semantics with API 35 instrumentation coverage; Web provides skip navigation, focusable main landmarks, visible keyboard focus/forced-colors behavior and live recommendation status/error semantics; the packaged Companion launcher provides document/landmark/keyboard-focus semantics and polite atomic live regions for runtime state. This is repository-level accessibility hardening only, not physical TalkBack/NVDA/JAWS/switch-device certification and not a substitute for authoritative Figma synchronization in issue #11.
+- [x] **Release evidence preflight.** Repository CI now has a fail-closed exact-SHA evidence collector/verifier that waits for the applicable Build & Test, Security, P1, Packaged Companion and PR-only Android workflows, requires their critical jobs to succeed, binds required GitHub artifacts to the same source SHA and server-side SHA-256 digests, requires the external GitHub Advanced Security CodeQL check on PRs, and emits one canonical `sentinel.release-evidence.v1` manifest. The manifest explicitly cannot claim signing, publication, production deployment or external-environment acceptance; those remain Owner/external gates.
 
 ## External / Owner-gated evidence
 
@@ -53,7 +54,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 
 ## Program order
 
-`Verified foundation → Block B productization → Companion/launcher/WoW/player/voice runtime → observability/performance/resilience runtime → accessibility hardening → Owner/external release gates`
+`Verified foundation → Block B productization → Companion/launcher/WoW/player/voice runtime → observability/performance/resilience runtime → accessibility hardening → exact-SHA release evidence preflight → Owner/external release gates`
 
 ### Definition of Done for every substantive block
 

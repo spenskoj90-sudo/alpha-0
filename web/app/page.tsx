@@ -23,8 +23,9 @@ export default function Dashboard() {
           <div className="label">RUNTIME BOUNDARY</div>
           <div className="item"><span className="ok">●</span> Billing state comes from Core</div>
           <div className="item"><span className="ok">●</span> Game entitlements are server-authoritative</div>
+          <div className="item"><span className="ok">●</span> Recommendation retrieval uses the authenticated Core boundary</div>
           <div className="item"><span className="info">●</span> Provider activation is external</div>
-          <div className="item"><span className="info">●</span> Recommendation card remains observational</div>
+          <div className="item"><span className="info">●</span> Recommendation output remains observational</div>
         </article>
       </section>
     </main>

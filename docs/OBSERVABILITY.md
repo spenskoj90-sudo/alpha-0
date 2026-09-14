@@ -1,101 +1,145 @@
-# SENTINEL Observability
+# SENTINEL Observability and Telemetry Contract
 
-**Status:** Active (issue #7)  
-**Scope:** Android runtime crash reporting + existing CI failure visibility.
+**Status:** ACTIVE  
+**Machine-readable contract:** `observability/telemetry-contract.v1.json`  
+**Scope:** Android runtime error telemetry, provider-neutral Core/Companion operational telemetry, exact-SHA CI correlation, privacy/retention, alert policy and GitHub/Linear triage.
 
-This document describes the two independent observability chains used by SENTINEL.
-No real DSN, credentials, or user data appear in this file or in the repository tree.
+No real DSN, API key, credential, user identifier or user-authored payload belongs in this document or repository telemetry configuration.
 
----
+## 1. Authority and evidence model
 
-## 1. Runtime errors (Android app) → Sentry
+Observability is evidence, never authorization. Telemetry cannot grant scopes, entitlement, capability evidence, game-write authority, release readiness or production acceptance.
 
-### Purpose
-Capture uncaught exceptions and selected runtime errors from the release Android client so that post-crash diagnosis is possible without relying on physical-device log collection alone.
+Three channels remain deliberately separate:
 
-### Data flow
-1. `SentinelApplication` (registered in `AndroidManifest.xml`) runs at process start.
-2. It reads `BuildConfig.SENTRY_DSN`.
-3. If the string is empty (debug builds, PR builds, local developer machines), Sentry is **not** initialized and no network calls are made.
-4. If the string is non-empty (release assemble jobs that receive the GitHub secret `SENTRY_DSN`), `SentryAndroid.init` is called with:
-   - `isSendDefaultPii = false`
-   - screenshots and view hierarchy disabled
-   - a `beforeSend` callback that performs data minimization
+1. **Android runtime crash/error diagnostics → Sentry** when an Owner-managed DSN and complete exact release identity are present.
+2. **Core/Companion operational telemetry → bounded local/PostgreSQL observability plane** for low-cardinality runtime health, latency and failure outcomes.
+3. **Build/test/security/release failures → GitHub Actions exact-SHA evidence.** CI failures are not mirrored into Sentry and runtime telemetry cannot substitute for required checks.
 
-### Privacy / data minimization (mandatory)
-The `beforeSend` scrubber in `SentinelApplication`:
+PostHog is mapped in the machine-readable contract but remains disabled. There is no PostHog SDK, credential or external delivery path in the current product. That preserves Local-First / Server-Minimal until an explicit provider activation decision is made.
 
-- Clears the Sentry `User` object (id, email, username, IP).
-- Removes request headers.
-- Strips breadcrumb / extra keys whose names contain: `email`, `token`, `password`, `authorization`, `user`, `session`, `device_id`, `fingerprint`.
+## 2. Android Sentry release identity
 
-Only technical stack traces, device model/SDK version, and non-sensitive breadcrumb messages remain. No PII and no user-authored content is intended to leave the device.
+`SentinelApplication` initializes Sentry only when all of these are true:
 
-### Configuration sources
-| Build type | `SENTRY_DSN` source |
-|---|---|
-| debug / unit / instrumentation | empty (default) |
-| release (CI `assembleRelease`) | GitHub Actions secret `SENTRY_DSN` injected as environment variable |
+- `BuildConfig.SENTRY_DSN` is non-empty;
+- `BuildConfig.SENTINEL_SOURCE_SHA` is exactly 40 lowercase hexadecimal characters;
+- `BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT` is one of `development`, `ci`, `release-candidate`, `production`.
 
-The DSN value itself is **never** committed. It exists only as a repository secret managed by the Owner.
+If any condition fails, Sentry remains disabled. There is no fallback to a floating version-only identity.
 
-### Related files
+The emitted Sentry release identity is deterministic:
+
+`com.alpha0.app@<VERSION>+<versionCode>.<sourceSha12>`
+
+The event also carries only two static SENTINEL tags:
+
+- `sentinel.component=android`;
+- `sentinel.source_sha=<exact 40-char source SHA>`.
+
+For the Owner-gated signed release-candidate workflow, `GITHUB_SHA` is a valid exact-source fallback because the workflow fails before signing unless `GITHUB_SHA == inputs.source_sha`, then checks out that same SHA. A DSN-bearing GitHub Actions release build defaults to environment `release-candidate`. `production` is never inferred from a normal repository build and requires explicit external activation/configuration.
+
+Debug, PR and ordinary instrumentation builds do not receive the Owner-managed DSN, so they perform no Sentry network delivery even though GitHub may expose a source SHA to the build process.
+
+## 3. Runtime event taxonomy
+
+The minimal external taxonomy is intentionally small:
+
+| Class | Channel | Severity | Meaning |
+| --- | --- | --- | --- |
+| `runtime.crash.unhandled` | Sentry | P1 | Unhandled fatal on a release-correlated Android runtime |
+| `runtime.error.selected` | Sentry | P2 | Explicitly selected technical runtime error suitable for external diagnosis |
+| `runtime.operational` | Core/Companion local/PostgreSQL | informational/health | Bounded low-cardinality operational state/outcome |
+| `ci.failure` | GitHub Actions | blocking engineering gate | Failed/missing/stale/pending exact-SHA workflow/check evidence |
+
+Do not export game payloads, speech transcripts/audio, character/realm identifiers, auth/session/device identifiers or arbitrary user content merely to enrich diagnostics.
+
+## 4. Privacy and data minimization
+
+Before an Android Sentry event leaves the device, `SentinelApplication.scrubEvent` structurally removes entire potentially user-controlled surfaces rather than depending on a growing key-name denylist:
+
+- `User` object → removed;
+- request object, including headers/body/query/cookies → removed;
+- breadcrumbs → removed;
+- extras → removed;
+- screenshot capture → disabled;
+- view hierarchy capture → disabled;
+- default PII → disabled.
+
+The useful retained context is therefore technical: exception type/stack trace plus the static release, environment, component and exact-source correlation described above.
+
+The canonical forbidden-dimension set additionally includes email, token, password, authorization, user/user ID, session/session ID, device ID/fingerprint/IP, realm/character, transcript/audio and payload values. Those must never become telemetry labels/dimensions.
+
+The DSN is Owner-managed configuration only. It is not source, documentation, artifact metadata or persisted lineage evidence.
+
+## 5. Environment separation
+
+The repository allowlist is:
+
+- `development` — explicit non-production development runtime;
+- `ci` — explicit synthetic/runtime CI diagnostics if intentionally enabled;
+- `release-candidate` — exact-source release candidate evaluation;
+- `production` — externally activated production runtime only.
+
+A build label is not an environment acceptance claim. In particular, producing an Android `release` build does not by itself authorize the `production` environment label.
+
+## 6. Alert policy
+
+Repository policy defines the engineering meaning; actual Sentry project alert-rule provisioning is an external/Owner configuration gate.
+
+- **P1 — current-release unhandled fatal:** one or more unhandled fatal events on the currently evaluated exact release identity blocks promotion until triaged or explicitly dispositioned with evidence.
+- **P2 — repeated selected runtime error:** the same technical fingerprint repeating on one current release and materially affecting a supported flow requires a tracked defect/reproduction. A numeric provider threshold is intentionally `UNVERIFIED` until measured runtime volume exists; the repository does not invent a statistically meaningless count.
+- **Blocking — required CI failure:** any required exact-SHA check failed, missing, stale or pending blocks merge/release readiness. Diagnose and remediate CI; do not create a Sentry workaround.
+
+## 7. GitHub / Linear triage correlation
+
+Runtime triage follows one deterministic engineering chain:
+
+1. identify Sentry environment + release + exact source SHA + technical fingerprint;
+2. confirm the event is privacy-safe and technically actionable;
+3. correlate the source SHA with GitHub commit/workflow/release-evidence state;
+4. deduplicate on provider + environment + release + technical fingerprint;
+5. link or create one GitHub/Linear defect with the reproduction boundary;
+6. fix on a short-lived branch with regression evidence;
+7. require exact-PR-HEAD CI and guarded merge;
+8. confirm the fixed release identity before closing a runtime regression.
+
+Silence is not proof of a fix. An issue is not auto-closed merely because no additional event arrived.
+
+GitHub Actions remains the source of truth for CI/build failures. Sentry is the runtime source for Android crash/error evidence. Linear/GitHub issue state is workflow metadata, not runtime truth.
+
+## 8. Retention
+
+- Repository/CI artifacts use their workflow retention policies.
+- Core recent traces are bounded in memory; optional PostgreSQL telemetry uses the implemented retention seam.
+- Sentry account retention is an Owner/external provider setting; repository code limits what can be sent regardless of provider retention.
+- PostHog retention is not applicable because PostHog delivery is disabled.
+
+Changing external provider retention cannot weaken the repository privacy boundary.
+
+## 9. Existing activation evidence
+
+Historical activation evidence from 2026-09-06 remains useful only as proof that the Android→Sentry transport worked at that time: Owner observed `SENTINEL_SENTRY_SMOKE` on an Infinix Android 14 release build. Temporary smoke UI/code was removed afterward.
+
+That historical event predates this exact-SHA release-correlation contract and must not be represented as current-release acceptance. Current claims require current release/environment/source identity.
+
+## 10. Related implementation
+
 - `app/src/main/java/com/alpha0/app/SentinelApplication.kt`
-- `app/build.gradle.kts` (`buildConfigField("SENTRY_DSN", …)`)
-- `app/proguard-rules.pro` (Sentry keep rules)
-- `.github/workflows/build.yml` and `release-candidate.yml` (env injection for release only)
+- `app/build.gradle.kts`
+- `.github/workflows/release-candidate.yml`
+- `observability/telemetry-contract.v1.json`
+- `scripts/test_telemetry_contract.py`
+- `docs/COMPANION_OBSERVABILITY_V1.md`
+- `docs/SENTINEL_EVIDENCE_PROTOCOL.md`
 
-### Activation evidence (2026-09-06)
+## 11. External and final-stage gates
 
-Owner verified end-to-end path on physical device (Infinix, Android 14, release `1.0.0-RC2` / versionCode 10002):
+The repository contract is complete without using production credentials. The following remain external/final-stage evidence:
 
-- Event message: `SENTINEL_SENTRY_SMOKE`
-- Stack: `SentrySmoke.captureSmoke` ← LoginScreen TEMP UI (removed after verify)
-- Sentry issue (Owner org): `sentinel-p7.sentry.io` issue `145252132`
-- Environment tag: `production`
+- Sentry project alert-rule provisioning and account retention settings;
+- explicit `production` environment activation;
+- any future PostHog provider selection/credential/network path;
+- physical-device runtime trend and crash acceptance on the selected release hardware.
 
-Temporary smoke UI and `SentrySmoke.kt` were **removed** after this confirmation. Ongoing observability is uncaught/selected runtime errors via `SentinelApplication` only.
-
----
-
-## 2. CI / build failures → GitHub Actions
-
-### Purpose
-Surface compile, unit-test, instrumentation, security, and packaging failures for every push and pull request against `main`.
-
-### Existing workflows (authoritative list)
-| Workflow file | Name | Trigger |
-|---|---|---|
-| `.github/workflows/build.yml` | Build & Test | push / PR → main |
-| `.github/workflows/security.yml` | Security | (see file) |
-| `.github/workflows/android-build.yml` | (Android-specific helper) | (see file) |
-| `.github/workflows/p1-evidence.yml` | P1 Evidence | (see file) |
-| `.github/workflows/release-candidate.yml` | Release Candidate Artifact | push main / workflow_dispatch |
-| `.github/workflows/release.yml` | Release | (see file) |
-| `.github/workflows/deploy.yml` | Deploy | (see file) |
-
-These workflows already produce run logs, artifacts, and status checks. No additional Sentry integration is required for CI failures; GitHub Actions remains the single source of truth for build-time errors.
-
-### How to locate a failure
-1. Open the PR or the commit on `main`.
-2. Inspect the Checks tab / Actions run for the failing job.
-3. Download logs or artifacts as needed.
-4. Exact evidence claims must include commit SHA + workflow Run ID (see `docs/SENTINEL_EVIDENCE_PROTOCOL.md`).
-
----
-
-## 3. Separation of concerns
-
-| Concern | Channel | Secret required |
-|---|---|---|
-| Runtime crash on device | Sentry | `SENTRY_DSN` (release only) |
-| CI / packaging / test failure | GitHub Actions | none (logs are public to collaborators) |
-
-Do not send CI failure events into Sentry. Do not embed the DSN in debug builds or documentation.
-
----
-
-## 4. Operator notes
-
-- Owner must keep the GitHub repository secret `SENTRY_DSN` set for release builds to emit events.
-- Changing scrubbing rules requires a code change and review; do not relax PII stripping without explicit Owner approval.
+Per current release sequencing, physical Android/host/audio/exact-game-environment tests remain final pre-release acceptance rather than blockers for repository-internal completion.

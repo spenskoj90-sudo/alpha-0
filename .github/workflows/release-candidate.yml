@@ -68,11 +68,12 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
           python scripts/release_lineage.py presecret \
             --repository "$GITHUB_REPOSITORY" \
-            --sha "$SOURCE_SHA" \
-            --output release-presecret-binding.json
-          version="$(tr -d '[:space:]' < VERSION)"
+            --sha "$SOURCE_SHA"
+          bash scripts/write_release_presecret_binding.sh \
+            "$GITHUB_REPOSITORY" "$SOURCE_SHA" "$version" release-presecret-binding.json
           python scripts/release_lineage.py verify-binding \
             --input release-presecret-binding.json \
             --expected-repository "$GITHUB_REPOSITORY" \
@@ -121,10 +122,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          version="$(tr -d '[:space:]' < VERSION)"
           python scripts/release_lineage.py presecret \
             --repository "$GITHUB_REPOSITORY" \
-            --sha "$SOURCE_SHA" \
-            --output release-presecret-binding.json
+            --sha "$SOURCE_SHA"
+          bash scripts/write_release_presecret_binding.sh \
+            "$GITHUB_REPOSITORY" "$SOURCE_SHA" "$version" release-presecret-binding.json
+          python scripts/release_lineage.py verify-binding \
+            --input release-presecret-binding.json \
+            --expected-repository "$GITHUB_REPOSITORY" \
+            --expected-sha "$SOURCE_SHA" \
+            --expected-version "$version"
           actual="$(python -c 'import json; print(json.load(open("release-presecret-binding.json", encoding="utf-8"))["bindingDigest"])')"
           test "$actual" = "$EXPECTED_BINDING_DIGEST"
 

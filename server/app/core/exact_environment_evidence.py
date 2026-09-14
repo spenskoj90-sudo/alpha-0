@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -46,9 +46,13 @@ class EvidenceExecutionMode(StrEnum):
 class PackagedHostProvenance(BaseModel):
     """Build identity embedded inside the packaged Companion application."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", validate_by_alias=True, validate_by_name=True)
 
-    schema: str = Field(pattern=r"^sentinel\.packaged-companion-runtime\.v1$")
+    schema_name: str = Field(
+        alias="schema",
+        serialization_alias="schema",
+        pattern=r"^sentinel\.packaged-companion-runtime\.v1$",
+    )
     source_sha: str
     target: str = Field(pattern=r"^win32-x64$")
     package_version: str = Field(min_length=1, max_length=64)
@@ -74,7 +78,7 @@ class PackagedHostProvenance(BaseModel):
 class CompanionHandshakeEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    accepted_at: object
+    accepted_at: datetime
     accepted: bool
     mode: str = Field(min_length=1, max_length=32)
     protocol_version: str = Field(min_length=1, max_length=32)
@@ -83,21 +87,11 @@ class CompanionHandshakeEvidence(BaseModel):
     core_protocol_version: str = Field(min_length=1, max_length=32)
     capability_profile: str = Field(min_length=1, max_length=64)
 
-    @field_validator("accepted_at", mode="before")
-    @classmethod
-    def parse_accepted_at(cls, value: object) -> object:
-        from datetime import datetime
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        raise ValueError("accepted_at must be an RFC3339 datetime")
-
 
 class CompanionRuntimeHealthEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    captured_at: object
+    captured_at: datetime
     connection_id: str = Field(min_length=1, max_length=128)
     mode: str = Field(min_length=1, max_length=32)
     reconnect_attempts: int = Field(ge=0, le=10_000)
@@ -107,16 +101,6 @@ class CompanionRuntimeHealthEvidence(BaseModel):
     peer_authenticated: bool
     rtt_ms: float = Field(ge=0, le=60_000)
 
-    @field_validator("captured_at", mode="before")
-    @classmethod
-    def parse_captured_at(cls, value: object) -> object:
-        from datetime import datetime
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        raise ValueError("captured_at must be an RFC3339 datetime")
-
 
 class CoreObservationAckEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -124,17 +108,7 @@ class CoreObservationAckEvidence(BaseModel):
     event_id: str = Field(min_length=1, max_length=128)
     accepted: bool
     reason: str = Field(min_length=1, max_length=128)
-    acknowledged_at: object
-
-    @field_validator("acknowledged_at", mode="before")
-    @classmethod
-    def parse_acknowledged_at(cls, value: object) -> object:
-        from datetime import datetime
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        raise ValueError("acknowledged_at must be an RFC3339 datetime")
+    acknowledged_at: datetime
 
 
 class LiveWowCheckpointEvidence(BaseModel):
@@ -143,7 +117,7 @@ class LiveWowCheckpointEvidence(BaseModel):
     checkpoint_sha256: str
     checkpoint_size_bytes: int = Field(gt=0, le=256 * 1024)
     path_fingerprint_sha256: str
-    captured_at: object
+    captured_at: datetime
     observation: WowObservation
     core_ack: CoreObservationAckEvidence
 
@@ -153,16 +127,6 @@ class LiveWowCheckpointEvidence(BaseModel):
         if not _SHA256_RE.fullmatch(value):
             raise ValueError("checkpoint evidence digests must be lowercase SHA-256")
         return value
-
-    @field_validator("captured_at", mode="before")
-    @classmethod
-    def parse_captured_at(cls, value: object) -> object:
-        from datetime import datetime
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        raise ValueError("captured_at must be an RFC3339 datetime")
 
 
 class ExactEnvironmentEvidenceBundle(BaseModel):
@@ -179,8 +143,8 @@ class ExactEnvironmentEvidenceBundle(BaseModel):
     evidence_id: str
     execution_mode: EvidenceExecutionMode
     source_sha: str
-    started_at: object
-    completed_at: object
+    started_at: datetime
+    completed_at: datetime
     adapter_identity: AdapterIdentity
     packaged_host: PackagedHostProvenance
     handshake: CompanionHandshakeEvidence
@@ -202,16 +166,6 @@ class ExactEnvironmentEvidenceBundle(BaseModel):
             raise ValueError("source_sha must be a lowercase 40-character Git SHA")
         return value
 
-    @field_validator("started_at", "completed_at", mode="before")
-    @classmethod
-    def parse_run_time(cls, value: object) -> object:
-        from datetime import datetime
-        if isinstance(value, datetime):
-            return value
-        if isinstance(value, str):
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        raise ValueError("run timestamps must be RFC3339 datetimes")
-
     @field_validator("capability_claims")
     @classmethod
     def validate_claim_list(cls, value: list[str]) -> list[str]:
@@ -223,16 +177,11 @@ class ExactEnvironmentEvidenceBundle(BaseModel):
 
     @model_validator(mode="after")
     def validate_timeline(self) -> "ExactEnvironmentEvidenceBundle":
-        from datetime import datetime
-        started_at = self.started_at
-        completed_at = self.completed_at
-        if not isinstance(started_at, datetime) or not isinstance(completed_at, datetime):
-            raise ValueError("run timestamps are invalid")
-        if started_at.tzinfo is None or completed_at.tzinfo is None:
+        if self.started_at.tzinfo is None or self.completed_at.tzinfo is None:
             raise ValueError("run timestamps must be timezone-aware")
-        if completed_at <= started_at:
+        if self.completed_at <= self.started_at:
             raise ValueError("completed_at must be after started_at")
-        if completed_at - started_at > timedelta(hours=8):
+        if self.completed_at - self.started_at > timedelta(hours=8):
             raise ValueError("exact-environment evidence run exceeds eight-hour bound")
         return self
 
@@ -253,7 +202,7 @@ class ExactEnvironmentAdmissionSummary(BaseModel):
 
 def canonical_evidence_digest(bundle: ExactEnvironmentEvidenceBundle) -> str:
     payload = json.dumps(
-        bundle.model_dump(mode="json"),
+        bundle.model_dump(mode="json", by_alias=True),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
@@ -261,9 +210,8 @@ def canonical_evidence_digest(bundle: ExactEnvironmentEvidenceBundle) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _require_aware(value: object, field_name: str):
-    from datetime import datetime
-    if not isinstance(value, datetime) or value.tzinfo is None:
+def _require_aware(value: datetime, field_name: str) -> datetime:
+    if value.tzinfo is None:
         raise ValueError(f"{field_name} must be timezone-aware")
     return value
 

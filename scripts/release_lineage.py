@@ -561,7 +561,16 @@ def fetch_candidate_package(
     return candidate, files
 
 
-def _write_json(path: Path, value: dict[str, Any]) -> None:
+def _write_presecret_binding(path: Path, repository: str, sha: str, version: str) -> None:
+    """Persist only the deterministic public-identity binding document."""
+    value = _binding_from_identity(repository, sha, version)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_candidate_manifest(path: Path, binding: dict[str, Any], apk: bytes, signer_sha256: str) -> None:
+    """Persist a candidate manifest derived only from validated local release inputs."""
+    value = create_candidate_manifest(binding, apk, signer_sha256)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -620,8 +629,8 @@ def main() -> int:
     try:
         if args.command == "presecret":
             version = Path(args.version_file).read_text(encoding="utf-8").strip()
-            binding = build_presecret_binding(args.repository, args.sha, version)
-            _write_json(Path(args.output), binding)
+            build_presecret_binding(args.repository, args.sha, version)
+            _write_presecret_binding(Path(args.output), args.repository, args.sha, version)
             print("pre-secret release binding PASS")
         elif args.command == "verify-binding":
             binding = _read_json(Path(args.input))
@@ -635,8 +644,7 @@ def main() -> int:
         elif args.command == "create-candidate":
             binding = _read_json(Path(args.binding))
             apk = Path(args.apk).read_bytes()
-            manifest = create_candidate_manifest(binding, apk, args.signer_sha256)
-            _write_json(Path(args.output), manifest)
+            _write_candidate_manifest(Path(args.output), binding, apk, args.signer_sha256)
             print("release candidate manifest PASS")
         elif args.command == "verify-candidate":
             manifest = _read_json(Path(args.input))

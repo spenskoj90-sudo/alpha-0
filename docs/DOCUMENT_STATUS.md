@@ -11,6 +11,7 @@
 - `TASKS.md` — active work queue, never implementation evidence.
 - `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md` and `ARTIFACT_ATTESTATION_V1.md` — active evidence, provenance and release-acceptance contracts.
 - `DESIGN_SYSTEM_V1.md` plus `../design/sentinel-design-system.v1.json` — active semantic cross-surface design contract and machine-readable design/code mapping; Figma is its visual design anchor, while repository tests provide implementation-drift evidence.
+- `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
 - `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
 - `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.
 

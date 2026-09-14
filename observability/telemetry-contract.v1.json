@@ -1,0 +1,119 @@
+{
+  "schema": "sentinel.telemetry-contract.v1",
+  "status": "ACTIVE",
+  "principles": [
+    "local-first",
+    "server-minimal",
+    "privacy-by-default",
+    "release-correlated",
+    "environment-separated",
+    "provider-optional",
+    "telemetry-never-authorizes-actions"
+  ],
+  "releaseIdentity": {
+    "androidFormat": "com.alpha0.app@<version>+<versionCode>.<sourceSha12>",
+    "requiredSourceShaLength": 40,
+    "sourceShaAlphabet": "lowercase-hex",
+    "sourceOfVersion": "VERSION",
+    "sourceOfCommitInReleaseCandidate": "GITHUB_SHA after workflow assertion GITHUB_SHA == source_sha"
+  },
+  "environments": {
+    "allowlist": ["development", "ci", "release-candidate", "production"],
+    "androidReleaseCandidateDefault": "release-candidate",
+    "productionRequiresExternalActivation": true
+  },
+  "providers": {
+    "sentry": {
+      "enabledSurface": "android-release-only-when-configured",
+      "purpose": "technical crash and runtime error diagnosis",
+      "credential": "Owner-managed SENTRY_DSN",
+      "requiredCorrelation": ["release", "environment", "sentinel.component", "sentinel.source_sha"],
+      "component": "android"
+    },
+    "posthog": {
+      "enabled": false,
+      "purpose": "optional future aggregate product telemetry",
+      "credential": null,
+      "policy": "No SDK or external delivery is enabled by this contract. Local/PostgreSQL operational telemetry remains canonical until an explicit provider activation decision."
+    },
+    "githubActions": {
+      "purpose": "build/test/security/release-evidence failures",
+      "correlation": ["exact source SHA", "workflow run ID", "job/check name"],
+      "mustNotMirrorIntoSentry": true
+    }
+  },
+  "eventClasses": {
+    "runtime.crash.unhandled": {
+      "externalProvider": "sentry",
+      "severity": "P1",
+      "requiredFields": ["release", "environment", "sourceSha", "component"],
+      "payloadPolicy": "technical-stack-only"
+    },
+    "runtime.error.selected": {
+      "externalProvider": "sentry",
+      "severity": "P2",
+      "requiredFields": ["release", "environment", "sourceSha", "component"],
+      "payloadPolicy": "technical-error-only"
+    },
+    "runtime.operational": {
+      "externalProvider": null,
+      "severity": "informational",
+      "source": "Core/Companion bounded telemetry plane",
+      "payloadPolicy": "bounded-low-cardinality"
+    },
+    "ci.failure": {
+      "externalProvider": "githubActions",
+      "severity": "engineering-gate",
+      "payloadPolicy": "workflow-native"
+    }
+  },
+  "privacy": {
+    "sentryKeep": ["exception type", "stack trace", "static release identity", "allowlisted environment", "static component", "exact source SHA"],
+    "sentryDrop": ["user object", "request object", "request headers", "request body", "query string", "cookies", "breadcrumbs", "extras", "screenshots", "view hierarchy"],
+    "forbiddenTelemetryDimensions": ["email", "token", "password", "authorization", "user", "user_id", "session", "session_id", "device_id", "fingerprint", "ip", "realm", "character", "transcript", "audio", "payload"],
+    "credentialValuesNeverPersisted": ["SENTRY_DSN", "PostHog API key"]
+  },
+  "retention": {
+    "repositoryEvidence": "per repository/workflow retention policy",
+    "coreOperationalRecentTrace": "bounded in-memory ring plus configured PostgreSQL retention seam",
+    "externalSentry": "provider/account retention is an Owner/external configuration gate; repository emits only minimized payloads",
+    "posthog": "disabled"
+  },
+  "alerts": {
+    "currentReleaseUnhandledFatal": {
+      "condition": "one or more unhandled fatal events on the currently evaluated release identity",
+      "severity": "P1",
+      "action": "open/attach an engineering defect before promotion; preserve release/source correlation"
+    },
+    "repeatedSelectedRuntimeError": {
+      "condition": "same technical fingerprint repeats on one current release and materially affects a supported flow",
+      "severity": "P2",
+      "action": "triage against exact release/source and reproduce before code change",
+      "numericProviderThreshold": "external-config-unverified"
+    },
+    "ciRequiredCheckFailure": {
+      "condition": "any required exact-SHA check is failed, missing, stale or pending at merge gate",
+      "severity": "blocking",
+      "action": "diagnose and remediate in the same engineering loop; never substitute runtime telemetry for CI evidence"
+    }
+  },
+  "triage": {
+    "sequence": [
+      "identify release/environment/source SHA",
+      "confirm event is privacy-safe and technically actionable",
+      "correlate with GitHub exact-SHA workflow/release evidence",
+      "link or create one GitHub/Linear defect with reproduction scope",
+      "implement regression evidence on a short-lived branch",
+      "require exact-HEAD CI and guarded merge",
+      "confirm fixed release identity before closing runtime regression"
+    ],
+    "dedupeKey": "provider + environment + release + technical fingerprint",
+    "noAutoCloseFromSilence": true
+  },
+  "externalGates": [
+    "Sentry project alert-rule provisioning and account retention settings",
+    "production environment activation",
+    "any future PostHog provider activation/credential",
+    "real-device runtime trend acceptance"
+  ]
+}

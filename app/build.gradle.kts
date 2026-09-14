@@ -17,10 +17,33 @@ android {
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
-        // Sentry DSN: empty by default. CI release jobs inject secrets.SENTRY_DSN.
-        // Never hardcode a real DSN in source or debug builds.
-        val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("")
-        buildConfigField("String", "SENTRY_DSN", "\"${sentryDsn.get()}\"")
+
+        // Runtime telemetry is disabled unless all required release identity is explicit.
+        // The DSN remains Owner-managed and is never committed. The guarded release-
+        // candidate workflow already enforces GITHUB_SHA == selected source_sha, so the
+        // standard Actions source identity is a valid fallback without passing another
+        // value through the secret-bearing signing step.
+        val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
+        val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
+            .orElse(providers.environmentVariable("GITHUB_SHA"))
+            .orElse("")
+            .get()
+            .trim()
+        val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
+        val runtimeEnvironment = providers.environmentVariable("SENTINEL_RUNTIME_ENVIRONMENT")
+            .orElse(if (sentryDsn.isNotEmpty() && githubActions) "release-candidate" else "")
+            .get()
+            .trim()
+        if (sourceSha.isNotEmpty() && !Regex("[0-9a-f]{40}").matches(sourceSha)) {
+            error("SENTINEL_SOURCE_SHA/GITHUB_SHA must be empty or a 40-character lowercase commit SHA")
+        }
+        val allowedRuntimeEnvironments = setOf("development", "ci", "release-candidate", "production")
+        if (runtimeEnvironment.isNotEmpty() && runtimeEnvironment !in allowedRuntimeEnvironments) {
+            error("SENTINEL_RUNTIME_ENVIRONMENT must be empty or an allowlisted environment")
+        }
+        buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
+        buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")
+        buildConfigField("String", "SENTINEL_RUNTIME_ENVIRONMENT", "\"$runtimeEnvironment\"")
     }
 
     buildFeatures {
@@ -88,15 +111,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.play:integrity:1.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    // Sentry Android SDK — runtime crash / error reporting (issue #7).
-    // Initialized only when BuildConfig.SENTRY_DSN is non-empty (release CI).
     implementation("io.sentry:sentry-android:8.54.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    // createComposeRule() uses the Compose test-host ComponentActivity declared by this debug manifest.
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
-    // Local JVM unit tests must use a real org.json implementation; the Android mock jar
-    // intentionally throws from JSONObject mutators outside an Android runtime.
     testImplementation("org.json:json:20250517")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

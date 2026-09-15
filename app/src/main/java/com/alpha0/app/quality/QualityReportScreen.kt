@@ -239,7 +239,7 @@ fun QualityReportScreen(
                 item {
                     SentinelCard {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("REPORT RECEIVED", style = MaterialTheme.typography.titleLarge, color = SentinelColors.Success)
+                            Text("REPORT RECEIVED", style = MaterialTheme.typography.titleLarge, color = SentinelColors.Signal)
                             Text("Reference: ${report.id}")
                             Text("Status: ${report.status}")
                             report.problemGroupId?.let { Text("Problem group: $it", color = SentinelColors.TextSecondary) }

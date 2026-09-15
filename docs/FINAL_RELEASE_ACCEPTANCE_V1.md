@@ -65,7 +65,7 @@ This strongest profile is an acceptance record for traffic readiness. The reposi
 
 ### Optional gate
 
-`firebase-test-lab` is allowed but never required while GitHub Emulator instrumentation remains the routine Android device gate and the external FTL IAM issue remains deferred.
+`firebase-test-lab` is optional informational evidence only. It is never required and must not replace GitHub Emulator instrumentation or the required exact-candidate `android-physical` acceptance gate. The former FTL IAM dependency is retired under `docs/FTL_POLICY.md`; issue #59 is closed `not planned`.
 
 ## Gate record
 

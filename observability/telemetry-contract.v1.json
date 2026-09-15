@@ -8,6 +8,8 @@
     "release-correlated",
     "environment-separated",
     "provider-optional",
+    "user-consent-before-diagnostic-upload",
+    "physical-test-forensics-never-ship-as-production-mode",
     "telemetry-never-authorizes-actions"
   ],
   "releaseIdentity": {
@@ -21,6 +23,56 @@
     "allowlist": ["development", "ci", "release-candidate", "production"],
     "androidReleaseCandidateDefault": "release-candidate",
     "productionRequiresExternalActivation": true
+  },
+  "localDiagnostics": {
+    "schema": "sentinel.diagnostic-snapshot.v1",
+    "physicalTest": {
+      "applicationIdSuffix": ".physicaltest",
+      "buildType": "physicalTest",
+      "mode": "FORENSIC_TEST",
+      "ringBytes": 16777216,
+      "fullLocalExport": true,
+      "automaticRemoteUpload": false,
+      "sentryEnabled": false,
+      "artifactRetentionDays": 90,
+      "purpose": "temporary physical-device acceptance and reproducible engineering evidence"
+    },
+    "production": {
+      "applicationId": "com.alpha0.app",
+      "mode": "PRODUCTION",
+      "ringBytes": 524288,
+      "fullLocalExport": false,
+      "automaticDiagnosticUpload": false,
+      "ticketSnapshotMaxBytes": 358400,
+      "serverSnapshotMaxBytes": 393216,
+      "diagnosticRetentionDays": 30,
+      "purpose": "bounded support breadcrumbs attached only after explicit user action"
+    },
+    "ticketFlow": {
+      "snapshotFrozenBeforeReportTextEntry": true,
+      "diagnosticsAttachmentRequiresExplicitConsent": true,
+      "qualityProgramOptInSeparateFromDiagnosticAttachment": true,
+      "ticketCanBeSubmittedWithoutDiagnostics": true,
+      "ticketMetadataOutlivesExpiredDiagnostics": true,
+      "directPublicIssueCreation": false
+    },
+    "neverCaptureByDefault": [
+      "passwords",
+      "access tokens",
+      "refresh tokens",
+      "session tokens",
+      "authorization headers",
+      "private keys",
+      "raw Play Integrity tokens",
+      "cookies",
+      "network request bodies",
+      "network response bodies",
+      "screenshots",
+      "raw microphone or audio data",
+      "WoW SavedVariables",
+      "game chat or transcripts",
+      "arbitrary ticket form text"
+    ]
   },
   "providers": {
     "sentry": {
@@ -61,6 +113,18 @@
       "source": "Core/Companion bounded telemetry plane",
       "payloadPolicy": "bounded-low-cardinality"
     },
+    "quality.report.user": {
+      "externalProvider": null,
+      "severity": "user-reported",
+      "source": "authenticated Core quality report plane",
+      "payloadPolicy": "ticket text plus separately consented sanitized diagnostic snapshot"
+    },
+    "physical-test.forensic": {
+      "externalProvider": null,
+      "severity": "acceptance-evidence",
+      "source": "isolated Android physicalTest build",
+      "payloadPolicy": "larger app-private structured ring with local explicit export"
+    },
     "ci.failure": {
       "externalProvider": "githubActions",
       "severity": "engineering-gate",
@@ -75,6 +139,9 @@
   },
   "retention": {
     "repositoryEvidence": "per repository/workflow retention policy",
+    "physicalTestApk": "90 days per exact-SHA GitHub Actions artifact",
+    "physicalTestLocalForensics": "bounded app-private ring; explicit local export; remove test app/data after acceptance",
+    "userTicketDiagnostics": "30 days maximum in Core; payload is independently pruned while ticket metadata remains",
     "coreOperationalRecentTrace": "bounded in-memory ring plus configured PostgreSQL retention seam",
     "externalSentry": "provider/account retention is an Owner/external configuration gate; repository emits only minimized payloads",
     "posthog": "disabled"

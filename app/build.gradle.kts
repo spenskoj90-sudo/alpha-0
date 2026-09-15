@@ -16,13 +16,9 @@ android {
         versionCode = 10002
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["appLabel"] = "SENTINEL"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
 
-        // Runtime telemetry is disabled unless all required release identity is explicit.
-        // The DSN remains Owner-managed and is never committed. The guarded release-
-        // candidate workflow already enforces GITHUB_SHA == selected source_sha, so the
-        // standard Actions source identity is a valid fallback without passing another
-        // value through the secret-bearing signing step.
         val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
         val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))
@@ -56,7 +52,23 @@ android {
     }
 
     buildTypes {
-        debug { }
+        debug {
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"DEVELOPMENT\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "2097152")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
+        }
+        create("physicalTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".physicaltest"
+            versionNameSuffix = "-physical-test"
+            manifestPlaceholders["appLabel"] = "SENTINEL PHYSICAL TEST"
+            matchingFallbacks += listOf("debug")
+            isDebuggable = true
+            isMinifyEnabled = false
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"FORENSIC_TEST\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -65,10 +77,12 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("ciRelease")
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"PRODUCTION\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false")
         }
     }
 
-    // Keep release signing secrets out of ordinary debug/unit-test configuration.
     val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
     val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
     val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
@@ -102,6 +116,7 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.01.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.navigation:navigation-compose:2.8.9")
     implementation("androidx.compose.ui:ui")

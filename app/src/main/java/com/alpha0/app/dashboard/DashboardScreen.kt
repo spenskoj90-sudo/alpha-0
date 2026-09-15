@@ -35,7 +35,8 @@ fun DashboardScreen(
     deviceId: String,
     api: DashboardApi,
     onDeviceClick: () -> Unit,
-    onGameClick: (String) -> Unit
+    onGameClick: (String) -> Unit,
+    onReportProblem: () -> Unit,
 ) {
     var device by remember { mutableStateOf<DashboardApi.Device?>(null) }
     var entitlements by remember { mutableStateOf<List<DashboardApi.Entitlement>>(emptyList()) }
@@ -102,6 +103,24 @@ fun DashboardScreen(
                             DataText(current.fingerprint)
                             DataText("Bound: ${current.boundAt ?: "not reported"}")
                         }
+                    }
+                }
+            }
+            item {
+                SentinelCard(
+                    modifier = Modifier
+                        .buttonCardSemantics("Report a problem and optionally attach diagnostics")
+                        .clickable { onReportProblem() },
+                    scan = true,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("QUALITY FEEDBACK", style = MaterialTheme.typography.labelLarge)
+                        Text("Report a problem", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Create a support ticket with an optional privacy-bounded diagnostic snapshot already captured before you opened the report.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SentinelColors.TextSecondary,
+                        )
                     }
                 }
             }

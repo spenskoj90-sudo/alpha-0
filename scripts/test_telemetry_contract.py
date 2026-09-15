@@ -19,6 +19,10 @@ class TelemetryContractTests(unittest.TestCase):
         cls.contract = json.loads(read("observability/telemetry-contract.v1.json"))
         cls.gradle = read("app/build.gradle.kts")
         cls.application = read("app/src/main/java/com/alpha0/app/SentinelApplication.kt")
+        cls.diagnostic_logger = read("app/src/main/java/com/alpha0/app/diagnostics/DiagnosticLogger.kt")
+        cls.quality_screen = read("app/src/main/java/com/alpha0/app/quality/QualityReportScreen.kt")
+        cls.quality_api = read("server/app/core/quality_api.py")
+        cls.physical_workflow = read(".github/workflows/physical-test-apk.yml")
         cls.release_candidate = read(".github/workflows/release-candidate.yml")
         cls.observability = read("docs/OBSERVABILITY.md")
         cls.companion = read("docs/COMPANION_OBSERVABILITY_V1.md")
@@ -29,6 +33,8 @@ class TelemetryContractTests(unittest.TestCase):
         principles = set(self.contract["principles"])
         self.assertIn("local-first", principles)
         self.assertIn("server-minimal", principles)
+        self.assertIn("user-consent-before-diagnostic-upload", principles)
+        self.assertIn("physical-test-forensics-never-ship-as-production-mode", principles)
         self.assertIn("telemetry-never-authorizes-actions", principles)
         self.assertFalse(self.contract["providers"]["posthog"]["enabled"])
 
@@ -70,7 +76,83 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertNotIn("User()", self.application)
         self.assertNotIn("SENTRY_DSN =", self.application)
 
-    def test_contract_forbids_sensitive_dimensions_and_separates_ci(self) -> None:
+    def test_physical_test_build_is_isolated_from_release(self) -> None:
+        local = self.contract["localDiagnostics"]
+        physical = local["physicalTest"]
+        production = local["production"]
+        self.assertEqual(physical["applicationIdSuffix"], ".physicaltest")
+        self.assertEqual(physical["mode"], "FORENSIC_TEST")
+        self.assertEqual(physical["ringBytes"], 16 * 1024 * 1024)
+        self.assertFalse(physical["automaticRemoteUpload"])
+        self.assertFalse(physical["sentryEnabled"])
+        self.assertEqual(physical["artifactRetentionDays"], 90)
+        self.assertEqual(production["mode"], "PRODUCTION")
+        self.assertEqual(production["ringBytes"], 512 * 1024)
+        self.assertFalse(production["fullLocalExport"])
+        self.assertFalse(production["automaticDiagnosticUpload"])
+
+        for value in (
+            'applicationIdSuffix = ".physicaltest"',
+            '"SENTINEL_DIAGNOSTICS_MODE", "\\\"FORENSIC_TEST\\\""',
+            '"SENTINEL_DIAGNOSTICS_MODE", "\\\"PRODUCTION\\\""',
+            '"SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216"',
+            '"SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288"',
+            '"SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false"',
+        ):
+            self.assertIn(value, self.gradle)
+        self.assertIn("if (diagnostics.isForensicTest())", self.application)
+        self.assertIn("REMOTE_TELEMETRY_DISABLED_FOR_FORENSIC_TEST", self.application)
+
+    def test_physical_test_apk_is_exact_sha_built_and_retained(self) -> None:
+        self.assertIn("assemblePhysicalTest", self.physical_workflow)
+        self.assertIn("SENTINEL_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}", self.physical_workflow)
+        self.assertIn("app-physicalTest.apk", self.physical_workflow)
+        self.assertIn("sha256sum", self.physical_workflow)
+        self.assertIn("retention-days: 90", self.physical_workflow)
+        self.assertNotIn("secrets.", self.physical_workflow)
+
+    def test_user_ticket_diagnostics_require_explicit_consent_and_remain_bounded(self) -> None:
+        local = self.contract["localDiagnostics"]
+        ticket = local["ticketFlow"]
+        production = local["production"]
+        self.assertTrue(ticket["snapshotFrozenBeforeReportTextEntry"])
+        self.assertTrue(ticket["diagnosticsAttachmentRequiresExplicitConsent"])
+        self.assertTrue(ticket["qualityProgramOptInSeparateFromDiagnosticAttachment"])
+        self.assertTrue(ticket["ticketCanBeSubmittedWithoutDiagnostics"])
+        self.assertFalse(ticket["directPublicIssueCreation"])
+        self.assertLessEqual(production["ticketSnapshotMaxBytes"], production["serverSnapshotMaxBytes"])
+        self.assertEqual(production["diagnosticRetentionDays"], 30)
+
+        self.assertIn("remember { diagnostics.createTicketSnapshot() }", self.quality_screen)
+        self.assertIn("Attach this diagnostic snapshot to my report", self.quality_screen)
+        self.assertIn("Contribute this report to SENTINEL quality improvement", self.quality_screen)
+        self.assertIn("diagnostics_consent != (self.diagnostics is not None)", self.quality_api)
+        self.assertIn("DIAGNOSTIC_RETENTION_DAYS = 30", self.quality_api)
+        self.assertIn("MAX_DIAGNOSTIC_BYTES = 384 * 1024", self.quality_api)
+
+    def test_local_diagnostics_explicitly_forbid_high_risk_payloads(self) -> None:
+        forbidden = {item.lower() for item in self.contract["localDiagnostics"]["neverCaptureByDefault"]}
+        for required in {
+            "passwords",
+            "access tokens",
+            "refresh tokens",
+            "session tokens",
+            "authorization headers",
+            "private keys",
+            "raw play integrity tokens",
+            "screenshots",
+            "raw microphone or audio data",
+            "wow savedvariables",
+            "game chat or transcripts",
+            "arbitrary ticket form text",
+        }:
+            self.assertIn(required, forbidden)
+        self.assertIn("request_body", self.diagnostic_logger)
+        self.assertIn("response_body", self.diagnostic_logger)
+        self.assertIn("savedvariables", self.diagnostic_logger)
+        self.assertIn("microphone_bytes", self.diagnostic_logger)
+
+    def test_contract_forbids_sensitive_external_dimensions_and_separates_ci(self) -> None:
         forbidden = set(self.contract["privacy"]["forbiddenTelemetryDimensions"])
         for required in {"email", "token", "authorization", "session_id", "device_id", "transcript", "audio", "payload"}:
             self.assertIn(required, forbidden)
@@ -106,7 +188,6 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertIn("telemetry", self.companion.lower())
 
     def test_no_obvious_committed_sentry_dsn(self) -> None:
-        # DSN examples must never appear as concrete project endpoints in source/docs.
         for path in (
             "app/build.gradle.kts",
             "app/src/main/java/com/alpha0/app/SentinelApplication.kt",

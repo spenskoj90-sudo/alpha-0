@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import com.alpha0.app.BuildConfig
+import java.io.InputStreamReader
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -21,6 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * logs, captures screens, records microphone audio, or sends telemetry automatically.
  */
 object DiagnosticRuntime {
+    private const val MAX_EXIT_TRACE_CHARS = 16_384
     private val installed = AtomicBoolean(false)
     private val strictModeExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "sentinel-strictmode").apply { isDaemon = true }
@@ -30,6 +32,8 @@ object DiagnosticRuntime {
         val logger = DiagnosticLogger.get(application)
         if (!installed.compareAndSet(false, true)) return logger
 
+        val metrics = application.resources.displayMetrics
+        val configuration = application.resources.configuration
         logger.info(
             "RUNTIME",
             "PROCESS_START",
@@ -41,6 +45,9 @@ object DiagnosticRuntime {
                 "sdk" to Build.VERSION.SDK_INT,
                 "manufacturer" to Build.MANUFACTURER.take(64),
                 "model" to Build.MODEL.take(64),
+                "density_dpi" to metrics.densityDpi,
+                "font_scale" to configuration.fontScale,
+                "orientation" to configuration.orientation,
             )
         )
         installUncaughtExceptionCapture(logger)
@@ -67,16 +74,12 @@ object DiagnosticRuntime {
 
     private fun installLifecycleCapture(application: Application, logger: DiagnosticLogger) {
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) =
-                lifecycle(logger, activity, "CREATED")
-
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = lifecycle(logger, activity, "CREATED")
             override fun onActivityStarted(activity: Activity) = lifecycle(logger, activity, "STARTED")
             override fun onActivityResumed(activity: Activity) = lifecycle(logger, activity, "RESUMED")
             override fun onActivityPaused(activity: Activity) = lifecycle(logger, activity, "PAUSED")
             override fun onActivityStopped(activity: Activity) = lifecycle(logger, activity, "STOPPED")
-            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) =
-                lifecycle(logger, activity, "STATE_SAVED")
-
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = lifecycle(logger, activity, "STATE_SAVED")
             override fun onActivityDestroyed(activity: Activity) = lifecycle(logger, activity, "DESTROYED")
         })
     }
@@ -122,18 +125,19 @@ object DiagnosticRuntime {
         try {
             val manager = context.getSystemService(ActivityManager::class.java) ?: return
             manager.getHistoricalProcessExitReasons(context.packageName, 0, 5).forEach { reason ->
-                logger.info(
-                    "RUNTIME",
-                    "PREVIOUS_PROCESS_EXIT",
-                    result = "OBSERVED",
-                    details = mapOf(
-                        "reason" to reason.reason,
-                        "status" to reason.status,
-                        "importance" to reason.importance,
-                        "timestamp_ms" to reason.timestamp,
-                        "description" to DiagnosticLogger.sanitizeTextForDiagnostics(reason.description, 512),
-                    )
+                val details = linkedMapOf<String, Any?>(
+                    "reason" to reason.reason,
+                    "status" to reason.status,
+                    "importance" to reason.importance,
+                    "timestamp_ms" to reason.timestamp,
+                    "pss_kb" to reason.pss,
+                    "rss_kb" to reason.rss,
+                    "description" to DiagnosticLogger.sanitizeTextForDiagnostics(reason.description, 512),
                 )
+                if (logger.isForensicTest()) {
+                    readExitTrace(reason.traceInputStream)?.let { details["trace_excerpt"] = it }
+                }
+                logger.info("RUNTIME", "PREVIOUS_PROCESS_EXIT", result = "OBSERVED", details = details)
             }
         } catch (error: Exception) {
             logger.warn(
@@ -142,6 +146,19 @@ object DiagnosticRuntime {
                 errorCode = error.javaClass.simpleName.take(96),
             )
         }
+    }
+
+    private fun readExitTrace(stream: java.io.InputStream?): String? {
+        if (stream == null) return null
+        return runCatching {
+            stream.use { input ->
+                InputStreamReader(input, Charsets.UTF_8).use { reader ->
+                    val buffer = CharArray(MAX_EXIT_TRACE_CHARS)
+                    val count = reader.read(buffer, 0, buffer.size)
+                    if (count <= 0) null else DiagnosticLogger.sanitizeTextForDiagnostics(String(buffer, 0, count), MAX_EXIT_TRACE_CHARS)
+                }
+            }
+        }.getOrNull()
     }
 
     private fun installForensicStrictMode(logger: DiagnosticLogger) {

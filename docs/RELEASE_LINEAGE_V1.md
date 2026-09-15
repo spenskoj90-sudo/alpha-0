@@ -1,121 +1,137 @@
 # SENTINEL Release Lineage v1
 
 **Status:** ACTIVE  
-**Purpose:** bind Owner-gated Android signing and release publication to canonical exact-SHA protected-main evidence without exposing signing material or persisting authenticated GitHub API metadata.
+**Purpose:** bind Owner-gated Android signing, final physical/environment acceptance and release publication to canonical exact-SHA protected-main evidence without exposing signing material or persisting authenticated GitHub API metadata.
 
 ## Invariant
 
-A release action is valid only for one exact source commit that already has a successful protected-`main` `sentinel.release-evidence.v1` artifact and a valid GitHub/Sigstore attestation for that manifest. PR evidence, an older successful SHA, a debug artifact, a stale or unattested release-candidate, or an unverified local file cannot substitute for that protected-main evidence.
+A release action is valid only for one exact source commit that already has successful protected-`main` `sentinel.release-evidence.v1` plus valid GitHub/Sigstore provenance. PR evidence, an older successful SHA, a debug artifact, a stale/unattested release candidate, a final-acceptance record for different bytes, or an unverified local file cannot substitute.
 
 The lineage is:
 
-`protected-main source SHA -> attested Supply Chain + Packaged Companion evidence -> Release Evidence verification -> attested release-evidence.json -> deterministic pre-secret binding -> Owner-signed release candidate -> no-secret candidate attestation -> Owner tag -> repeated attestation/lineage verification -> publication authority`
+`protected-main source SHA -> attested Supply Chain + Packaged Companion evidence -> Release Evidence verification -> attested release-evidence.json -> deterministic pre-secret binding -> Owner-signed release candidate -> no-secret candidate attestation -> real physical/environment acceptance bound to exact candidate/package -> no-secret final-acceptance attestation -> Owner tag -> repeated lineage/attestation/final-acceptance verification -> publication authority`
+
+Deployment is a subsequent and stronger boundary: remote rollout additionally requires an Owner dispatch and a `deployment` final-acceptance profile for that exact release set.
 
 ## Protected-main attestation prerequisite
 
-`docs/ARTIFACT_ATTESTATION_V1.md` defines the cryptographic provenance contract. Protected-main Supply Chain and Packaged Companion workflows produce GitHub/Sigstore attestations in separate downstream jobs that have OIDC/attestation authority but no repository secrets. `Release Evidence Preflight` verifies those exact subjects before it can upload its canonical manifest, then a second no-secret job attests `release-evidence.json` itself.
+`docs/ARTIFACT_ATTESTATION_V1.md` defines the cryptographic provenance contract. Protected-main Supply Chain and Packaged Companion workflows produce GitHub/Sigstore attestations in separate downstream jobs that have OIDC/attestation authority but no repository secrets. `Release Evidence Preflight` verifies those exact subjects before it uploads its canonical manifest, then a second no-secret job attests `release-evidence.json` itself.
 
-`scripts/verify_release_evidence_attestation.sh` selects only a successful exact-SHA `Release Evidence Preflight` push on branch `main`, downloads its exact named artifact and verifies the manifest subject against the expected repository, `.github/workflows/release-evidence.yml`, exact source SHA, `refs/heads/main` and GitHub-hosted-runner policy.
+`scripts/verify_release_evidence_attestation.sh` selects only a successful exact-SHA `Release Evidence Preflight` push on branch `main`, downloads its exact named artifact and verifies the manifest against repository, `.github/workflows/release-evidence.yml`, exact source SHA, `refs/heads/main` and GitHub-hosted-runner policy.
 
-This attestation check is additive to the existing live metadata/archive verifier; neither can substitute for the other.
+This attestation check is additive to the existing live metadata/archive verifier; neither substitutes for the other.
 
 ## Pre-secret binding
 
 `scripts/release_lineage.py presecret` performs the authenticated verification boundary before any signing secret is referenced. It:
 
 1. requires a 40-character lowercase source SHA and canonical `VERSION`;
-2. selects the newest exact-SHA `Release Evidence Preflight` run whose event is `push`, branch is `main`, workflow path is `.github/workflows/release-evidence.yml`, and conclusion is `success`;
+2. selects the newest exact-SHA successful protected-main `Release Evidence Preflight` run;
 3. requires `sentinel-release-evidence-<sha>` from that exact run;
 4. downloads the GitHub artifact ZIP through the Actions API;
-5. bounds the archive size and accepts only the single expected `release-evidence.json` member;
-6. verifies the downloaded ZIP SHA-256 and size against GitHub's authenticated server-side artifact metadata;
-7. runs the existing release-evidence verifier with the active Supply Chain Evidence extension against repository, exact SHA and version;
-8. rejects PR evidence even if its internal structure is otherwise valid;
-9. returns only a static PASS/FAIL process result and does not persist authenticated or derived data.
+5. bounds archive size and accepts only the single expected `release-evidence.json` member;
+6. verifies downloaded ZIP SHA-256 and size against authenticated server-side artifact metadata;
+7. runs the active release-evidence verifier against repository, exact SHA and version;
+8. rejects PR evidence as protected-main evidence; and
+9. returns only PASS/FAIL without persisting authenticated response metadata.
 
-Owner-gated workflows run the independent GitHub attestation check before this Python boundary. After both checks succeed, `scripts/write_release_presecret_binding.sh` constructs the deterministic `sentinel.release-presecret-binding.v1` document from only the public repository/source/version identity and canonical workflow/artifact selector. The Python `verify-binding` command immediately validates the generated schema and canonical digest before the binding can be uploaded, compared, or used by later release stages.
+After independent attestation and live verification succeed, `scripts/write_release_presecret_binding.sh` creates deterministic `sentinel.release-presecret-binding.v1` from public repository/source/version identity and the canonical protected-main evidence selector. `verify-binding` immediately checks schema and canonical digest.
 
-GitHub authentication is owned by the `gh` process supplied by the workflow environment where practical. The Python lineage module never reads, receives, serializes, or logs the GitHub credential. Authenticated run/artifact metadata, server artifact digests, response sizes and release-evidence payload bytes are verification inputs only: they are validated and then discarded. They are not persisted directly, hashed into persisted lineage, or copied into the release-candidate manifest. The Python authenticated-verification path has no pre-secret binding storage sink.
-
-The persisted binding therefore contains no raw or digest-projected authenticated API metadata. Its `bindingDigest` covers only deterministic exact-source identity, the canonical protected-main evidence selector and explicit false claims for signing, publication and deployment. Repeated generation for the same exact source is stable, but generation still fails closed unless the live protected-main evidence passes every verification step at that moment.
-
-Repository regression tests lock this privacy boundary: persisted bindings must omit run IDs, artifact IDs, response-derived digests and timestamps; the shell-generated binding must be byte-semantically equivalent to the Python canonical binding model; candidate lineage must contain only the deterministic binding digest; and the Python authenticated path must not persist a pre-secret binding or emit data-derived values in logs.
+Persisted binding contains no raw or digest-projected authenticated API metadata. Its digest covers deterministic exact-source identity and explicit false claims for signing/publication/deployment. Regression tests prevent run IDs, artifact IDs, response-derived digests or timestamps from leaking into persisted pre-secret lineage.
 
 ## Manual release-candidate signing
 
-`.github/workflows/release-candidate.yml` remains an Owner-only manual workflow. It requires an explicit `source_sha`, must itself be dispatched from `main`, and now requires `GITHUB_SHA == source_sha`.
+`.github/workflows/release-candidate.yml` is Owner-only. It requires an explicit `source_sha`, dispatch from `main`, and `GITHUB_SHA == source_sha`; that last property is necessary because GitHub OIDC provenance describes the workflow execution commit.
 
-That final requirement is a cryptographic provenance invariant: GitHub OIDC describes the workflow execution commit. The workflow cannot honestly attest a candidate as exact-source provenance if it was dispatched at one commit and merely checked out a different commit supplied as data.
+The read-only pre-secret job verifies protected-main release-evidence attestation/live evidence and deterministic binding. The signing job repeats those checks before its first signing-secret reference. Only then may it decode the Android keystore and build the signed APK.
 
-Its first job, `presecret`, has read-only Actions/contents/attestation access. It verifies the protected-main release-evidence attestation, verifies canonical protected-main evidence, generates and independently verifies the deterministic binding, and exports its digest. The signing job also has read-only attestation access; it checks out the exact selected SHA, repeats both the attestation and live protected-main verification, regenerates and verifies the same binding, and compares it **before the first step that references release secrets**. Only then may it decode the Android keystore and build the signed APK.
-
-After independent `apksigner` fingerprint and non-debuggable verification, the workflow creates `sentinel.release-candidate.v1`. That manifest binds:
+After independent `apksigner` fingerprint and non-debuggable verification, the workflow creates `sentinel.release-candidate.v1`, binding:
 
 - repository, exact source SHA and version;
-- the deterministic pre-secret binding digest;
+- deterministic pre-secret binding digest;
 - signed APK byte size and SHA-256;
 - expected signer certificate SHA-256;
 - explicit false claims for publication and production deployment.
 
-The retained `sentinel-release-candidate-<sha>` artifact contains exactly:
+The retained `sentinel-release-candidate-<sha>` artifact contains exactly `app-release.apk`, `release-presecret-binding.json` and `release-candidate.json`. The signing job exports hashes of those bytes. A separate downstream job with no signing secrets rechecks the hashes and attests all three subjects.
 
-- `app-release.apk`;
-- `release-presecret-binding.json`;
-- `release-candidate.json`.
+Signing-key custody, secret provisioning and execution remain Owner-only gates. Ordinary PR/main CI validates machinery and non-secret provenance lanes only.
 
-The signing job exports the SHA-256 of those exact bytes. A **separate downstream attestation job** has no signing secrets: it downloads the immutable candidate artifact, rechecks all three hashes and uses the pinned `actions/attest` action to attest those three subjects. Because dispatch commit identity equals `source_sha`, the GitHub OIDC source digest is the same source commit represented by the candidate lineage.
+## Exact-candidate final acceptance
 
-Signing-key custody, secret provisioning and execution of this workflow remain Owner-only gates. Ordinary PR/main CI validates only the machinery and non-secret attestation lanes.
+A signed candidate is necessary but no longer sufficient for publication. `docs/FINAL_RELEASE_ACCEPTANCE_V1.md` defines the next boundary.
+
+Physical Android, packaged Windows host, exact WoW environment, microphone/acoustic and final accessibility/visual acceptance are performed late against the selected release set. Every accepted gate is machine-bound to:
+
+- repository/source SHA/version;
+- current retained candidate digest;
+- exact signed APK SHA-256; and
+- exact protected-main Packaged Companion archive SHA-256.
+
+The Human Owner records those real results into `sentinel.final-release-acceptance.v1`. The Owner-dispatched `.github/workflows/final-release-acceptance.yml` must itself run from `main` with `GITHUB_SHA == source_sha`. Its read-only validation job independently re-verifies Release Evidence, current retained candidate/APK attestations and protected-main package provenance before it accepts the manifest. A separate no-secret OIDC job attests `final-release-acceptance.json`.
+
+A newer or different candidate/package invalidates earlier acceptance automatically because publication re-fetches the current candidate and package and reruns the binding verifier. Real tests must then be rerun where byte/source binding changed; stale acceptance is never inherited merely because the semantic version is the same.
+
+Repository tests use synthetic gate evidence only and therefore do not constitute physical/environment acceptance.
 
 ## Publication without re-signing
 
-`.github/workflows/release.yml` remains triggered only by an Owner-created `v*.*.*` tag. It does not decode a keystore and does not run `assembleRelease`.
+`.github/workflows/release.yml` is triggered only by an Owner-created `v*.*.*` tag. It does not decode a keystore and does not run `assembleRelease`.
 
-The workflow has three authority stages:
+Its authority stages are:
 
-1. `presecret` has read-only Actions/contents/attestation permissions. It resolves the tag to its exact commit, verifies that the tag version equals root `VERSION`, verifies the protected-main `release-evidence.json` attestation, repeats protected-main live release-evidence verification for that commit, constructs the deterministic public-identity binding outside the authenticated Python path, and independently verifies that binding.
-2. `verify-candidate` also has only read permissions. It repeats release-evidence attestation/live verification, locates and downloads the newest successful `Release Candidate Artifact` containing `sentinel-release-candidate-<sha>`, transiently verifies GitHub candidate ZIP digest/size and safe member set, validates the packaged binding/candidate/APK, then cryptographically verifies all three candidate subjects against `.github/workflows/release-candidate.yml`, exact source SHA and `refs/heads/main`. It independently runs `apksigner`, rejects a debuggable APK, builds the exact-source Core archive, records local byte hashes and uploads one preverified publication-input artifact.
-3. `publish` is the **only** job with `contents: write`. It has no repository checkout, no OIDC/attestation write authority and executes no repository Python code. It downloads the prior job's publication-input artifact with an immutable pinned official `actions/download-artifact` commit, rechecks the SHA-256 of every release asset against read-only job outputs, and only then calls `gh release create`.
+1. `presecret` — read-only Actions/contents/attestation access; resolves the tag to its exact commit/version, verifies protected-main release-evidence attestation/live lineage, creates and verifies the deterministic binding.
+2. `verify-candidate` — read-only; repeats release-evidence checks, fetches the newest successful candidate for the exact source, validates GitHub candidate ZIP metadata/member set, binding/candidate/APK, candidate attestations, signer and non-debuggable state. It then invokes `scripts/verify_final_release_acceptance_live.sh` at minimum `publication` profile, which re-verifies Release Evidence, candidate provenance, protected-main package provenance, final-acceptance attestation and exact candidate/package binding. Only then is the exact-source Core archive built and one publication-input artifact uploaded.
+3. `publish` — the only release job with `contents: write`. It has no checkout, no OIDC/attestation authority and executes no repository Python. It downloads only the preverified publication input, rechecks byte hashes for APK/Core/candidate/binding/final-acceptance, and calls `gh release create`.
 
-The published assets are the already-signed APK, exact-source Core archive, release-candidate manifest and deterministic pre-secret binding. No authenticated GitHub API response metadata is emitted as a release asset.
+Published lineage assets include the already-signed APK, exact-source Core archive, release-candidate manifest, deterministic pre-secret binding and `final-release-acceptance.json`.
 
-A tag therefore cannot cause the publication workflow to manufacture a new signed binary or accept an unattested candidate. A valid Owner-signed and GitHub-attested release-candidate artifact for the exact tagged source SHA must already exist, and write authority is not granted until current protected-main evidence, release-evidence provenance and signed-candidate provenance have all been verified successfully.
+A tag therefore cannot manufacture a new signed binary or bypass final physical/environment acceptance. Publication write authority is reached only after current protected-main evidence, candidate provenance and exact-candidate final acceptance all verify successfully.
+
+## Deployment lineage
+
+`.github/workflows/deploy.yml` consumes an exact published version tag rather than a mutable generic source selector. Before image publication it checks out that exact tag/source and requires at least `publication` final acceptance.
+
+Remote rollout is not an automatic consequence of GitHub Release publication. It can run only after a separate Owner `workflow_dispatch`, `DEPLOY_ENABLED=true`, and successful verification of a stronger `deployment` final-acceptance profile for the exact same source/candidate/package. Deployment secrets are referenced only in the final remote job after that read-only acceptance job succeeds.
+
+`production-traffic` is a stronger recorded acceptance profile adding target runtime-security/penetration evidence. The repository does not autonomously enable production traffic.
 
 ## Fail-closed behavior
 
-The lineage/attestation boundary rejects, among other cases:
+The lineage/provenance/final-acceptance boundary rejects, among other cases:
 
-- missing, pending, failed or non-`main` Release Evidence Preflight;
-- a mismatched source SHA or version;
-- expired or zero-size GitHub artifacts;
-- missing/malformed GitHub SHA-256 artifact metadata;
-- archive bytes whose digest/size do not match GitHub metadata;
-- unsafe, nested, duplicate or unexpected ZIP paths;
+- missing, pending, failed or non-main Release Evidence Preflight;
+- mismatched source SHA/version;
+- expired/zero-size GitHub artifacts;
+- malformed authenticated artifact SHA-256 metadata;
+- archive bytes whose digest/size differs from GitHub metadata;
+- unsafe/nested/duplicate/unexpected ZIP paths;
 - PR evidence presented as protected-main release evidence;
-- missing/tampered/wrong-workflow/wrong-SHA GitHub attestations;
+- missing/tampered/wrong-workflow/wrong-SHA attestations;
 - self-hosted-runner attestations;
-- a release-candidate dispatch whose workflow commit differs from `source_sha`;
-- tampered pre-secret binding or release-candidate manifests;
+- release-candidate dispatch whose workflow commit differs from `source_sha`;
+- tampered pre-secret/candidate/final-acceptance manifests;
 - stale candidate lineage;
-- tampered APK bytes;
-- unexpected signer certificate identity;
-- candidate bytes that differ from signing-job hash outputs; and
-- a release-candidate workflow that did not complete successfully.
+- tampered APK bytes or unexpected signer identity;
+- candidate bytes differing from signing-job hash outputs;
+- final-acceptance gate from another candidate/APK/package/source;
+- missing required physical/environment gate;
+- final-acceptance profile weaker than the requested publication/deployment operation; and
+- an attempt to remote-deploy from automatic `release: published` instead of explicit Owner dispatch.
 
-No fallback to an older successful release-evidence run is permitted when the newest exact-SHA run is failed or incomplete.
+Do not fall back to older evidence when the current exact release-set evidence is failed, missing, stale or weaker than required.
 
 ## Explicit non-claims
 
-Repository CI can validate this boundary, schemas, non-secret protected-main attestations and synthetic tamper cases without release secrets. That does **not** mean a signed release candidate has been produced or a release has been published.
+Repository CI can validate schemas, synthetic tamper cases, authority wiring and non-secret protected-main provenance without signing/production secrets. That does not mean a signed candidate, real final acceptance, release or deployment exists.
 
 The following remain Owner/external gates:
 
 - Android signing keystore/password custody and manual signed-RC execution;
-- creation/push of the release tag;
-- GitHub Release publication;
-- production/live deployment;
-- physical Android/Windows/audio acceptance;
-- exact WoW/private-server L3 acceptance;
-- production provider, ingress and database credentials.
+- physical Android/Windows/audio/accessibility and exact WoW/private-server acceptance;
+- selected production provider/ingress/database/runtime-security evidence;
+- Owner recording/dispatch of the final-acceptance manifest after real tests;
+- creation/push of the release tag and GitHub Release publication;
+- Owner-dispatched production/live deployment and production traffic activation.
 
-GPT may implement, test, review and merge the lineage/attestation machinery through ordinary exact-SHA CI. GPT must stop at the actual signing, tag/publication and live-deployment gates.
+GPT may implement, test, review and merge this machinery through ordinary exact-SHA CI. GPT must stop at actual signing, real-environment acceptance recording, tag/publication and live-deployment gates.

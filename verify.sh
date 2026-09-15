@@ -36,6 +36,7 @@ check 'CI deploy workflow' test -f .github/workflows/deploy.yml
 check 'CI release workflow' test -f .github/workflows/release.yml
 check 'CI release-candidate workflow' test -f .github/workflows/release-candidate.yml
 check 'CI release evidence workflow' test -f .github/workflows/release-evidence.yml
+check 'CI final release acceptance workflow' test -f .github/workflows/final-release-acceptance.yml
 check 'API docs' test -f docs/API.md
 check 'Security docs' test -f docs/SECURITY.md
 check 'Architecture docs' test -f docs/ARCHITECTURE.md
@@ -57,16 +58,23 @@ check 'Release supply-chain evidence tests' test -f scripts/test_release_evidenc
 check 'Release lineage verifier' test -f scripts/release_lineage.py
 check 'Release lineage tests' test -f scripts/test_release_lineage.py
 check 'Artifact attestation tests' test -f scripts/test_artifact_attestations.py
+check 'Final release acceptance verifier' test -f scripts/final_release_acceptance.py
+check 'Final release acceptance tests' test -f scripts/test_final_release_acceptance.py
 check 'GitHub attestation verifier' test -f scripts/verify_github_attestation.sh
 check 'Protected-main release attestation verifier' test -f scripts/verify_release_evidence_attestation.sh
 check 'Release upstream attestation verifier' test -f scripts/verify_release_upstream_attestations.sh
+check 'Final acceptance attestation verifier' test -f scripts/verify_final_release_acceptance_attestation.sh
+check 'Live final acceptance verifier' test -f scripts/verify_final_release_acceptance_live.sh
 check 'Release evidence contract' test -f docs/RELEASE_EVIDENCE_PREFLIGHT_V1.md
 check 'Release lineage contract' test -f docs/RELEASE_LINEAGE_V1.md
+check 'Final release acceptance contract' test -f docs/FINAL_RELEASE_ACCEPTANCE_V1.md
 
-check 'Artifact attestation shell syntax' bash -n \
+check 'Artifact and acceptance shell syntax' bash -n \
   scripts/verify_github_attestation.sh \
   scripts/verify_release_evidence_attestation.sh \
-  scripts/verify_release_upstream_attestations.sh
+  scripts/verify_release_upstream_attestations.sh \
+  scripts/verify_final_release_acceptance_attestation.sh \
+  scripts/verify_final_release_acceptance_live.sh
 
 if command -v python >/dev/null 2>&1; then
   check 'Python compile' python -m compileall -q \
@@ -75,7 +83,8 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
     scripts/release_lineage.py scripts/test_release_lineage.py \
     scripts/test_artifact_attestations.py scripts/test_design_system.py \
-    scripts/test_telemetry_contract.py
+    scripts/test_telemetry_contract.py \
+    scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
@@ -83,6 +92,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
   check 'Design system invariants' python scripts/test_design_system.py
   check 'Telemetry contract invariants' python scripts/test_telemetry_contract.py
+  check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

@@ -61,6 +61,7 @@ jobs:
           python scripts/test_release_evidence_supply_chain.py
           python scripts/test_release_lineage.py
           python scripts/test_artifact_attestations.py
+          python scripts/test_final_release_acceptance.py
 
       - name: Verify protected-main release-evidence attestation
         env:
@@ -109,10 +110,10 @@ jobs:
           retention-days: 90
 
   verify-candidate:
-    name: Verify signed candidate before publication authority
+    name: Verify signed candidate and final acceptance before publication authority
     needs: presecret
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       actions: read
       contents: read
@@ -123,6 +124,7 @@ jobs:
       core_sha256: ${{ steps.hashes.outputs.core_sha256 }}
       candidate_sha256: ${{ steps.hashes.outputs.candidate_sha256 }}
       binding_sha256: ${{ steps.hashes.outputs.binding_sha256 }}
+      acceptance_sha256: ${{ steps.hashes.outputs.acceptance_sha256 }}
     steps:
       - name: Checkout exact release source SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -226,6 +228,22 @@ jobs:
           fi
           echo "Release APK verification: PASS"
 
+      - name: Require attested final physical/environment acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.presecret.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          bash scripts/verify_final_release_acceptance_live.sh \
+            "$GITHUB_REPOSITORY" \
+            "$SOURCE_SHA" \
+            "$SENTINEL_RELEASE_SIGNER_SHA256" \
+            publication \
+            "$RUNNER_TEMP/final-acceptance-live"
+          cp "$RUNNER_TEMP/final-acceptance-live/final-acceptance/final-release-acceptance.json" \
+            release-input/final-release-acceptance.json
+
       - name: Build exact-source Core artifact
         run: tar -czf release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz server docs docker-compose.yml
 
@@ -237,6 +255,7 @@ jobs:
           echo "core_sha256=$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "candidate_sha256=$(sha256sum release-input/release-candidate.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "binding_sha256=$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "acceptance_sha256=$(sha256sum release-input/final-release-acceptance.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
       - name: Upload verified publication input
         id: upload
@@ -268,14 +287,16 @@ jobs:
           EXPECTED_CORE_SHA256: ${{ needs.verify-candidate.outputs.core_sha256 }}
           EXPECTED_CANDIDATE_SHA256: ${{ needs.verify-candidate.outputs.candidate_sha256 }}
           EXPECTED_BINDING_SHA256: ${{ needs.verify-candidate.outputs.binding_sha256 }}
+          EXPECTED_ACCEPTANCE_SHA256: ${{ needs.verify-candidate.outputs.acceptance_sha256 }}
         run: |
           set -euo pipefail
           test "$(sha256sum release-input/app-release.apk | awk '{print $1}')" = "$EXPECTED_APK_SHA256"
           test "$(sha256sum release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz | awk '{print $1}')" = "$EXPECTED_CORE_SHA256"
           test "$(sha256sum release-input/release-candidate.json | awk '{print $1}')" = "$EXPECTED_CANDIDATE_SHA256"
           test "$(sha256sum release-input/release-presecret-binding.json | awk '{print $1}')" = "$EXPECTED_BINDING_SHA256"
+          test "$(sha256sum release-input/final-release-acceptance.json | awk '{print $1}')" = "$EXPECTED_ACCEPTANCE_SHA256"
 
-      - name: Publish verified release lineage
+      - name: Publish verified release lineage and final acceptance
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -285,5 +306,6 @@ jobs:
             "release-input/sentinel-core-${GITHUB_REF_NAME}.tar.gz" \
             release-input/release-candidate.json \
             release-input/release-presecret-binding.json \
+            release-input/final-release-acceptance.json \
             --generate-notes \
             --title "SENTINEL ${GITHUB_REF_NAME}"

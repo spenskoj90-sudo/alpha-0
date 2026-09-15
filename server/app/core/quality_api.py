@@ -20,6 +20,8 @@ router = APIRouter(tags=["quality", "diagnostics"])
 DIAGNOSTIC_RETENTION_DAYS = 30
 MAX_DIAGNOSTIC_BYTES = 384 * 1024
 MAX_DIAGNOSTIC_EVENTS = 600
+MAX_CLUSTER_ALIAS_HOPS = 64
+QUALITY_CLUSTER_MERGE_ADVISORY_LOCK = 834_607_112
 REPORT_STATUSES = {"RECEIVED", "TRIAGED", "IN_PROGRESS", "RESOLVED", "WONT_FIX"}
 CLUSTER_SEVERITIES = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
 SEVERITY_RANK = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
@@ -213,6 +215,28 @@ class QualityReportRepository:
                 item["diagnostics"] = None
                 item["diagnostics_bytes"] = 0
 
+    def _resolve_memory_root(self, cluster: dict[str, Any]) -> dict[str, Any]:
+        aliases: list[str] = []
+        seen: set[str] = set()
+        current = cluster
+        while current.get("merged_into_id"):
+            current_id = str(current["id"])
+            if current_id in seen or len(seen) >= MAX_CLUSTER_ALIAS_HOPS:
+                raise RuntimeError("quality cluster alias cycle or excessive depth")
+            seen.add(current_id)
+            aliases.append(current_id)
+            next_id = str(current["merged_into_id"])
+            next_cluster = self._memory_clusters.get(next_id)
+            if next_cluster is None:
+                raise RuntimeError("merged quality cluster target missing")
+            current = next_cluster
+        root_id = str(current["id"])
+        for alias_id in aliases:
+            alias = self._memory_clusters.get(alias_id)
+            if alias is not None:
+                alias["merged_into_id"] = root_id
+        return current
+
     def _prune_postgres(self, conn: Any) -> None:
         conn.execute(
             text(
@@ -224,6 +248,23 @@ class QualityReportRepository:
                 " FROM expired e WHERE q.id=e.id"
             )
         )
+
+    def _lock_postgres_root(self, conn: Any, cluster: Any) -> Any:
+        current = cluster
+        seen: set[str] = set()
+        while current.get("merged_into_id"):
+            current_id = str(current["id"])
+            if current_id in seen or len(seen) >= MAX_CLUSTER_ALIAS_HOPS:
+                raise RuntimeError("quality cluster alias cycle or excessive depth")
+            seen.add(current_id)
+            next_cluster = conn.execute(
+                text("SELECT * FROM quality_issue_clusters WHERE id=:id FOR UPDATE"),
+                {"id": current["merged_into_id"]},
+            ).mappings().first()
+            if next_cluster is None:
+                raise RuntimeError("merged quality cluster target missing")
+            current = next_cluster
+        return current
 
     def create(self, store: Any, principal: Any, payload: QualityReportCreate) -> dict[str, Any]:
         report_id = str(uuid.uuid4())
@@ -273,8 +314,8 @@ class QualityReportRepository:
                 (item for item in self._memory_clusters.values() if item["fingerprint"] == record["issue_fingerprint"]),
                 None,
             )
-            if cluster and cluster.get("merged_into_id"):
-                cluster = self._memory_clusters.get(cluster["merged_into_id"], cluster)
+            if cluster is not None:
+                cluster = self._resolve_memory_root(cluster)
             if cluster is None:
                 cluster_id = str(uuid.uuid4())
                 cluster = {
@@ -367,13 +408,7 @@ class QualityReportRepository:
             ).mappings().first()
             if cluster is None:
                 raise RuntimeError("quality cluster was not created")
-            if cluster.get("merged_into_id"):
-                cluster = conn.execute(
-                    text("SELECT * FROM quality_issue_clusters WHERE id=:id FOR UPDATE"),
-                    {"id": cluster["merged_into_id"]},
-                ).mappings().first()
-                if cluster is None:
-                    raise RuntimeError("merged quality cluster target missing")
+            cluster = self._lock_postgres_root(conn, cluster)
             cluster_id = str(cluster["id"])
             record["cluster_id"] = cluster_id
             conn.execute(
@@ -654,18 +689,30 @@ class QualityReportRepository:
                     target["severity"], target["occurrence_count"], target["affected_user_count"]
                 )
                 target["updated_at"] = now
-                source["merged_into_id"] = target_id
-                source["updated_at"] = now
+                aliases = {source_id}
+                changed = True
+                while changed:
+                    changed = False
+                    for candidate in self._memory_clusters.values():
+                        candidate_id = str(candidate["id"])
+                        merged_into_id = candidate.get("merged_into_id")
+                        if merged_into_id and str(merged_into_id) in aliases and candidate_id not in aliases:
+                            aliases.add(candidate_id)
+                            changed = True
+                for alias_id in aliases:
+                    alias = self._memory_clusters.get(alias_id)
+                    if alias is not None:
+                        alias["merged_into_id"] = target_id
+                        alias["updated_at"] = now
                 return _copy_cluster(target)
         with store.engine.begin() as conn:
-            ids = sorted([source_id, target_id])
-            rows = conn.execute(
-                text("SELECT * FROM quality_issue_clusters WHERE id IN (:first,:second) FOR UPDATE"),
-                {"first": ids[0], "second": ids[1]},
-            ).mappings().all()
-            by_id = {str(row["id"]): row for row in rows}
-            source = by_id.get(source_id)
-            target = by_id.get(target_id)
+            conn.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": QUALITY_CLUSTER_MERGE_ADVISORY_LOCK})
+            source = conn.execute(
+                text("SELECT * FROM quality_issue_clusters WHERE id=:id FOR UPDATE"), {"id": source_id}
+            ).mappings().first()
+            target = conn.execute(
+                text("SELECT * FROM quality_issue_clusters WHERE id=:id FOR UPDATE"), {"id": target_id}
+            ).mappings().first()
             if not source or not target or source.get("merged_into_id") or target.get("merged_into_id"):
                 return None
             conn.execute(
@@ -737,7 +784,14 @@ class QualityReportRepository:
                 },
             ).mappings().first()
             conn.execute(
-                text("UPDATE quality_issue_clusters SET merged_into_id=:target,updated_at=:now WHERE id=:source"),
+                text(
+                    "WITH RECURSIVE aliases AS ("
+                    " SELECT id FROM quality_issue_clusters WHERE id=:source"
+                    " UNION ALL"
+                    " SELECT q.id FROM quality_issue_clusters q JOIN aliases a ON q.merged_into_id=a.id"
+                    ") UPDATE quality_issue_clusters SET merged_into_id=:target,updated_at=:now"
+                    " WHERE id IN (SELECT id FROM aliases) AND id<>:target"
+                ),
                 {"source": source_id, "target": target_id, "now": now},
             )
         return dict(row) if row else None
@@ -786,17 +840,17 @@ def _issue_identity(payload: QualityReportCreate) -> tuple[str, str, str]:
 
 
 def _infer_severity(payload: QualityReportCreate, event: DiagnosticEvent | None) -> str:
-    if payload.category == "SECURITY_PRIVACY":
-        return "CRITICAL"
     if event:
         combined = f"{event.event} {event.error_code or ''} {event.exception_class or ''}".upper()
         if any(token in combined for token in ("UNCAUGHT", "CRASH", "ANR", "PROCESS_EXIT", "SECURITY", "INTEGRITY")):
             return "CRITICAL"
+        if payload.category == "SECURITY_PRIVACY":
+            return "HIGH"
         if event.level in {"ERROR", "WARN"} and payload.category in {
             "FUNCTIONALITY", "GAME_INTEGRATION", "ACCESSIBILITY", "VOICE_AUDIO", "PERFORMANCE"
         }:
             return "HIGH"
-    if payload.category in {"FUNCTIONALITY", "GAME_INTEGRATION", "ACCESSIBILITY", "VOICE_AUDIO", "PERFORMANCE"}:
+    if payload.category in {"FUNCTIONALITY", "GAME_INTEGRATION", "ACCESSIBILITY", "VOICE_AUDIO", "PERFORMANCE", "SECURITY_PRIVACY"}:
         return "MEDIUM"
     if payload.category == "DESIGN":
         return "LOW"

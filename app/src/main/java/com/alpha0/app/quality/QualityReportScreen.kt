@@ -275,8 +275,8 @@ fun QualityReportScreen(
                                     )
                                 }
                                 when (result) {
-                                    is QualityReportApi.Result.Success -> submitted = result.value
-                                    is QualityReportApi.Result.Failure -> error = result.code
+                                    is QualityReportApi.SubmitResult.Success -> submitted = result.value
+                                    is QualityReportApi.SubmitResult.Failure -> error = result.code
                                 }
                                 submitting = false
                             }

@@ -19,6 +19,9 @@ class QualityReportApi(
         val diagnosticsRetained: Boolean,
         val diagnosticsExpiresAt: String?,
         val requestId: String?,
+        val problemGroupId: String?,
+        val relatedReportCount: Int?,
+        val inferredSeverity: String?,
     )
 
     sealed interface SubmitResult {
@@ -82,6 +85,9 @@ class QualityReportApi(
                     diagnosticsRetained = report.optBoolean("diagnostics_retained", false),
                     diagnosticsExpiresAt = report.optString("diagnostics_expires_at").takeIf { it.isNotBlank() },
                     requestId = json.optString("request_id").takeIf { it.isNotBlank() },
+                    problemGroupId = report.optString("problem_group_id").takeIf { it.isNotBlank() },
+                    relatedReportCount = if (report.has("related_report_count") && !report.isNull("related_report_count")) report.optInt("related_report_count") else null,
+                    inferredSeverity = report.optString("inferred_severity").takeIf { it.isNotBlank() },
                 )
                 diagnostics.info(
                     "QUALITY",
@@ -91,6 +97,8 @@ class QualityReportApi(
                     details = mapOf(
                         "diagnostics_retained" to submitted.diagnosticsRetained,
                         "status" to submitted.status,
+                        "related_report_count" to (submitted.relatedReportCount ?: 1),
+                        "inferred_severity" to (submitted.inferredSeverity ?: "UNKNOWN"),
                     )
                 )
                 SubmitResult.Success(submitted)

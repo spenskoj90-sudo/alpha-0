@@ -18,11 +18,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
 
-        // Runtime telemetry is disabled unless all required release identity is explicit.
-        // The DSN remains Owner-managed and is never committed. The guarded release-
-        // candidate workflow already enforces GITHUB_SHA == selected source_sha, so the
-        // standard Actions source identity is a valid fallback without passing another
-        // value through the secret-bearing signing step.
         val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
         val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))
@@ -86,7 +81,6 @@ android {
         }
     }
 
-    // Keep release signing secrets out of ordinary debug/unit-test configuration.
     val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")
     val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
     val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
@@ -120,6 +114,7 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.01.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
+    implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.navigation:navigation-compose:2.8.9")
     implementation("androidx.compose.ui:ui")

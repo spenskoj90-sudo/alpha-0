@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from types import SimpleNamespace
 
 import pytest
@@ -119,3 +120,68 @@ def test_postgres_chained_merge_flattens_aliases_and_routes_future_ingest_to_roo
     assert report_count == 4
     assert int(root["occurrence_count"]) == 4
     assert int(root["affected_user_count"]) == 4
+
+
+def test_postgres_alias_ingest_and_followup_merge_do_not_deadlock() -> None:
+    from app.core.store import PostgresStore
+    from app.main import store
+
+    assert isinstance(store, PostgresStore)
+
+    # Exercise the lock-order race repeatedly. After A→B, a new A report locks
+    # the alias before resolving B. A concurrent B→C merge must therefore lock
+    # incoming aliases before B/C so neither transaction can wait cyclically.
+    for case in range(12):
+        suffix = f"case{case:03d}"
+        payload_a = _payload(f"Alias deadlock alpha {suffix} regression")
+        payload_b = _payload(f"Alias deadlock beta {suffix} regression")
+        payload_c = _payload(f"Alias deadlock gamma {suffix} regression")
+        for payload in (payload_a, payload_b, payload_c):
+            _cleanup_fingerprint(store, _issue_identity(payload)[0])
+
+        first = repository.create(store, _principal(f"pg-lock-a-{case}"), payload_a)
+        second = repository.create(store, _principal(f"pg-lock-b-{case}"), payload_b)
+        third = repository.create(store, _principal(f"pg-lock-c-{case}"), payload_c)
+        alias_id = first["cluster_id"]
+        source_id = second["cluster_id"]
+        root_id = third["cluster_id"]
+        assert repository.merge_cluster(store, alias_id, source_id) is not None
+
+        barrier = Barrier(2)
+
+        def ingest_alias() -> dict:
+            barrier.wait(timeout=10)
+            return repository.create(store, _principal(f"pg-lock-new-{case}"), payload_a)
+
+        def merge_source() -> dict | None:
+            barrier.wait(timeout=10)
+            return repository.merge_cluster(store, source_id, root_id)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            ingest_future = executor.submit(ingest_alias)
+            merge_future = executor.submit(merge_source)
+            routed = ingest_future.result(timeout=20)
+            merged = merge_future.result(timeout=20)
+
+        assert merged is not None
+        assert str(merged["id"]) == root_id
+        assert routed["cluster_id"] in {source_id, root_id}
+
+        with store.engine.connect() as conn:
+            aliases = conn.execute(
+                text("SELECT id, merged_into_id FROM quality_issue_clusters WHERE id IN (:a,:b) ORDER BY id"),
+                {"a": alias_id, "b": source_id},
+            ).mappings().all()
+            root = conn.execute(
+                text("SELECT occurrence_count, affected_user_count FROM quality_issue_clusters WHERE id=:id"),
+                {"id": root_id},
+            ).mappings().one()
+            report_count = conn.execute(
+                text("SELECT count(*) FROM quality_reports WHERE cluster_id=:id"), {"id": root_id}
+            ).scalar_one()
+
+        assert len(aliases) == 2
+        assert all(str(alias["merged_into_id"]) == root_id for alias in aliases)
+        assert report_count == 4
+        assert int(root["occurrence_count"]) == 4
+        assert int(root["affected_user_count"]) == 4

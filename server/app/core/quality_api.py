@@ -707,6 +707,34 @@ class QualityReportRepository:
                 return _copy_cluster(target)
         with store.engine.begin() as conn:
             conn.execute(text("SELECT pg_advisory_xact_lock(:lock_id)"), {"lock_id": QUALITY_CLUSTER_MERGE_ADVISORY_LOCK})
+
+            # Manual merges are serialized by the advisory lock. Lock incoming aliases
+            # before their active source/root, matching the order used by normal ingest
+            # (alias -> root). This removes the A->B ingest / B->C merge lock inversion.
+            source_snapshot = conn.execute(
+                text("SELECT * FROM quality_issue_clusters WHERE id=:id"), {"id": source_id}
+            ).mappings().first()
+            target_snapshot = conn.execute(
+                text("SELECT * FROM quality_issue_clusters WHERE id=:id"), {"id": target_id}
+            ).mappings().first()
+            if (
+                not source_snapshot
+                or not target_snapshot
+                or source_snapshot.get("merged_into_id")
+                or target_snapshot.get("merged_into_id")
+            ):
+                return None
+            conn.execute(
+                text(
+                    "WITH RECURSIVE aliases(id) AS ("
+                    " SELECT id FROM quality_issue_clusters WHERE id=:source"
+                    " UNION"
+                    " SELECT q.id FROM quality_issue_clusters q JOIN aliases a ON q.merged_into_id=a.id"
+                    ") SELECT q.id FROM quality_issue_clusters q JOIN aliases a ON a.id=q.id"
+                    " WHERE q.id<>:source ORDER BY q.id FOR UPDATE OF q"
+                ),
+                {"source": source_id},
+            ).all()
             source = conn.execute(
                 text("SELECT * FROM quality_issue_clusters WHERE id=:id FOR UPDATE"), {"id": source_id}
             ).mappings().first()
@@ -785,9 +813,9 @@ class QualityReportRepository:
             ).mappings().first()
             conn.execute(
                 text(
-                    "WITH RECURSIVE aliases AS ("
+                    "WITH RECURSIVE aliases(id) AS ("
                     " SELECT id FROM quality_issue_clusters WHERE id=:source"
-                    " UNION ALL"
+                    " UNION"
                     " SELECT q.id FROM quality_issue_clusters q JOIN aliases a ON q.merged_into_id=a.id"
                     ") UPDATE quality_issue_clusters SET merged_into_id=:target,updated_at=:now"
                     " WHERE id IN (SELECT id FROM aliases) AND id<>:target"

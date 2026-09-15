@@ -242,6 +242,11 @@ fun QualityReportScreen(
                             Text("REPORT RECEIVED", style = MaterialTheme.typography.titleLarge, color = SentinelColors.Success)
                             Text("Reference: ${report.id}")
                             Text("Status: ${report.status}")
+                            report.problemGroupId?.let { Text("Problem group: $it", color = SentinelColors.TextSecondary) }
+                            report.inferredSeverity?.let { Text("Initial severity: $it", color = SentinelColors.TextSecondary) }
+                            report.relatedReportCount?.takeIf { it > 1 }?.let {
+                                Text("This problem group already contains $it related reports.", color = SentinelColors.TextSecondary)
+                            }
                             if (report.diagnosticsRetained) {
                                 Text(
                                     "Diagnostics attached${report.diagnosticsExpiresAt?.let { " · expires $it" } ?: ""}",

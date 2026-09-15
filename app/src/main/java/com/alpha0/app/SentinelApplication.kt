@@ -1,26 +1,43 @@
 package com.alpha0.app
 
 import android.app.Application
+import com.alpha0.app.diagnostics.DiagnosticRuntime
 import io.sentry.SentryEvent
 import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
 
 /**
- * Optional Android runtime crash reporting.
+ * Optional Android runtime crash reporting plus app-private structured diagnostics.
  *
- * Telemetry stays disabled unless the Owner-managed DSN, exact source SHA and an
- * allowlisted runtime environment are all present. That makes every emitted
- * release event attributable to one repository source instead of a floating
- * build label.
+ * The dedicated physicalTest build is intentionally local-only: it installs richer
+ * forensic diagnostics but never starts Sentry, even if a DSN is present in the build
+ * environment. Release telemetry stays disabled unless the Owner-managed DSN, exact
+ * source SHA and an allowlisted runtime environment are all present.
  */
 class SentinelApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        val diagnostics = DiagnosticRuntime.install(this)
+        if (diagnostics.isForensicTest()) {
+            diagnostics.info("TELEMETRY", "REMOTE_TELEMETRY_DISABLED_FOR_FORENSIC_TEST", result = "SKIPPED")
+            return
+        }
+
         val dsn = BuildConfig.SENTRY_DSN.trim()
         val sourceSha = BuildConfig.SENTINEL_SOURCE_SHA.trim()
         val environment = BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT.trim()
         if (dsn.isEmpty() || !SOURCE_SHA.matches(sourceSha) || environment !in ALLOWED_ENVIRONMENTS) {
+            diagnostics.info(
+                "TELEMETRY",
+                "SENTRY_INIT",
+                result = "SKIPPED",
+                details = mapOf(
+                    "has_dsn" to dsn.isNotEmpty(),
+                    "has_source_identity" to SOURCE_SHA.matches(sourceSha),
+                    "environment_allowed" to (environment in ALLOWED_ENVIRONMENTS),
+                )
+            )
             return
         }
 
@@ -40,6 +57,11 @@ class SentinelApplication : Application() {
                 scrubEvent(event)
             }
         }
+        diagnostics.info(
+            "TELEMETRY",
+            "SENTRY_INIT",
+            details = mapOf("environment" to environment, "source_sha_prefix" to sourceSha.take(12)),
+        )
     }
 
     companion object {

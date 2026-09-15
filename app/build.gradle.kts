@@ -56,7 +56,22 @@ android {
     }
 
     buildTypes {
-        debug { }
+        debug {
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"DEVELOPMENT\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "2097152")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
+        }
+        create("physicalTest") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".physicaltest"
+            versionNameSuffix = "-physical-test"
+            matchingFallbacks += listOf("debug")
+            isDebuggable = true
+            isMinifyEnabled = false
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"FORENSIC_TEST\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -65,6 +80,9 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("ciRelease")
+            buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"PRODUCTION\"")
+            buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288")
+            buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false")
         }
     }
 

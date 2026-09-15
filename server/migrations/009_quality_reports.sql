@@ -23,9 +23,21 @@ CREATE TABLE IF NOT EXISTS quality_reports (
         diagnostics_bytes >= 0 AND diagnostics_bytes <= 393216
     ),
     CONSTRAINT quality_reports_diagnostics_consent_ck CHECK (
-        (diagnostics_consent AND diagnostics_json IS NOT NULL AND diagnostics_expires_at IS NOT NULL)
+        (
+            diagnostics_consent
+            AND diagnostics_expires_at IS NOT NULL
+            AND (
+                (diagnostics_json IS NOT NULL AND diagnostics_bytes > 0)
+                OR (diagnostics_json IS NULL AND diagnostics_bytes = 0)
+            )
+        )
         OR
-        (NOT diagnostics_consent AND diagnostics_json IS NULL AND diagnostics_bytes = 0 AND diagnostics_expires_at IS NULL)
+        (
+            NOT diagnostics_consent
+            AND diagnostics_json IS NULL
+            AND diagnostics_bytes = 0
+            AND diagnostics_expires_at IS NULL
+        )
     )
 );
 

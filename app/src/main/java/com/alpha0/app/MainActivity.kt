@@ -28,6 +28,8 @@ import com.alpha0.app.dashboard.GameDetailsScreen
 import com.alpha0.app.device.DeviceApi
 import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
+import com.alpha0.app.quality.QualityReportApi
+import com.alpha0.app.quality.QualityReportScreen
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.security.SecureSessionStore
 import com.alpha0.app.ui.SentinelTheme
@@ -45,7 +47,9 @@ class MainActivity : ComponentActivity() {
             "SUCCESS",
             details = mapOf(
                 "sdk" to android.os.Build.VERSION.SDK_INT,
-                "model" to (android.os.Build.MODEL ?: "unknown").take(64)
+                "model" to (android.os.Build.MODEL ?: "unknown").take(64),
+                "diagnostics_mode" to diag.mode(),
+                "build_type" to BuildConfig.BUILD_TYPE,
             )
         )
         deviceIdentity.attachDiagnostics(this)
@@ -65,6 +69,7 @@ class MainActivity : ComponentActivity() {
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
         val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL)
+        val qualityReportApi = QualityReportApi(BuildConfig.SENTINEL_API_BASE_URL, diag)
 
         setContent {
             SentinelTheme {
@@ -76,9 +81,15 @@ class MainActivity : ComponentActivity() {
                     if (session == null) {
                         refreshComplete = true
                     } else {
+                        diag.info("SESSION", "REFRESH_START")
                         sessionManager.refreshStoredSession(this@MainActivity)
                         activeSession = sessionStore.load(this@MainActivity)
                         refreshComplete = true
+                        diag.info(
+                            "SESSION",
+                            "REFRESH_COMPLETE",
+                            if (activeSession != null) "SUCCESS" else "FAILURE",
+                        )
                     }
                 }
 
@@ -100,6 +111,7 @@ class MainActivity : ComponentActivity() {
                         popExitTransition = { fadeOut(animationSpec = tween(150)) },
                     ) {
                         composable("login") {
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "login")) }
                             LoginScreen(api = authApi) { authenticatedSession ->
                                 diag.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")
                                 sessionStore.save(this@MainActivity, authenticatedSession.accessToken, authenticatedSession.refreshToken)
@@ -111,6 +123,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         composable("device-setup") {
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "device-setup")) }
                             val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
                             if (currentSession == null) {
                                 diag.warn("SESSION", "SESSION_MISSING_ON_SETUP", "FAILURE")
@@ -153,6 +166,7 @@ class MainActivity : ComponentActivity() {
                             route = "dashboard/{deviceId}",
                             arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
                         ) { entry ->
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "dashboard")) }
                             val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
                             val deviceId = entry.arguments?.getString("deviceId")
                             if (currentSession == null || deviceId.isNullOrBlank()) {
@@ -163,8 +177,18 @@ class MainActivity : ComponentActivity() {
                                     accessToken = currentSession.accessToken,
                                     deviceId = deviceId,
                                     api = dashboardApi,
-                                    onDeviceClick = { navController.navigate("device-details/${Uri.encode(deviceId)}") },
-                                    onGameClick = { entitlementId -> navController.navigate("game-details/${Uri.encode(entitlementId)}") }
+                                    onDeviceClick = {
+                                        diag.info("UI", "DEVICE_DETAILS_OPEN")
+                                        navController.navigate("device-details/${Uri.encode(deviceId)}")
+                                    },
+                                    onGameClick = { entitlementId ->
+                                        diag.info("UI", "GAME_DETAILS_OPEN")
+                                        navController.navigate("game-details/${Uri.encode(entitlementId)}")
+                                    },
+                                    onReportProblem = {
+                                        diag.info("UI", "QUALITY_REPORT_OPEN")
+                                        navController.navigate("quality-report")
+                                    },
                                 )
                             }
                         }
@@ -172,6 +196,7 @@ class MainActivity : ComponentActivity() {
                             route = "device-details/{deviceId}",
                             arguments = listOf(navArgument("deviceId") { type = NavType.StringType })
                         ) { entry ->
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "device-details")) }
                             val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
                             val deviceId = entry.arguments?.getString("deviceId")
                             if (currentSession == null || deviceId.isNullOrBlank()) {
@@ -210,12 +235,28 @@ class MainActivity : ComponentActivity() {
                             route = "game-details/{entitlementId}",
                             arguments = listOf(navArgument("entitlementId") { type = NavType.StringType })
                         ) { entry ->
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "game-details")) }
                             val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
                             val entitlementId = entry.arguments?.getString("entitlementId")
                             if (currentSession == null || entitlementId.isNullOrBlank()) {
                                 navController.navigate("login") { popUpTo("login") { inclusive = true } }
                             } else {
                                 GameDetailsScreen(accessToken = currentSession.accessToken, entitlementId = entitlementId, api = dashboardApi)
+                            }
+                        }
+                        composable("quality-report") {
+                            LaunchedEffect(Unit) { diag.info("NAV", "ROUTE_ENTER", details = mapOf("route" to "quality-report")) }
+                            val currentSession = activeSession ?: sessionStore.load(this@MainActivity)
+                            if (currentSession == null) {
+                                diag.warn("SESSION", "SESSION_MISSING_ON_QUALITY_REPORT", "FAILURE")
+                                navController.navigate("login") { popUpTo("login") { inclusive = true } }
+                            } else {
+                                QualityReportScreen(
+                                    accessToken = currentSession.accessToken,
+                                    api = qualityReportApi,
+                                    diagnostics = diag,
+                                    onBack = { navController.popBackStack() },
+                                )
                             }
                         }
                     }

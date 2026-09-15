@@ -10,6 +10,7 @@ from app.core.quality_api import repository
 from app.main import app, store
 
 client = TestClient(app)
+ADMIN_HEADERS = {"X-Sentinel-Admin-Token": os.environ["SENTINEL_ADMIN_TOKEN"]}
 
 
 def reset_quality_state() -> None:
@@ -19,6 +20,7 @@ def reset_quality_state() -> None:
         store.failures.clear()
     with repository._lock:
         repository._memory.clear()
+        repository._memory_clusters.clear()
 
 
 def user_token(user_id: str = "quality-user") -> str:
@@ -26,7 +28,7 @@ def user_token(user_id: str = "quality-user") -> str:
     return token
 
 
-def snapshot(*, details: dict | None = None) -> dict:
+def snapshot(*, details: dict | None = None, error_code: str = "HTTP_503") -> dict:
     return {
         "schema": "sentinel.diagnostic-snapshot.v1",
         "mode": "PRODUCTION",
@@ -46,7 +48,7 @@ def snapshot(*, details: dict | None = None) -> dict:
                 "event": "REQUEST_COMPLETE",
                 "result": "FAILURE",
                 "request_id": "012345abcdef",
-                "error_code": "HTTP_503",
+                "error_code": error_code,
                 "duration_ms": 215,
                 "details": details or {"path_id": "quality-report", "network": "validated"},
                 "exception_class": None,
@@ -57,7 +59,7 @@ def snapshot(*, details: dict | None = None) -> dict:
     }
 
 
-def report_payload(*, with_diagnostics: bool = True) -> dict:
+def report_payload(*, with_diagnostics: bool = True, error_code: str = "HTTP_503") -> dict:
     payload = {
         "category": "FUNCTIONALITY",
         "title": "Dashboard status did not refresh",
@@ -66,8 +68,19 @@ def report_payload(*, with_diagnostics: bool = True) -> dict:
         "quality_program_opt_in": True,
     }
     if with_diagnostics:
-        payload["diagnostics"] = snapshot()
+        payload["diagnostics"] = snapshot(error_code=error_code)
     return payload
+
+
+def submit(user_id: str, payload: dict) -> dict:
+    token = user_token(user_id)
+    response = client.post(
+        "/v1/quality/reports",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert response.status_code == 200
+    return response.json()["report"]
 
 
 def test_quality_report_requires_authentication() -> None:
@@ -92,6 +105,9 @@ def test_quality_report_accepts_explicit_diagnostics_consent() -> None:
     assert report["quality_program_opt_in"] is True
     assert report["diagnostics_retained"] is True
     assert report["diagnostics_bytes"] > 0
+    assert report["problem_group_id"]
+    assert report["related_report_count"] == 1
+    assert report["inferred_severity"] == "HIGH"
     assert body["diagnostics_retention_days"] == 30
 
 
@@ -128,6 +144,19 @@ def test_sensitive_diagnostic_detail_key_is_rejected_fail_closed() -> None:
     token = user_token()
     payload = report_payload()
     payload["diagnostics"] = snapshot(details={"access_token": "must-never-be-stored"})
+    response = client.post(
+        "/v1/quality/reports",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert response.status_code == 422
+
+
+def test_identity_like_diagnostic_detail_key_is_rejected_fail_closed() -> None:
+    reset_quality_state()
+    token = user_token()
+    payload = report_payload()
+    payload["diagnostics"] = snapshot(details={"device_id_prefix": "abcdef012345"})
     response = client.post(
         "/v1/quality/reports",
         headers={"Authorization": f"Bearer {token}"},
@@ -182,20 +211,113 @@ def test_admin_can_triage_and_read_retained_diagnostics() -> None:
         json=report_payload(),
     )
     report_id = created.json()["report"]["id"]
-    admin_headers = {"X-Sentinel-Admin-Token": os.environ["SENTINEL_ADMIN_TOKEN"]}
 
-    listing = client.get("/v1/admin/quality/reports", headers=admin_headers)
+    listing = client.get("/v1/admin/quality/reports", headers=ADMIN_HEADERS)
     assert listing.status_code == 200
     assert any(item["id"] == report_id for item in listing.json()["reports"])
 
-    detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=admin_headers)
+    detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=ADMIN_HEADERS)
     assert detail.status_code == 200
     assert detail.json()["report"]["diagnostics"]["schema"] == "sentinel.diagnostic-snapshot.v1"
 
     updated = client.post(
         f"/v1/admin/quality/reports/{report_id}/status",
-        headers=admin_headers,
+        headers=ADMIN_HEADERS,
         json={"status": "TRIAGED"},
     )
     assert updated.status_code == 200
     assert updated.json()["report"]["status"] == "TRIAGED"
+
+
+def test_identical_diagnostic_failure_clusters_across_users_and_titles() -> None:
+    reset_quality_state()
+    first_payload = report_payload()
+    second_payload = report_payload()
+    second_payload["title"] = "Reconnect leaves dashboard data stale"
+    second_payload["description"] = "Different wording, same observed backend failure."
+
+    first = submit("cluster-user-1", first_payload)
+    second = submit("cluster-user-2", second_payload)
+
+    assert first["problem_group_id"] == second["problem_group_id"]
+    assert second["related_report_count"] == 2
+
+    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    assert listing.status_code == 200
+    cluster = next(item for item in listing.json()["clusters"] if item["id"] == second["problem_group_id"])
+    assert cluster["signature_kind"] == "DIAGNOSTIC"
+    assert cluster["occurrence_count"] == 2
+    assert cluster["affected_user_count"] == 2
+    assert cluster["affected_version_count"] == 1
+    assert cluster["severity"] == "HIGH"
+    assert cluster["priority_score"] >= 50
+
+
+def test_different_diagnostic_error_codes_remain_separate_clusters() -> None:
+    reset_quality_state()
+    first = submit("error-user-1", report_payload(error_code="HTTP_503"))
+    second = submit("error-user-2", report_payload(error_code="HTTP_401"))
+    assert first["problem_group_id"] != second["problem_group_id"]
+
+
+def test_text_only_reports_with_same_normalized_title_cluster_conservatively() -> None:
+    reset_quality_state()
+    first_payload = report_payload(with_diagnostics=False)
+    first_payload["title"] = "Dashboard stale refresh status"
+    second_payload = report_payload(with_diagnostics=False)
+    second_payload["title"] = "Stale dashboard status refresh"
+
+    first = submit("text-user-1", first_payload)
+    second = submit("text-user-2", second_payload)
+    assert first["problem_group_id"] == second["problem_group_id"]
+
+
+def test_cluster_triage_updates_all_member_reports_and_locks_severity() -> None:
+    reset_quality_state()
+    first = submit("triage-user-1", report_payload())
+    second = submit("triage-user-2", report_payload())
+    cluster_id = first["problem_group_id"]
+
+    updated = client.post(
+        f"/v1/admin/quality/clusters/{cluster_id}",
+        headers=ADMIN_HEADERS,
+        json={"status": "IN_PROGRESS", "severity": "CRITICAL"},
+    )
+    assert updated.status_code == 200
+    cluster = updated.json()["cluster"]
+    assert cluster["status"] == "IN_PROGRESS"
+    assert cluster["severity"] == "CRITICAL"
+    assert cluster["severity_locked"] is True
+
+    for report_id in (first["id"], second["id"]):
+        detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=ADMIN_HEADERS)
+        assert detail.status_code == 200
+        assert detail.json()["report"]["status"] == "IN_PROGRESS"
+
+
+def test_admin_can_merge_confirmed_related_clusters_without_losing_reports() -> None:
+    reset_quality_state()
+    first = submit("merge-user-1", report_payload(error_code="HTTP_503"))
+    second = submit("merge-user-2", report_payload(error_code="HTTP_502"))
+    source = first["problem_group_id"]
+    target = second["problem_group_id"]
+
+    merged = client.post(
+        f"/v1/admin/quality/clusters/{source}/merge",
+        headers=ADMIN_HEADERS,
+        json={"target_cluster_id": target},
+    )
+    assert merged.status_code == 200
+    cluster = merged.json()["cluster"]
+    assert cluster["id"] == target
+    assert cluster["occurrence_count"] == 2
+    assert cluster["affected_user_count"] == 2
+
+    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    ids = {item["id"] for item in listing.json()["clusters"]}
+    assert target in ids
+    assert source not in ids
+
+    source_report = client.get(f"/v1/admin/quality/reports/{first['id']}", headers=ADMIN_HEADERS)
+    assert source_report.status_code == 200
+    assert source_report.json()["report"]["problem_group_id"] == target

@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
-        val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL)
+        val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
         val qualityReportApi = QualityReportApi(BuildConfig.SENTINEL_API_BASE_URL, diag)
 
         setContent {

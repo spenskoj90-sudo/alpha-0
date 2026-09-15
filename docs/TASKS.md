@@ -35,6 +35,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 - [x] **Cryptographic artifact provenance boundary.** Protected-main Supply Chain and Packaged Companion workflows use separate no-secret GitHub OIDC jobs to attest canonical evidence subjects; Release Evidence Preflight verifies those exact repository/workflow/SHA/ref attestations before uploading its manifest and then attests `release-evidence.json` itself. The Owner-only release-candidate path requires dispatch commit identity to equal `source_sha`, verifies the protected-main manifest attestation before signing-secret access, and uses a separate no-secret job to attest the signed APK/candidate/binding bytes. Tag publication remains read-only until release/candidate attestations, lineage, APK signature and byte hashes pass; only the final no-checkout publication job has `contents: write`. This machinery does not execute Owner signing, tag creation, publication or deployment.
 - [x] **Runtime telemetry/privacy/release-correlation boundary.** Android Sentry is fail-closed unless an Owner-managed DSN, exact source SHA and allowlisted environment are present; release identity is correlated to canonical version/versionCode/source SHA; event delivery structurally removes user/request/breadcrumb/extra payload surfaces. `observability/telemetry-contract.v1.json` defines bounded event classes, environment/release mapping, privacy/retention/alert semantics and GitHub/Linear triage. PostHog remains disabled by default and Core/Companion telemetry remains Local-First / Server-Minimal. Production provider account configuration and physical-runtime acceptance remain external evidence.
 - [x] **Exact-candidate final release acceptance boundary.** `sentinel.final-release-acceptance.v1` binds every late physical/environment gate to one exact protected-main source, signed release-candidate digest, signed APK SHA-256 and protected-main Packaged Companion archive SHA-256. Profiles are monotonic: `publication` requires real Android/Companion/WoW/voice/accessibility acceptance; `deployment` adds provider-network/database/ingress evidence; `production-traffic` adds target runtime security/penetration evidence. An Owner-dispatched no-secret workflow re-verifies existing Release Evidence, candidate and package attestations before accepting and separately attesting the final manifest. Release publication fails closed without an attested `publication` profile. Remote rollout is no longer an automatic consequence of GitHub Release publication: it requires a separate Owner dispatch, exact version tag, `DEPLOY_ENABLED=true` and an attested `deployment` profile before deployment secrets are referenced. Repository tests use synthetic evidence only and do **not** claim that any physical test, signing, tag, release, deployment or production-traffic activation has happened.
+- [x] **Firebase Test Lab dependency retired.** FTL is optional informational evidence only. GitHub Emulator instrumentation remains the routine automated Android gate and exact-candidate physical Android acceptance remains the final device gate; issue #59 is closed `not planned`.
 
 ## External / Owner-gated evidence
 
@@ -43,7 +44,6 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 - [ ] Selected production STT/TTS provider credentials/network acceptance plus physical microphone/driver/acoustic-quality evidence on the release host.
 - [ ] Signed release-candidate execution, final exact-candidate acceptance recording, release tag/publication and live production deployment.
 - [ ] Physical-device and real packaged Companion-host acceptance, including final accessibility/visual checks, where not already tied to the selected release commit.
-- [ ] Firebase Test Lab remains optional/non-blocking while GitHub Emulator instrumentation is the routine Android gate.
 
 ## Rules
 
@@ -55,7 +55,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 - Prefer one coherent, independently testable large vertical per PR; split only when a block cannot remain safe and independently verifiable.
 - Keep branches short-lived and return completed work to `main` promptly after exact-SHA validation.
 - Documentation changes belong in the same logical PR when product/architecture meaning changes. Do not create generated HEAD-sync documentation changes for ordinary code commits.
-- FTL usage must be quota-aware; prefer GitHub-hosted emulator for routine CI while the external FTL permission gate remains unresolved.
+- Firebase Test Lab must not become a required dependency or replace GitHub Emulator/physical-device acceptance. Any future FTL use is additive optional evidence only, as defined by `docs/FTL_POLICY.md`.
 
 ## Program order
 

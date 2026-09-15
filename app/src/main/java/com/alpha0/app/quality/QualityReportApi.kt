@@ -21,9 +21,9 @@ class QualityReportApi(
         val requestId: String?,
     )
 
-    sealed interface Result<out T> {
-        data class Success<T>(val value: T) : Result<T>
-        data class Failure(val code: String) : Result<Nothing>
+    sealed interface SubmitResult {
+        data class Success(val value: SubmittedReport) : SubmitResult
+        data class Failure(val code: String) : SubmitResult
     }
 
     fun submit(
@@ -34,7 +34,7 @@ class QualityReportApi(
         diagnosticsConsent: Boolean,
         qualityProgramOptIn: Boolean,
         snapshot: DiagnosticLogger.TicketSnapshot?,
-    ): Result<SubmittedReport> {
+    ): SubmitResult {
         val correlationId = diagnostics.newCorrelationId()
         val started = System.nanoTime()
         diagnostics.info(
@@ -93,7 +93,7 @@ class QualityReportApi(
                         "status" to submitted.status,
                     )
                 )
-                Result.Success(submitted)
+                SubmitResult.Success(submitted)
             } else {
                 val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
                 diagnostics.warn(
@@ -104,7 +104,7 @@ class QualityReportApi(
                     durationMs = durationMs,
                     details = mapOf("http_status" to response.status),
                 )
-                Result.Failure(code)
+                SubmitResult.Failure(code)
             }
         } catch (_: IOException) {
             diagnostics.warn(
@@ -113,7 +113,7 @@ class QualityReportApi(
                 requestId = correlationId,
                 errorCode = "NETWORK_ERROR",
             )
-            Result.Failure("NETWORK_ERROR")
+            SubmitResult.Failure("NETWORK_ERROR")
         } catch (error: Exception) {
             diagnostics.error(
                 "QUALITY",
@@ -122,7 +122,7 @@ class QualityReportApi(
                 errorCode = "UNEXPECTED_ERROR",
                 throwable = error,
             )
-            Result.Failure("UNEXPECTED_ERROR")
+            SubmitResult.Failure("UNEXPECTED_ERROR")
         }
     }
 }

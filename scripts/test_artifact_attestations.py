@@ -45,6 +45,9 @@ class ArtifactAttestationContractTests(unittest.TestCase):
     def test_packaged_companion_attestation_is_main_only_and_separate(self):
         workflow = self.read(".github/workflows/packaged-companion.yml")
         self.assertIn("  attest-packaged-companion:", workflow)
+        package_block = workflow.split("  packaged-companion:", 1)[1].split("  attest-packaged-companion:", 1)[0]
+        self.assertIn("retention-days: 90", package_block)
+        self.assertNotIn("retention-days: 14", package_block)
         block = workflow.split("  attest-packaged-companion:", 1)[1]
         self.assertIn("github.event_name == 'push'", block)
         self.assertIn("github.ref == 'refs/heads/main'", block)

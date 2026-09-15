@@ -139,7 +139,7 @@ jobs:
           name: packaged-companion-host-${{ env.SENTINEL_SOURCE_SHA }}
           path: artifacts/packaged-companion/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
   attest-packaged-companion:
     name: Attest protected-main packaged Companion evidence

@@ -24,20 +24,9 @@ import kotlin.concurrent.withLock
 /**
  * Bounded, structured diagnostics used by both physical acceptance and user tickets.
  *
- * There are deliberately two modes:
- * - FORENSIC_TEST: isolated physical-test APK, larger local ring and richer stack traces.
- * - PRODUCTION/DEVELOPMENT: privacy-bounded breadcrumbs suitable for an explicit
- *   user-submitted quality report snapshot.
- *
- * Hard security/privacy rules:
- * - never retain passwords, access/refresh/session tokens, JWTs, authorization headers,
- *   private keys, Play Integrity tokens, cookies, DATABASE_URL or API credentials;
- * - never capture screenshots, raw microphone/audio, WoW SavedVariables, chat text,
- *   network request/response bodies, or arbitrary user-entered form contents here;
- * - no automatic upload. Production diagnostics remain local until the user submits a
- *   report with diagnostic attachment enabled;
- * - request identifiers are one-way shortened with SHA-256;
- * - all files are bounded and stored in app-private storage.
+ * FORENSIC_TEST is restricted to the isolated physical-test APK. Production keeps a
+ * smaller privacy-bounded ring and uploads nothing automatically; a bounded snapshot
+ * may be attached only through the explicit report flow.
  */
 class DiagnosticLogger private constructor(private val context: Context) {
 
@@ -70,8 +59,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
         fun redactRequestId(raw: String?): String? {
             if (raw.isNullOrBlank()) return null
             return try {
-                val dig = MessageDigest.getInstance("SHA-256")
-                    .digest(raw.toByteArray(Charsets.UTF_8))
+                val dig = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
                 dig.take(6).joinToString("") { b -> "%02x".format(b) }
             } catch (_: Exception) {
                 "redacted"
@@ -83,7 +71,8 @@ class DiagnosticLogger private constructor(private val context: Context) {
             "jwt", "authorization", "secret", "keystore", "private_key", "credential",
             "database_url", "api_key", "integrity_token", "play_integrity_token",
             "nonce_raw", "challenge_raw", "cookie", "set-cookie", "savedvariables",
-            "chat_text", "request_body", "response_body", "audio_bytes", "microphone_bytes"
+            "chat_text", "request_body", "response_body", "audio_bytes", "microphone_bytes",
+            "device_id", "fingerprint", "user_id", "email", "realm", "character", "transcript"
         )
 
         fun isSensitiveDetailKey(raw: String): Boolean {
@@ -98,10 +87,13 @@ class DiagnosticLogger private constructor(private val context: Context) {
                 Regex("-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\\s\\S]*?(?:-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|$)"),
                 "[REDACTED_PRIVATE_KEY]"
             )
-            value = value.replace(Regex("(?i)(bearer\\s+)[a-z0-9._~+\\-/]+"), "$1[REDACTED]")
+            value = value.replace(
+                Regex("(?i)(bearer\\s+)[a-z0-9._~+\\-/]+"),
+                "${'$'}1[REDACTED]"
+            )
             value = value.replace(
                 Regex("(?i)(password|access_token|refresh_token|session_token|token|secret|api_key|authorization)[=:]\\s*\\S+"),
-                "$1=[REDACTED]"
+                "${'$'}1=[REDACTED]"
             )
             value = value.replace(
                 Regex("eyJ[a-zA-Z0-9_-]{8,}\\.[a-zA-Z0-9_-]{8,}\\.[a-zA-Z0-9_-]{8,}"),
@@ -191,10 +183,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
         val out = JSONObject()
         for ((rawKey, value) in raw.entries.take(32)) {
             val key = rawKey.take(64)
-            if (isSensitiveDetailKey(key)) {
-                out.put(key, "[REDACTED]")
-                continue
-            }
+            if (isSensitiveDetailKey(key)) continue
             when (value) {
                 null -> out.put(key, JSONObject.NULL)
                 is Number, is Boolean -> out.put(key, value)
@@ -202,6 +191,29 @@ class DiagnosticLogger private constructor(private val context: Context) {
             }
         }
         return out
+    }
+
+    private fun sanitizeParsedEvent(event: JSONObject): JSONObject {
+        val safe = JSONObject(event.toString())
+        val details = safe.optJSONObject("details")
+        if (details != null) {
+            val keys = mutableListOf<String>()
+            val iterator = details.keys()
+            while (iterator.hasNext()) keys += iterator.next()
+            keys.filter(::isSensitiveDetailKey).forEach(details::remove)
+            for (key in keys.filterNot(::isSensitiveDetailKey)) {
+                val value = details.opt(key)
+                if (value is String) details.put(key, sanitizeTextForDiagnostics(value, MAX_DETAIL_LEN))
+            }
+        }
+        if (safe.has("exception_msg")) {
+            safe.put("exception_msg", sanitizeTextForDiagnostics(safe.optString("exception_msg"), MAX_DETAIL_LEN))
+        }
+        if (safe.has("exception_stack")) {
+            val stackLimit = if (isForensicTest()) MAX_FORENSIC_STACK_LEN else MAX_PRODUCTION_STACK_LEN
+            safe.put("exception_stack", sanitizeTextForDiagnostics(safe.optString("exception_stack"), stackLimit))
+        }
+        return safe
     }
 
     private fun appendLine(line: String) {
@@ -255,7 +267,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
                 file.readLines(Charsets.UTF_8)
                     .asSequence()
                     .filter { it.isNotBlank() }
-                    .mapNotNull { runCatching { JSONObject(it) }.getOrNull() }
+                    .mapNotNull { runCatching { sanitizeParsedEvent(JSONObject(it)) }.getOrNull() }
                     .toList()
                     .takeLast(maxEvents.coerceIn(1, MAX_TICKET_EVENTS))
                     .toMutableList()

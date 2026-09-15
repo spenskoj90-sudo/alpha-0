@@ -6,10 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Pure JVM tests for DiagnosticLogger security helpers.
- * Context/file-backed paths are exercised by instrumentation / physical acceptance.
- */
+/** Pure JVM tests for diagnostic privacy/security helpers. */
 class DiagnosticLoggerTest {
 
     @Test
@@ -44,9 +41,35 @@ class DiagnosticLoggerTest {
     @Test
     fun redact_does_not_echo_jwt_like_input() {
         val jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature"
-        val r = DiagnosticLogger.redactRequestId(jwt)!!
-        assertFalse(r.contains("eyJ"))
-        assertFalse(r.contains("payload"))
-        assertFalse(r.contains("signature"))
+        val redacted = DiagnosticLogger.redactRequestId(jwt)!!
+        assertFalse(redacted.contains("eyJ"))
+        assertFalse(redacted.contains("payload"))
+        assertFalse(redacted.contains("signature"))
+    }
+
+    @Test
+    fun sensitive_detail_key_detection_is_fail_closed() {
+        for (key in listOf("access_token", "Authorization", "private_key_pem", "play_integrity_token", "request_body")) {
+            assertTrue("expected sensitive key: $key", DiagnosticLogger.isSensitiveDetailKey(key))
+        }
+        assertFalse(DiagnosticLogger.isSensitiveDetailKey("network_transport"))
+        assertFalse(DiagnosticLogger.isSensitiveDetailKey("route"))
+    }
+
+    @Test
+    fun freeform_scrubber_removes_secret_and_email_material() {
+        val raw = "Bearer abcdefghijklmnop token=supersecret user@example.com"
+        val safe = DiagnosticLogger.sanitizeTextForDiagnostics(raw)
+        assertFalse(safe.contains("abcdefghijklmnop"))
+        assertFalse(safe.contains("supersecret"))
+        assertFalse(safe.contains("user@example.com"))
+        assertTrue(safe.contains("[REDACTED]"))
+        assertTrue(safe.contains("[REDACTED_EMAIL]"))
+    }
+
+    @Test
+    fun scrubber_obeys_output_bound() {
+        val safe = DiagnosticLogger.sanitizeTextForDiagnostics("x".repeat(5000), 128)
+        assertTrue(safe.length <= 128)
     }
 }

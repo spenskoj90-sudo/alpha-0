@@ -321,3 +321,88 @@ def test_admin_can_merge_confirmed_related_clusters_without_losing_reports() -> 
     source_report = client.get(f"/v1/admin/quality/reports/{first['id']}", headers=ADMIN_HEADERS)
     assert source_report.status_code == 200
     assert source_report.json()["report"]["problem_group_id"] == target
+
+
+def test_chained_cluster_merges_flatten_aliases_and_route_future_reports_to_root() -> None:
+    reset_quality_state()
+    first = submit("chain-user-1", report_payload(error_code="HTTP_503"))
+    second = submit("chain-user-2", report_payload(error_code="HTTP_502"))
+    third = submit("chain-user-3", report_payload(error_code="HTTP_504"))
+    first_id = first["problem_group_id"]
+    second_id = second["problem_group_id"]
+    root_id = third["problem_group_id"]
+
+    first_merge = client.post(
+        f"/v1/admin/quality/clusters/{first_id}/merge",
+        headers=ADMIN_HEADERS,
+        json={"target_cluster_id": second_id},
+    )
+    assert first_merge.status_code == 200
+    second_merge = client.post(
+        f"/v1/admin/quality/clusters/{second_id}/merge",
+        headers=ADMIN_HEADERS,
+        json={"target_cluster_id": root_id},
+    )
+    assert second_merge.status_code == 200
+
+    routed = submit("chain-user-4", report_payload(error_code="HTTP_503"))
+    assert routed["problem_group_id"] == root_id
+    assert routed["related_report_count"] == 4
+
+    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    assert listing.status_code == 200
+    active_ids = {item["id"] for item in listing.json()["clusters"]}
+    assert root_id in active_ids
+    assert first_id not in active_ids
+    assert second_id not in active_ids
+
+    first_alias = client.get(f"/v1/admin/quality/clusters/{first_id}", headers=ADMIN_HEADERS)
+    second_alias = client.get(f"/v1/admin/quality/clusters/{second_id}", headers=ADMIN_HEADERS)
+    assert first_alias.status_code == 200
+    assert second_alias.status_code == 200
+    assert first_alias.json()["cluster"]["merged_into_id"] == root_id
+    assert second_alias.json()["cluster"]["merged_into_id"] == root_id
+
+    root = client.get(f"/v1/admin/quality/clusters/{root_id}", headers=ADMIN_HEADERS)
+    assert root.status_code == 200
+    cluster = root.json()["cluster"]
+    assert cluster["occurrence_count"] == 4
+    assert cluster["affected_user_count"] == 4
+    assert len(cluster["reports"]) == 4
+
+
+def test_security_privacy_category_alone_cannot_self_promote_to_critical() -> None:
+    reset_quality_state()
+    payload = report_payload(with_diagnostics=False)
+    payload["category"] = "SECURITY_PRIVACY"
+    payload["title"] = "Privacy settings wording is confusing"
+    payload["description"] = "I want the privacy settings explanation to be clearer."
+
+    report = submit("security-text-user", payload)
+    assert report["inferred_severity"] == "MEDIUM"
+
+    cluster = client.get(
+        f"/v1/admin/quality/clusters/{report['problem_group_id']}",
+        headers=ADMIN_HEADERS,
+    )
+    assert cluster.status_code == 200
+    assert cluster.json()["cluster"]["severity"] == "MEDIUM"
+    assert cluster.json()["cluster"]["priority_score"] < 70
+
+
+def test_security_privacy_requires_diagnostic_signal_for_critical_inference() -> None:
+    reset_quality_state()
+    payload = report_payload(error_code="INTEGRITY_FAILURE")
+    payload["category"] = "SECURITY_PRIVACY"
+    payload["title"] = "Integrity validation failed"
+    payload["description"] = "The client recorded an integrity validation failure."
+
+    report = submit("security-signal-user", payload)
+    assert report["inferred_severity"] == "CRITICAL"
+
+    cluster = client.get(
+        f"/v1/admin/quality/clusters/{report['problem_group_id']}",
+        headers=ADMIN_HEADERS,
+    )
+    assert cluster.status_code == 200
+    assert cluster.json()["cluster"]["severity"] == "CRITICAL"

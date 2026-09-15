@@ -102,7 +102,7 @@ Known external or protected items remain:
 - signed release-candidate Owner execution;
 - release tag/publication and live production deployment.
 
-Firebase Test Lab issue #59 remains deferred/non-blocking while GitHub-hosted emulator instrumentation is the routine Android gate.
+Firebase Test Lab is retired as a project dependency and remains optional informational evidence only; issue #59 is closed `not planned`. GitHub-hosted emulator instrumentation remains the routine automated Android gate, while exact-candidate physical Android acceptance remains the final device gate.
 
 ## 8. Governance
 

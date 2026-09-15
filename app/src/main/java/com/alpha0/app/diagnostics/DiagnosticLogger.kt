@@ -67,7 +67,6 @@ class DiagnosticLogger private constructor(private val context: Context) {
             }
         }
 
-        /** Redact a request id to a short, non-reversible prefix. */
         fun redactRequestId(raw: String?): String? {
             if (raw.isNullOrBlank()) return null
             return try {
@@ -92,13 +91,13 @@ class DiagnosticLogger private constructor(private val context: Context) {
             return SENSITIVE_KEYS.any { key.contains(it) }
         }
 
-        /**
-         * Scrub secret-like and common personally identifying fragments from free-form
-         * exception/OS messages. Structured event details should still use opaque IDs.
-         */
         fun sanitizeTextForDiagnostics(raw: String?, maxLen: Int = MAX_DETAIL_LEN): String {
             if (raw.isNullOrBlank()) return ""
-            var value = raw.take(maxLen)
+            var value = raw
+            value = value.replace(
+                Regex("-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\\s\\S]*?(?:-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|$)"),
+                "[REDACTED_PRIVATE_KEY]"
+            )
             value = value.replace(Regex("(?i)(bearer\\s+)[a-z0-9._~+\\-/]+"), "$1[REDACTED]")
             value = value.replace(
                 Regex("(?i)(password|access_token|refresh_token|session_token|token|secret|api_key|authorization)[=:]\\s*\\S+"),
@@ -112,11 +111,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
                 Regex("[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,128}\\.[A-Za-z]{2,24}"),
                 "[REDACTED_EMAIL]"
             )
-            value = value.replace(
-                Regex("-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\\s\\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-                "[REDACTED_PRIVATE_KEY]"
-            )
-            return value
+            return value.take(maxLen.coerceAtLeast(0))
         }
     }
 
@@ -127,9 +122,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
     private val sessionId = UUID.randomUUID().toString()
 
     fun isForensicTest(): Boolean = mode == "FORENSIC_TEST"
-
     fun mode(): String = mode
-
     fun sessionId(): String = sessionId
 
     private fun logFile(): File {
@@ -138,10 +131,6 @@ class DiagnosticLogger private constructor(private val context: Context) {
         return File(dir, LOG_FILE)
     }
 
-    /**
-     * Emit one structured event. Callers must use stable component/event identifiers and
-     * must never place arbitrary user-entered text or payloads in [details].
-     */
     fun event(
         level: String,
         component: String,
@@ -165,17 +154,12 @@ class DiagnosticLogger private constructor(private val context: Context) {
                 redactRequestId(requestId)?.let { put("request_id", it) }
                 errorCode?.take(96)?.let { put("error_code", it) }
                 durationMs?.coerceAtLeast(0)?.let { put("duration_ms", it) }
-                if (details != null && details.isNotEmpty()) {
-                    put("details", sanitizeDetails(details))
-                }
+                if (details != null && details.isNotEmpty()) put("details", sanitizeDetails(details))
                 if (throwable != null) {
                     put("exception_class", throwable.javaClass.name.take(160))
                     put("exception_msg", sanitizeTextForDiagnostics(throwable.message, MAX_DETAIL_LEN))
                     val stackLimit = if (isForensicTest()) MAX_FORENSIC_STACK_LEN else MAX_PRODUCTION_STACK_LEN
-                    put(
-                        "exception_stack",
-                        sanitizeTextForDiagnostics(throwable.stackTraceToString(), stackLimit)
-                    )
+                    put("exception_stack", sanitizeTextForDiagnostics(throwable.stackTraceToString(), stackLimit))
                 }
             }
             appendLine(obj.toString())
@@ -224,13 +208,9 @@ class DiagnosticLogger private constructor(private val context: Context) {
         val encodedBytes = line.toByteArray(Charsets.UTF_8).size + 1L
         lock.withLock {
             val file = logFile()
-            if (file.exists() && file.length() + encodedBytes > maxBytes) {
-                rotateDown(file)
-            }
+            if (file.exists() && file.length() + encodedBytes > maxBytes) rotateDown(file)
             file.appendText(line + "\n", Charsets.UTF_8)
-            if (file.length() > maxBytes) {
-                rotateDown(file)
-            }
+            if (file.length() > maxBytes) rotateDown(file)
         }
     }
 
@@ -253,7 +233,6 @@ class DiagnosticLogger private constructor(private val context: Context) {
         }
     }
 
-    /** Read current bounded log content for local forensic export/tests. */
     fun readAll(): String = lock.withLock {
         val file = logFile()
         if (!file.exists()) "" else file.readText(Charsets.UTF_8)
@@ -267,20 +246,22 @@ class DiagnosticLogger private constructor(private val context: Context) {
 
     fun logFilePath(): String = logFile().absolutePath
 
-    /**
-     * Freeze a privacy-bounded snapshot of the already-recorded ring for a quality ticket.
-     * The snapshot is deliberately capped below the server's 384 KiB hard limit.
-     */
     fun createTicketSnapshot(maxEvents: Int = MAX_TICKET_EVENTS): TicketSnapshot {
         val events = lock.withLock {
             val file = logFile()
-            if (!file.exists()) emptyList() else file.readLines(Charsets.UTF_8)
-                .asSequence()
-                .filter { it.isNotBlank() }
-                .mapNotNull { runCatching { JSONObject(it) }.getOrNull() }
-                .takeLast(maxEvents.coerceIn(1, MAX_TICKET_EVENTS))
-                .toMutableList()
+            if (!file.exists()) {
+                mutableListOf()
+            } else {
+                file.readLines(Charsets.UTF_8)
+                    .asSequence()
+                    .filter { it.isNotBlank() }
+                    .mapNotNull { runCatching { JSONObject(it) }.getOrNull() }
+                    .toList()
+                    .takeLast(maxEvents.coerceIn(1, MAX_TICKET_EVENTS))
+                    .toMutableList()
+            }
         }
+        var snapshotDropped = 0L
         val root = JSONObject().apply {
             put("schema", "sentinel.diagnostic-snapshot.v1")
             put("mode", if (isForensicTest()) "FORENSIC_TEST" else "PRODUCTION")
@@ -295,17 +276,14 @@ class DiagnosticLogger private constructor(private val context: Context) {
         }
         while (root.toString().toByteArray(Charsets.UTF_8).size > MAX_TICKET_BYTES && events.size > 1) {
             events.removeAt(0)
+            snapshotDropped += 1
             root.put("events", JSONArray(events))
-            root.put("dropped_events", droppedEvents.get() + 1)
+            root.put("dropped_events", droppedEvents.get() + snapshotDropped)
         }
         val bytes = root.toString().toByteArray(Charsets.UTF_8).size
         return TicketSnapshot(root, events.size, bytes)
     }
 
-    /**
-     * Physical-test/development-only full forensic export. Production builds cannot
-     * invoke this path; production support data must flow through the reviewed ticket UI.
-     */
     fun exportShare(activityContext: Context): Boolean {
         if (!BuildConfig.SENTINEL_DIAGNOSTICS_EXPORT_ENABLED) return false
         return try {
@@ -332,6 +310,5 @@ class DiagnosticLogger private constructor(private val context: Context) {
         }
     }
 
-    /** Generate a correlation id for a local operation chain (not a server secret). */
     fun newCorrelationId(): String = UUID.randomUUID().toString()
 }

@@ -1,5 +1,7 @@
 package com.alpha0.app.dashboard
 
+import android.content.Context
+import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.net.HttpMethod
 import com.alpha0.app.net.HttpRequest
 import com.alpha0.app.net.HttpTransport
@@ -12,6 +14,12 @@ class DashboardApi(
     private val baseUrl: String,
     private val transport: HttpTransport = UrlConnectionHttpTransport(),
 ) {
+    @Volatile private var diag: DiagnosticLogger? = null
+
+    fun attachDiagnostics(context: Context) {
+        diag = DiagnosticLogger.get(context)
+    }
+
     data class Device(
         val deviceId: String,
         val state: String,
@@ -62,7 +70,7 @@ class DashboardApi(
         data class Failure(val message: String) : Result<Nothing>
     }
 
-    fun getDevice(accessToken: String, deviceId: String): Result<Device> = request(accessToken, "/v1/devices/$deviceId") { json ->
+    fun getDevice(accessToken: String, deviceId: String): Result<Device> = request(accessToken, "/v1/devices/$deviceId", "DEVICE_GET") { json ->
         Device(
             deviceId = json.optString("device_id"),
             state = json.optString("state"),
@@ -75,7 +83,7 @@ class DashboardApi(
         )
     }
 
-    fun rotateDevice(accessToken: String, deviceId: String, platform: String, publicKeyDerB64: String, fingerprintSha256: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/rotate", "POST", JSONObject().apply {
+    fun rotateDevice(accessToken: String, deviceId: String, platform: String, publicKeyDerB64: String, fingerprintSha256: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/rotate", "DEVICE_ROTATE", "POST", JSONObject().apply {
         put("platform", platform)
         put("public_key_der_b64", publicKeyDerB64)
         put("fingerprint_sha256", fingerprintSha256)
@@ -91,11 +99,11 @@ class DashboardApi(
         )
     }
 
-    fun revokeDevice(accessToken: String, deviceId: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/revoke", "POST") {
+    fun revokeDevice(accessToken: String, deviceId: String): Result<DeviceActionResult> = request(accessToken, "/v1/devices/$deviceId/revoke", "DEVICE_REVOKE", "POST") {
         DeviceActionResult(revoked = it.optBoolean("revoked"))
     }
 
-    fun getEntitlements(accessToken: String): Result<List<Entitlement>> = request(accessToken, "/v1/entitlements/me") { json ->
+    fun getEntitlements(accessToken: String): Result<List<Entitlement>> = request(accessToken, "/v1/entitlements/me", "ENTITLEMENTS_LIST") { json ->
         val array = json.optJSONArray("entitlements") ?: JSONArray()
         buildList {
             for (index in 0 until array.length()) {
@@ -115,7 +123,7 @@ class DashboardApi(
         }
     }
 
-    fun getEntitlement(accessToken: String, entitlementId: String): Result<GameDetails> = request(accessToken, "/v1/entitlements/$entitlementId") { json ->
+    fun getEntitlement(accessToken: String, entitlementId: String): Result<GameDetails> = request(accessToken, "/v1/entitlements/$entitlementId", "ENTITLEMENT_GET") { json ->
         GameDetails(
             id = json.optString("id"),
             gameId = json.optString("game_id"),
@@ -132,19 +140,22 @@ class DashboardApi(
         )
     }
 
-    private fun <T> request(accessToken: String, path: String, parser: (JSONObject) -> T): Result<T> = request(accessToken, path, "GET", null, parser)
+    private fun <T> request(accessToken: String, path: String, operation: String, parser: (JSONObject) -> T): Result<T> =
+        request(accessToken, path, operation, "GET", null, parser)
 
-    private fun <T> request(accessToken: String, path: String, method: String, body: JSONObject? = null, parser: (JSONObject) -> T): Result<T> {
+    private fun <T> request(accessToken: String, path: String, operation: String, method: String, body: JSONObject? = null, parser: (JSONObject) -> T): Result<T> {
+        val requestId = diag?.newCorrelationId()
+        val started = System.nanoTime()
+        diag?.debug("API", "REQUEST_START", details = mapOf("operation" to operation, "method" to method))
         return try {
             val normalizedBase = baseUrl.trim().trimEnd('/')
             val headers = linkedMapOf(
                 "Authorization" to "Bearer $accessToken",
                 "Accept" to "application/json",
             )
+            requestId?.let { headers["X-Request-ID"] = it }
             val requestBody = body?.toString()?.toByteArray(Charsets.UTF_8)
-            if (requestBody != null) {
-                headers["Content-Type"] = "application/json"
-            }
+            if (requestBody != null) headers["Content-Type"] = "application/json"
             val response = transport.execute(
                 HttpRequest(
                     method = when (method) {
@@ -157,15 +168,34 @@ class DashboardApi(
                     body = requestBody,
                 )
             )
+            val durationMs = (System.nanoTime() - started) / 1_000_000
             val json = runCatching { JSONObject(response.body) }.getOrNull()
             if (response.status in 200..299 && json != null) {
+                diag?.info(
+                    "API",
+                    "REQUEST_COMPLETE",
+                    requestId = requestId,
+                    durationMs = durationMs,
+                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status),
+                )
                 Result.Success(parser(json))
             } else {
-                Result.Failure(json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}")
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                diag?.warn(
+                    "API",
+                    "REQUEST_COMPLETE",
+                    requestId = requestId,
+                    errorCode = code,
+                    durationMs = durationMs,
+                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status),
+                )
+                Result.Failure(code)
             }
         } catch (_: IOException) {
+            diag?.warn("API", "REQUEST_COMPLETE", requestId = requestId, errorCode = "NETWORK_ERROR", details = mapOf("operation" to operation, "method" to method))
             Result.Failure("NETWORK_ERROR")
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            diag?.error("API", "REQUEST_COMPLETE", requestId = requestId, errorCode = "UNEXPECTED_ERROR", details = mapOf("operation" to operation, "method" to method), throwable = error)
             Result.Failure("UNEXPECTED_ERROR")
         }
     }

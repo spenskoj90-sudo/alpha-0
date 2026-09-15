@@ -16,6 +16,7 @@ android {
         versionCode = 10002
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["appLabel"] = "SENTINEL"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
 
         val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
@@ -60,6 +61,7 @@ android {
             initWith(getByName("debug"))
             applicationIdSuffix = ".physicaltest"
             versionNameSuffix = "-physical-test"
+            manifestPlaceholders["appLabel"] = "SENTINEL PHYSICAL TEST"
             matchingFallbacks += listOf("debug")
             isDebuggable = true
             isMinifyEnabled = false

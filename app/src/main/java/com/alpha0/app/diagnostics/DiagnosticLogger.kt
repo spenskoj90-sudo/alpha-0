@@ -173,8 +173,8 @@ class DiagnosticLogger private constructor(private val context: Context) {
     fun info(component: String, event: String, result: String = "SUCCESS", requestId: String? = null, durationMs: Long? = null, details: Map<String, Any?>? = null) =
         event("INFO", component, event, result, requestId, null, durationMs, details)
 
-    fun warn(component: String, event: String, result: String = "FAILURE", requestId: String? = null, errorCode: String? = null, durationMs: Long? = null, details: Map<String, Any?>? = null) =
-        event("WARN", component, event, result, requestId, errorCode, durationMs, details)
+    fun warn(component: String, event: String, result: String = "FAILURE", requestId: String? = null, errorCode: String? = null, durationMs: Long? = null, details: Map<String, Any?>? = null, throwable: Throwable? = null) =
+        event("WARN", component, event, result, requestId, errorCode, durationMs, details, throwable)
 
     fun error(component: String, event: String, result: String = "FAILURE", requestId: String? = null, errorCode: String? = null, durationMs: Long? = null, details: Map<String, Any?>? = null, throwable: Throwable? = null) =
         event("ERROR", component, event, result, requestId, errorCode, durationMs, details, throwable)

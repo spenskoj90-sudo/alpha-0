@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const page = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('./globals.css', import.meta.url), 'utf8');
 const recommendation = readFileSync(new URL('./components/recommendation-panel.tsx', import.meta.url), 'utf8');
+const accountControl = readFileSync(new URL('./components/account-control.tsx', import.meta.url), 'utf8');
 
 describe('Web accessibility contract', () => {
   it('keeps skip navigation and a focusable main landmark', () => {
@@ -27,5 +28,21 @@ describe('Web accessibility contract', () => {
     expect(recommendation).toContain("aria-live={view === 'ERROR' ? 'assertive' : 'polite'}");
     expect(recommendation).toContain('<div role="status" aria-live="polite" aria-atomic="true">');
     expect(recommendation).toContain('Observational only · no action execution');
+  });
+
+  it('exposes account busy, failure and password requirement semantics', () => {
+    expect(accountControl).toContain('aria-busy={busy}');
+    expect(accountControl).toContain('aria-busy="true"');
+    expect(accountControl).toContain('aria-describedby="password-requirement"');
+    expect(accountControl).toContain('id="password-requirement"');
+    expect(accountControl).toContain("role={messageTone === 'error' ? 'alert' : 'status'}");
+    expect(accountControl).toContain("aria-live={messageTone === 'error' ? 'assertive' : 'polite'}");
+    expect(accountControl).toContain('role="alert" aria-live="assertive"');
+  });
+
+  it('keeps repeated plan actions uniquely named', () => {
+    expect(accountControl).toContain('`Start checkout for ${plan.name}`');
+    expect(accountControl).toContain('`Activate free plan ${plan.name}`');
+    expect(accountControl).toContain('aria-label={actionLabel}');
   });
 });

@@ -29,11 +29,13 @@ def create_checkout_session(
     authorization_header: str = Header(..., alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> dict[str, Any]:
-    """Create a server-owned Stripe-hosted subscription Checkout session.
+    """Create or resume a server-owned Stripe-hosted Checkout session.
 
     The browser supplies only a canonical SENTINEL plan code. Stripe price IDs,
     mode, redirect URLs and subscription metadata remain server configuration.
-    A local PENDING row is created first and never grants paid features.
+    A local PENDING row is created first and never grants paid features. An
+    existing PENDING Stripe setup for the same plan is reused so cancellation
+    or transient provider failure does not strand the account.
     """
 
     from app.main import (
@@ -65,8 +67,18 @@ def create_checkout_session(
     if payload.plan_code not in adapter.config.price_ids:
         raise HTTPException(status_code=503, detail="STRIPE_PLAN_NOT_CONFIGURED")
 
+    pending = next(
+        (
+            item
+            for item in store.list_subscriptions(principal.user_id)
+            if item.get("provider") == "stripe"
+            and item.get("plan_code") == payload.plan_code
+            and item.get("status") == "PENDING"
+        ),
+        None,
+    )
     try:
-        item = billing_service.create_subscription(
+        item = pending or billing_service.create_subscription(
             principal.user_id,
             payload.plan_code,
             provider="stripe",
@@ -77,8 +89,8 @@ def create_checkout_session(
         status = 409 if code == "SUBSCRIPTION_ALREADY_EXISTS" else 400
         raise HTTPException(status_code=status, detail=code) from exc
     except StripeProviderError as exc:
-        # The PENDING row intentionally grants no feature. Keeping the failed
-        # setup attempt is safer than fabricating provider confirmation.
+        # The retained PENDING row is deliberately non-entitling and makes a
+        # later retry deterministic through the same provider idempotency key.
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     store.add_audit({
@@ -89,6 +101,7 @@ def create_checkout_session(
         "decision": "ALLOW",
         "reason_code": "STRIPE_TEST_CHECKOUT_CREATED" if not checkout.livemode else "STRIPE_CHECKOUT_CREATED",
         "request_id": rid,
+        "metadata": {"resumed": pending is not None},
     })
     return {
         "provider": "stripe",

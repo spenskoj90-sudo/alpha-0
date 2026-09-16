@@ -89,9 +89,12 @@
       "activationSurface": "core-companion-staging-only-when-configured",
       "purpose": "optional staging aggregate operational telemetry",
       "credential": "Owner-managed SENTINEL_POSTHOG_PROJECT_KEY",
+      "regionSelector": "SENTINEL_POSTHOG_REGION: us|eu",
+      "networkDestinations": ["https://us.i.posthog.com/capture/", "https://eu.i.posthog.com/capture/"],
+      "arbitraryHostConfiguration": false,
       "requiredCorrelation": ["environment", "release", "source_sha"],
       "distinctIdPolicy": "constant sentinel-runtime with $process_person_profile=false",
-      "policy": "A bounded HTTPS delivery adapter exists but remains disabled by default. Code permits activation only when SENTINEL_ENV=staging and exact release/source identity is supplied. Local/PostgreSQL operational telemetry remains canonical and provider delivery is fail-isolated. Production PostHog activation is not permitted by this contract."
+      "policy": "A bounded HTTPS delivery adapter exists but remains disabled by default. Code permits activation only when SENTINEL_ENV=staging and exact release/source identity is supplied. Network egress is selected only from literal PostHog US/EU ingestion endpoints. Local/PostgreSQL operational telemetry remains canonical and provider delivery is fail-isolated. Production PostHog activation is not permitted by this contract."
     },
     "githubActions": {
       "purpose": "build/test/security/release-evidence failures",
@@ -186,7 +189,7 @@
   "externalGates": [
     "Sentry project alert-rule provisioning and account retention settings",
     "production environment activation",
-    "PostHog staging project credential/host/retention activation; production PostHog remains prohibited",
+    "PostHog staging project credential/region/account-retention activation; production PostHog remains prohibited",
     "real-device runtime trend acceptance"
   ]
 }

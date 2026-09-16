@@ -51,7 +51,7 @@ jobs:
           pip-audit
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Install web dependencies without executing lifecycle scripts
@@ -60,6 +60,12 @@ jobs:
       - name: Audit web dependencies
         working-directory: web
         run: npm audit --audit-level=high
+      - name: Audit repository dependency manifests with OSV
+        uses: google/osv-scanner-action/osv-scanner-action@6e4298ebc4db23e847df9b2e2de2939d6f066c67 # v2.5.1
+        with:
+          scan-args: |-
+            --recursive
+            ./
 
   filesystem:
     name: Secret and image scan

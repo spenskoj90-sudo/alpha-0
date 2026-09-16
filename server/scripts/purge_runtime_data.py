@@ -6,8 +6,7 @@ import os
 import re
 from urllib.parse import urlsplit
 
-from sqlalchemy import create_engine
-
+from app.core.database_engine import create_service_role_engine
 from app.core.database_security import validate_database_url
 from app.core.retention import purge_expired_runtime_data, retention_batch_size_from_env
 
@@ -27,10 +26,9 @@ def main() -> None:
     if not database_url:
         raise SystemExit("DATABASE_URL is required")
 
-    engine = create_engine(
+    engine = create_service_role_engine(
         _sqlalchemy_url(database_url),
         pool_pre_ping=True,
-        connect_args={"options": "-c app.service_role=true"},
     )
     try:
         deleted = purge_expired_runtime_data(engine, batch_size=retention_batch_size_from_env())

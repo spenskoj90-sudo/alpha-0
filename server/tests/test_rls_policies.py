@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 import psycopg
@@ -35,11 +36,56 @@ def test_required_rls_policies_exist():
 
 
 @pytest.mark.postgres
-def test_application_postgres_connections_opt_into_rls_service_policy():
+def test_application_postgres_service_role_is_transaction_local(monkeypatch):
+    """The service GUC is set at BEGIN and cannot leak between pooled clients."""
+
+    # CI historically exported PGOPTIONS globally. Remove it before the engine
+    # opens its first physical connection so this regression proves the new
+    # application boundary rather than inheriting a process startup setting.
+    monkeypatch.delenv("PGOPTIONS", raising=False)
     store = PostgresStore(os.environ["DATABASE_URL"])
-    with store.engine.connect() as conn:
-        assert conn.exec_driver_sql("SHOW app.service_role").scalar() == "true"
+
+    with store.engine.begin() as conn:
+        assert conn.exec_driver_sql(
+            "SELECT current_setting('app.service_role', true)"
+        ).scalar() == "true"
+
+    # Bypass SQLAlchemy's BEGIN listener on the same pool. The previous
+    # transaction-local GUC must already have reset on commit before checkout.
+    raw = store.engine.raw_connection()
+    try:
+        with raw.cursor() as cursor:
+            cursor.execute("SELECT current_setting('app.service_role', true)")
+            assert cursor.fetchone()[0] in (None, "")
+        raw.rollback()
+    finally:
+        raw.close()
+
+    # A new application transaction opts in again automatically.
+    with store.engine.begin() as conn:
+        assert conn.exec_driver_sql(
+            "SELECT current_setting('app.service_role', true)"
+        ).scalar() == "true"
     store.engine.dispose()
+
+
+def test_application_sources_do_not_use_service_role_startup_parameters():
+    """PgBouncer transaction pooling must never depend on arbitrary startup GUCs."""
+
+    root = Path(__file__).resolve().parents[1]
+    application_paths = (
+        root / "app" / "core" / "store.py",
+        root / "app" / "core" / "user_store.py",
+        root / "app" / "core" / "event_runtime.py",
+        root / "scripts" / "purge_runtime_data.py",
+    )
+    for path in application_paths:
+        source = path.read_text(encoding="utf-8")
+        assert "-c app.service_role=true" not in source, path
+        assert 'connect_args={"options"' not in source, path
+
+    helper = (root / "app" / "core" / "database_engine.py").read_text(encoding="utf-8")
+    assert "set_config('app.service_role', 'true', true)" in helper
 
 
 @pytest.mark.postgres

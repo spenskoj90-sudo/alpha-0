@@ -35,6 +35,7 @@ type Entitlement = {
 };
 
 type ViewState = 'CHECKING' | 'SIGNED_OUT' | 'READY' | 'ERROR';
+type MessageTone = 'status' | 'error';
 
 type AccountSnapshot =
   | { view: 'SIGNED_OUT'; message?: string }
@@ -116,6 +117,7 @@ export function AccountControl() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [entitlements, setEntitlements] = useState<Entitlement[]>([]);
   const [message, setMessage] = useState('');
+  const [messageTone, setMessageTone] = useState<MessageTone>('status');
   const [busy, setBusy] = useState(false);
 
   function applySnapshot(snapshot: AccountSnapshot) {
@@ -124,6 +126,7 @@ export function AccountControl() {
       setSubscriptions(snapshot.subscriptions);
       setEntitlements(snapshot.entitlements);
       setMessage('');
+      setMessageTone('status');
       setView('READY');
       return;
     }
@@ -131,6 +134,7 @@ export function AccountControl() {
     setSubscriptions([]);
     setEntitlements([]);
     setMessage(snapshot.message ?? '');
+    setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
     setView(snapshot.view);
   }
 
@@ -147,6 +151,7 @@ export function AccountControl() {
         setSubscriptions(snapshot.subscriptions);
         setEntitlements(snapshot.entitlements);
         setMessage('');
+        setMessageTone('status');
         setView('READY');
         return;
       }
@@ -154,6 +159,7 @@ export function AccountControl() {
       setSubscriptions([]);
       setEntitlements([]);
       setMessage(snapshot.message ?? '');
+      setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
       setView(snapshot.view);
     });
     return () => { active = false; };
@@ -169,6 +175,7 @@ export function AccountControl() {
     event.preventDefault();
     setBusy(true);
     setMessage('');
+    setMessageTone('status');
     try {
       const response = await fetch(`/api/session/${mode}`, {
         method: 'POST',
@@ -178,6 +185,7 @@ export function AccountControl() {
       const payload = await responseJson<{ error?: string; code?: string }>(response);
       if (!response.ok) {
         setMessage(payload?.code ?? payload?.error ?? `Authentication failed (${response.status}).`);
+        setMessageTone('error');
         setView('SIGNED_OUT');
         return;
       }
@@ -197,6 +205,7 @@ export function AccountControl() {
       setEntitlements([]);
       setView('SIGNED_OUT');
       setMessage('Session cleared.');
+      setMessageTone('status');
     } finally {
       setBusy(false);
     }
@@ -205,6 +214,7 @@ export function AccountControl() {
   async function createSubscription(plan: Plan) {
     setBusy(true);
     setMessage('');
+    setMessageTone('status');
     try {
       if (plan.amount_minor > 0) {
         const response = await fetch('/api/billing/checkout-sessions', {
@@ -215,11 +225,13 @@ export function AccountControl() {
         const payload = await responseJson<CheckoutResponse>(response);
         if (!response.ok) {
           setMessage(payload?.code ?? payload?.error ?? `Checkout setup failed (${response.status}).`);
+          setMessageTone('error');
           return;
         }
         const checkoutUrl = verifiedCheckoutUrl(payload);
         if (!checkoutUrl) {
           setMessage('INVALID_CHECKOUT_RESPONSE');
+          setMessageTone('error');
           return;
         }
         window.location.assign(checkoutUrl);
@@ -234,35 +246,49 @@ export function AccountControl() {
       const payload = await responseJson<{ error?: string; code?: string }>(response);
       if (!response.ok) {
         setMessage(payload?.code ?? payload?.error ?? `Subscription intent failed (${response.status}).`);
+        setMessageTone('error');
         return;
       }
       await reloadAccount();
       setMessage('Free subscription intent recorded. Server policy remains authoritative.');
+      setMessageTone('status');
     } finally {
       setBusy(false);
     }
   }
 
   if (view === 'CHECKING') {
-    return <article className="card account-panel"><div className="label">ACCOUNT CONTROL</div><p className="muted">Checking secure Web session…</p></article>;
+    return <article className="card account-panel" aria-busy="true"><div className="label">ACCOUNT CONTROL</div><p className="muted" role="status" aria-live="polite">Checking secure Web session…</p></article>;
   }
 
   if (view === 'SIGNED_OUT') {
     return (
-      <article className="card account-panel" aria-label="SENTINEL account sign in">
+      <article className="card account-panel" aria-label="SENTINEL account sign in" aria-busy={busy}>
         <div className="panel-heading">
           <div><div className="label">ACCOUNT CONTROL</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
           <span className="badge">HTTPONLY SESSION</span>
         </div>
         <form onSubmit={authenticate}>
           <label className="field-label">EMAIL<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
-          <label className="field-label">PASSWORD<input type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={12} value={password} onChange={event => setPassword(event.target.value)} required /></label>
+          <label className="field-label">
+            PASSWORD
+            <input
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={12}
+              aria-describedby="password-requirement"
+              value={password}
+              onChange={event => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
           <button className="btn" disabled={busy}>{busy ? 'WORKING…' : mode === 'login' ? 'SIGN IN' : 'REGISTER'}</button>
         </form>
-        <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage(''); }} disabled={busy}>
+        <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage(''); setMessageTone('status'); }} disabled={busy}>
           {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
         </button>
-        {message && <p className="status-message" role="status">{message}</p>}
+        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
         <p className="boundary-copy">Credentials are sent only to the same-origin Web control plane. Core access and refresh tokens are never exposed to client-side JavaScript.</p>
       </article>
     );
@@ -270,22 +296,22 @@ export function AccountControl() {
 
   if (view === 'ERROR') {
     return (
-      <article className="card account-panel" aria-label="SENTINEL account control unavailable">
+      <article className="card account-panel" aria-label="SENTINEL account control unavailable" aria-busy={busy}>
         <div className="panel-heading"><div><div className="label">ACCOUNT CONTROL</div><h2>Control data unavailable</h2></div><span className="badge">FAIL-CLOSED</span></div>
-        <p className="status-message" role="status">{message || 'Core account data could not be verified.'}</p>
+        <p className="status-message" role="alert" aria-live="assertive">{message || 'Core account data could not be verified.'}</p>
         <div className="button-row"><button className="ghost-btn" onClick={() => void reloadAccount()} disabled={busy}>RETRY</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>CLEAR SESSION</button></div>
       </article>
     );
   }
 
   return (
-    <div className="account-stack">
+    <div className="account-stack" aria-busy={busy}>
       <article className="card account-panel">
         <div className="panel-heading">
           <div><div className="label">ACCOUNT CONTROL</div><h2>Subscription & entitlement state</h2></div>
           <button className="ghost-btn" onClick={logout} disabled={busy}>SIGN OUT</button>
         </div>
-        {message && <p className="status-message" role="status">{message}</p>}
+        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
         <div className="account-metrics">
           <div><span className="label">SESSION</span><strong className="ok">AUTHENTICATED</strong></div>
           <div><span className="label">SUBSCRIPTIONS</span><strong>{subscriptions.length}</strong></div>
@@ -300,9 +326,14 @@ export function AccountControl() {
           {plans.map(plan => {
             const hasOpenIntent = activePlanCodes.has(plan.code);
             const paid = plan.amount_minor > 0;
+            const actionLabel = hasOpenIntent
+              ? `${plan.name}: subscription intent exists`
+              : paid
+                ? `Start checkout for ${plan.name}`
+                : `Activate free plan ${plan.name}`;
             return <div className="item plan-row" key={plan.code}>
               <div><strong>{plan.name}</strong><div className="muted">{money(plan)} / {plan.interval_days} days · {plan.entitlement_codes.join(' + ')}</div></div>
-              <button className="ghost-btn" disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'INTENT EXISTS' : paid ? 'CHECKOUT' : 'ACTIVATE FREE'}</button>
+              <button className="ghost-btn" aria-label={actionLabel} disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'INTENT EXISTS' : paid ? 'CHECKOUT' : 'ACTIVATE FREE'}</button>
             </div>;
           })}
           <p className="boundary-copy">Paid checkout uses a server-created hosted provider session. The browser cannot select price IDs, provider mode, entitlement state, or payment confirmation. Paid features activate only after a verified provider lifecycle event.</p>

@@ -34,8 +34,8 @@ def create_checkout_session(
     The browser supplies only a canonical SENTINEL plan code. Stripe price IDs,
     mode, redirect URLs and subscription metadata remain server configuration.
     A local PENDING row is created first and never grants paid features. An
-    existing PENDING Stripe setup for the same plan is reused so cancellation
-    or transient provider failure does not strand the account.
+    existing unbound PENDING Stripe setup for the same plan is reused so
+    cancellation or transient provider failure does not strand the account.
     """
 
     from app.main import (
@@ -74,6 +74,7 @@ def create_checkout_session(
             if item.get("provider") == "stripe"
             and item.get("plan_code") == payload.plan_code
             and item.get("status") == "PENDING"
+            and item.get("provider_subscription_id") == f"local_{item.get('id')}"
         ),
         None,
     )
@@ -164,6 +165,7 @@ async def verified_provider_webhook(
         status = 404 if code == "SUBSCRIPTION_NOT_FOUND" else 409 if code in {
             "SUBSCRIPTION_STATE_CHANGED",
             "SUBSCRIPTION_PROVIDER_MISMATCH",
+            "SUBSCRIPTION_BINDING_MISMATCH",
             "SUBSCRIPTION_ALREADY_EXISTS",
             "INVALID_WEBHOOK_STATE",
         } or code.startswith("INVALID_BILLING_TRANSITION") else 400

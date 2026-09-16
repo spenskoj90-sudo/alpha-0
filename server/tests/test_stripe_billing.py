@@ -157,6 +157,42 @@ def test_signed_stripe_subscription_binds_local_pending_row_and_controls_feature
     assert service.feature_entitlements("stripe-user") == ()
 
 
+def test_signed_stripe_event_cannot_redirect_existing_provider_binding() -> None:
+    store = MemoryStore()
+    service = BillingService(store)
+    first = service.create_subscription("stripe-user-a", "core-plus", provider="stripe")
+    second = service.create_subscription("stripe-user-b", "core-plus", provider="stripe")
+    adapter = StripeBillingProviderAdapter(stripe_config(), FakeStripeTransport())
+    created = int(time.time())
+
+    first_body = subscription_event(
+        first["id"],
+        event_type="customer.subscription.created",
+        event_id="evt_binding_first_123456",
+        created=created,
+    )
+    first_verified = adapter.verify_webhook(first_body, sign_stripe(first_body, created))
+    service.apply_verified_webhook(first_verified)
+
+    conflicting_body = subscription_event(
+        second["id"],
+        provider_subscription_id="sub_1234567890",
+        event_id="evt_binding_conflict_123456",
+        created=created + 1,
+    )
+    conflicting = adapter.verify_webhook(
+        conflicting_body,
+        sign_stripe(conflicting_body, created + 1),
+        now=datetime.fromtimestamp(created + 1, UTC),
+    )
+    with pytest.raises(ValueError, match="SUBSCRIPTION_BINDING_MISMATCH"):
+        service.apply_verified_webhook(conflicting)
+
+    assert store.get_subscription(second["id"])["status"] == "PENDING"
+    assert store.get_subscription(second["id"])["provider_subscription_id"] == f"local_{second['id']}"
+    assert service.feature_entitlements("stripe-user-b") == ()
+
+
 def test_signed_past_due_before_activation_never_grants_paid_feature() -> None:
     store = MemoryStore()
     service = BillingService(store)

@@ -5,8 +5,31 @@
     "fileName": "SENTINEL — Canonical Product Design System",
     "fileKey": "vRIHsesWZNMEEEjNJu8TjB",
     "url": "https://www.figma.com/design/vRIHsesWZNMEEEjNJu8TjB",
-    "authoredPages": ["00 Foundations", "01 Components"],
-    "note": "Figma is the visual design anchor. Repository manifests and tests are the executable anti-drift contract. Additional screen-page authoring may be continued when Figma MCP quota permits without changing the semantic contract."
+    "authoredPages": ["00 Foundations"],
+    "liveInventoryStatus": "FOUNDATIONS_ONLY",
+    "foundationPageNodeId": "0:1",
+    "foundationFrameNodeId": "1:4",
+    "componentPageStatus": "UNAUTHORED",
+    "note": "The connected canonical Figma file currently exposes the repository-bound Foundations page only. Reusable component semantics remain repository-backed until concrete Figma component nodes exist; no component-page or screen-completeness claim is inferred."
+  },
+  "figmaMappings": {
+    "foundations": {
+      "pageName": "00 Foundations",
+      "pageNodeId": "0:1",
+      "frameName": "SENTINEL Foundations",
+      "frameNodeId": "1:4",
+      "webAndCompanionColorTokens": {
+        "background": {"frameNodeId": "1:8", "swatchNodeId": "1:9", "codeAnchor": "--bg"},
+        "surface": {"frameNodeId": "1:11", "swatchNodeId": "1:12", "codeAnchor": "--panel"},
+        "surfaceRaised": {"frameNodeId": "1:14", "swatchNodeId": "1:15", "codeAnchor": "--panel-2"},
+        "textPrimary": {"frameNodeId": "1:17", "swatchNodeId": "1:18", "codeAnchor": "--text"},
+        "textSecondary": {"frameNodeId": "1:20", "swatchNodeId": "1:21", "codeAnchor": "--muted"},
+        "primary": {"frameNodeId": "1:23", "swatchNodeId": "1:24", "codeAnchor": "--accent"},
+        "signal": {"frameNodeId": "1:26", "swatchNodeId": "1:27", "codeAnchor": "--accent-2"},
+        "danger": {"frameNodeId": "1:29", "swatchNodeId": "1:30", "codeAnchor": "--danger"},
+        "border": {"frameNodeId": "1:32", "swatchNodeId": "1:33", "codeAnchor": "--border"}
+      }
+    }
   },
   "principles": [
     "security-first",
@@ -90,37 +113,42 @@
       "web": ".btn",
       "android": "PrimaryButton",
       "companion": ".btn",
+      "figma": "UNAUTHORED",
       "semantics": ["enabled/disabled", "visible focus", "explicit text label"]
     },
     "DangerAction": {
       "web": "danger state/action copy where applicable",
       "android": "DangerButton",
       "companion": "STOP / KILL SWITCH",
+      "figma": "UNAUTHORED",
       "semantics": ["destructive or terminal action is explicit", "no color-only meaning"]
     },
     "Status": {
       "web": ".state / .status-message",
       "android": "StatusBadge",
       "companion": ".status",
+      "figma": "UNAUTHORED",
       "semantics": ["text label required", "aria/live-region or Compose semantics where dynamic"]
     },
     "OperationalCard": {
       "web": ".card",
       "android": "SentinelCard / Material Card",
       "companion": ".panel / .card",
+      "figma": "UNAUTHORED",
       "semantics": ["structural only", "does not imply elevated authority"]
     },
     "RecommendationPresentation": {
       "web": "RecommendationPanel",
       "android": "presentation UI only",
       "companion": "overlay.html presentation list",
+      "figma": "UNAUTHORED",
       "semantics": ["observational", "no game-write action", "source/authority boundary remains explicit"]
     }
   },
   "accessibility": {
-    "web": ["skip navigation", "focus-visible", "main landmark", "live status", "forced-colors"],
+    "web": ["skip navigation", "focus-visible", "main landmark", "live status", "forced-colors", "busy state", "assertive failure state", "plan-specific action names"],
     "android": ["polite/assertive live region", "progress semantics", "button/card semantics", "API 35 instrumentation"],
-    "companion": ["skip navigation", "focus-visible", "live status", "forced-colors", "overlay polite live region"],
+    "companion": ["skip navigation", "focus-visible", "live status", "forced-colors", "busy state", "assertive failure state", "overlay polite live region"],
     "physicalPreRelease": ["TalkBack", "NVDA/JAWS", "switch/keyboard on target hardware", "real packaged host overlay", "microphone/driver/acoustic acceptance"]
   },
   "authorityStates": {

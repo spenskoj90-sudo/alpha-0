@@ -10,8 +10,10 @@ from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Any
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
+from app.core.database_engine import create_service_role_engine
 from app.core.security import session_hash
 
 SCOPES = ["character:read", "game:write", "game:read", "audit:read"]
@@ -67,6 +69,10 @@ class Store(ABC):
     def list_subscriptions(self, user_id: str) -> list[dict[str, Any]]: ...
     @abstractmethod
     def find_subscription_by_provider_id(self, provider: str, provider_subscription_id: str) -> dict[str, Any] | None: ...
+    @abstractmethod
+    def get_subscription(self, subscription_id: str) -> dict[str, Any] | None: ...
+    @abstractmethod
+    def bind_subscription_provider_id(self, subscription_id: str, provider: str, provider_subscription_id: str) -> dict[str, Any]: ...
     @abstractmethod
     def apply_subscription_transition(self, subscription_id: str, event: Any, previous: str, current: str) -> dict[str, Any]: ...
     @abstractmethod
@@ -269,6 +275,35 @@ class MemoryStore(Store):
                     return dict(item)
         return None
 
+    def get_subscription(self, subscription_id):
+        with self.lock:
+            item = self.subscriptions.get(subscription_id)
+            return dict(item) if item else None
+
+    def bind_subscription_provider_id(self, subscription_id, provider, provider_subscription_id):
+        if not provider_subscription_id or len(provider_subscription_id) > 256:
+            raise ValueError("INVALID_PROVIDER_SUBSCRIPTION_ID")
+        with self.lock:
+            item = self.subscriptions.get(subscription_id)
+            if item is None:
+                raise ValueError("SUBSCRIPTION_NOT_FOUND")
+            if item["provider"] != provider:
+                raise ValueError("SUBSCRIPTION_PROVIDER_MISMATCH")
+            if item["status"] != "PENDING":
+                if item["provider_subscription_id"] == provider_subscription_id:
+                    return dict(item)
+                raise ValueError("SUBSCRIPTION_STATE_CHANGED")
+            if any(
+                existing_id != subscription_id
+                and existing["provider"] == provider
+                and existing["provider_subscription_id"] == provider_subscription_id
+                for existing_id, existing in self.subscriptions.items()
+            ):
+                raise ValueError("SUBSCRIPTION_ALREADY_EXISTS")
+            item["provider_subscription_id"] = provider_subscription_id
+            item["updated_at"] = datetime.now(UTC)
+            return dict(item)
+
     def apply_subscription_transition(self, subscription_id, event, previous, current):
         with self.lock:
             item = self.subscriptions[subscription_id]
@@ -334,12 +369,11 @@ class MemoryStore(Store):
 
 class PostgresStore(Store):
     def __init__(self, database_url: str) -> None:
-        self.engine = create_engine(
+        self.engine = create_service_role_engine(
             database_url,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
-            connect_args={"options": "-c app.service_role=true"},
         )
         self.lock = Lock()
 
@@ -524,17 +558,48 @@ class PostgresStore(Store):
             row = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE s.provider=:p AND s.provider_subscription_id=:ps"), {"p": provider, "ps": provider_subscription_id}).mappings().first()
         return dict(row) if row else None
 
+    def get_subscription(self, subscription_id):
+        with self.engine.begin() as conn:
+            row = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE s.id=:id"), {"id": subscription_id}).mappings().first()
+        return dict(row) if row else None
+
+    def bind_subscription_provider_id(self, subscription_id, provider, provider_subscription_id):
+        if not provider_subscription_id or len(provider_subscription_id) > 256:
+            raise ValueError("INVALID_PROVIDER_SUBSCRIPTION_ID")
+        try:
+            with self.engine.begin() as conn:
+                row = conn.execute(
+                    text(
+                        "UPDATE subscriptions SET provider_subscription_id=:ps, updated_at=now() "
+                        "WHERE id=:id AND provider=:provider AND status='PENDING' RETURNING id::text"
+                    ),
+                    {"ps": provider_subscription_id, "id": subscription_id, "provider": provider},
+                ).first()
+                if row is None:
+                    current = conn.execute(
+                        text("SELECT provider,status,provider_subscription_id FROM subscriptions WHERE id=:id"),
+                        {"id": subscription_id},
+                    ).mappings().first()
+                    if current is None:
+                        raise ValueError("SUBSCRIPTION_NOT_FOUND")
+                    if current["provider"] != provider:
+                        raise ValueError("SUBSCRIPTION_PROVIDER_MISMATCH")
+                    if current["provider_subscription_id"] == provider_subscription_id:
+                        return self.get_subscription(subscription_id) or dict(current)
+                    raise ValueError("SUBSCRIPTION_STATE_CHANGED")
+        except IntegrityError as exc:
+            raise ValueError("SUBSCRIPTION_ALREADY_EXISTS") from exc
+        loaded = self.get_subscription(subscription_id)
+        if loaded is None:
+            raise ValueError("SUBSCRIPTION_NOT_FOUND")
+        return loaded
+
     def apply_subscription_transition(self, subscription_id, event, previous, current):
         with self.engine.begin() as conn:
             row = conn.execute(text("UPDATE subscriptions SET status=:current, updated_at=:at, expires_at=CASE WHEN :current IN ('CANCELED','EXPIRED') THEN :at ELSE expires_at END WHERE id=:id AND status=:previous RETURNING id::text id"), {"current": current, "at": event.occurred_at, "id": subscription_id, "previous": previous}).mappings().first()
             if not row:
                 raise ValueError("SUBSCRIPTION_STATE_CHANGED")
         return self.get_subscription(subscription_id)
-
-    def get_subscription(self, subscription_id):
-        with self.engine.begin() as conn:
-            row = conn.execute(text("SELECT s.id::text id,i.user_handle user_id,s.plan_code,s.status,s.currency,s.started_at,s.expires_at,s.provider,s.provider_subscription_id,s.updated_at FROM subscriptions s JOIN identities i ON i.id=s.identity_id WHERE s.id=:id"), {"id": subscription_id}).mappings().first()
-        return dict(row) if row else None
 
     def has_billing_event(self, event_id):
         with self.engine.begin() as conn:

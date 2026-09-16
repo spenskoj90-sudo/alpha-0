@@ -17,6 +17,49 @@ from app.core.stripe_billing import StripeProviderError, configured_stripe_adapt
 router = APIRouter(tags=["billing-provider"])
 _PROVIDER_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
+# Public API errors are selected from explicit constants. Provider/library
+# exception text is never reflected verbatim into an HTTP response: doing so
+# would couple the public surface to internal exception/stack details and can
+# disclose implementation information when providers wrap lower-level errors.
+_PROVIDER_VERIFICATION_CODES = frozenset(
+    {
+        "PROVIDER_WEBHOOK_BODY_INVALID",
+        "PROVIDER_WEBHOOK_EVENT_TIME_INVALID",
+        "PROVIDER_WEBHOOK_SIGNATURE_INVALID",
+        "PROVIDER_WEBHOOK_SIGNATURE_STALE",
+        "STRIPE_MODE_MISMATCH",
+        "STRIPE_SUBSCRIPTION_BINDING_INVALID",
+    }
+)
+_STRIPE_PROVIDER_CODES = frozenset(
+    {
+        "STRIPE_API_UNAVAILABLE",
+        "STRIPE_API_RESPONSE_TOO_LARGE",
+        "STRIPE_API_RESPONSE_INVALID",
+        "STRIPE_CHECKOUT_RESPONSE_INVALID",
+        "STRIPE_MODE_MISMATCH",
+    }
+)
+_BILLING_CONFLICT_CODES = frozenset(
+    {
+        "SUBSCRIPTION_STATE_CHANGED",
+        "SUBSCRIPTION_PROVIDER_MISMATCH",
+        "SUBSCRIPTION_BINDING_MISMATCH",
+        "SUBSCRIPTION_ALREADY_EXISTS",
+        "INVALID_WEBHOOK_STATE",
+    }
+)
+
+
+def _public_code(exc: BaseException, allowed: frozenset[str], fallback: str) -> str:
+    """Map an internal exception to a constant allowlisted public code."""
+
+    candidate = exc.args[0] if len(exc.args) == 1 and isinstance(exc.args[0], str) else ""
+    for code in allowed:
+        if candidate == code:
+            return code
+    return fallback
+
 
 class CheckoutSessionRequest(BaseModel):
     plan_code: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._-]+$")
@@ -60,8 +103,8 @@ def create_checkout_session(
         raise HTTPException(status_code=400, detail="FREE_PLAN_REQUIRES_NO_CHECKOUT")
     try:
         adapter = configured_stripe_adapter()
-    except (RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=503, detail="STRIPE_NOT_CONFIGURED") from exc
+    except (RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="STRIPE_NOT_CONFIGURED") from None
     if adapter is None:
         raise HTTPException(status_code=503, detail="STRIPE_NOT_CONFIGURED")
     if payload.plan_code not in adapter.config.price_ids:
@@ -86,13 +129,18 @@ def create_checkout_session(
         )
         checkout = adapter.create_checkout_session(item["id"], payload.plan_code)
     except ValueError as exc:
-        code = str(exc)
+        code = _public_code(
+            exc,
+            frozenset({"SUBSCRIPTION_ALREADY_EXISTS", "STRIPE_PLAN_NOT_CONFIGURED"}),
+            "BILLING_CHECKOUT_INVALID",
+        )
         status = 409 if code == "SUBSCRIPTION_ALREADY_EXISTS" else 400
-        raise HTTPException(status_code=status, detail=code) from exc
+        raise HTTPException(status_code=status, detail=code) from None
     except StripeProviderError as exc:
         # The retained PENDING row is deliberately non-entitling and makes a
         # later retry deterministic through the same provider idempotency key.
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        code = _public_code(exc, _STRIPE_PROVIDER_CODES, "STRIPE_API_ERROR")
+        raise HTTPException(status_code=502, detail=code) from None
 
     store.add_audit({
         "actor_user_id": principal.user_id,
@@ -135,8 +183,8 @@ async def verified_provider_webhook(
     try:
         registry = configured_provider_registry()
         adapter = registry.require(provider)
-    except (KeyError, RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=503, detail="BILLING_PROVIDER_NOT_CONFIGURED") from exc
+    except (KeyError, RuntimeError, ValueError):
+        raise HTTPException(status_code=503, detail="BILLING_PROVIDER_NOT_CONFIGURED") from None
 
     if provider == "stripe":
         if not stripe_signature:
@@ -153,23 +201,30 @@ async def verified_provider_webhook(
     try:
         verified = adapter.verify_webhook(body, signature)
     except ProviderEventIgnored as exc:
-        return {"accepted": False, "ignored": True, "reason": str(exc)}
+        reason = _public_code(exc, frozenset({"STRIPE_EVENT_IGNORED"}), "PROVIDER_EVENT_IGNORED")
+        return {"accepted": False, "ignored": True, "reason": reason}
     except ProviderVerificationError as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        code = _public_code(exc, _PROVIDER_VERIFICATION_CODES, "PROVIDER_WEBHOOK_VERIFICATION_FAILED")
+        raise HTTPException(status_code=401, detail=code) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="PROVIDER_WEBHOOK_INVALID") from None
     try:
         result = billing_service.apply_verified_webhook(verified)
     except ValueError as exc:
-        code = str(exc)
-        status = 404 if code == "SUBSCRIPTION_NOT_FOUND" else 409 if code in {
-            "SUBSCRIPTION_STATE_CHANGED",
-            "SUBSCRIPTION_PROVIDER_MISMATCH",
-            "SUBSCRIPTION_BINDING_MISMATCH",
-            "SUBSCRIPTION_ALREADY_EXISTS",
-            "INVALID_WEBHOOK_STATE",
-        } or code.startswith("INVALID_BILLING_TRANSITION") else 400
-        raise HTTPException(status_code=status, detail=code) from exc
+        candidate = exc.args[0] if len(exc.args) == 1 and isinstance(exc.args[0], str) else ""
+        if candidate == "SUBSCRIPTION_NOT_FOUND":
+            status = 404
+            code = "SUBSCRIPTION_NOT_FOUND"
+        elif candidate in _BILLING_CONFLICT_CODES:
+            status = 409
+            code = _public_code(exc, _BILLING_CONFLICT_CODES, "SUBSCRIPTION_CONFLICT")
+        elif candidate.startswith("INVALID_BILLING_TRANSITION"):
+            status = 409
+            code = "INVALID_BILLING_TRANSITION"
+        else:
+            status = 400
+            code = "BILLING_WEBHOOK_INVALID"
+        raise HTTPException(status_code=status, detail=code) from None
     subscription = result["subscription"]
     store.add_audit({
         "actor_user_id": subscription["user_id"],

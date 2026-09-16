@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable, Mapping
+from contextlib import asynccontextmanager
 from threading import Event, Lock, Thread
 from typing import Any
 
@@ -106,6 +107,12 @@ class RuntimeMaintenanceService:
 
 
 def install_runtime_maintenance(app: Any, engine: Engine | None, *, environment: str) -> RuntimeMaintenanceService | None:
+    """Compose maintenance into the application's existing ASGI lifespan.
+
+    Starlette 1.x removed the legacy startup/shutdown event registration methods.
+    Wrapping ``router.lifespan_context`` preserves any existing lifespan while using
+    the supported ASGI lifespan path for startup and shutdown.
+    """
     if engine is None or not runtime_maintenance_enabled(environment):
         app.state.runtime_maintenance = None
         return None
@@ -116,6 +123,17 @@ def install_runtime_maintenance(app: Any, engine: Engine | None, *, environment:
         batch_size=retention_batch_size_from_env(),
     )
     app.state.runtime_maintenance = service
-    app.add_event_handler("startup", service.start)
-    app.add_event_handler("shutdown", service.stop)
+
+    original_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def maintenance_lifespan(application: Any):
+        async with original_lifespan(application) as state:
+            service.start()
+            try:
+                yield state
+            finally:
+                service.stop()
+
+    app.router.lifespan_context = maintenance_lifespan
     return service

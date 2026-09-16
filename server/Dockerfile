@@ -15,6 +15,7 @@ COPY VERSION /build/VERSION
 COPY server/app /build/server/app
 COPY server/migrations /build/server/migrations
 COPY server/migrate.py /build/server/migrate.py
+COPY server/maintenance.py /build/server/maintenance.py
 
 RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade 'pip==26.2.1' \
@@ -38,9 +39,10 @@ COPY --from=builder /build/server/app /app/server/app
 COPY --from=builder /build/VERSION /app/VERSION
 COPY --from=builder /build/server/migrations /app/server/migrations
 COPY --from=builder /build/server/migrate.py /app/server/migrate.py
+COPY --from=builder /build/server/maintenance.py /app/server/maintenance.py
 
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"
 
-CMD ["sh", "-c", "python migrate.py && exec uvicorn app.entrypoint:app --host 0.0.0.0 --port 8080"]
+CMD ["sh", "-c", "python migrate.py && python maintenance.py && exec uvicorn app.entrypoint:app --host 0.0.0.0 --port 8080"]

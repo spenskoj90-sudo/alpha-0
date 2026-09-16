@@ -5,10 +5,12 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
+from app.core.account_api import router as account_router
 from app.core.billing_provider import ProviderVerificationError, configured_provider_registry
 from app.core.stripe_billing import configured_stripe_sandbox_adapter
 
 router = APIRouter(tags=["billing-provider"])
+router.include_router(account_router)
 _PROVIDER_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
@@ -38,11 +40,7 @@ async def verified_provider_webhook(provider: str, request: Request, x_billing_s
 
 
 @router.post("/v1/billing/stripe/webhook")
-async def stripe_sandbox_webhook(
-    request: Request,
-    stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
-) -> dict[str, Any]:
-    """Pre-release Stripe webhook boundary; live-mode events are rejected."""
+async def stripe_sandbox_webhook(request: Request, stripe_signature: str | None = Header(default=None, alias="Stripe-Signature")) -> dict[str, Any]:
     from app.main import billing_service, rate_limit, store
     rate_limit(request, "billing-stripe-webhook")
     if not stripe_signature:
@@ -67,20 +65,10 @@ def _apply_verified(provider: str, verified: Any, billing_service: Any, store: A
         result = billing_service.apply_verified_webhook(verified)
     except ValueError as exc:
         code = str(exc)
-        status = 404 if code == "SUBSCRIPTION_NOT_FOUND" else 409 if code in {
-            "SUBSCRIPTION_STATE_CHANGED", "INVALID_WEBHOOK_STATE"
-        } or code.startswith("INVALID_BILLING_TRANSITION") else 400
+        status = 404 if code == "SUBSCRIPTION_NOT_FOUND" else 409 if code in {"SUBSCRIPTION_STATE_CHANGED", "INVALID_WEBHOOK_STATE"} or code.startswith("INVALID_BILLING_TRANSITION") else 400
         raise HTTPException(status_code=status, detail=code) from exc
     subscription = result["subscription"]
-    store.add_audit({
-        "actor_user_id": subscription["user_id"],
-        "actor_device_id": None,
-        "action": "billing:webhook:verified",
-        "resource": provider,
-        "decision": "ALLOW",
-        "reason_code": verified.verification_method,
-        "request_id": None,
-    })
+    store.add_audit({"actor_user_id": subscription["user_id"], "actor_device_id": None, "action": "billing:webhook:verified", "resource": provider, "decision": "ALLOW", "reason_code": verified.verification_method, "request_id": None})
     return result
 
 

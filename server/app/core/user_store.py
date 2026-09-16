@@ -14,7 +14,17 @@ from app.core.security import session_hash
 class UserAccountStore:
     def __init__(self, database_url: str | None) -> None:
         self._database_url = database_url
-        self._engine = create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=10) if database_url else None
+        self._engine = (
+            create_engine(
+                database_url,
+                pool_pre_ping=True,
+                pool_size=5,
+                max_overflow=10,
+                connect_args={"options": "-c app.service_role=true"},
+            )
+            if database_url
+            else None
+        )
         self._users: dict[str, dict[str, Any]] = {}
         self._lock = Lock()
 

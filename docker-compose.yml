@@ -27,6 +27,7 @@ services:
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
       REFRESH_TTL_SECONDS: ${REFRESH_TTL_SECONDS:-2592000}
       MAX_REQUEST_SKEW_SECONDS: ${MAX_REQUEST_SKEW_SECONDS:-120}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     depends_on:
@@ -43,6 +44,7 @@ services:
       dockerfile: Dockerfile
     environment:
       NODE_ENV: production
+      SENTINEL_CORE_URL: http://core:8080
     depends_on:
       core:
         condition: service_started

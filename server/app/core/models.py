@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .json_bounds import validate_bounded_json
+
 
 class ErrorResponse(BaseModel):
     code: str
@@ -90,6 +92,11 @@ class GameEvent(BaseModel):
     sequence: int = Field(ge=0)
     payload: dict[str, Any]
 
+    @field_validator("payload")
+    @classmethod
+    def bound_payload(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return validate_bounded_json(value, max_bytes=65_536)
+
 
 class EventBatchRequest(BaseModel):
     events: list[GameEvent] = Field(min_length=1, max_length=100)
@@ -97,6 +104,11 @@ class EventBatchRequest(BaseModel):
 
 class RecommendationRequest(BaseModel):
     context: dict[str, Any] = Field(max_length=100)
+
+    @field_validator("context")
+    @classmethod
+    def bound_context(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return validate_bounded_json(value, max_bytes=65_536)
 
 
 class Recommendation(BaseModel):
@@ -133,3 +145,8 @@ class BillingWebhookRequest(BaseModel):
     occurred_at: datetime
     external_reference: str | None = Field(default=None, max_length=256)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("payload")
+    @classmethod
+    def bound_payload(cls, value: dict[str, Any]) -> dict[str, Any]:
+        return validate_bounded_json(value, max_bytes=131_072)

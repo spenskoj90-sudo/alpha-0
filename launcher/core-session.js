@@ -3,9 +3,15 @@
 const { randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
 
+function isLoopbackHostname(hostname) {
+  const normalized = String(hostname || '').toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
 function normalizeCoreUrl(value) {
   const url = new URL(String(value || '').trim());
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('INVALID_CORE_URL');
+  if (url.protocol === 'http:' && !isLoopbackHostname(url.hostname)) throw new Error('INSECURE_CORE_URL');
   if (url.username || url.password || url.search || url.hash) throw new Error('INVALID_CORE_URL');
   url.pathname = url.pathname.replace(/\/$/, '');
   return url.toString().replace(/\/$/, '');
@@ -155,4 +161,4 @@ function errorCode(payload, fallback) {
   return fallback;
 }
 
-module.exports = { CoreSessionManager, normalizeCoreUrl, publicSession, requestId };
+module.exports = { CoreSessionManager, normalizeCoreUrl, publicSession, requestId, isLoopbackHostname };

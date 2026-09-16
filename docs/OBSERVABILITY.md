@@ -14,7 +14,7 @@ Four channels remain deliberately separated:
 
 1. **Android runtime crash/error diagnostics → Sentry** when an Owner-managed DSN and complete exact release identity are present.
 2. **Core/Companion operational telemetry → bounded local/PostgreSQL observability plane** for low-cardinality runtime health, latency and failure outcomes. This remains the canonical operational plane.
-3. **Core/Companion staging operational fanout → optional PostHog HTTPS adapter** only when explicitly configured with `SENTINEL_ENV=staging`, exact release/source identity and an externally injected project key. Provider delivery is fail-isolated and disabled by default.
+3. **Core/Companion staging operational fanout → optional PostHog HTTPS adapter** only when explicitly configured with `SENTINEL_ENV=staging`, exact release/source identity and an externally injected project key. Network destination is not a free-form URL: `SENTINEL_POSTHOG_REGION` accepts only `us` or `eu`, which map in code to literal PostHog ingestion endpoints. Provider delivery is fail-isolated and disabled by default.
 4. **Build/test/security/release failures → GitHub Actions exact-SHA evidence.** CI failures are not mirrored into Sentry/PostHog and runtime telemetry cannot substitute for required checks.
 
 The PostHog implementation is intentionally narrower than a general product analytics SDK. It exports only Companion operational events with a constant non-person distinct ID, disables person-profile processing and applies a fixed low-cardinality attribute allowlist. It is not enabled for production by this contract.
@@ -75,7 +75,7 @@ The canonical forbidden-dimension set additionally includes email, token, passwo
 
 Provider credentials are Owner-managed configuration only. They are not source, documentation, artifact metadata or persisted lineage evidence.
 
-## 5. Environment separation
+## 5. Environment and network-destination separation
 
 The Android/Sentry runtime allowlist is:
 
@@ -84,7 +84,9 @@ The Android/Sentry runtime allowlist is:
 - `release-candidate` — exact-source release candidate evaluation;
 - `production` — externally activated production runtime only.
 
-The optional Core/Companion external telemetry network allowlist is separately restricted to `staging`. `configured_posthog_sink()` rejects any other `SENTINEL_ENV`, including `production`. This separation prevents enabling a staging product-telemetry path from implicitly expanding Android production telemetry authority.
+The optional Core/Companion external telemetry network allowlist is separately restricted to `staging`. `configured_posthog_sink()` rejects any other `SENTINEL_ENV`, including `production`.
+
+PostHog egress is also destination-pinned. The runtime accepts only region selector `us` or `eu`; those select literal `https://us.i.posthog.com/capture/` or `https://eu.i.posthog.com/capture/` endpoints embedded in the adapter. Arbitrary URLs, loopback/private-network hosts and credential-bearing URLs are not configurable, preventing the telemetry provider seam from becoming an SSRF primitive.
 
 A build label is not an environment acceptance claim. In particular, producing an Android `release` build does not by itself authorize the `production` environment label.
 
@@ -120,7 +122,7 @@ GitHub Actions remains the source of truth for CI/build failures. Sentry is the 
 - Repository/CI artifacts use their workflow retention policies.
 - Core recent traces are bounded in memory; optional PostgreSQL telemetry uses the implemented retention seam.
 - Sentry account retention is an Owner/external provider setting; repository code limits what can be sent regardless of provider retention.
-- PostHog staging account retention is an Owner/external provider setting; the repository adapter controls the minimized payload but does not claim provider-side retention configuration.
+- PostHog staging account retention is an Owner/external provider setting; the repository adapter controls the minimized payload and fixed destination set but does not claim provider-side retention configuration.
 
 Changing external provider retention cannot weaken the repository privacy boundary.
 
@@ -151,7 +153,7 @@ The repository contract is complete without using production credentials. The fo
 
 - Sentry project alert-rule provisioning and account retention settings;
 - explicit Android `production` environment activation;
-- optional PostHog staging project key/host/account retention and observed ingestion evidence;
+- optional PostHog staging project key/region/account retention and observed ingestion evidence;
 - any future decision to permit production PostHog delivery (currently prohibited by code/contract);
 - physical-device runtime trend and crash acceptance on the selected release hardware.
 

@@ -129,6 +129,11 @@ class BillingService:
                     verified.provider,
                     verified.provider_subscription_id,
                 )
+            elif str(existing.get("id")) != verified.local_subscription_id:
+                # A valid provider signature authenticates the provider event,
+                # but it must not be allowed to redirect an already-bound
+                # provider subscription to a different local SENTINEL row.
+                raise ValueError("SUBSCRIPTION_BINDING_MISMATCH")
 
         event = BillingWebhookEvent(
             event_id=verified.event_id,

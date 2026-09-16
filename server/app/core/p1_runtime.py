@@ -16,7 +16,7 @@ class BillingState(StrEnum):
 
 
 _ALLOWED_BILLING_TRANSITIONS = {
-    BillingState.PENDING: {BillingState.ACTIVE, BillingState.CANCELED},
+    BillingState.PENDING: {BillingState.ACTIVE, BillingState.PAST_DUE, BillingState.CANCELED, BillingState.EXPIRED},
     BillingState.ACTIVE: {BillingState.PAST_DUE, BillingState.CANCELED, BillingState.EXPIRED},
     BillingState.PAST_DUE: {BillingState.ACTIVE, BillingState.CANCELED, BillingState.EXPIRED},
     BillingState.CANCELED: set(),
@@ -47,18 +47,10 @@ class BillingRuntime:
             return self._state.get(subscription_id)
 
     def seed(self, subscription_id: str, current: BillingState) -> None:
-        """Load durable state before evaluating a webhook transition."""
         with self._lock:
             self._state.setdefault(subscription_id, current)
 
-    def transition(
-        self,
-        subscription_id: str,
-        target: BillingState,
-        *,
-        provider: str,
-        external_reference: str | None = None,
-    ) -> BillingTransition:
+    def transition(self, subscription_id: str, target: BillingState, *, provider: str, external_reference: str | None = None) -> BillingTransition:
         with self._lock:
             previous = self._state.get(subscription_id, BillingState.PENDING)
             if target not in _ALLOWED_BILLING_TRANSITIONS[previous]:
@@ -117,8 +109,6 @@ class OutboxEvent:
 
 
 class OutboxManager:
-    """Deterministic state machine mirroring the PostgreSQL outbox contract."""
-
     def __init__(self) -> None:
         self.events: dict[str, OutboxEvent] = {}
         self._lock = Lock()
@@ -156,8 +146,6 @@ class OutboxManager:
 
 
 class WorkerManager:
-    """Worker lifecycle wrapper with explicit failure/retry semantics."""
-
     def __init__(self, outbox: OutboxManager) -> None:
         self.outbox = outbox
 

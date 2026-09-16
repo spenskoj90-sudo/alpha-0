@@ -26,7 +26,7 @@ class CaptureTransport:
 def config() -> PostHogConfig:
     return PostHogConfig(
         project_key="phc_test_project_key",
-        host="https://eu.i.posthog.com",
+        region="eu",
         environment="staging",
         release="1.0.0-rc1",
         source_sha="a" * 40,
@@ -80,10 +80,30 @@ def test_posthog_provider_failure_isolated_from_companion_runtime() -> None:
     assert sink.dropped_events == 1
 
 
+def test_posthog_region_is_strictly_allowlisted() -> None:
+    with pytest.raises(ValueError, match="POSTHOG_REGION_INVALID"):
+        PostHogConfig(
+            project_key="phc_test",
+            region="https://127.0.0.1",
+            environment="staging",
+            release="rc1",
+            source_sha="a" * 40,
+        )
+    with pytest.raises(ValueError, match="POSTHOG_REGION_INVALID"):
+        PostHogConfig(
+            project_key="phc_test",
+            region="example.com",
+            environment="staging",
+            release="rc1",
+            source_sha="a" * 40,
+        )
+
+
 def test_posthog_is_disabled_by_default_and_fails_closed_on_bad_activation(monkeypatch) -> None:
     for name in (
         "SENTINEL_POSTHOG_ENABLED",
         "SENTINEL_POSTHOG_PROJECT_KEY",
+        "SENTINEL_POSTHOG_REGION",
         "SENTINEL_RELEASE",
         "SENTINEL_SOURCE_SHA",
     ):
@@ -98,6 +118,11 @@ def test_posthog_is_disabled_by_default_and_fails_closed_on_bad_activation(monke
     monkeypatch.setenv("SENTINEL_POSTHOG_PROJECT_KEY", "phc_test")
     monkeypatch.setenv("SENTINEL_RELEASE", "rc1")
     monkeypatch.setenv("SENTINEL_SOURCE_SHA", "b" * 40)
+    monkeypatch.setenv("SENTINEL_POSTHOG_REGION", "private-network")
+    with pytest.raises(RuntimeError, match="POSTHOG_REGION_INVALID"):
+        configured_posthog_sink()
+
+    monkeypatch.setenv("SENTINEL_POSTHOG_REGION", "us")
     monkeypatch.setenv("SENTINEL_ENV", "production")
     with pytest.raises(RuntimeError, match="POSTHOG_STAGING_ONLY"):
         configured_posthog_sink()

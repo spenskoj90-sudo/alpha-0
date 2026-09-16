@@ -108,8 +108,33 @@ class BillingService:
         return self._apply_event(event)
 
     def apply_verified_webhook(self, verified: VerifiedBillingWebhook) -> dict[str, Any]:
-        if verified.verification_method not in {"hmac-sha256-v1", "provider-reconciliation"}:
+        if verified.verification_method not in {
+            "hmac-sha256-v1",
+            "stripe-signature-v1",
+            "provider-reconciliation",
+        }:
             raise ValueError("UNSUPPORTED_PROVIDER_VERIFICATION")
+
+        # Hosted Checkout starts with a local PENDING row. Stripe assigns the
+        # durable subscription id later; a signed subscription webhook carries
+        # only the server-created local UUID in metadata. Bind once, then all
+        # lifecycle processing uses the normal provider-id lookup path.
+        if verified.local_subscription_id is not None:
+            existing = self.store.find_subscription_by_provider_id(
+                verified.provider, verified.provider_subscription_id
+            )
+            if existing is None:
+                self.store.bind_subscription_provider_id(
+                    verified.local_subscription_id,
+                    verified.provider,
+                    verified.provider_subscription_id,
+                )
+            elif str(existing.get("id")) != verified.local_subscription_id:
+                # A valid provider signature authenticates the provider event,
+                # but it must not be allowed to redirect an already-bound
+                # provider subscription to a different local SENTINEL row.
+                raise ValueError("SUBSCRIPTION_BINDING_MISMATCH")
+
         event = BillingWebhookEvent(
             event_id=verified.event_id,
             provider=verified.provider,

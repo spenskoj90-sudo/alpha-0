@@ -21,6 +21,10 @@ class ProviderVerificationError(ValueError):
     """A provider event failed cryptographic or freshness verification."""
 
 
+class ProviderEventIgnored(Exception):
+    """A verified provider event is valid but outside SENTINEL lifecycle scope."""
+
+
 @dataclass(frozen=True)
 class VerifiedBillingWebhook:
     event_id: str
@@ -32,6 +36,7 @@ class VerifiedBillingWebhook:
     payload: dict[str, object]
     verification_method: str
     verified_at: datetime
+    local_subscription_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -186,20 +191,28 @@ class BillingProviderRegistry:
 
 
 def configured_provider_registry() -> BillingProviderRegistry:
-    """Build the runtime registry from secret-free configuration references.
+    """Build the runtime registry from environment-injected provider secrets.
 
-    The actual webhook secret is supplied only through the process environment.
-    No provider credential or production network client is embedded in source.
+    Providers remain disabled unless their complete configuration is present.
+    Secret values never enter repository state or provider metadata.
     """
 
+    adapters: list[BillingProviderAdapter] = []
     provider = os.getenv("SENTINEL_BILLING_HMAC_PROVIDER", "").strip()
     secret = os.getenv("SENTINEL_BILLING_HMAC_WEBHOOK_SECRET", "")
-    if not provider and not secret:
-        return BillingProviderRegistry()
-    if not provider or not secret:
-        raise RuntimeError("BILLING_PROVIDER_NOT_CONFIGURED")
-    adapter = HmacBillingProviderAdapter(provider, secret.encode("utf-8"))
-    return BillingProviderRegistry((adapter,))
+    if provider or secret:
+        if not provider or not secret:
+            raise RuntimeError("BILLING_PROVIDER_NOT_CONFIGURED")
+        adapters.append(HmacBillingProviderAdapter(provider, secret.encode("utf-8")))
+
+    # Local import avoids a module cycle while keeping Stripe an optional
+    # adapter rather than a billing-core dependency.
+    from app.core.stripe_billing import configured_stripe_adapter
+
+    stripe = configured_stripe_adapter()
+    if stripe is not None:
+        adapters.append(stripe)
+    return BillingProviderRegistry(tuple(adapters))
 
 
 def _parse_signature(signature: str) -> tuple[int, str]:

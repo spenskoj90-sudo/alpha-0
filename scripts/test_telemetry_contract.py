@@ -22,6 +22,7 @@ class TelemetryContractTests(unittest.TestCase):
         cls.diagnostic_logger = read("app/src/main/java/com/alpha0/app/diagnostics/DiagnosticLogger.kt")
         cls.quality_screen = read("app/src/main/java/com/alpha0/app/quality/QualityReportScreen.kt")
         cls.quality_api = read("server/app/core/quality_api.py")
+        cls.posthog = read("server/app/core/posthog_telemetry.py")
         cls.physical_workflow = read(".github/workflows/physical-test-apk.yml")
         cls.release_candidate = read(".github/workflows/release-candidate.yml")
         cls.observability = read("docs/OBSERVABILITY.md")
@@ -36,7 +37,11 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertIn("user-consent-before-diagnostic-upload", principles)
         self.assertIn("physical-test-forensics-never-ship-as-production-mode", principles)
         self.assertIn("telemetry-never-authorizes-actions", principles)
-        self.assertFalse(self.contract["providers"]["posthog"]["enabled"])
+        posthog = self.contract["providers"]["posthog"]
+        self.assertFalse(posthog["enabled"])
+        self.assertFalse(posthog["enabledByDefault"])
+        self.assertEqual(posthog["activationSurface"], "core-companion-staging-only-when-configured")
+        self.assertEqual(self.contract["environments"]["providerNetworkAllowlist"], ["staging"])
 
     def test_android_build_identity_is_exact_sha_and_allowlisted_environment(self) -> None:
         self.assertIn('providers.environmentVariable("GITHUB_SHA")', self.gradle)
@@ -75,6 +80,36 @@ class TelemetryContractTests(unittest.TestCase):
             self.assertIn(value, self.application)
         self.assertNotIn("User()", self.application)
         self.assertNotIn("SENTRY_DSN =", self.application)
+
+    def test_posthog_is_staging_only_fail_closed_and_non_person(self) -> None:
+        for value in (
+            'self.environment != "staging"',
+            '"distinct_id": "sentinel-runtime"',
+            '"$process_person_profile": False',
+            'os.getenv("SENTINEL_POSTHOG_PROJECT_KEY", "")',
+            'os.getenv("SENTINEL_RELEASE", "")',
+            'os.getenv("SENTINEL_SOURCE_SHA", "")',
+            'raise RuntimeError("POSTHOG_NOT_CONFIGURED")',
+        ):
+            self.assertIn(value, self.posthog)
+        allowed = {
+            "mode",
+            "reason",
+            "state",
+            "status",
+            "outcome",
+            "message_type",
+            "latency_class",
+            "latency_ms",
+            "attempt",
+            "delay_ms",
+            "event_type",
+        }
+        match = re.search(r"_ALLOWED_ATTRIBUTES = frozenset\(\s*\{(?P<body>.*?)\}\s*\)", self.posthog, re.S)
+        self.assertIsNotNone(match)
+        keys = set(re.findall(r'"([a-z_]+)"', match.group("body") if match else ""))
+        self.assertEqual(keys, allowed)
+        self.assertTrue(keys.isdisjoint({"user", "user_id", "session_id", "device_id", "email", "payload", "transcript", "audio"}))
 
     def test_physical_test_build_is_isolated_from_release(self) -> None:
         local = self.contract["localDiagnostics"]
@@ -159,6 +194,7 @@ class TelemetryContractTests(unittest.TestCase):
         github = self.contract["providers"]["githubActions"]
         self.assertTrue(github["mustNotMirrorIntoSentry"])
         self.assertEqual(self.contract["eventClasses"]["ci.failure"]["externalProvider"], "githubActions")
+        self.assertEqual(self.contract["eventClasses"]["runtime.operational"]["optionalExternalProvider"], "posthog-staging")
 
     def test_alerts_and_triage_are_release_correlated_without_fake_provider_evidence(self) -> None:
         alerts = self.contract["alerts"]
@@ -184,7 +220,8 @@ class TelemetryContractTests(unittest.TestCase):
             "physical",
         ):
             self.assertIn(text, self.observability)
-        self.assertIn("does not claim PostHog ingestion", self.companion)
+        self.assertIn("staging-only PostHog", self.companion)
+        self.assertIn("does not claim production PostHog activation", self.companion)
         self.assertIn("telemetry", self.companion.lower())
 
     def test_no_obvious_committed_sentry_dsn(self) -> None:

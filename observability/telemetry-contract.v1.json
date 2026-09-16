@@ -21,6 +21,7 @@
   },
   "environments": {
     "allowlist": ["development", "ci", "release-candidate", "production"],
+    "providerNetworkAllowlist": ["staging"],
     "androidReleaseCandidateDefault": "release-candidate",
     "productionRequiresExternalActivation": true
   },
@@ -84,9 +85,16 @@
     },
     "posthog": {
       "enabled": false,
-      "purpose": "optional future aggregate product telemetry",
-      "credential": null,
-      "policy": "No SDK or external delivery is enabled by this contract. Local/PostgreSQL operational telemetry remains canonical until an explicit provider activation decision."
+      "enabledByDefault": false,
+      "activationSurface": "core-companion-staging-only-when-configured",
+      "purpose": "optional staging aggregate operational telemetry",
+      "credential": "Owner-managed SENTINEL_POSTHOG_PROJECT_KEY",
+      "regionSelector": "SENTINEL_POSTHOG_REGION: us|eu",
+      "networkDestinations": ["https://us.i.posthog.com/capture/", "https://eu.i.posthog.com/capture/"],
+      "arbitraryHostConfiguration": false,
+      "requiredCorrelation": ["environment", "release", "source_sha"],
+      "distinctIdPolicy": "constant sentinel-runtime with $process_person_profile=false",
+      "policy": "A bounded HTTPS delivery adapter exists but remains disabled by default. Code permits activation only when SENTINEL_ENV=staging and exact release/source identity is supplied. Network egress is selected only from literal PostHog US/EU ingestion endpoints. Local/PostgreSQL operational telemetry remains canonical and provider delivery is fail-isolated. Production PostHog activation is not permitted by this contract."
     },
     "githubActions": {
       "purpose": "build/test/security/release-evidence failures",
@@ -109,6 +117,7 @@
     },
     "runtime.operational": {
       "externalProvider": null,
+      "optionalExternalProvider": "posthog-staging",
       "severity": "informational",
       "source": "Core/Companion bounded telemetry plane",
       "payloadPolicy": "bounded-low-cardinality"
@@ -144,7 +153,7 @@
     "userTicketDiagnostics": "30 days maximum in Core; payload is independently pruned while ticket metadata remains",
     "coreOperationalRecentTrace": "bounded in-memory ring plus configured PostgreSQL retention seam",
     "externalSentry": "provider/account retention is an Owner/external configuration gate; repository emits only minimized payloads",
-    "posthog": "disabled"
+    "posthog": "staging-only provider/account retention is an Owner/external configuration gate; repository emits only the bounded operational allowlist when explicitly enabled"
   },
   "alerts": {
     "currentReleaseUnhandledFatal": {
@@ -180,7 +189,7 @@
   "externalGates": [
     "Sentry project alert-rule provisioning and account retention settings",
     "production environment activation",
-    "any future PostHog provider activation/credential",
+    "PostHog staging project credential/region/account-retention activation; production PostHog remains prohibited",
     "real-device runtime trend acceptance"
   ]
 }

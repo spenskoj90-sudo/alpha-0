@@ -16,7 +16,12 @@ class BillingState(StrEnum):
 
 
 _ALLOWED_BILLING_TRANSITIONS = {
-    BillingState.PENDING: {BillingState.ACTIVE, BillingState.CANCELED},
+    BillingState.PENDING: {
+        BillingState.ACTIVE,
+        BillingState.PAST_DUE,
+        BillingState.CANCELED,
+        BillingState.EXPIRED,
+    },
     BillingState.ACTIVE: {BillingState.PAST_DUE, BillingState.CANCELED, BillingState.EXPIRED},
     BillingState.PAST_DUE: {BillingState.ACTIVE, BillingState.CANCELED, BillingState.EXPIRED},
     BillingState.CANCELED: set(),

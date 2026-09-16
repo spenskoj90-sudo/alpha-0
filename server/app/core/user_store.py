@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 from threading import Lock
 from typing import Any, Iterable
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from app.core.auth import hash_password, verify_password
+from app.core.database_engine import create_service_role_engine
 from app.core.security import session_hash
 
 
@@ -15,12 +16,11 @@ class UserAccountStore:
     def __init__(self, database_url: str | None) -> None:
         self._database_url = database_url
         self._engine = (
-            create_engine(
+            create_service_role_engine(
                 database_url,
                 pool_pre_ping=True,
                 pool_size=5,
                 max_overflow=10,
-                connect_args={"options": "-c app.service_role=true"},
             )
             if database_url
             else None

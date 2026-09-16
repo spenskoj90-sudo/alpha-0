@@ -55,14 +55,17 @@ Accepted character events are projected into the character store on a best-effor
 
 ## Billing and account control
 
-- `GET /v1/billing/plans` — list the canonical product-plan catalog; prices are metadata only and no provider is contacted.
+- `GET /v1/billing/plans` — list the canonical product-plan catalog. Price values are display metadata; the browser cannot submit a Stripe price ID.
 - `GET /v1/billing/subscriptions` — list subscriptions owned by the authenticated caller.
-- `POST /v1/billing/subscriptions` — create a pending subscription intent for the caller. Provider credentials and payment capture are Owner-only.
-- `GET /v1/billing/features` — return feature codes derived server-side from the caller's ACTIVE subscriptions only.
-- `POST /v1/billing/provider-webhooks/{provider}` — signed external-provider ingress. The configured generic adapter requires `X-Billing-Signature: t=<unix>,v1=<hmac-sha256>` over the exact raw request body and rejects stale or invalid signatures.
+- `POST /v1/billing/subscriptions` — create a provider-neutral pending subscription intent. The Web UI uses this only for the zero-price plan; paid checkout uses the server-owned route below.
+- `POST /v1/billing/checkout-sessions` — create or resume a Stripe-hosted subscription Checkout session for a canonical SENTINEL plan code. Core owns provider selection, Stripe price ID, test/live mode, redirect URLs and subscription metadata. The local subscription remains `PENDING` and grants no paid feature until a verified provider lifecycle event arrives.
+- `GET /v1/billing/features` — return feature codes derived server-side from the caller's `ACTIVE` subscriptions only.
+- `POST /v1/billing/provider-webhooks/{provider}` — cryptographically verified external-provider ingress. Stripe uses its native `Stripe-Signature` over the exact raw body; the generic signed adapter uses `X-Billing-Signature: t=<unix>,v1=<hmac-sha256>`. Stale, malformed, mode-mismatched or invalid signatures fail closed.
 - `POST /v1/billing/webhooks/{provider}` — legacy/internal shared-token ingress. `BillingService` restricts this path to the `manual` and `test` providers; it cannot activate an arbitrary external-provider subscription.
 
-Provider deliveries and deterministic reconciliation events are keyed by durable event IDs and pass through the same lifecycle state machine. Terminal `CANCELED` and `EXPIRED` states cannot be reactivated by a later event. The generic signed adapter is a concrete HMAC provider contract, not a claim of compatibility with Stripe or another vendor-specific wire format.
+The Stripe adapter maps only bounded subscription lifecycle state into the existing server-authoritative state machine: `active`/`trialing` → `ACTIVE`; `past_due`/`unpaid`/`incomplete`/`paused` → `PAST_DUE`; `canceled` → `CANCELED`; `incomplete_expired` → `EXPIRED`. A signed Stripe subscription event binds the provider subscription ID to the server-created local UUID carried in Stripe metadata; client payloads never assert entitlement state. Snapshot reconciliation uses the same lifecycle path. Terminal `CANCELED` and `EXPIRED` states cannot be reactivated by a later event.
+
+Stripe integration is disabled unless complete environment-injected configuration is present. Test mode is the normal pre-release path. Live mode additionally requires `SENTINEL_ENV=production` and explicit `SENTINEL_STRIPE_ALLOW_LIVE=true`; repository code and CI do not supply live credentials or perform live charges.
 
 ## Companion
 
@@ -80,7 +83,7 @@ Every HTTP response carries a normalized `X-Request-ID` and a server-generated `
 - `GET /v1/admin/observability` — existing admin-token-protected bounded JSON operational snapshot: counters, local p50/p95/max latency, capacity/overflow evidence and a small recent correlation ring.
 - `GET /v1/admin/metrics` — existing admin-token-protected OpenMetrics-compatible plaintext representation of the bounded operational series.
 
-These endpoints are not public metrics surfaces and do not expose a production telemetry-provider credential. They describe process-local operational evidence; a deployed external telemetry backend and production SLOs remain environment concerns. See `docs/BLOCK_D_OBSERVABILITY_RESILIENCE_V1.md`.
+These endpoints are not public metrics surfaces and do not expose a production telemetry-provider credential. The optional PostHog adapter is disabled by default and staging-only; it receives only an allowlisted low-cardinality subset of Companion operational telemetry plus release/environment/source-SHA correlation and no user/device/session/game identity. Provider failure is isolated from Core request serving. See `docs/BLOCK_D_OBSERVABILITY_RESILIENCE_V1.md`.
 
 ## World of Warcraft
 

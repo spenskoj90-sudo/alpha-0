@@ -13,21 +13,37 @@ This is deliberate. Web and Companion currently share the dark green/blue operat
 
 The executable source of truth is the combination of:
 
-1. `design/sentinel-design-system.v1.json` — semantic roles, aliases, component mappings and acceptance partition;
-2. `scripts/test_design_system.py` — drift verification against live implementation sources;
+1. `design/sentinel-design-system.v1.json` — semantic roles, aliases, implementation mappings, exact known Figma-node mappings and acceptance partition;
+2. `scripts/test_design_system.py` — drift verification against live implementation sources and the repository-side Figma inventory contract;
 3. this document — human-readable design and accessibility contract;
-4. the Figma file above — visual design anchor and reusable component workspace.
+4. the canonical Figma file above — visual foundations anchor and future reusable-component workspace.
 
-Live code and exact-SHA CI remain implementation evidence. Figma alone is never proof that a runtime implements a design.
+Live code and exact-SHA CI remain implementation evidence. Figma alone is never proof that a runtime implements a design, and repository text must not claim Figma nodes that do not exist.
 
-## Figma structure
+## Figma structure and current mapping
 
-The canonical Figma file was created for SENTINEL and contains repository-derived foundations and reusable component states. At minimum the authored design inventory contains:
+Connected Figma inspection on 2026-09-16 found one authored top-level page in the canonical file:
 
-- `00 Foundations` — repository-bound color foundations and design principles;
-- `01 Components` — primary/secondary/focus actions, status states, operational/fail-closed/observational card states.
+- `00 Foundations` (`0:1`) — repository-bound Web/Companion color foundations and product principles;
+- `SENTINEL Foundations` frame (`1:4`) — the concrete token frame used by the repository mapping.
 
-The design file is intended to grow as a visual workspace, but screen completeness in Figma is not allowed to become a hidden release gate. Screen behavior, accessibility and authority semantics are bound directly to code by the machine-readable manifest and CI test. This avoids treating a design-tool service quota or stale mockup as stronger evidence than repository reality.
+The previously documented `01 Components` page is **not present in the connected canonical Figma file**. The machine-readable contract therefore no longer claims it. Reusable component semantics still exist in code and in the manifest, but their Figma field is explicitly `UNAUTHORED` until concrete component nodes are actually created and inspectable.
+
+The current foundations mapping is explicit rather than inferred:
+
+| Semantic role | Figma frame / swatch | Web code anchor |
+| --- | --- | --- |
+| background | `1:8` / `1:9` | `--bg` |
+| surface | `1:11` / `1:12` | `--panel` |
+| raised surface | `1:14` / `1:15` | `--panel-2` |
+| primary text | `1:17` / `1:18` | `--text` |
+| secondary text | `1:20` / `1:21` | `--muted` |
+| primary action | `1:23` / `1:24` | `--accent` |
+| signal / focus | `1:26` / `1:27` | `--accent-2` |
+| danger | `1:29` / `1:30` | `--danger` |
+| border | `1:32` / `1:33` | `--border` |
+
+This is intentionally a narrow truth claim. Screen completeness in Figma is not a hidden release gate. Screen behavior, accessibility and authority semantics are bound directly to code by the machine-readable manifest and CI test.
 
 ## Shared product principles
 
@@ -38,7 +54,7 @@ All interactive surfaces must preserve these meanings:
 - **observational recommendations:** recommendation and overlay output is presentation-only and never implies autonomous gameplay authority;
 - **explicit state:** color may reinforce state but text/semantics must carry the meaning;
 - **visible focus:** keyboard focus is visually explicit;
-- **accessible dynamic state:** live updates use the surface-appropriate announcement semantics;
+- **accessible dynamic state:** live updates use the surface-appropriate announcement semantics; operation progress is exposed as busy state where applicable and failures requiring attention use assertive/error semantics;
 - **bounded responsive behavior:** narrower layouts collapse rather than clipping critical authority/status content.
 
 ## Surface aliases
@@ -66,7 +82,7 @@ The current Web palette uses:
 
 Cards use a 16 px outer radius, nested operational surfaces use 12 px, ordinary controls use 10 px. The layout collapses to one column below the current 800 px breakpoint.
 
-The Web surface must retain skip navigation, a focusable main landmark, visible focus, forced-colors behavior and live status/error semantics.
+The Web surface must retain skip navigation, a focusable main landmark, visible focus, forced-colors behavior, live status/error semantics, operation busy state and plan-specific accessible names for repeated billing actions. Password requirements must be programmatically associated with the password field rather than existing only as an implicit validation rule.
 
 ### Android
 
@@ -97,32 +113,34 @@ API 35 instrumentation is the routine automated device-level gate. Physical Talk
 Implementation anchors:
 
 - `launcher/index.html`
+- `launcher/renderer.js`
 - `launcher/overlay.html`
-- launcher renderer/runtime files for state transitions.
 
-The launcher shares the Web operational palette and interaction language. It must retain skip navigation, visible focus, live status regions, forced-colors support and explicit disabled states.
+The launcher shares the Web operational palette and interaction language. It must retain skip navigation, visible focus, live status regions, forced-colors support, explicit disabled states and an `aria-busy` operation boundary for account work. Routine status changes remain polite; bounded runtime failures that require immediate user awareness are promoted to assertive alert semantics and return to polite status semantics on the next normal update.
 
 The overlay is a distinct transparent presentation surface. It is click-through/read-only, announces presentation changes politely, accepts only sanitized presentation state from the trusted runtime path, and must not visually imply game-write authority.
 
 ## Reusable semantic component map
 
-| Semantic component | Web | Android | Companion |
-| --- | --- | --- | --- |
-| Primary action | `.btn` | `PrimaryButton` | `.btn` |
-| Destructive/terminal action | explicit danger action/state | `DangerButton` | `STOP / KILL SWITCH` |
-| Dynamic status | `.state` / `.status-message` | `StatusBadge` + semantics | `.status` |
-| Operational card | `.card` | `SentinelCard` / Material Card | `.panel` / `.card` |
-| Recommendation/presentation | `RecommendationPanel` | presentation UI only | read-only overlay presentation list |
+| Semantic component | Web | Android | Companion | Figma |
+| --- | --- | --- | --- | --- |
+| Primary action | `.btn` | `PrimaryButton` | `.btn` | `UNAUTHORED` |
+| Destructive/terminal action | explicit danger action/state | `DangerButton` | `STOP / KILL SWITCH` | `UNAUTHORED` |
+| Dynamic status | `.state` / `.status-message` | `StatusBadge` + semantics | `.status` | `UNAUTHORED` |
+| Operational card | `.card` | `SentinelCard` / Material Card | `.panel` / `.card` | `UNAUTHORED` |
+| Recommendation/presentation | `RecommendationPanel` | presentation UI only | read-only overlay presentation list | `UNAUTHORED` |
 
-A mapping is valid only if both visual state and authority semantics remain equivalent. Matching color alone is insufficient.
+A mapping is valid only if both visual state and authority semantics remain equivalent. Matching color alone is insufficient. `UNAUTHORED` means there is deliberately no claimed Figma component node yet; it does not mean the runtime component is absent.
 
 ## Accessibility contract
 
-Repository-automated acceptance now covers the semantics that can be verified deterministically:
+Repository-automated acceptance covers the semantics that can be verified deterministically:
 
 - Web/Companion keyboard focus and skip navigation;
 - Web forced-colors behavior;
-- Web/Companion live status regions;
+- Web/Companion live status regions and explicit busy state for bounded async work;
+- assertive error semantics for failures requiring attention while ordinary runtime status remains polite;
+- Web password requirement association and repeated plan-action accessible names;
 - Android live-region/progress/button/card semantics;
 - API 35 emulator instrumentation;
 - responsive source contracts and disabled-state behavior;
@@ -138,10 +156,10 @@ The following are intentionally final pre-release physical acceptance, not curre
 
 ## Drift policy
 
-`scripts/test_design_system.py` fails if canonical aliases or key accessibility/component anchors stop matching implementation. `verify.sh` executes that test as part of routine repository verification.
+`scripts/test_design_system.py` fails if canonical aliases, known Figma inventory metadata or key accessibility/component anchors stop matching implementation. `verify.sh` executes that test as part of routine repository verification.
 
-Changing a semantic role therefore requires changing the manifest, implementation and documentation coherently in the same engineering pass. Cosmetic Figma exploration may precede implementation, but it is not an implementation claim until the repository contract moves with it.
+Changing a semantic role therefore requires changing the manifest, implementation and documentation coherently in the same engineering pass. Figma may evolve independently as a visual workspace, but a repository claim that a Figma page/component exists must be backed by an inspectable node mapping before it is treated as authored.
 
 ## Non-claims
 
-This contract does not claim physical-device certification, production provider readiness, signed release execution, publication, or live deployment. Those gates remain separate and are intentionally deferred to the final release phase where applicable.
+This contract does not claim physical-device certification, production provider readiness, signed release execution, publication, or live production deployment. Those gates remain separate and are intentionally deferred to the final release phase where applicable.

@@ -9,6 +9,10 @@ DEFAULT_BATCH_SIZE = 1_000
 MIN_BATCH_SIZE = 100
 MAX_BATCH_SIZE = 10_000
 
+# One transaction-scoped lock serializes a sweep across workers/replicas while still
+# releasing automatically on commit/rollback or process loss.
+RETENTION_ADVISORY_LOCK_ID = 7_153_000_012
+
 # Operational/security transient data only. Durable audit, billing, game events,
 # quality evidence, and user records are intentionally excluded here.
 _PURGE_RULES: tuple[tuple[str, str], ...] = (
@@ -38,9 +42,11 @@ def retention_batch_size_from_env(value: str | None = None) -> int:
 
 
 def purge_expired_runtime_data(engine: Engine, *, batch_size: int | None = None) -> Mapping[str, int]:
-    """Delete a bounded batch of expired transient rows per table.
+    """Delete one distributed-safe bounded batch of expired transient rows per table.
 
-    Each rule deliberately uses a ctid-limited candidate set so one maintenance
+    A transaction-scoped PostgreSQL advisory lock makes concurrent workers/replicas
+    collapse to one active sweep. Lock contention is a normal no-op and returns an
+    empty mapping. Each rule uses a ctid-limited candidate set so one maintenance
     pass cannot turn into an unbounded delete or long-running lock storm.
     """
     limit = retention_batch_size_from_env() if batch_size is None else batch_size
@@ -49,6 +55,13 @@ def purge_expired_runtime_data(engine: Engine, *, batch_size: int | None = None)
 
     deleted: dict[str, int] = {}
     with engine.begin() as conn:
+        acquired = conn.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_id)"),
+            {"lock_id": RETENTION_ADVISORY_LOCK_ID},
+        ).scalar_one()
+        if acquired is not True:
+            return {}
+
         for table_name, predicate in _PURGE_RULES:
             statement = text(
                 f"WITH doomed AS ("

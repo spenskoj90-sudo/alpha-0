@@ -8,6 +8,13 @@ from app.core.request_limits import RequestBodyLimitMiddleware, request_body_lim
 _environment = os.getenv("SENTINEL_ENV", "development").lower()
 validate_database_url(os.getenv("DATABASE_URL"), _environment)
 
-from app.main import app as core_app  # noqa: E402
+from app.main import app as core_app, store as core_store  # noqa: E402
+from app.core.runtime_maintenance import install_runtime_maintenance  # noqa: E402
+
+install_runtime_maintenance(
+    core_app,
+    getattr(core_store, "engine", None),
+    environment=_environment,
+)
 
 app = RequestBodyLimitMiddleware(core_app, max_body_bytes=request_body_limit_from_env())

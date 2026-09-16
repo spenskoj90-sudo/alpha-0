@@ -6,9 +6,17 @@ import uuid
 import pytest
 from sqlalchemy import create_engine, text
 
-from app.core.retention import purge_expired_runtime_data
+from app.core.retention import RETENTION_ADVISORY_LOCK_ID, purge_expired_runtime_data
 
 pytestmark = pytest.mark.postgres
+
+
+def _engine():
+    return create_engine(
+        os.environ["DATABASE_URL"],
+        pool_pre_ping=True,
+        connect_args={"options": "-c app.service_role=true"},
+    )
 
 
 def test_runtime_retention_deletes_expired_rows_and_preserves_recent_rows():
@@ -17,11 +25,7 @@ def test_runtime_retention_deletes_expired_rows_and_preserves_recent_rows():
     fresh_outbox = str(uuid.uuid4())
     old_worker = str(uuid.uuid4())
     fresh_worker = str(uuid.uuid4())
-    engine = create_engine(
-        os.environ["DATABASE_URL"],
-        pool_pre_ping=True,
-        connect_args={"options": "-c app.service_role=true"},
-    )
+    engine = _engine()
     try:
         with engine.begin() as conn:
             conn.execute(
@@ -79,4 +83,44 @@ def test_runtime_retention_deletes_expired_rows_and_preserves_recent_rows():
             conn.execute(text("DELETE FROM outbox_events WHERE aggregate_type='retention-test' AND id IN (CAST(:a AS uuid),CAST(:b AS uuid))"), {"a": old_outbox, "b": fresh_outbox})
             conn.execute(text("DELETE FROM worker_jobs WHERE kind='retention-test' AND id IN (CAST(:a AS uuid),CAST(:b AS uuid))"), {"a": old_worker, "b": fresh_worker})
     finally:
+        engine.dispose()
+
+
+def test_runtime_retention_skips_when_another_worker_holds_advisory_lock():
+    marker = uuid.uuid4().hex
+    key = f"lock-{marker}"
+    engine = _engine()
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO idempotency_keys(key,actor_id,request_hash,response_json,created_at,expires_at) "
+                    "VALUES (:key,:actor,'old','{}'::jsonb,now()-interval '2 days',now()-interval '1 day')"
+                ),
+                {"key": key, "actor": f"actor-{marker}"},
+            )
+
+        with engine.connect() as lock_conn:
+            transaction = lock_conn.begin()
+            try:
+                assert lock_conn.execute(
+                    text("SELECT pg_try_advisory_xact_lock(:lock_id)"),
+                    {"lock_id": RETENTION_ADVISORY_LOCK_ID},
+                ).scalar_one() is True
+                assert purge_expired_runtime_data(engine, batch_size=100) == {}
+                with engine.connect() as verify_conn:
+                    assert verify_conn.execute(
+                        text("SELECT 1 FROM idempotency_keys WHERE key=:key"),
+                        {"key": key},
+                    ).first()
+            finally:
+                transaction.rollback()
+
+        deleted = purge_expired_runtime_data(engine, batch_size=100)
+        assert deleted["idempotency_keys"] >= 1
+        with engine.connect() as conn:
+            assert conn.execute(text("SELECT 1 FROM idempotency_keys WHERE key=:key"), {"key": key}).first() is None
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM idempotency_keys WHERE key=:key"), {"key": key})
         engine.dispose()

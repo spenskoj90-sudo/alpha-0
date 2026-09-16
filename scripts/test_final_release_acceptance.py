@@ -30,6 +30,25 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
+    def checkpoint_document(self, gate_id: str, *, all_pass: bool = True) -> dict:
+        document = acceptance.build_checkpoint_template(
+            gate_id,
+            self.candidate,
+            self.apk,
+            COMPANION,
+            f"env/{gate_id}",
+            {
+                "deviceOrHost": f"fixture-{gate_id}",
+                "platform": "fixture-platform",
+                "tool": "sentinel-acceptance-fixture",
+            },
+        )
+        if all_pass:
+            for checkpoint in document["checkpoints"]:
+                checkpoint["status"] = "PASS"
+            document["checkpointsDigest"] = acceptance._canonical_digest(document, "checkpointsDigest")
+        return document
+
     def gate(self, gate_id: str, marker: str | None = None) -> dict:
         evidence = self.root / f"{gate_id}.json"
         evidence.write_text(json.dumps({"gate": gate_id, "marker": marker or gate_id}), encoding="utf-8")
@@ -39,6 +58,7 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
             self.apk,
             COMPANION,
             f"env/{gate_id}",
+            self.checkpoint_document(gate_id),
             evidence,
             "application/json",
             RECORDED_AT,
@@ -47,6 +67,142 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
     def manifest(self, profile: str) -> dict:
         gates = [self.gate(gate) for gate in sorted(acceptance.REQUIRED_GATES[profile])]
         return acceptance.build_manifest(profile, self.candidate, self.apk, COMPANION, gates)
+
+    def test_checkpoint_template_is_pending_and_cannot_build_pass_gate(self) -> None:
+        evidence = self.root / "evidence.json"
+        evidence.write_text("{}", encoding="utf-8")
+        checkpoints = self.checkpoint_document("android-physical", all_pass=False)
+        self.assertTrue(all(item["status"] == "PENDING" for item in checkpoints["checkpoints"]))
+        with self.assertRaisesRegex(ValueError, "incomplete checkpoints"):
+            acceptance.build_gate(
+                "android-physical",
+                self.candidate,
+                self.apk,
+                COMPANION,
+                "env/android-physical",
+                checkpoints,
+                evidence,
+                "application/json",
+                RECORDED_AT,
+            )
+
+    def test_checkpoint_finalize_recomputes_digest_only_after_all_pass(self) -> None:
+        document = self.checkpoint_document("android-physical", all_pass=False)
+        for checkpoint in document["checkpoints"]:
+            checkpoint["status"] = "PASS"
+        stale_digest = document["checkpointsDigest"]
+        finalized = acceptance.finalize_checkpoints(document, self.candidate, self.apk, COMPANION)
+        self.assertNotEqual(finalized["checkpointsDigest"], stale_digest)
+        acceptance.verify_checkpoints(
+            finalized,
+            gate_id="android-physical",
+            expected_source=finalized["source"],
+            expected_binding=finalized["binding"],
+            expected_environment_id=finalized["environmentId"],
+            require_pass=True,
+        )
+
+    def test_all_required_checkpoints_pass_gate(self) -> None:
+        gate = self.gate("android-physical")
+        self.assertEqual(gate["status"], "PASS")
+        self.assertEqual(
+            {item["id"] for item in gate["checkpoints"]},
+            set(acceptance.REQUIRED_CHECKPOINTS["android-physical"]),
+        )
+
+    def test_missing_duplicate_unknown_and_pending_checkpoints_are_rejected(self) -> None:
+        cases = []
+
+        missing = self.checkpoint_document("android-physical")
+        missing["checkpoints"].pop()
+        missing["checkpointsDigest"] = acceptance._canonical_digest(missing, "checkpointsDigest")
+        cases.append((missing, "checkpoint set mismatch"))
+
+        duplicate = self.checkpoint_document("android-physical")
+        duplicate["checkpoints"].append(copy.deepcopy(duplicate["checkpoints"][0]))
+        duplicate["checkpointsDigest"] = acceptance._canonical_digest(duplicate, "checkpointsDigest")
+        cases.append((duplicate, "duplicate checkpoint"))
+
+        unknown = self.checkpoint_document("android-physical")
+        unknown["checkpoints"][-1]["id"] = "unknown_checkpoint"
+        unknown["checkpointsDigest"] = acceptance._canonical_digest(unknown, "checkpointsDigest")
+        cases.append((unknown, "checkpoint set mismatch"))
+
+        pending = self.checkpoint_document("android-physical")
+        pending["checkpoints"][0]["status"] = "PENDING"
+        pending["checkpointsDigest"] = acceptance._canonical_digest(pending, "checkpointsDigest")
+        cases.append((pending, "incomplete checkpoints"))
+
+        evidence = self.root / "evidence.json"
+        evidence.write_text("{}", encoding="utf-8")
+        for document, pattern in cases:
+            with self.subTest(pattern=pattern):
+                with self.assertRaisesRegex(ValueError, pattern):
+                    acceptance.build_gate(
+                        "android-physical",
+                        self.candidate,
+                        self.apk,
+                        COMPANION,
+                        "env/android-physical",
+                        document,
+                        evidence,
+                        "application/json",
+                        RECORDED_AT,
+                    )
+
+    def test_checkpoint_execution_is_strict_and_bounded(self) -> None:
+        document = self.checkpoint_document("android-physical")
+        document["execution"]["extra"] = "not-allowed"
+        document["checkpointsDigest"] = acceptance._canonical_digest(document, "checkpointsDigest")
+        evidence = self.root / "evidence.json"
+        evidence.write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "execution has unexpected fields"):
+            acceptance.build_gate(
+                "android-physical",
+                self.candidate,
+                self.apk,
+                COMPANION,
+                "env/android-physical",
+                document,
+                evidence,
+                "application/json",
+                RECORDED_AT,
+            )
+
+    def test_checkpoint_release_binding_drift_is_rejected(self) -> None:
+        document = self.checkpoint_document("android-physical")
+        document["binding"]["companionArchiveSha256"] = "sha256:" + "c" * 64
+        document["checkpointsDigest"] = acceptance._canonical_digest(document, "checkpointsDigest")
+        evidence = self.root / "evidence.json"
+        evidence.write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "binding mismatch"):
+            acceptance.build_gate(
+                "android-physical",
+                self.candidate,
+                self.apk,
+                COMPANION,
+                "env/android-physical",
+                document,
+                evidence,
+                "application/json",
+                RECORDED_AT,
+            )
+
+    def test_arbitrary_evidence_alone_cannot_create_pass(self) -> None:
+        evidence = self.root / "arbitrary.txt"
+        evidence.write_text("PASS", encoding="utf-8")
+        with self.assertRaisesRegex((TypeError, ValueError), "checkpoint"):
+            acceptance.build_gate(
+                "android-physical",
+                self.candidate,
+                self.apk,
+                COMPANION,
+                "env/android-physical",
+                {},
+                evidence,
+                "text/plain",
+                RECORDED_AT,
+            )
 
     def test_publication_profile_passes(self) -> None:
         manifest = self.manifest("publication")
@@ -75,12 +231,24 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
         other_candidate = release_lineage.create_candidate_manifest(binding, other_apk, SIGNER)
         evidence = self.root / "mixed.json"
         evidence.write_text("{}", encoding="utf-8")
+        checkpoints = acceptance.build_checkpoint_template(
+            "android-physical",
+            other_candidate,
+            other_apk,
+            COMPANION,
+            "env/mixed",
+            {"deviceOrHost": "mixed-host", "platform": "fixture", "tool": "fixture-tool"},
+        )
+        for checkpoint in checkpoints["checkpoints"]:
+            checkpoint["status"] = "PASS"
+        checkpoints["checkpointsDigest"] = acceptance._canonical_digest(checkpoints, "checkpointsDigest")
         mixed_gate = acceptance.build_gate(
             "android-physical",
             other_candidate,
             other_apk,
             COMPANION,
             "env/mixed",
+            checkpoints,
             evidence,
             "application/json",
             RECORDED_AT,

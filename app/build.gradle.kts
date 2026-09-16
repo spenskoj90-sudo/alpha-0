@@ -4,6 +4,31 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
+}
+val explicitApiBaseUrl = providers.environmentVariable("SENTINEL_API_BASE_URL").orNull
+    ?.trim()
+    ?.trimEnd('/')
+    ?.takeIf { it.isNotEmpty() }
+val apiBaseUrl = explicitApiBaseUrl ?: "http://127.0.0.1:8000"
+if (releaseRequested) {
+    val value = explicitApiBaseUrl
+        ?: error("SENTINEL_API_BASE_URL is required for release builds")
+    val uri = runCatching { java.net.URI(value) }
+        .getOrElse { error("SENTINEL_API_BASE_URL must be a valid HTTPS URL for release builds") }
+    if (
+        uri.scheme?.lowercase() != "https" ||
+        uri.host.isNullOrBlank() ||
+        uri.rawUserInfo != null ||
+        uri.rawQuery != null ||
+        uri.rawFragment != null ||
+        (!uri.rawPath.isNullOrEmpty() && uri.rawPath != "/")
+    ) {
+        error("SENTINEL_API_BASE_URL must be an HTTPS origin without credentials, path, query, or fragment for release builds")
+    }
+}
+
 android {
     namespace = "com.alpha0.app"
 
@@ -17,7 +42,7 @@ android {
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
-        buildConfigField("String", "SENTINEL_API_BASE_URL", "\"${providers.environmentVariable("SENTINEL_API_BASE_URL").orElse("http://127.0.0.1:8000").get().trimEnd('/')}\"")
+        buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
 
         val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
         val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
@@ -87,10 +112,6 @@ android {
     val androidKeystorePassword = providers.environmentVariable("ANDROID_KEYSTORE_PASSWORD")
     val androidKeyAlias = providers.environmentVariable("ANDROID_KEY_ALIAS")
     val androidKeyPassword = providers.environmentVariable("ANDROID_KEY_PASSWORD")
-
-    val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
-        taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
-    }
 
     if (releaseRequested) {
         val keystorePath = androidKeystorePath.orNull

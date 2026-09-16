@@ -7,6 +7,10 @@ on:
         description: "Exact protected-main commit SHA to sign"
         required: true
         type: string
+      api_base_url:
+        description: "Exact HTTPS SENTINEL Core origin embedded in the signed APK"
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -29,6 +33,9 @@ jobs:
       binding_digest: ${{ steps.binding.outputs.digest }}
     steps:
       - name: Require dispatch from exact protected-main source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          API_BASE_URL: ${{ inputs.api_base_url }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "main"
@@ -37,8 +44,22 @@ jobs:
           esac
           test "${#SOURCE_SHA}" -eq 40
           test "$GITHUB_SHA" = "$SOURCE_SHA"
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          python - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          value = os.environ["API_BASE_URL"].strip().rstrip("/")
+          parsed = urlsplit(value)
+          if (
+              parsed.scheme != "https"
+              or not parsed.hostname
+              or parsed.username is not None
+              or parsed.password is not None
+              or parsed.path not in ("", "/")
+              or parsed.query
+              or parsed.fragment
+          ):
+              raise SystemExit("api_base_url must be an HTTPS origin without credentials, path, query, or fragment")
+          PY
 
       - name: Checkout selected source SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -47,11 +68,11 @@ jobs:
           persist-credentials: false
 
       - name: Verify checkout identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
 
       - name: Setup Python 3.12
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -199,12 +220,17 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
+          SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
+          SENTINEL_RUNTIME_ENVIRONMENT: release-candidate
         run: |
           set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
 
       - name: Verify release APK
+        env:
+          SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
         run: |
           set -euo pipefail
           apk="app/build/outputs/apk/release/app-release.apk"
@@ -227,6 +253,7 @@ jobs:
             echo "APK is debuggable — FAIL"
             exit 1
           fi
+          unzip -p "$apk" 'classes*.dex' | strings | grep -F -- "$SENTINEL_API_BASE_URL" >/dev/null
           echo "Verified release APK: $apk"
 
       - name: Build release-candidate lineage package

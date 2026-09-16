@@ -30,36 +30,43 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def gate(self, gate_id: str, marker: str | None = None) -> dict:
-        evidence = self.root / f"{gate_id}.json"
-        evidence.write_text(json.dumps({"gate": gate_id, "marker": marker or gate_id}), encoding="utf-8")
+    def evidence(self, gate_id: str, *, omit: str | None = None) -> Path:
+        path = self.root / f"{gate_id}.json"
+        checkpoints = sorted(acceptance.REQUIRED_CHECKPOINTS[gate_id] - ({omit} if omit else set()))
+        path.write_text(json.dumps({
+            "schema": acceptance.CHECKPOINT_EVIDENCE_SCHEMA,
+            "gateId": gate_id,
+            "checkpoints": [{"id": checkpoint, "status": "PASS"} for checkpoint in checkpoints],
+        }), encoding="utf-8")
+        return path
+
+    def gate(self, gate_id: str) -> dict:
         return acceptance.build_gate(
-            gate_id,
-            self.candidate,
-            self.apk,
-            COMPANION,
-            f"env/{gate_id}",
-            evidence,
-            "application/json",
-            RECORDED_AT,
+            gate_id, self.candidate, self.apk, COMPANION, f"env/{gate_id}",
+            self.evidence(gate_id), "application/json", RECORDED_AT,
         )
 
     def manifest(self, profile: str) -> dict:
-        gates = [self.gate(gate) for gate in sorted(acceptance.REQUIRED_GATES[profile])]
-        return acceptance.build_manifest(profile, self.candidate, self.apk, COMPANION, gates)
+        return acceptance.build_manifest(
+            profile, self.candidate, self.apk, COMPANION,
+            [self.gate(gate) for gate in sorted(acceptance.REQUIRED_GATES[profile])],
+        )
 
     def test_publication_profile_passes(self) -> None:
         manifest = self.manifest("publication")
-        acceptance.verify_manifest(
-            manifest,
-            self.candidate,
-            self.apk,
-            COMPANION,
-            minimum_profile="publication",
-            expected_repository=REPOSITORY,
-            expected_sha=SOURCE_SHA,
-            expected_version=VERSION,
-        )
+        acceptance.verify_manifest(manifest, self.candidate, self.apk, COMPANION, minimum_profile="publication", expected_repository=REPOSITORY, expected_sha=SOURCE_SHA, expected_version=VERSION)
+
+    def test_gate_rejects_missing_required_checkpoint(self) -> None:
+        gate_id = "android-physical"
+        missing = sorted(acceptance.REQUIRED_CHECKPOINTS[gate_id])[0]
+        with self.assertRaisesRegex(ValueError, "checkpoint set mismatch"):
+            acceptance.build_gate(gate_id, self.candidate, self.apk, COMPANION, "env/android", self.evidence(gate_id, omit=missing), "application/json", RECORDED_AT)
+
+    def test_gate_rejects_freeform_or_non_json_evidence(self) -> None:
+        evidence = self.root / "freeform.txt"
+        evidence.write_text("looks good", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "machine-readable"):
+            acceptance.build_gate("android-physical", self.candidate, self.apk, COMPANION, "env/android", evidence, "text/plain", RECORDED_AT)
 
     def test_publication_rejects_missing_physical_gate(self) -> None:
         manifest = self.manifest("publication")
@@ -73,32 +80,19 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
         other_apk = b"different-signed-apk"
         binding = release_lineage._binding_from_identity(REPOSITORY, SOURCE_SHA, VERSION)
         other_candidate = release_lineage.create_candidate_manifest(binding, other_apk, SIGNER)
-        evidence = self.root / "mixed.json"
-        evidence.write_text("{}", encoding="utf-8")
-        mixed_gate = acceptance.build_gate(
-            "android-physical",
-            other_candidate,
-            other_apk,
-            COMPANION,
-            "env/mixed",
-            evidence,
-            "application/json",
-            RECORDED_AT,
-        )
+        mixed_gate = acceptance.build_gate("android-physical", other_candidate, other_apk, COMPANION, "env/mixed", self.evidence("android-physical"), "application/json", RECORDED_AT)
         manifest["gates"] = [mixed_gate if gate["id"] == "android-physical" else gate for gate in manifest["gates"]]
         manifest["acceptanceDigest"] = acceptance._canonical_digest(manifest, "acceptanceDigest")
         with self.assertRaisesRegex(ValueError, "release-byte binding mismatch"):
             acceptance.verify_manifest(manifest, self.candidate, self.apk, COMPANION)
 
     def test_companion_archive_drift_is_rejected(self) -> None:
-        manifest = self.manifest("publication")
         with self.assertRaisesRegex(ValueError, "release-byte binding mismatch"):
-            acceptance.verify_manifest(manifest, self.candidate, self.apk, "sha256:" + "c" * 64)
+            acceptance.verify_manifest(self.manifest("publication"), self.candidate, self.apk, "sha256:" + "c" * 64)
 
     def test_deployment_is_stronger_than_publication(self) -> None:
-        manifest = self.manifest("publication")
         with self.assertRaisesRegex(ValueError, "weaker than required"):
-            acceptance.verify_manifest(manifest, self.candidate, self.apk, COMPANION, minimum_profile="deployment")
+            acceptance.verify_manifest(self.manifest("publication"), self.candidate, self.apk, COMPANION, minimum_profile="deployment")
         deployment = self.manifest("deployment")
         acceptance.verify_manifest(deployment, self.candidate, self.apk, COMPANION, minimum_profile="publication")
         acceptance.verify_manifest(deployment, self.candidate, self.apk, COMPANION, minimum_profile="deployment")
@@ -173,12 +167,9 @@ class FinalReleaseAcceptanceWorkflowTests(unittest.TestCase):
     def test_live_verifier_rechecks_candidate_package_and_acceptance_attestations(self) -> None:
         helper = self.read("scripts/verify_final_release_acceptance_live.sh")
         for required in (
-            "verify_release_evidence_attestation.sh",
-            "release_lineage.py fetch-candidate",
-            "verify_github_attestation.sh",
-            "verify_release_upstream_attestations.sh",
-            "verify_final_release_acceptance_attestation.sh",
-            "final_release_acceptance.py verify",
+            "verify_release_evidence_attestation.sh", "release_lineage.py fetch-candidate",
+            "verify_github_attestation.sh", "verify_release_upstream_attestations.sh",
+            "verify_final_release_acceptance_attestation.sh", "final_release_acceptance.py verify",
         ):
             self.assertIn(required, helper)
 

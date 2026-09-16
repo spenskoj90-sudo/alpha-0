@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
@@ -15,10 +17,19 @@ from app.core.runtime_maintenance import (
 class FakeApp:
     def __init__(self) -> None:
         self.state = SimpleNamespace()
-        self.handlers: dict[str, list] = {"startup": [], "shutdown": []}
+        self.original_entered = False
+        self.original_exited = False
 
-    def add_event_handler(self, event: str, handler) -> None:
-        self.handlers[event].append(handler)
+        @asynccontextmanager
+        async def original_lifespan(_app):
+            self.original_entered = True
+            try:
+                yield {"original": True}
+            finally:
+                self.original_exited = True
+
+        self.original_lifespan = original_lifespan
+        self.router = SimpleNamespace(lifespan_context=original_lifespan)
 
 
 def test_runtime_maintenance_defaults_only_for_managed_environments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,20 +93,33 @@ def test_service_isolates_purge_failure() -> None:
     assert service.last_error == "RuntimeError"
 
 
-def test_install_registers_lifecycle_only_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_install_composes_supported_lifespan_only_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SENTINEL_RUNTIME_MAINTENANCE_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_RUNTIME_MAINTENANCE_INTERVAL_SECONDS", "300")
     monkeypatch.setenv("SENTINEL_RETENTION_BATCH_SIZE", "100")
+
+    lifecycle: list[str] = []
+    monkeypatch.setattr(RuntimeMaintenanceService, "start", lambda self: lifecycle.append("maintenance-start"))
+    monkeypatch.setattr(RuntimeMaintenanceService, "stop", lambda self: lifecycle.append("maintenance-stop"))
 
     app = FakeApp()
     service = install_runtime_maintenance(app, object(), environment="staging")  # type: ignore[arg-type]
     assert service is not None
     assert app.state.runtime_maintenance is service
-    assert len(app.handlers["startup"]) == 1
-    assert len(app.handlers["shutdown"]) == 1
+    assert app.router.lifespan_context is not app.original_lifespan
+
+    async def exercise_lifespan() -> None:
+        async with app.router.lifespan_context(app) as state:
+            assert state == {"original": True}
+            assert app.original_entered is True
+            assert lifecycle == ["maintenance-start"]
+
+    asyncio.run(exercise_lifespan())
+    assert app.original_exited is True
+    assert lifecycle == ["maintenance-start", "maintenance-stop"]
 
     disabled = FakeApp()
     monkeypatch.setenv("SENTINEL_RUNTIME_MAINTENANCE_ENABLED", "false")
     assert install_runtime_maintenance(disabled, object(), environment="production") is None  # type: ignore[arg-type]
     assert disabled.state.runtime_maintenance is None
-    assert disabled.handlers == {"startup": [], "shutdown": []}
+    assert disabled.router.lifespan_context is disabled.original_lifespan

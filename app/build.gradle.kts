@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -15,7 +17,7 @@ val apiBaseUrl = explicitApiBaseUrl ?: "http://127.0.0.1:8000"
 if (releaseRequested) {
     val value = explicitApiBaseUrl
         ?: error("SENTINEL_API_BASE_URL is required for release builds")
-    val uri = runCatching { java.net.URI(value) }
+    val uri = runCatching { URI(value) }
         .getOrElse { error("SENTINEL_API_BASE_URL must be a valid HTTPS URL for release builds") }
     if (
         uri.scheme?.lowercase() != "https" ||

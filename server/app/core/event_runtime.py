@@ -4,7 +4,9 @@ import secrets
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+
+from app.core.database_engine import create_service_role_engine
 
 
 @dataclass(frozen=True)
@@ -29,12 +31,11 @@ class PostgresEventRuntime:
     ):
         if lease_seconds <= 0 or max_attempts <= 0 or backoff_base_seconds <= 0:
             raise ValueError("INVALID_RUNTIME_LIMITS")
-        self.engine = create_engine(
+        self.engine = create_service_role_engine(
             database_url,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
-            connect_args={"options": "-c app.service_role=true"},
         )
         self.lease_seconds = lease_seconds
         self.max_attempts = max_attempts

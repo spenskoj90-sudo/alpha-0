@@ -14,6 +14,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com
+
 jobs:
   physical-test-apk:
     name: Build physical test APK
@@ -38,13 +41,14 @@ jobs:
       - name: Run Android unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Build isolated physical-test APK
+      - name: Build isolated physical-test APK against staging Core
         env:
+          SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
           SENTINEL_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           SENTINEL_RUNTIME_ENVIRONMENT: ci
         run: ./gradlew --no-daemon assemblePhysicalTest
 
-      - name: Verify physical-test identity and production separation
+      - name: Verify physical-test identity, staging binding, and production separation
         shell: bash
         run: |
           set -euo pipefail
@@ -54,6 +58,7 @@ jobs:
           grep -F 'SENTINEL_DIAGNOSTICS_MODE", "\"PRODUCTION\"' app/build.gradle.kts
           grep -F 'SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false"' app/build.gradle.kts
           grep -F 'if (diagnostics.isForensicTest())' app/src/main/java/com/alpha0/app/SentinelApplication.kt
+          grep -F "PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com" .github/workflows/physical-test-apk.yml
 
       - name: Hash physical-test APK
         run: sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256

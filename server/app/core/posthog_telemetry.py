@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from app.core.companion_observability import CompanionTelemetryEvent, CompanionTelemetrySink
@@ -31,6 +30,9 @@ _ALLOWED_ATTRIBUTES = frozenset(
 _SOURCE_SHA = re.compile(r"^[0-9a-f]{40}$")
 _RELEASE = re.compile(r"^[A-Za-z0-9._:+-]{1,128}$")
 _ENVIRONMENT = re.compile(r"^[a-z0-9_-]{1,32}$")
+_POSTHOG_REGIONS = frozenset({"us", "eu"})
+_POSTHOG_US_CAPTURE = "https://us.i.posthog.com/capture/"
+_POSTHOG_EU_CAPTURE = "https://eu.i.posthog.com/capture/"
 
 
 class PostHogTransport(Protocol):
@@ -40,7 +42,7 @@ class PostHogTransport(Protocol):
 @dataclass(frozen=True)
 class PostHogConfig:
     project_key: str = field(repr=False)
-    host: str
+    region: str
     environment: str
     release: str
     source_sha: str
@@ -48,9 +50,8 @@ class PostHogConfig:
     def __post_init__(self) -> None:
         if not self.project_key or len(self.project_key) > 256:
             raise ValueError("POSTHOG_PROJECT_KEY_INVALID")
-        parts = urlsplit(self.host)
-        if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.path not in {"", "/"}:
-            raise ValueError("POSTHOG_HOST_INVALID")
+        if self.region not in _POSTHOG_REGIONS:
+            raise ValueError("POSTHOG_REGION_INVALID")
         if not _ENVIRONMENT.fullmatch(self.environment):
             raise ValueError("POSTHOG_ENVIRONMENT_INVALID")
         if self.environment != "staging":
@@ -70,8 +71,12 @@ class PostHogHttpTransport:
 
     def capture(self, payload: dict[str, Any]) -> None:
         body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        # Never construct an outbound URL from environment- or request-controlled
+        # text. Region selection chooses one of two literal provider endpoints,
+        # eliminating an SSRF surface while retaining PostHog US/EU support.
+        endpoint = _POSTHOG_EU_CAPTURE if self._config.region == "eu" else _POSTHOG_US_CAPTURE
         request = Request(
-            f"{self._config.host.rstrip('/')}/capture/",
+            endpoint,
             data=body,
             method="POST",
             headers={
@@ -156,7 +161,7 @@ def configured_posthog_sink() -> PostHogCompanionTelemetrySink | None:
     try:
         config = PostHogConfig(
             project_key=required["project_key"],
-            host=os.getenv("SENTINEL_POSTHOG_HOST", "https://us.i.posthog.com"),
+            region=os.getenv("SENTINEL_POSTHOG_REGION", "us").strip().lower(),
             environment=os.getenv("SENTINEL_ENV", "development").strip().lower(),
             release=required["release"],
             source_sha=required["source_sha"].strip().lower(),

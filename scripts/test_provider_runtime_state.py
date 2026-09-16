@@ -13,9 +13,12 @@ def read(path: str) -> str:
 
 def main() -> int:
     failures: list[str] = []
+    passed = 0
 
     def require(condition: bool, message: str) -> None:
+        nonlocal passed
         if condition:
+            passed += 1
             print(f"PASS  {message}")
         else:
             failures.append(message)
@@ -63,7 +66,7 @@ def main() -> int:
     require("production deployment" in provider, "provider contract preserves production non-claim")
     require("live charges" in provider, "provider contract preserves live-charge non-claim")
 
-    print(f"\nPROVIDER_STATE_PASSED={24 - len(failures)} PROVIDER_STATE_FAILED={len(failures)}")
+    print(f"\nPROVIDER_STATE_PASSED={passed} PROVIDER_STATE_FAILED={len(failures)}")
     if failures:
         print("Provider runtime state violations:")
         for failure in failures:

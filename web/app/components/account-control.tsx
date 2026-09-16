@@ -41,6 +41,15 @@ type AccountSnapshot =
   | { view: 'ERROR'; message: string }
   | { view: 'READY'; plans: Plan[]; subscriptions: Subscription[]; entitlements: Entitlement[] };
 
+type CheckoutResponse = {
+  checkout_url?: unknown;
+  checkout_session_id?: unknown;
+  subscription_id?: unknown;
+  livemode?: unknown;
+  error?: string;
+  code?: string;
+};
+
 function lifecycleText(status: Subscription['status']) {
   switch (status) {
     case 'PENDING': return 'Awaiting provider confirmation';
@@ -58,6 +67,17 @@ function money(plan: Plan) {
 async function responseJson<T>(response: Response): Promise<T | null> {
   try {
     return await response.json() as T;
+  } catch {
+    return null;
+  }
+}
+
+function verifiedCheckoutUrl(payload: CheckoutResponse | null): string | null {
+  if (!payload || typeof payload.checkout_url !== 'string') return null;
+  try {
+    const url = new URL(payload.checkout_url);
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    return url.toString();
   } catch {
     return null;
   }
@@ -182,14 +202,34 @@ export function AccountControl() {
     }
   }
 
-  async function createSubscription(planCode: string) {
+  async function createSubscription(plan: Plan) {
     setBusy(true);
     setMessage('');
     try {
+      if (plan.amount_minor > 0) {
+        const response = await fetch('/api/billing/checkout-sessions', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ plan_code: plan.code }),
+        });
+        const payload = await responseJson<CheckoutResponse>(response);
+        if (!response.ok) {
+          setMessage(payload?.code ?? payload?.error ?? `Checkout setup failed (${response.status}).`);
+          return;
+        }
+        const checkoutUrl = verifiedCheckoutUrl(payload);
+        if (!checkoutUrl) {
+          setMessage('INVALID_CHECKOUT_RESPONSE');
+          return;
+        }
+        window.location.assign(checkoutUrl);
+        return;
+      }
+
       const response = await fetch('/api/billing/subscriptions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plan_code: planCode }),
+        body: JSON.stringify({ plan_code: plan.code }),
       });
       const payload = await responseJson<{ error?: string; code?: string }>(response);
       if (!response.ok) {
@@ -197,7 +237,7 @@ export function AccountControl() {
         return;
       }
       await reloadAccount();
-      setMessage('Subscription intent recorded. Activation remains provider-confirmed and server-authoritative.');
+      setMessage('Free subscription intent recorded. Server policy remains authoritative.');
     } finally {
       setBusy(false);
     }
@@ -259,12 +299,13 @@ export function AccountControl() {
           {plans.length === 0 && <p className="muted">No plans returned by Core.</p>}
           {plans.map(plan => {
             const hasOpenIntent = activePlanCodes.has(plan.code);
+            const paid = plan.amount_minor > 0;
             return <div className="item plan-row" key={plan.code}>
               <div><strong>{plan.name}</strong><div className="muted">{money(plan)} / {plan.interval_days} days · {plan.entitlement_codes.join(' + ')}</div></div>
-              <button className="ghost-btn" disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan.code)}>{hasOpenIntent ? 'INTENT EXISTS' : 'CREATE INTENT'}</button>
+              <button className="ghost-btn" disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'INTENT EXISTS' : paid ? 'CHECKOUT' : 'ACTIVATE FREE'}</button>
             </div>;
           })}
-          <p className="boundary-copy">Creating an intent does not charge a payment method. Paid activation remains pending until a configured provider produces a verified lifecycle event.</p>
+          <p className="boundary-copy">Paid checkout uses a server-created hosted provider session. The browser cannot select price IDs, provider mode, entitlement state, or payment confirmation. Paid features activate only after a verified provider lifecycle event.</p>
         </article>
 
         <article className="card">

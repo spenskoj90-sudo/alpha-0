@@ -50,6 +50,7 @@ check 'Design system tests' test -f scripts/test_design_system.py
 check 'Telemetry contract' test -f docs/OBSERVABILITY.md
 check 'Telemetry manifest' test -f observability/telemetry-contract.v1.json
 check 'Telemetry contract tests' test -f scripts/test_telemetry_contract.py
+check 'Provider runtime state tests' test -f scripts/test_provider_runtime_state.py
 check 'Repository policy verifier' test -f scripts/verify_repository.py
 check 'Release evidence verifier' test -f scripts/release_evidence.py
 check 'Release evidence policy entrypoint' test -f scripts/release_evidence_entrypoint.py
@@ -83,7 +84,7 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
     scripts/release_lineage.py scripts/test_release_lineage.py \
     scripts/test_artifact_attestations.py scripts/test_design_system.py \
-    scripts/test_telemetry_contract.py \
+    scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
@@ -92,6 +93,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
   check 'Design system invariants' python scripts/test_design_system.py
   check 'Telemetry contract invariants' python scripts/test_telemetry_contract.py
+  check 'Provider runtime state invariants' python scripts/test_provider_runtime_state.py
   check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py
 fi
 

@@ -18,6 +18,7 @@ def psycopg_url(url: str) -> str:
 def main() -> None:
     with psycopg.connect(psycopg_url(DATABASE_URL), autocommit=True) as conn:
         with conn.cursor() as cur:
+            cur.execute("SELECT set_config('app.service_role', 'true', false)")
             cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())")
             cur.execute("SELECT version, checksum FROM schema_migrations")
             applied = dict(cur.fetchall())

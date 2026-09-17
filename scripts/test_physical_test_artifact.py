@@ -61,6 +61,8 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["sourceSha"], SHA)
         self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
         self.assertEqual(manifest["runtimeEnvironment"], "staging")
+        self.assertEqual(manifest["httpReadTimeoutMs"], 75_000)
+        self.assertTrue(manifest["coldStartAware"])
         self.assertEqual(manifest["apk"]["applicationId"], "com.alpha0.app.physicaltest")
         self.assertEqual(len(manifest["apk"]["sha256"]), 64)
 

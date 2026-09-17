@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 EXPECTED_APPLICATION_ID = "com.alpha0.app.physicaltest"
 EXPECTED_VARIANT = "physicalTest"
 EXPECTED_STAGING_ORIGIN = "https://sentinel-core-staging.onrender.com"
+EXPECTED_HTTP_READ_TIMEOUT_MS = 75_000
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 DEX_ENTRY = re.compile(r"^classes(?:\d+)?\.dex$")
 
@@ -115,6 +116,8 @@ def build_manifest(
         "apiEnvironment": "staging",
         "apiBaseUrl": origin,
         "runtimeEnvironment": "staging",
+        "httpReadTimeoutMs": EXPECTED_HTTP_READ_TIMEOUT_MS,
+        "coldStartAware": True,
         "diagnosticsMode": "FORENSIC_TEST",
         "generatedAt": timestamp,
     }

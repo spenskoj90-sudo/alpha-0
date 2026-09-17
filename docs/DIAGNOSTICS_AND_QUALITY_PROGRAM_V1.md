@@ -20,6 +20,7 @@ The physical-test APK exists only for controlled real-device acceptance and engi
 - Sentry/automatic remote telemetry is disabled in this build even if a DSN is available;
 - this APK must never be published as the mass-user release;
 - the Gradle build fails unless the exact source SHA, `staging` runtime environment and canonical HTTPS staging Core origin are supplied;
+- the physical build uses a bounded 75-second read timeout so a Render staging cold start cannot complete an account write after the UI has already reported a false 15-second network failure; production/release remains at 15 seconds;
 - CI verifies the compiled DEX contains that SHA, staging origin and forensic marker and contains no loopback origin;
 - CI produces an exact-source-SHA APK, SHA-256 file and `sentinel.android-physical-test-artifact.v1` manifest retained for 90 days.
 

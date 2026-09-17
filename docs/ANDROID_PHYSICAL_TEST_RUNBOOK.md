@@ -57,6 +57,13 @@ Never put the password, tokens, private keys or exported diagnostics in a public
 
 ## 4. Authentication and first device proof
 
+The free staging Core can be asleep after inactivity. The first authenticated
+request may therefore remain in progress for roughly a minute while Render
+wakes the service. The physical-test build waits up to 75 seconds for the
+authoritative response. Do not tap repeatedly or leave the app while the button
+is busy. A registration timeout is an unknown write outcome: wait for staging
+and try **Sign in** before attempting to create the account again.
+
 1. On **SIGN IN**, enter a malformed email and a short password. Expect local validation and no navigation.
 2. Enter plausible but invalid existing-account credentials. Expect a bounded authentication error; do not expect access.
 3. Select **Create a new account**, enter the staging test email and a password of at least 12 characters, then create the account. For an existing account, sign in instead.

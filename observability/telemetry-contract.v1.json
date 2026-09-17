@@ -39,6 +39,8 @@
       "apiEnvironment": "staging",
       "apiOrigin": "https://sentinel-core-staging.onrender.com",
       "runtimeEnvironment": "staging",
+      "httpReadTimeoutMs": 75000,
+      "coldStartAware": true,
       "artifactManifestSchema": "sentinel.android-physical-test-artifact.v1",
       "purpose": "temporary physical-device acceptance and reproducible engineering evidence"
     },

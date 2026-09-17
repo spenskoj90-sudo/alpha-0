@@ -83,6 +83,7 @@ android {
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")
         buildConfigField("String", "SENTINEL_RUNTIME_ENVIRONMENT", "\"$runtimeEnvironment\"")
+        buildConfigField("int", "SENTINEL_HTTP_READ_TIMEOUT_MS", "15000")
     }
 
     buildFeatures {
@@ -111,6 +112,11 @@ android {
             buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"FORENSIC_TEST\"")
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
+            // Render free-tier staging may need roughly a minute to wake. The
+            // physical build must wait for the authoritative POST response so
+            // registration cannot succeed server-side while the UI reports a
+            // false network failure. Release behavior remains at 15 seconds.
+            buildConfigField("int", "SENTINEL_HTTP_READ_TIMEOUT_MS", "75000")
         }
         release {
             isMinifyEnabled = true

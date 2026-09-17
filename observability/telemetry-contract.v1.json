@@ -20,7 +20,7 @@
     "sourceOfCommitInReleaseCandidate": "GITHUB_SHA after workflow assertion GITHUB_SHA == source_sha"
   },
   "environments": {
-    "allowlist": ["development", "ci", "release-candidate", "production"],
+    "allowlist": ["development", "ci", "staging", "release-candidate", "production"],
     "providerNetworkAllowlist": ["staging"],
     "androidReleaseCandidateDefault": "release-candidate",
     "productionRequiresExternalActivation": true
@@ -36,6 +36,10 @@
       "automaticRemoteUpload": false,
       "sentryEnabled": false,
       "artifactRetentionDays": 90,
+      "apiEnvironment": "staging",
+      "apiOrigin": "https://sentinel-core-staging.onrender.com",
+      "runtimeEnvironment": "staging",
+      "artifactManifestSchema": "sentinel.android-physical-test-artifact.v1",
       "purpose": "temporary physical-device acceptance and reproducible engineering evidence"
     },
     "production": {

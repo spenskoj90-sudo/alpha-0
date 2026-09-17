@@ -16,6 +16,7 @@ concurrency:
 
 env:
   PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com
+  PHYSICAL_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   physical-test-apk:
@@ -38,30 +39,39 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Run Android unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+      - name: Run Android debug and physical-test unit tests
+        env:
+          SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
+          SENTINEL_SOURCE_SHA: ${{ env.PHYSICAL_TEST_SOURCE_SHA }}
+          SENTINEL_RUNTIME_ENVIRONMENT: staging
+        run: ./gradlew --no-daemon testDebugUnitTest testPhysicalTestUnitTest
 
       - name: Build isolated physical-test APK against staging Core
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
-          SENTINEL_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          SENTINEL_RUNTIME_ENVIRONMENT: ci
+          SENTINEL_SOURCE_SHA: ${{ env.PHYSICAL_TEST_SOURCE_SHA }}
+          SENTINEL_RUNTIME_ENVIRONMENT: staging
         run: ./gradlew --no-daemon assemblePhysicalTest
 
-      - name: Verify physical-test identity, staging binding, and production separation
+      - name: Verify compiled APK identity, staging binding, and production separation
         shell: bash
         run: |
           set -euo pipefail
-          test -f app/build/outputs/apk/physicalTest/app-physicalTest.apk
-          grep -F 'applicationIdSuffix = ".physicaltest"' app/build.gradle.kts
-          grep -F 'SENTINEL_DIAGNOSTICS_MODE", "\"FORENSIC_TEST\"' app/build.gradle.kts
-          grep -F 'SENTINEL_DIAGNOSTICS_MODE", "\"PRODUCTION\"' app/build.gradle.kts
-          grep -F 'SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false"' app/build.gradle.kts
-          grep -F 'if (diagnostics.isForensicTest())' app/src/main/java/com/alpha0/app/SentinelApplication.kt
-          grep -F "PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com" .github/workflows/physical-test-apk.yml
+          python scripts/physical_test_artifact.py \
+            --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk \
+            --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json \
+            --version-file VERSION \
+            --source-sha "$PHYSICAL_TEST_SOURCE_SHA" \
+            --api-base-url "$PHYSICAL_TEST_API_BASE_URL" \
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output physical-test-manifest.json
 
       - name: Hash physical-test APK
-        run: sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
+        run: |
+          sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
+          test "$(cut -d ' ' -f 1 physical-test-apk.sha256)" = "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["apk"]["sha256"])')"
 
       - name: Upload exact-SHA physical-test APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -70,5 +80,6 @@ jobs:
           path: |
             app/build/outputs/apk/physicalTest/app-physicalTest.apk
             physical-test-apk.sha256
+            physical-test-manifest.json
           if-no-files-found: error
           retention-days: 90

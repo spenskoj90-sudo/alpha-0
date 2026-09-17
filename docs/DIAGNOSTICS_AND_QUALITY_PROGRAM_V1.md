@@ -19,7 +19,9 @@ The physical-test APK exists only for controlled real-device acceptance and engi
 - full trace can be exported as a compressed file through the Android share sheet;
 - Sentry/automatic remote telemetry is disabled in this build even if a DSN is available;
 - this APK must never be published as the mass-user release;
-- CI produces an exact-source-SHA APK and SHA-256 artifact retained for 90 days.
+- the Gradle build fails unless the exact source SHA, `staging` runtime environment and canonical HTTPS staging Core origin are supplied;
+- CI verifies the compiled DEX contains that SHA, staging origin and forensic marker and contains no loopback origin;
+- CI produces an exact-source-SHA APK, SHA-256 file and `sentinel.android-physical-test-artifact.v1` manifest retained for 90 days.
 
 The build does **not** weaken authorization, device binding, Play Integrity boundaries, transport security or any server-side policy. It adds observation only.
 
@@ -156,13 +158,14 @@ For a real Android acceptance run:
 
 1. Select one exact protected-`main` SHA with a completed MAIN PASS.
 2. Download `sentinel-physical-test-apk-<sha>` from the **Physical Test APK** workflow for that exact SHA.
-3. Verify the bundled `physical-test-apk.sha256` before installation.
-4. Install the `.physicaltest` application. It can coexist with the release package because its application ID is different.
-5. Execute the physical acceptance procedure normally. Do not weaken device/security controls for the test build.
-6. If behavior is wrong, reproduce it once where safe, then use **Report a problem** and/or **Export full forensic log**. The full forensic export is available only in the physical-test build.
-7. Preserve the exact source SHA, APK SHA-256, device/OS context and exported log as engineering evidence.
-8. Fix only defects supported by the real evidence, rerun CI, produce a new exact-SHA test APK and repeat the measured scenario.
-9. Remove the test application/data from the device after the acceptance campaign is complete.
+3. Verify `physical-test-manifest.json` names the selected repository/SHA, canonical staging origin, `com.alpha0.app.physicaltest` application ID and `FORENSIC_TEST` mode.
+4. Verify the APK against both the manifest SHA-256 and bundled `physical-test-apk.sha256` before installation.
+5. Install the `.physicaltest` application. It can coexist with the release package because its application ID is different.
+6. Execute the physical acceptance procedure normally. Do not weaken device/security controls for the test build.
+7. If behavior is wrong, reproduce it once where safe, then use **Report a problem** and/or **Export full forensic log**. The full forensic export is available only in the physical-test build.
+8. Preserve the exact source SHA, APK SHA-256, manifest, device/OS context and exported log as engineering evidence.
+9. Fix only defects supported by the real evidence, rerun CI, produce a new exact-SHA test APK and repeat the measured scenario.
+10. Remove the test application/data from the device after the acceptance campaign is complete.
 
 A diagnostic trace is evidence for diagnosis; it is not by itself a PASS. Final release gates remain governed by `docs/FINAL_RELEASE_ACCEPTANCE_V1.md`.
 

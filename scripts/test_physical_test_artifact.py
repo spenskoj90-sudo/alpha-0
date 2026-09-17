@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+
+from physical_test_artifact import build_manifest
+
+
+SHA = "a" * 40
+ORIGIN = "https://sentinel-core-staging.onrender.com"
+
+
+class PhysicalTestArtifactTests(unittest.TestCase):
+    def fixture(self, root: Path, *, dex_suffix: bytes = b"", application_id: str = "com.alpha0.app.physicaltest") -> tuple[Path, Path, Path]:
+        apk = root / "app-physicalTest.apk"
+        with zipfile.ZipFile(apk, "w") as archive:
+            archive.writestr("classes.dex", b"dex\n" + SHA.encode() + b"\n" + ORIGIN.encode() + b"\nFORENSIC_TEST\n" + dex_suffix)
+        metadata = root / "output-metadata.json"
+        metadata.write_text(
+            json.dumps(
+                {
+                    "artifactType": {"type": "APK"},
+                    "applicationId": application_id,
+                    "variantName": "physicalTest",
+                    "elements": [
+                        {
+                            "outputFile": apk.name,
+                            "versionCode": 10002,
+                            "versionName": "1.0.0-rc2-physical-test",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        version = root / "VERSION"
+        version.write_text("1.0.0-rc2\n", encoding="utf-8")
+        return apk, metadata, version
+
+    def create_manifest(self, root: Path, **fixture_overrides: object) -> dict[str, object]:
+        apk, metadata, version = self.fixture(root, **fixture_overrides)
+        return build_manifest(
+            apk=apk,
+            output_metadata=metadata,
+            version_file=version,
+            source_sha=SHA,
+            api_base_url=ORIGIN,
+            repository="spenskoj90-sudo/alpha-0",
+            run_id="12345",
+            run_attempt="2",
+            generated_at="2026-09-16T20:00:00Z",
+        )
+
+    def test_manifest_binds_exact_apk_source_staging_and_gradle_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            manifest = self.create_manifest(Path(temp))
+        self.assertEqual(manifest["sourceSha"], SHA)
+        self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
+        self.assertEqual(manifest["runtimeEnvironment"], "staging")
+        self.assertEqual(manifest["apk"]["applicationId"], "com.alpha0.app.physicaltest")
+        self.assertEqual(len(manifest["apk"]["sha256"]), 64)
+
+    def test_loopback_bytes_in_compiled_dex_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, "forbidden loopback"):
+                self.create_manifest(Path(temp), dex_suffix=b"http://127.0.0.1:8000")
+
+    def test_wrong_application_id_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(ValueError, "application ID mismatch"):
+                self.create_manifest(Path(temp), application_id="com.alpha0.app")
+
+
+if __name__ == "__main__":
+    unittest.main()

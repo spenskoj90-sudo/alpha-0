@@ -34,6 +34,7 @@ fun DeviceDetailsScreen(
     accessToken: String,
     deviceId: String,
     api: DashboardApi,
+    deviceIdentity: DeviceIdentity,
     onRevoked: () -> Unit = {},
     onRotated: (DashboardApi.DeviceActionResult) -> Unit = {},
 ) {
@@ -43,7 +44,6 @@ fun DeviceDetailsScreen(
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var revoked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val identity = remember { DeviceIdentity() }
 
     LaunchedEffect(deviceId, accessToken) {
         when (val result = withContext(Dispatchers.IO) { api.getDevice(accessToken, deviceId) }) {
@@ -85,22 +85,48 @@ fun DeviceDetailsScreen(
                                 error = null
                                 actionMessage = null
                                 scope.launch(Dispatchers.IO) {
-                                    val info = identity.getIdentityInfo()
-                                    val publicKey = identity.getPublicKeyDerBase64()
-                                    val result = api.rotateDevice(accessToken, current.deviceId, current.platform, publicKey, info.fingerprint)
-                                    withContext(Dispatchers.Main) {
-                                        actionInProgress = false
-                                        when (result) {
+                                    var rotated: DashboardApi.DeviceActionResult? = null
+                                    var failure: String? = null
+                                    var candidate: DeviceIdentity.RotationCandidate? = null
+                                    try {
+                                        val prepared = deviceIdentity.prepareRotation()
+                                        candidate = prepared
+                                        when (
+                                            val result = api.rotateDevice(
+                                                accessToken,
+                                                current.deviceId,
+                                                current.platform,
+                                                prepared.publicKeyDerBase64,
+                                                prepared.fingerprint,
+                                            )
+                                        ) {
                                             is DashboardApi.Result.Success -> {
-                                                val rotated = result.value
-                                                if (rotated.deviceId.isNullOrBlank() || rotated.sessionToken.isNullOrBlank() || rotated.refreshToken.isNullOrBlank()) {
-                                                    error = "UNEXPECTED_ERROR: Invalid rotate response: missing device/session data"
+                                                val value = result.value
+                                                if (value.deviceId.isNullOrBlank() || value.sessionToken.isNullOrBlank() || value.refreshToken.isNullOrBlank()) {
+                                                    deviceIdentity.abortRotation(prepared)
+                                                    failure = "UNEXPECTED_ERROR: Invalid rotate response: missing device/session data"
                                                 } else {
-                                                    actionMessage = "Device binding rotated. Session renewed."
-                                                    onRotated(rotated)
+                                                    deviceIdentity.commitRotation(prepared)
+                                                    rotated = value
                                                 }
                                             }
-                                            is DashboardApi.Result.Failure -> error = result.message
+                                            is DashboardApi.Result.Failure -> {
+                                                deviceIdentity.abortRotation(prepared)
+                                                failure = result.message
+                                            }
+                                        }
+                                    } catch (exception: Exception) {
+                                        candidate?.let(deviceIdentity::abortRotation)
+                                        failure = "KEY_ROTATION_${exception.javaClass.simpleName}"
+                                    }
+                                    withContext(Dispatchers.Main) {
+                                        actionInProgress = false
+                                        val value = rotated
+                                        if (value == null) {
+                                            error = failure ?: "KEY_ROTATION_FAILED"
+                                        } else {
+                                            actionMessage = "Device binding rotated. Session renewed."
+                                            onRotated(value)
                                         }
                                     }
                                 }

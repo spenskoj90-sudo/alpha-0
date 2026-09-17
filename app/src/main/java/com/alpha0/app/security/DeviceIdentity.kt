@@ -21,6 +21,10 @@ class DeviceIdentity {
     companion object {
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
         private const val KEY_ALIAS = "alpha0.device.identity.v1"
+        private const val ROTATION_ALIAS_A = "alpha0.device.identity.rotation.a.v1"
+        private const val ROTATION_ALIAS_B = "alpha0.device.identity.rotation.b.v1"
+        private const val PREFS = "sentinel_device_identity"
+        private const val ACTIVE_ALIAS = "active_alias"
 
         private const val CURVE = "secp256r1"
         private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
@@ -32,10 +36,18 @@ class DeviceIdentity {
         val algorithm: String
     )
 
+    data class RotationCandidate internal constructor(
+        internal val alias: String,
+        val fingerprint: String,
+        val publicKeyDerBase64: String,
+    )
+
     private var diag: DiagnosticLogger? = null
+    private var appContext: Context? = null
 
     /** Optional: attach logger from Application/Activity context. */
     fun attachDiagnostics(context: Context) {
+        appContext = context.applicationContext
         diag = DiagnosticLogger.get(context)
     }
 
@@ -54,10 +66,16 @@ class DeviceIdentity {
         }
     }
 
-    private fun ensureKeyExists() {
+    private fun activeAlias(): String = appContext
+        ?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        ?.getString(ACTIVE_ALIAS, KEY_ALIAS)
+        ?.takeIf { it in setOf(KEY_ALIAS, ROTATION_ALIAS_A, ROTATION_ALIAS_B) }
+        ?: KEY_ALIAS
+
+    private fun ensureKeyExists(alias: String = activeAlias()) {
         val keyStore = loadKeyStore()
 
-        if (keyStore.containsAlias(KEY_ALIAS)) {
+        if (keyStore.containsAlias(alias)) {
             log("INFO", "KEY_AVAILABLE", "SUCCESS", mapOf("alias_present" to true, "generated" to false))
             return
         }
@@ -69,7 +87,7 @@ class DeviceIdentity {
         )
 
         val builder = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
+            alias,
             KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         )
             .setAlgorithmParameterSpec(
@@ -97,7 +115,7 @@ class DeviceIdentity {
         } catch (e: StrongBoxUnavailableException) {
             log("WARN", "STRONGBOX_UNAVAILABLE", "SKIPPED", mapOf("fallback" to "TEE"), e)
             val teeBuilder = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
+                alias,
                 KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
             )
                 .setAlgorithmParameterSpec(
@@ -120,7 +138,7 @@ class DeviceIdentity {
         } catch (e: Exception) {
             log("WARN", "STRONGBOX_OR_INIT_FAIL", "SKIPPED", mapOf("fallback" to "TEE_MINIMAL"), e)
             val teeBuilder = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
+                alias,
                 KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
             )
                 .setAlgorithmParameterSpec(
@@ -142,13 +160,13 @@ class DeviceIdentity {
         }
     }
 
-    private fun getPrivateKey(): PrivateKey {
-        ensureKeyExists()
+    private fun getPrivateKey(alias: String = activeAlias()): PrivateKey {
+        ensureKeyExists(alias)
 
         val keyStore = loadKeyStore()
 
         return keyStore.getKey(
-            KEY_ALIAS,
+            alias,
             null
         ) as? PrivateKey
             ?: run {
@@ -159,13 +177,13 @@ class DeviceIdentity {
             }
     }
 
-    private fun getPublicKey(): PublicKey {
-        ensureKeyExists()
+    private fun getPublicKey(alias: String = activeAlias()): PublicKey {
+        ensureKeyExists(alias)
 
         val keyStore = loadKeyStore()
 
         return keyStore
-            .getCertificate(KEY_ALIAS)
+            .getCertificate(alias)
             ?.publicKey
             ?: run {
                 log("ERROR", "PUBLIC_KEY_UNAVAILABLE", "FAILURE")
@@ -200,6 +218,70 @@ class DeviceIdentity {
 
     fun getPublicKeyDerBase64(): String {
         return Base64.encodeToString(getPublicKey().encoded, Base64.NO_WRAP)
+    }
+
+    /**
+     * Generates a staged hardware-backed identity without replacing the active key.
+     * The caller must commit it only after Core accepts the rotation, or abort it on
+     * every failure path. Two alternating aliases make repeated rotations possible.
+     */
+    @Synchronized
+    fun prepareRotation(): RotationCandidate {
+        checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        val current = activeAlias()
+        val candidateAlias = if (current == ROTATION_ALIAS_A) ROTATION_ALIAS_B else ROTATION_ALIAS_A
+        val keyStore = loadKeyStore()
+        if (keyStore.containsAlias(candidateAlias)) keyStore.deleteEntry(candidateAlias)
+        ensureKeyExists(candidateAlias)
+        val publicKey = getPublicKey(candidateAlias)
+        val fingerprint = MessageDigest
+            .getInstance(HASH_ALGORITHM)
+            .digest(publicKey.encoded)
+            .toHex()
+        log(
+            "INFO",
+            "KEY_ROTATION_PREPARED",
+            "SUCCESS",
+            mapOf("fingerprint_prefix" to fingerprint.take(12)),
+        )
+        return RotationCandidate(
+            alias = candidateAlias,
+            fingerprint = fingerprint,
+            publicKeyDerBase64 = Base64.encodeToString(publicKey.encoded, Base64.NO_WRAP),
+        )
+    }
+
+    @Synchronized
+    fun commitRotation(candidate: RotationCandidate) {
+        val context = checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        val previous = activeAlias()
+        val keyStore = loadKeyStore()
+        check(candidate.alias != previous && keyStore.containsAlias(candidate.alias)) {
+            "Rotation candidate is not available"
+        }
+        check(
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(ACTIVE_ALIAS, candidate.alias)
+                .commit()
+        ) { "Unable to persist rotated identity" }
+        if (previous != candidate.alias && keyStore.containsAlias(previous)) {
+            keyStore.deleteEntry(previous)
+        }
+        log(
+            "INFO",
+            "KEY_ROTATION_COMMITTED",
+            "SUCCESS",
+            mapOf("fingerprint_prefix" to candidate.fingerprint.take(12)),
+        )
+    }
+
+    @Synchronized
+    fun abortRotation(candidate: RotationCandidate) {
+        if (candidate.alias == activeAlias()) return
+        val keyStore = loadKeyStore()
+        if (keyStore.containsAlias(candidate.alias)) keyStore.deleteEntry(candidate.alias)
+        log("INFO", "KEY_ROTATION_ABORTED", "SKIPPED")
     }
 
     fun sign(challenge: ByteArray): ByteArray {

@@ -45,4 +45,23 @@ class DashboardApiTest {
 
         assertEquals(DashboardApi.Result.Failure("NETWORK_ERROR"), result)
     }
+
+    @Test
+    fun signOutRevokesServerSessionBeforeLocalClear() {
+        var captured: HttpRequest? = null
+        val transport = object : HttpTransport {
+            override fun execute(request: HttpRequest): HttpResponse {
+                captured = request
+                return HttpResponse(200, "{\"revoked\":true}")
+            }
+        }
+
+        val result = DashboardApi("https://example.test", transport).revokeSession("access")
+
+        assertEquals(DashboardApi.Result.Success(true), result)
+        val request = requireNotNull(captured)
+        assertEquals(HttpMethod.POST, request.method)
+        assertEquals("https://example.test/v1/sessions/revoke", request.url)
+        assertEquals("Bearer access", request.headers["Authorization"])
+    }
 }

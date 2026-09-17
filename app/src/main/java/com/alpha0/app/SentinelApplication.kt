@@ -67,7 +67,7 @@ class SentinelApplication : Application() {
     companion object {
         private val SOURCE_SHA = Regex("[0-9a-f]{40}")
         private val ALLOWED_ENVIRONMENTS =
-            setOf("development", "ci", "release-candidate", "production")
+            setOf("development", "ci", "staging", "release-candidate", "production")
 
         /**
          * Data minimization before any event leaves the device.

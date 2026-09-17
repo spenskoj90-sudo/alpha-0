@@ -10,9 +10,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -85,7 +87,31 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SentinelTheme {
-                Box {
+                Column {
+                    if (diag.isForensicTest()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF7A1F1F))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "PHYSICAL TEST · STAGING · ${BuildConfig.VERSION_NAME} · ${BuildConfig.SENTINEL_SOURCE_SHA.take(12)}",
+                                color = Color.White,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Button(onClick = {
+                                diag.info("QUALITY", "FORENSIC_EXPORT_REQUESTED", details = mapOf("surface" to "global-banner"))
+                                diag.exportShare(this@MainActivity)
+                            }) {
+                                Text("Export logs")
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
                     val navController = rememberNavController()
                     var activeSession by remember { mutableStateOf(session) }
                     var refreshComplete by remember { mutableStateOf(session == null) }
@@ -201,6 +227,14 @@ class MainActivity : ComponentActivity() {
                                             diag.info("UI", "QUALITY_REPORT_OPEN")
                                             navController.navigate("quality-report")
                                         },
+                                        onSignedOut = {
+                                            diag.info("AUTH", "SIGN_OUT", "SUCCESS")
+                                            sessionStore.clear(this@MainActivity)
+                                            activeSession = null
+                                            navController.navigate("login") {
+                                                popUpTo("dashboard/${Uri.encode(deviceId)}") { inclusive = true }
+                                            }
+                                        },
                                     )
                                 }
                             }
@@ -218,6 +252,7 @@ class MainActivity : ComponentActivity() {
                                         accessToken = currentSession.accessToken,
                                         deviceId = deviceId,
                                         api = dashboardApi,
+                                        deviceIdentity = deviceIdentity,
                                         onRevoked = {
                                             diag.info("DEVICE", "REVOKE", "SUCCESS")
                                             sessionStore.clear(this@MainActivity)
@@ -274,24 +309,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (diag.isForensicTest()) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .fillMaxWidth()
-                                .background(Color(0xFF7A1F1F))
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("PHYSICAL TEST · FORENSIC LOGGING ACTIVE", color = Color.White)
-                            Button(onClick = {
-                                diag.info("QUALITY", "FORENSIC_EXPORT_REQUESTED", details = mapOf("surface" to "global-banner"))
-                                diag.exportShare(this@MainActivity)
-                            }) {
-                                Text("Export logs")
-                            }
-                        }
                     }
                 }
             }

@@ -81,6 +81,7 @@ The Android/Sentry runtime allowlist is:
 
 - `development` — explicit non-production development runtime;
 - `ci` — explicit synthetic/runtime CI diagnostics if intentionally enabled;
+- `staging` — exact-source physical-device acceptance against the canonical staging Core; remote Android/Sentry telemetry remains disabled for the `physicalTest` build even when a DSN is present;
 - `release-candidate` — exact-source release candidate evaluation;
 - `production` — externally activated production runtime only.
 

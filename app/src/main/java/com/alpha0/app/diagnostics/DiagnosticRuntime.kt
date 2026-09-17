@@ -45,6 +45,7 @@ object DiagnosticRuntime {
                 "source_sha" to BuildConfig.SENTINEL_SOURCE_SHA,
                 "runtime_environment" to BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT,
                 "api_origin" to BuildConfig.SENTINEL_API_BASE_URL,
+                "http_read_timeout_ms" to BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS,
                 "sdk" to Build.VERSION.SDK_INT,
                 "manufacturer" to Build.MANUFACTURER.take(64),
                 "model" to Build.MODEL.take(64),

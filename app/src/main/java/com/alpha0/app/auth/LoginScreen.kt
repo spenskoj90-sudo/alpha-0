@@ -68,6 +68,8 @@ fun LoginScreen(
                         is AuthApi.Result.Failure -> error = when (result.message) {
                             "INVALID_CREDENTIALS" -> "Email or password is incorrect"
                             "EMAIL_ALREADY_REGISTERED" -> "An account with this email already exists"
+                            "REGISTER_OUTCOME_UNKNOWN" -> "Registration response timed out. The account may already exist; wait for staging, then sign in."
+                            "REQUEST_TIMEOUT" -> "SENTINEL staging is still waking up. Wait a moment and try again."
                             "NETWORK_ERROR" -> "Cannot reach SENTINEL server"
                             else -> "Authentication failed: ${result.message}"
                         }

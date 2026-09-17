@@ -19,6 +19,8 @@ class TelemetryContractTests(unittest.TestCase):
         cls.contract = json.loads(read("observability/telemetry-contract.v1.json"))
         cls.gradle = read("app/build.gradle.kts")
         cls.application = read("app/src/main/java/com/alpha0/app/SentinelApplication.kt")
+        cls.main_activity = read("app/src/main/java/com/alpha0/app/MainActivity.kt")
+        cls.diagnostic_runtime = read("app/src/main/java/com/alpha0/app/diagnostics/DiagnosticRuntime.kt")
         cls.diagnostic_logger = read("app/src/main/java/com/alpha0/app/diagnostics/DiagnosticLogger.kt")
         cls.quality_screen = read("app/src/main/java/com/alpha0/app/quality/QualityReportScreen.kt")
         cls.quality_api = read("server/app/core/quality_api.py")
@@ -125,6 +127,8 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertEqual(physical["apiEnvironment"], "staging")
         self.assertEqual(physical["apiOrigin"], "https://sentinel-core-staging.onrender.com")
         self.assertEqual(physical["runtimeEnvironment"], "staging")
+        self.assertEqual(physical["httpReadTimeoutMs"], 75_000)
+        self.assertTrue(physical["coldStartAware"])
         self.assertEqual(physical["artifactManifestSchema"], "sentinel.android-physical-test-artifact.v1")
         self.assertEqual(production["mode"], "PRODUCTION")
         self.assertEqual(production["ringBytes"], 512 * 1024)
@@ -138,10 +142,18 @@ class TelemetryContractTests(unittest.TestCase):
             '"SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216"',
             '"SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288"',
             '"SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false"',
+            '"SENTINEL_HTTP_READ_TIMEOUT_MS", "15000"',
+            '"SENTINEL_HTTP_READ_TIMEOUT_MS", "75000"',
         ):
             self.assertIn(value, self.gradle)
         self.assertIn("if (diagnostics.isForensicTest())", self.application)
         self.assertIn("REMOTE_TELEMETRY_DISABLED_FOR_FORENSIC_TEST", self.application)
+        self.assertIn("readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS", self.main_activity)
+        for constructor in ("AuthApi", "DeviceApi", "DashboardApi"):
+            self.assertIn(f"{constructor}(BuildConfig.SENTINEL_API_BASE_URL, httpTransport)", self.main_activity)
+        self.assertIn("QualityReportApi(BuildConfig.SENTINEL_API_BASE_URL, diag, httpTransport)", self.main_activity)
+        self.assertIn('"http_read_timeout_ms" to BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS', self.diagnostic_runtime)
+        self.assertIn('put("http_read_timeout_ms", BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)', self.diagnostic_logger)
 
     def test_physical_test_apk_is_exact_sha_built_and_retained(self) -> None:
         self.assertIn("assemblePhysicalTest", self.physical_workflow)

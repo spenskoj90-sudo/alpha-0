@@ -284,6 +284,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
             put("build_type", BuildConfig.BUILD_TYPE.take(32))
             put("runtime_environment", BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT.take(32))
             put("api_origin", BuildConfig.SENTINEL_API_BASE_URL.take(256))
+            put("http_read_timeout_ms", BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
             put("session_id", sessionId)
             put("dropped_events", droppedEvents.get())
             put("events", JSONArray(events))

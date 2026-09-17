@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 interface RefreshClient {
     suspend fun refresh(refreshToken: String): AuthApi.Result
@@ -80,8 +81,13 @@ class AuthApi(
             parseSessionResponse(response, op, t0)
         } catch (e: IOException) {
             val duration = System.currentTimeMillis() - t0
-            diag?.error("AUTH", op, "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
-            Result.Failure("NETWORK_ERROR")
+            val code = when {
+                e is SocketTimeoutException && op == "REGISTER" -> "REGISTER_OUTCOME_UNKNOWN"
+                e is SocketTimeoutException -> "REQUEST_TIMEOUT"
+                else -> "NETWORK_ERROR"
+            }
+            diag?.error("AUTH", op, "FAILURE", errorCode = code, durationMs = duration, throwable = e)
+            Result.Failure(code)
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)

@@ -41,6 +41,7 @@ import com.alpha0.app.dashboard.GameDetailsScreen
 import com.alpha0.app.device.DeviceApi
 import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
+import com.alpha0.app.net.UrlConnectionHttpTransport
 import com.alpha0.app.quality.QualityReportApi
 import com.alpha0.app.quality.QualityReportScreen
 import com.alpha0.app.security.DeviceIdentity
@@ -78,11 +79,14 @@ class MainActivity : ComponentActivity() {
             )
         )
 
-        val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
+        val httpTransport = UrlConnectionHttpTransport(
+            readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS,
+        )
+        val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
         val sessionManager = SessionManager(authApi, sessionStore)
-        val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
-        val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL).also { it.attachDiagnostics(this) }
-        val qualityReportApi = QualityReportApi(BuildConfig.SENTINEL_API_BASE_URL, diag)
+        val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
+        val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
+        val qualityReportApi = QualityReportApi(BuildConfig.SENTINEL_API_BASE_URL, diag, httpTransport)
 
         setContent {
             SentinelTheme {

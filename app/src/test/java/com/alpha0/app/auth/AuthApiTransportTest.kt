@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 class AuthApiTransportTest {
     private class FakeTransport(private val response: HttpResponse) : HttpTransport {
@@ -46,5 +47,27 @@ class AuthApiTransportTest {
         }
         val result = AuthApi("https://example.test", transport).refresh("refresh")
         assertEquals(AuthApi.Result.Failure("NETWORK_ERROR"), result)
+    }
+
+    @Test
+    fun loginTimeoutIsSafeToRetry() = runBlocking {
+        val transport = object : HttpTransport {
+            override fun execute(request: HttpRequest): HttpResponse = throw SocketTimeoutException("staging wake")
+        }
+
+        val result = AuthApi("https://example.test", transport).login("user@example.test", "secret")
+
+        assertEquals(AuthApi.Result.Failure("REQUEST_TIMEOUT"), result)
+    }
+
+    @Test
+    fun registrationTimeoutDoesNotClaimThatTheWriteFailed() = runBlocking {
+        val transport = object : HttpTransport {
+            override fun execute(request: HttpRequest): HttpResponse = throw SocketTimeoutException("staging wake")
+        }
+
+        val result = AuthApi("https://example.test", transport).register("user@example.test", "secret")
+
+        assertEquals(AuthApi.Result.Failure("REGISTER_OUTCOME_UNKNOWN"), result)
     }
 }

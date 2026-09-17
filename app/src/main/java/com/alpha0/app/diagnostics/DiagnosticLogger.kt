@@ -282,6 +282,8 @@ class DiagnosticLogger private constructor(private val context: Context) {
             val sourceSha = BuildConfig.SENTINEL_SOURCE_SHA.trim()
             if (Regex("[0-9a-f]{40}").matches(sourceSha)) put("source_sha", sourceSha)
             put("build_type", BuildConfig.BUILD_TYPE.take(32))
+            put("runtime_environment", BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT.take(32))
+            put("api_origin", BuildConfig.SENTINEL_API_BASE_URL.take(256))
             put("session_id", sessionId)
             put("dropped_events", droppedEvents.get())
             put("events", JSONArray(events))

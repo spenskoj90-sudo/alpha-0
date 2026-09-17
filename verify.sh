@@ -61,6 +61,8 @@ check 'Release lineage tests' test -f scripts/test_release_lineage.py
 check 'Artifact attestation tests' test -f scripts/test_artifact_attestations.py
 check 'Final release acceptance verifier' test -f scripts/final_release_acceptance.py
 check 'Final release acceptance tests' test -f scripts/test_final_release_acceptance.py
+check 'Physical-test artifact verifier' test -f scripts/physical_test_artifact.py
+check 'Physical-test artifact verifier tests' test -f scripts/test_physical_test_artifact.py
 check 'GitHub attestation verifier' test -f scripts/verify_github_attestation.sh
 check 'Protected-main release attestation verifier' test -f scripts/verify_release_evidence_attestation.sh
 check 'Release upstream attestation verifier' test -f scripts/verify_release_upstream_attestations.sh
@@ -85,7 +87,8 @@ if command -v python >/dev/null 2>&1; then
     scripts/release_lineage.py scripts/test_release_lineage.py \
     scripts/test_artifact_attestations.py scripts/test_design_system.py \
     scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py \
-    scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py
+    scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
+    scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
@@ -95,6 +98,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Telemetry contract invariants' python scripts/test_telemetry_contract.py
   check 'Provider runtime state invariants' python scripts/test_provider_runtime_state.py
   check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py
+  check 'Physical-test artifact invariants' python scripts/test_physical_test_artifact.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

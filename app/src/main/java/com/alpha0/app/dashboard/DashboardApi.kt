@@ -103,6 +103,11 @@ class DashboardApi(
         DeviceActionResult(revoked = it.optBoolean("revoked"))
     }
 
+    fun revokeSession(accessToken: String): Result<Boolean> =
+        request(accessToken, "/v1/sessions/revoke", "SESSION_REVOKE", "POST") {
+            it.optBoolean("revoked")
+        }
+
     fun getEntitlements(accessToken: String): Result<List<Entitlement>> = request(accessToken, "/v1/entitlements/me", "ENTITLEMENTS_LIST") { json ->
         val array = json.optJSONArray("entitlements") ?: JSONArray()
         buildList {

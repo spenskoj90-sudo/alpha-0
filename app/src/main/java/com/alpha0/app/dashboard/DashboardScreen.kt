@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 import com.alpha0.app.ui.StatusBadge
@@ -37,13 +39,16 @@ fun DashboardScreen(
     onDeviceClick: () -> Unit,
     onGameClick: (String) -> Unit,
     onReportProblem: () -> Unit,
+    onSignedOut: () -> Unit,
 ) {
     var device by remember { mutableStateOf<DashboardApi.Device?>(null) }
     var entitlements by remember { mutableStateOf<List<DashboardApi.Entitlement>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var signingOut by remember { mutableStateOf(false) }
+    var reloadGeneration by remember { mutableStateOf(0) }
 
-    LaunchedEffect(deviceId, accessToken) {
+    LaunchedEffect(deviceId, accessToken, reloadGeneration) {
         loading = true
         error = null
         val deviceResult = withContext(Dispatchers.IO) { api.getDevice(accessToken, deviceId) }
@@ -81,11 +86,17 @@ fun DashboardScreen(
             }
             if (error != null) {
                 item {
-                    Text(
-                        "Load failed: $error",
-                        modifier = Modifier.assertiveStatusSemantics(),
-                        color = SentinelColors.Danger,
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Load failed: $error",
+                            modifier = Modifier.assertiveStatusSemantics(),
+                            color = SentinelColors.Danger,
+                        )
+                        PrimaryButton(
+                            text = "Retry",
+                            onClick = { reloadGeneration += 1 },
+                        )
+                    }
                 }
             }
             device?.let { current ->
@@ -121,6 +132,31 @@ fun DashboardScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = SentinelColors.TextSecondary,
                         )
+                    }
+                }
+            }
+            item {
+                OutlinedButton(
+                    onClick = {
+                        signingOut = true
+                        error = null
+                    },
+                    enabled = !signingOut,
+                ) {
+                    Text(if (signingOut) "Signing out…" else "Sign out")
+                }
+                if (signingOut) {
+                    LaunchedEffect(accessToken) {
+                        when (val result = withContext(Dispatchers.IO) { api.revokeSession(accessToken) }) {
+                            is DashboardApi.Result.Success -> {
+                                signingOut = false
+                                if (result.value) onSignedOut() else error = "SESSION_REVOKE_REJECTED"
+                            }
+                            is DashboardApi.Result.Failure -> {
+                                signingOut = false
+                                error = result.message
+                            }
+                        }
                     }
                 }
             }

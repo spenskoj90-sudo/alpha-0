@@ -9,16 +9,31 @@ plugins {
 val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
     taskName.substringAfterLast(':').contains("Release", ignoreCase = false)
 }
+val physicalTestRequested = gradle.startParameter.taskNames.any { taskName ->
+    taskName.substringAfterLast(':').contains("PhysicalTest", ignoreCase = false)
+}
 val explicitApiBaseUrl = providers.environmentVariable("SENTINEL_API_BASE_URL").orNull
     ?.trim()
     ?.trimEnd('/')
     ?.takeIf { it.isNotEmpty() }
 val apiBaseUrl = explicitApiBaseUrl ?: "http://127.0.0.1:8000"
-if (releaseRequested) {
+val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
+val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
+    .orElse(providers.environmentVariable("GITHUB_SHA"))
+    .orElse("")
+    .get()
+    .trim()
+val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
+val runtimeEnvironment = providers.environmentVariable("SENTINEL_RUNTIME_ENVIRONMENT")
+    .orElse(if (sentryDsn.isNotEmpty() && githubActions) "release-candidate" else "")
+    .get()
+    .trim()
+
+if (releaseRequested || physicalTestRequested) {
     val value = explicitApiBaseUrl
-        ?: error("SENTINEL_API_BASE_URL is required for release builds")
+        ?: error("SENTINEL_API_BASE_URL is required for release and physical-test builds")
     val uri = runCatching { URI(value) }
-        .getOrElse { error("SENTINEL_API_BASE_URL must be a valid HTTPS URL for release builds") }
+        .getOrElse { error("SENTINEL_API_BASE_URL must be a valid HTTPS URL for release and physical-test builds") }
     if (
         uri.scheme?.lowercase() != "https" ||
         uri.host.isNullOrBlank() ||
@@ -27,7 +42,26 @@ if (releaseRequested) {
         uri.rawFragment != null ||
         (!uri.rawPath.isNullOrEmpty() && uri.rawPath != "/")
     ) {
-        error("SENTINEL_API_BASE_URL must be an HTTPS origin without credentials, path, query, or fragment for release builds")
+        error("SENTINEL_API_BASE_URL must be an HTTPS origin without credentials, path, query, or fragment for release and physical-test builds")
+    }
+    if (physicalTestRequested && uri.host.lowercase() != "sentinel-core-staging.onrender.com") {
+        error("Physical-test builds must target the canonical staging Core")
+    }
+}
+
+if (sourceSha.isNotEmpty() && !Regex("[0-9a-f]{40}").matches(sourceSha)) {
+    error("SENTINEL_SOURCE_SHA/GITHUB_SHA must be empty or a 40-character lowercase commit SHA")
+}
+val allowedRuntimeEnvironments = setOf("development", "ci", "staging", "release-candidate", "production")
+if (runtimeEnvironment.isNotEmpty() && runtimeEnvironment !in allowedRuntimeEnvironments) {
+    error("SENTINEL_RUNTIME_ENVIRONMENT must be empty or an allowlisted environment")
+}
+if (physicalTestRequested) {
+    if (!Regex("[0-9a-f]{40}").matches(sourceSha)) {
+        error("Physical-test builds require an exact SENTINEL_SOURCE_SHA")
+    }
+    if (runtimeEnvironment != "staging") {
+        error("Physical-test builds require SENTINEL_RUNTIME_ENVIRONMENT=staging")
     }
 }
 
@@ -46,24 +80,6 @@ android {
         manifestPlaceholders["appLabel"] = "SENTINEL"
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
 
-        val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
-        val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
-            .orElse(providers.environmentVariable("GITHUB_SHA"))
-            .orElse("")
-            .get()
-            .trim()
-        val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
-        val runtimeEnvironment = providers.environmentVariable("SENTINEL_RUNTIME_ENVIRONMENT")
-            .orElse(if (sentryDsn.isNotEmpty() && githubActions) "release-candidate" else "")
-            .get()
-            .trim()
-        if (sourceSha.isNotEmpty() && !Regex("[0-9a-f]{40}").matches(sourceSha)) {
-            error("SENTINEL_SOURCE_SHA/GITHUB_SHA must be empty or a 40-character lowercase commit SHA")
-        }
-        val allowedRuntimeEnvironments = setOf("development", "ci", "release-candidate", "production")
-        if (runtimeEnvironment.isNotEmpty() && runtimeEnvironment !in allowedRuntimeEnvironments) {
-            error("SENTINEL_RUNTIME_ENVIRONMENT must be empty or an allowlisted environment")
-        }
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")
         buildConfigField("String", "SENTINEL_RUNTIME_ENVIRONMENT", "\"$runtimeEnvironment\"")

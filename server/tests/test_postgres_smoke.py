@@ -340,5 +340,5 @@ def test_postgres_federated_identity_and_challenge_persistence_are_rls_protected
     assert persisted["purpose"] == "OAUTH_STATE"
     assert raw_count == 0
     assert provider_binding == 1
-    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) is True
-    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) is False
+    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) == (True, None)
+    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) == (False, None)

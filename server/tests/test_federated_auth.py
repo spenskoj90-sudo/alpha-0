@@ -20,6 +20,7 @@ from app.core.federated_auth import (
     provider_statuses,
     verify_google_id_token,
 )
+from app.core.security import session_hash
 from app.core.user_store import UserAccountStore
 from app.main import app, user_store
 
@@ -343,6 +344,17 @@ def test_google_provider_link_requires_authenticated_account_and_fresh_nonce(mon
 
     anonymous = client.post("/v1/account/providers/google/link", json=payload)
     assert anonymous.status_code == 422
+
+    pre_device = client.post(
+        "/v1/account/providers/google/link",
+        headers={"Authorization": f"Bearer {access}"},
+        json=payload,
+    )
+    assert pre_device.status_code == 403
+    assert pre_device.json()["code"] == "DEVICE_BOUND_SESSION_REQUIRED"
+
+    session_record = main_module.store.sessions[session_hash(access)]
+    session_record["device_id"] = "unit-test-device"
 
     linked = client.post(
         "/v1/account/providers/google/link",

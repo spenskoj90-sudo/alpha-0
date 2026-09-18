@@ -161,7 +161,7 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertIn("PHYSICAL_TEST_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}", self.physical_workflow)
         self.assertIn("SENTINEL_SOURCE_SHA: ${{ env.PHYSICAL_TEST_SOURCE_SHA }}", self.physical_workflow)
         self.assertIn("app-physicalTest.apk", self.physical_workflow)
-        self.assertIn("testPhysicalTestUnitTest", self.physical_workflow)
+        self.assertIn("run: ./gradlew --no-daemon test", self.physical_workflow)
         self.assertIn("SENTINEL_RUNTIME_ENVIRONMENT: staging", self.physical_workflow)
         self.assertIn("scripts/physical_test_artifact.py", self.physical_workflow)
         self.assertIn("physical-test-manifest.json", self.physical_workflow)

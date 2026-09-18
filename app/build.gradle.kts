@@ -76,10 +76,12 @@ android {
         targetSdk = 35
         // Monotonic application identity. Increment for every installable update;
         // Android rejects an in-place replacement that does not advance this value.
-        versionCode = 10005
+        versionCode = 10006
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
+        manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
+        buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
@@ -109,6 +111,8 @@ android {
             applicationIdSuffix = ".physicaltest"
             versionNameSuffix = "-physical-test"
             manifestPlaceholders["appLabel"] = "SENTINEL PHYSICAL TEST"
+            manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.physicaltest.auth"
+            buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.physicaltest.auth\"")
             matchingFallbacks += listOf("debug")
             isDebuggable = true
             isMinifyEnabled = false
@@ -134,6 +138,8 @@ android {
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false")
             buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"play\"")
+            manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth"
+            buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth\"")
         }
     }
 
@@ -174,6 +180,9 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
     implementation("com.google.android.play:integrity:1.4.0")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:app-update-ktx:2.1.0")

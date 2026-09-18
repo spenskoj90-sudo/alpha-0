@@ -65,7 +65,12 @@ class FederatedAuthCoordinator(
         if (normalized !in setOf("telegram", "vk")) {
             return BrowserLaunchResult.Failure("AUTH_PROVIDER_UNSUPPORTED")
         }
-        return when (val result = api.startBrowserProvider(normalized)) {
+        return when (
+            val result = api.startBrowserProvider(
+                normalized,
+                "$callbackScheme://callback",
+            )
+        ) {
             is AuthApi.BrowserStartResult.Failure -> BrowserLaunchResult.Failure(result.message)
             is AuthApi.BrowserStartResult.Success -> {
                 val start = result.value

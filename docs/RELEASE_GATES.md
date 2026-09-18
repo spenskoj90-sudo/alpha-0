@@ -20,6 +20,9 @@ Routine PR validation must not load release-signing material or receive attestat
 10. `Secret and image scan` — secret-pattern checks and Trivy filesystem scan with no HIGH/CRITICAL finding, including findings without a published fix.
 11. `P1 evidence artifacts` — dependency and P1 performance/test evidence.
 12. `Repository verification` — immutable Action references, deterministic dependency metadata, signing/attestation/final-acceptance boundaries, version and governance invariants.
+13. `Android product-shell contract` — `scripts/test_android_product_shell.py` verifies the pre-auth menu, RU/EN/System language choices, System/Light/Dark appearance choices, authenticated primary navigation, scroll-safe onboarding, Play In-App Updates integration and monotonically advanced Android `versionCode`.
+
+Green compilation alone is not Android product-readiness evidence. A change that removes a required route, language/theme choice, reachable onboarding action or update boundary fails the product-shell gate even if the APK still builds.
 
 The exact required context names are controlled by protected-branch policy. GPT must inspect the live policy before merge and must not change it autonomously.
 

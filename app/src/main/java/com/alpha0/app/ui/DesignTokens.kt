@@ -66,12 +66,12 @@ val SentinelDataFont = FontFamily(
 
 @Composable
 fun DataText(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont), color = SentinelColors.TextSecondary)
+    Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
 fun StatusBadge(text: String, active: Boolean = true, modifier: Modifier = Modifier) {
-    val color = if (active) SentinelColors.Signal else SentinelColors.Danger
+    val color = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
     Surface(modifier = modifier, color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(50)) {
         Text(
             text = text.uppercase(),
@@ -89,12 +89,13 @@ fun SentinelCard(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(4.dp)
+    val primaryColor = MaterialTheme.colorScheme.primary
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(SentinelColors.Surface)
-            .border(BorderStroke(1.dp, SentinelColors.Border), shape),
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shape),
     ) {
         Box(modifier = Modifier.padding(start = 10.dp, top = 16.dp, end = 16.dp, bottom = 16.dp), content = content)
 
@@ -113,12 +114,12 @@ fun SentinelCard(
 
         Canvas(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
                 .onSizeChanged { scanHeightPx = it.height },
         ) {
             if (scan && progress.value < 1f) {
                 drawLine(
-                    color = SentinelColors.Primary,
+                    color = primaryColor,
                     start = Offset(0f, size.height * progress.value),
                     end = Offset(size.width, size.height * progress.value),
                     strokeWidth = 1.dp.toPx(),
@@ -126,7 +127,7 @@ fun SentinelCard(
                 )
             }
             drawLine(
-                color = SentinelColors.Primary,
+                color = primaryColor,
                 start = Offset(1.dp.toPx(), 0f),
                 end = Offset(1.dp.toPx(), size.height),
                 strokeWidth = 2.dp.toPx(),
@@ -148,7 +149,7 @@ fun PrimaryButton(
         modifier = modifier,
         enabled = enabled,
         shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = SentinelColors.Primary, contentColor = SentinelColors.TextPrimary),
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
     ) {
         content?.invoke() ?: Text(text)
     }
@@ -161,7 +162,7 @@ fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
         modifier = modifier,
         enabled = enabled,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, SentinelColors.Danger),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = SentinelColors.Danger),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
     ) { Text(text) }
 }

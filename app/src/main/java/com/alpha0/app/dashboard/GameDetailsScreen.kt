@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 import com.alpha0.app.ui.StatusBadge
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun GameDetailsScreen(accessToken: String, entitlementId: String, api: DashboardApi) {
+    val strings = LocalAppStrings.current
     var game by remember { mutableStateOf<DashboardApi.GameDetails?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -38,26 +40,26 @@ fun GameDetailsScreen(accessToken: String, entitlementId: String, api: Dashboard
         loading = false
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("GAME DETAILS", style = MaterialTheme.typography.headlineMedium)
+            Text(strings.text("game_details"), style = MaterialTheme.typography.headlineMedium)
             when {
-                loading -> CircularProgressIndicator(color = SentinelColors.Primary)
-                error != null -> Text("Load failed: $error", color = SentinelColors.Danger)
+                loading -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                error != null -> Text(strings.text("load_failed", error), color = MaterialTheme.colorScheme.error)
                 game != null -> {
                     val current = game!!
                     SentinelCard {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(current.gameName, style = MaterialTheme.typography.titleLarge)
                             StatusBadge(current.status, active = current.status.equals("ACTIVE", ignoreCase = true))
-                            Text("Platform: ${current.platform}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Family: ${current.family}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Versioning: ${current.versioning}", style = MaterialTheme.typography.bodyMedium)
-                            DataText("Source: ${current.source}")
-                            DataText("Valid from: ${current.validFrom}")
-                            DataText("Valid until: ${current.validUntil}")
-                            Text("Launcher supported: ${current.launcherSupported}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Interaction mode: ${current.interactionMode}", style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.text("platform", current.platform), style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.text("family", current.family), style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.text("versioning", current.versioning), style = MaterialTheme.typography.bodyMedium)
+                            DataText(strings.text("source", current.source))
+                            DataText(strings.text("valid_from", current.validFrom))
+                            DataText(strings.text("valid_until", current.validUntil))
+                            Text(strings.text("launcher_supported", strings.text(if (current.launcherSupported) "yes" else "no")), style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.text("interaction_mode", current.interactionMode), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }

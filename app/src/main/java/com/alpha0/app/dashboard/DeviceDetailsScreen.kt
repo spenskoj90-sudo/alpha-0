@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.DangerButton
+import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
@@ -38,6 +39,7 @@ fun DeviceDetailsScreen(
     onRevoked: () -> Unit = {},
     onRotated: (DashboardApi.DeviceActionResult) -> Unit = {},
 ) {
+    val strings = LocalAppStrings.current
     var device by remember { mutableStateOf<DashboardApi.Device?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var actionInProgress by remember { mutableStateOf(false) }
@@ -52,33 +54,33 @@ fun DeviceDetailsScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("DEVICE DETAILS", style = MaterialTheme.typography.headlineMedium)
+            Text(strings.text("device_details"), style = MaterialTheme.typography.headlineMedium)
             when {
-                device == null && error == null -> CircularProgressIndicator(color = SentinelColors.Primary)
-                error != null -> Text("Load failed: $error", color = SentinelColors.Danger)
+                device == null && error == null -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                error != null -> Text(strings.text("load_failed", error), color = MaterialTheme.colorScheme.error)
                 else -> {
                     val current = device!!
                     SentinelCard(scan = true) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("STATE / SECURITY", style = MaterialTheme.typography.labelLarge)
-                            StatusBadge(if (revoked) "REVOKED" else current.state, active = !revoked && current.state.equals("ACTIVE", true))
-                            StatusBadge(if (revoked) "AT_RISK" else current.securityStatus, active = !revoked && current.securityStatus.equals("OK", true))
-                            Text("Platform: ${current.platform}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Algorithm: ${current.algorithm}", style = MaterialTheme.typography.bodyMedium)
-                            DataText("Fingerprint: ${current.fingerprint}")
-                            DataText("Bound at: ${current.boundAt ?: "not reported"}")
-                            DataText("Last seen: ${current.lastSeenAt ?: "not reported"}")
+                            Text(strings.text("state_security"), style = MaterialTheme.typography.labelLarge)
+                            StatusBadge(if (revoked) strings.text("status_revoked") else current.state, active = !revoked && current.state.equals("ACTIVE", true))
+                            StatusBadge(if (revoked) strings.text("status_at_risk") else current.securityStatus, active = !revoked && current.securityStatus.equals("OK", true))
+                            Text(strings.text("platform", current.platform), style = MaterialTheme.typography.bodyMedium)
+                            Text(strings.text("algorithm", current.algorithm), style = MaterialTheme.typography.bodyMedium)
+                            DataText(strings.text("fingerprint", current.fingerprint))
+                            DataText(strings.text("bound", current.boundAt ?: strings.text("not_available")))
+                            DataText(strings.text("last_seen", current.lastSeenAt ?: strings.text("not_available")))
                         }
                     }
 
-                    actionMessage?.let { Text(it, color = SentinelColors.Signal) }
-                    error?.let { Text(it, color = SentinelColors.Danger) }
+                    actionMessage?.let { Text(it, color = MaterialTheme.colorScheme.tertiary) }
+                    error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
                     if (!revoked) {
                         PrimaryButton(
-                            text = "Rotate key",
+                            text = strings.text("rotate_key"),
                             enabled = !actionInProgress,
                             onClick = {
                                 actionInProgress = true
@@ -125,7 +127,7 @@ fun DeviceDetailsScreen(
                                         if (value == null) {
                                             error = failure ?: "KEY_ROTATION_FAILED"
                                         } else {
-                                            actionMessage = "Device binding rotated. Session renewed."
+                                            actionMessage = strings.text("rotation_success")
                                             onRotated(value)
                                         }
                                     }
@@ -135,7 +137,7 @@ fun DeviceDetailsScreen(
                         )
 
                         DangerButton(
-                            text = "Revoke device",
+                            text = strings.text("revoke_device"),
                             enabled = !actionInProgress,
                             onClick = {
                                 actionInProgress = true
@@ -148,7 +150,7 @@ fun DeviceDetailsScreen(
                                         when (result) {
                                             is DashboardApi.Result.Success -> {
                                                 revoked = true
-                                                actionMessage = "Device revoked. Sign in again to continue."
+                                                actionMessage = strings.text("revoked")
                                                 onRevoked()
                                             }
                                             is DashboardApi.Result.Failure -> error = result.message
@@ -159,7 +161,7 @@ fun DeviceDetailsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        Text("This device is revoked. Sign in again to continue.", color = SentinelColors.Danger)
+                        Text(strings.text("revoked"), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }

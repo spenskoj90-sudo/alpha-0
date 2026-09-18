@@ -6,7 +6,7 @@
 
 ## 1. Product surfaces
 
-- Android client exists under `app/`.
+- Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
 - FastAPI Core exists under `server/`.
 - Next.js control plane exists under `web/`.
 - Electron launcher exists under `launcher/` and exposes account/Companion runtime state, local game launching, passive WoW checkpoint state, a read-only Companion overlay renderer and an explicit-consent push-to-talk voice surface.
@@ -100,7 +100,8 @@ The machinery needed to collect and validate exact-environment evidence is repos
 Known external or protected items remain:
 
 - real exact WoW 3.3.5a/private-server L3 capture and acceptance against the intended target environment;
-- physical Android release-device acceptance;
+- physical Android product-shell and release-device acceptance, including the scroll-safe onboarding and language/theme/navigation matrix;
+- Google Play application/internal-testing-track activation, tester enrollment, app-signing custody and a real higher-version in-app update acceptance pass;
 - selected production STT/TTS provider credentials/network acceptance and physical microphone/driver/acoustic-quality evidence;
 - physical target-PC acceptance for the packaged Companion where required by the release candidate;
 - production ingress/database credentials;

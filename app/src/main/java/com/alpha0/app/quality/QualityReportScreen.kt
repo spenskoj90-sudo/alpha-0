@@ -30,23 +30,23 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.ui.SentinelCard
-import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.assertiveStatusSemantics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private data class QualityCategory(val id: String, val label: String)
+private data class QualityCategory(val id: String, val labelKey: String)
 
 private val QUALITY_CATEGORIES = listOf(
-    QualityCategory("FUNCTIONALITY", "Functionality"),
-    QualityCategory("DESIGN", "Design / visual"),
-    QualityCategory("GAME_INTEGRATION", "Game integration"),
-    QualityCategory("PERFORMANCE", "Performance"),
-    QualityCategory("ACCESSIBILITY", "Accessibility"),
-    QualityCategory("VOICE_AUDIO", "Voice / audio"),
-    QualityCategory("SECURITY_PRIVACY", "Security / privacy"),
-    QualityCategory("OTHER", "Other"),
+    QualityCategory("FUNCTIONALITY", "category_functionality"),
+    QualityCategory("DESIGN", "category_design"),
+    QualityCategory("GAME_INTEGRATION", "category_game"),
+    QualityCategory("PERFORMANCE", "category_performance"),
+    QualityCategory("ACCESSIBILITY", "category_accessibility"),
+    QualityCategory("VOICE_AUDIO", "category_voice"),
+    QualityCategory("SECURITY_PRIVACY", "category_security"),
+    QualityCategory("OTHER", "category_other"),
 )
 
 @Composable
@@ -56,6 +56,7 @@ fun QualityReportScreen(
     diagnostics: DiagnosticLogger,
     onBack: () -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snapshot = remember { diagnostics.createTicketSnapshot() }
@@ -80,21 +81,21 @@ fun QualityReportScreen(
         )
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                Text("REPORT A PROBLEM", style = MaterialTheme.typography.headlineMedium)
+                Text(strings.text("report_problem"), style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    "Help improve SENTINEL with a reproducible report. Diagnostic data stays on this device until you submit this form.",
+                    strings.text("report_intro"),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = SentinelColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            item { Text("CATEGORY", style = MaterialTheme.typography.titleMedium) }
+            item { Text(strings.text("category"), style = MaterialTheme.typography.titleMedium) }
             items(QUALITY_CATEGORIES, key = { it.id }) { option ->
                 FilterChip(
                     selected = category.id == option.id,
@@ -102,7 +103,7 @@ fun QualityReportScreen(
                         category = option
                         diagnostics.debug("QUALITY", "CATEGORY_SELECTED", details = mapOf("category" to option.id))
                     },
-                    label = { Text(option.label) },
+                    label = { Text(strings.text(option.labelKey)) },
                 )
             }
 
@@ -111,8 +112,8 @@ fun QualityReportScreen(
                     value = title,
                     onValueChange = { if (it.length <= 160) title = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Short summary") },
-                    supportingText = { Text("Do not include passwords, tokens or private credentials.") },
+                    label = { Text(strings.text("short_summary")) },
+                    supportingText = { Text(strings.text("no_secrets")) },
                     singleLine = true,
                     enabled = !submitting && submitted == null,
                 )
@@ -123,8 +124,8 @@ fun QualityReportScreen(
                     value = description,
                     onValueChange = { if (it.length <= 4000) description = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("What happened?") },
-                    supportingText = { Text("Describe what you expected and what actually happened. This text is never copied into diagnostic logs.") },
+                    label = { Text(strings.text("what_happened")) },
+                    supportingText = { Text(strings.text("what_happened_hint")) },
                     minLines = 5,
                     enabled = !submitting && submitted == null,
                 )
@@ -133,20 +134,20 @@ fun QualityReportScreen(
             item {
                 SentinelCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("DIAGNOSTIC SNAPSHOT", style = MaterialTheme.typography.titleMedium)
+                        Text(strings.text("diagnostic_snapshot"), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "${snapshot.eventCount} structured events · ${snapshot.encodedBytes / 1024} KiB · ${diagnostics.mode()}",
-                            color = SentinelColors.TextSecondary,
+                            strings.text("diagnostic_stats", snapshot.eventCount, snapshot.encodedBytes / 1024, diagnostics.mode()),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            "Contains app lifecycle, screen-route identifiers, safe UI actions, API result/timing metadata, device/runtime state and sanitized errors. It does not contain screenshots, raw audio, passwords/tokens, request bodies, game chat or SavedVariables.",
+                            strings.text("diagnostic_contents"),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = SentinelColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            "If sent, diagnostic payloads are retained for up to 30 days; the ticket itself can remain for support history.",
+                            strings.text("diagnostic_retention"),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = SentinelColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Row(
                             modifier = Modifier
@@ -166,7 +167,7 @@ fun QualityReportScreen(
                                 onCheckedChange = null,
                                 enabled = snapshot.eventCount > 0 && !submitting && submitted == null,
                             )
-                            Text("Attach this diagnostic snapshot to my report")
+                            Text(strings.text("attach_diagnostics"))
                         }
                     }
                 }
@@ -175,11 +176,11 @@ fun QualityReportScreen(
             item {
                 SentinelCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("QUALITY IMPROVEMENT PROGRAM", style = MaterialTheme.typography.titleMedium)
+                        Text(strings.text("quality_program"), style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Optional. Allow this report and its attached sanitized diagnostics to be used beyond direct support triage to improve reliability, design, accessibility and game integration quality.",
+                            strings.text("quality_program_body"),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = SentinelColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Row(
                             modifier = Modifier
@@ -199,7 +200,7 @@ fun QualityReportScreen(
                                 onCheckedChange = null,
                                 enabled = !submitting && submitted == null,
                             )
-                            Text("Contribute this report to SENTINEL quality improvement")
+                            Text(strings.text("quality_program_opt_in"))
                         }
                     }
                 }
@@ -209,16 +210,16 @@ fun QualityReportScreen(
                 item {
                     SentinelCard {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("PHYSICAL TEST FORENSICS", style = MaterialTheme.typography.titleMedium)
+                            Text(strings.text("physical_forensics"), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                "This isolated physical-test build keeps a larger local trace. Export the complete compressed trace when we need evidence beyond the bounded ticket snapshot.",
-                                color = SentinelColors.TextSecondary,
+                                strings.text("physical_forensics_body"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Button(onClick = {
                                 diagnostics.info("QUALITY", "FORENSIC_EXPORT_REQUESTED")
                                 diagnostics.exportShare(context)
                             }) {
-                                Text("Export full forensic log")
+                                Text(strings.text("export_full_log"))
                             }
                         }
                     }
@@ -228,9 +229,9 @@ fun QualityReportScreen(
             error?.let { code ->
                 item {
                     Text(
-                        "Report could not be submitted: $code",
+                        strings.text("report_submit_failed", code),
                         modifier = Modifier.assertiveStatusSemantics(),
-                        color = SentinelColors.Danger,
+                        color = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -239,21 +240,21 @@ fun QualityReportScreen(
                 item {
                     SentinelCard {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("REPORT RECEIVED", style = MaterialTheme.typography.titleLarge, color = SentinelColors.Signal)
-                            Text("Reference: ${report.id}")
-                            Text("Status: ${report.status}")
-                            report.problemGroupId?.let { Text("Problem group: $it", color = SentinelColors.TextSecondary) }
-                            report.inferredSeverity?.let { Text("Initial severity: $it", color = SentinelColors.TextSecondary) }
+                            Text(strings.text("report_received"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.tertiary)
+                            Text(strings.text("reference", report.id))
+                            Text(strings.text("status", report.status))
+                            report.problemGroupId?.let { Text(strings.text("problem_group", it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                            report.inferredSeverity?.let { Text(strings.text("initial_severity", it), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                             report.relatedReportCount?.takeIf { it > 1 }?.let {
-                                Text("This problem group already contains $it related reports.", color = SentinelColors.TextSecondary)
+                                Text(strings.text("related_reports", it), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (report.diagnosticsRetained) {
                                 Text(
-                                    "Diagnostics attached${report.diagnosticsExpiresAt?.let { " · expires $it" } ?: ""}",
-                                    color = SentinelColors.TextSecondary,
+                                    strings.text("diagnostics_attached", report.diagnosticsExpiresAt?.let { strings.text("expires", it) } ?: ""),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             } else {
-                                Text("No diagnostics were attached.", color = SentinelColors.TextSecondary)
+                                Text(strings.text("no_diagnostics_attached"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -287,10 +288,10 @@ fun QualityReportScreen(
                             }
                         },
                     ) {
-                        Text(if (submitting) "Sending…" else "Submit report")
+                        Text(strings.text(if (submitting) "sending" else "submit_report"))
                     }
                     Button(onClick = onBack, enabled = !submitting) {
-                        Text(if (submitted == null) "Cancel" else "Back")
+                        Text(strings.text(if (submitted == null) "cancel" else "back"))
                     }
                 }
             }

@@ -63,6 +63,8 @@ check 'Final release acceptance verifier' test -f scripts/final_release_acceptan
 check 'Final release acceptance tests' test -f scripts/test_final_release_acceptance.py
 check 'Physical-test artifact verifier' test -f scripts/physical_test_artifact.py
 check 'Physical-test artifact verifier tests' test -f scripts/test_physical_test_artifact.py
+check 'Android product shell contract' test -f docs/ANDROID_PRODUCT_SHELL_V1.md
+check 'Android product shell tests' test -f scripts/test_android_product_shell.py
 check 'GitHub attestation verifier' test -f scripts/verify_github_attestation.sh
 check 'Protected-main release attestation verifier' test -f scripts/verify_release_evidence_attestation.sh
 check 'Release upstream attestation verifier' test -f scripts/verify_release_upstream_attestations.sh
@@ -89,6 +91,7 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
     scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py
+  check 'Android product shell invariants' python scripts/test_android_product_shell.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py

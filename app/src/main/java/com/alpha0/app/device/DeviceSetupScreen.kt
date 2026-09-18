@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +29,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
@@ -41,6 +44,7 @@ fun DeviceSetupScreen(
     api: DeviceApi,
     onBound: (DeviceApi.ProvenSession) -> Unit
 ) {
+    val strings = LocalAppStrings.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val identity = remember { deviceIdentity.getIdentityInfo() }
@@ -60,37 +64,39 @@ fun DeviceSetupScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("DEVICE SETUP", style = MaterialTheme.typography.headlineMedium)
+            Text(strings.text("device_setup"), style = MaterialTheme.typography.headlineMedium)
             Text(
-                "Bind this phone and prove possession of its hardware-backed identity before SENTINEL enables device-scoped operations.",
+                strings.text("device_setup_intro"),
                 style = MaterialTheme.typography.bodyLarge,
-                color = SentinelColors.TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             SentinelCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("DEVICE IDENTITY", style = MaterialTheme.typography.labelLarge, color = SentinelColors.TextPrimary)
+                    Text(strings.text("step_identity"), style = MaterialTheme.typography.labelLarge)
+                    Text(strings.text("identity_ready"), style = MaterialTheme.typography.titleMedium)
                     DataText(identity.fingerprint)
                     DataText(identity.algorithm)
+                    Text(strings.text("setup_privacy"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             if (!batteryOptimizationIgnored) {
                 SentinelCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("BACKGROUND NETWORK", style = MaterialTheme.typography.labelLarge, color = SentinelColors.TextPrimary)
+                        Text(strings.text("step_background"), style = MaterialTheme.typography.labelLarge)
                         Text(
-                            "Some Android devices restrict background network activity. Allowing SENTINEL to ignore battery optimization helps prevent delayed first requests and session timeouts.",
+                            strings.text("background_explanation"),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = SentinelColors.TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         PrimaryButton(
-                            text = "Allow background operation",
+                            text = strings.text("allow_background"),
                             onClick = {
                                 val opened = BatteryOptimization.request(context)
                                 if (!opened) {
@@ -109,12 +115,23 @@ fun DeviceSetupScreen(
                 }
             }
 
-            if (error != null) {
-                Text("Device setup failed: $error", color = SentinelColors.Danger, style = MaterialTheme.typography.bodyMedium)
+            if (batteryOptimizationIgnored) {
+                SentinelCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(strings.text("step_background"), style = MaterialTheme.typography.labelLarge)
+                        Text(strings.text("background_allowed"), color = MaterialTheme.colorScheme.tertiary)
+                    }
+                }
             }
 
+            if (error != null) {
+                Text(strings.text("setup_failed", error), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Text(strings.text("step_proof"), style = MaterialTheme.typography.labelLarge)
+
             PrimaryButton(
-                text = if (pendingBind == null) "Привязать и подтвердить устройство" else "Повторить подтверждение",
+                text = strings.text(if (pendingBind == null) "bind_device" else "retry_proof"),
                 onClick = {
                     busy = true
                     error = null
@@ -176,9 +193,11 @@ fun DeviceSetupScreen(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                if (busy) CircularProgressIndicator() else Text(
-                    if (pendingBind == null) "Привязать и подтвердить устройство" else "Повторить подтверждение"
-                )
+                if (busy) {
+                    Column { CircularProgressIndicator(); Text(strings.text("setup_busy")) }
+                } else {
+                    Text(strings.text(if (pendingBind == null) "bind_device" else "retry_proof"))
+                }
             }
         }
     }

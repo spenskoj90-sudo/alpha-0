@@ -240,7 +240,6 @@ def verify_google_id_token(
     *,
     now: int | None = None,
     jwks_fetcher: Callable[[], dict[str, Any]] | None = None,
-    nonce: str | None = None,
 ) -> VerifiedFederatedIdentity:
     status = provider_status("google")
     if not status.enabled or not status.client_id:
@@ -314,6 +313,7 @@ def complete_telegram(
     *,
     code: str,
     code_verifier: str,
+    nonce: str | None = None,
     now: int | None = None,
     token_fetcher: Callable[[], dict[str, Any]] | None = None,
     jwks_fetcher: Callable[[], dict[str, Any]] | None = None,

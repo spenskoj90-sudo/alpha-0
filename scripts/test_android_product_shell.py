@@ -24,6 +24,8 @@ class AndroidProductShellTests(unittest.TestCase):
         cls.tokens = read("app/src/main/java/com/alpha0/app/ui/DesignTokens.kt")
         cls.update = read("app/src/main/java/com/alpha0/app/update/UpdateScreen.kt")
         cls.gradle = read("app/build.gradle.kts")
+        cls.manifest = read("app/src/main/AndroidManifest.xml")
+        cls.launcher = read("app/src/main/res/mipmap-anydpi/ic_launcher.xml")
 
     def test_pre_auth_menu_and_product_routes_exist(self) -> None:
         for route in ("settings", "updates", "help", "about"):
@@ -64,7 +66,21 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('implementation("com.google.android.play:app-update:2.1.0")', self.gradle)
         version = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
         self.assertIsNotNone(version)
-        self.assertGreaterEqual(int(version.group(1)), 10003)
+        self.assertGreaterEqual(int(version.group(1)), 10004)
+
+    def test_launcher_identity_is_explicit_and_branded(self) -> None:
+        self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)
+        self.assertIn('android:roundIcon="@mipmap/ic_launcher"', self.manifest)
+        self.assertIn("#0D1117", self.launcher)
+        self.assertIn("#B356FF", self.launcher)
+        self.assertIn("#00E5FF", self.launcher)
+        self.assertIn("#F0F6FC", self.launcher)
+
+    def test_distribution_channels_keep_play_and_diagnostics_separate(self) -> None:
+        self.assertIn('applicationIdSuffix = ".physicaltest"', self.gradle)
+        for channel in ("development", "diagnostic", "play"):
+            self.assertIn(f'SENTINEL_DISTRIBUTION_CHANNEL", "\\\"{channel}\\\""', self.gradle)
+        self.assertIn("BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL", self.update)
 
     def test_release_gate_names_product_shell(self) -> None:
         gates = read("docs/RELEASE_GATES.md")

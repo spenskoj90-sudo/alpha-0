@@ -33,6 +33,7 @@ class UserAccountStore:
         self._users: dict[str, dict[str, Any]] = {}
         self._action_tokens: dict[str, dict[str, Any]] = {}
         self._external_identities: dict[tuple[str, str], dict[str, str | None]] = {}
+        self._federated_challenges: dict[str, dict[str, Any]] = {}
         self._lock = Lock()
 
     @staticmethod
@@ -380,6 +381,185 @@ class UserAccountStore:
         with self._lock:
             binding = self._external_identities.get((provider, subject))
             return str(binding["user_id"]) if binding else None
+
+    def issue_federated_challenge(
+        self,
+        provider: str,
+        purpose: str,
+        ttl_seconds: int = 300,
+    ) -> str:
+        provider = provider.strip().lower()
+        if provider not in _EXTERNAL_PROVIDERS or purpose not in {"OIDC_NONCE", "OAUTH_STATE"}:
+            raise ValueError("FEDERATED_CHALLENGE_INVALID")
+        if ttl_seconds <= 0 or ttl_seconds > 900:
+            raise ValueError("FEDERATED_CHALLENGE_TTL_INVALID")
+        token = secrets.token_urlsafe(32)
+        token_hash = self._action_hash(token)
+        expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+        if self._engine:
+            with self._engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "INSERT INTO federated_auth_challenges"
+                        "(challenge_hash,provider,purpose,expires_at) "
+                        "VALUES (:challenge_hash,:provider,:purpose,:expires_at)"
+                    ),
+                    {
+                        "challenge_hash": token_hash,
+                        "provider": provider,
+                        "purpose": purpose,
+                        "expires_at": expires_at,
+                    },
+                )
+            return token
+        with self._lock:
+            self._federated_challenges[token_hash] = {
+                "provider": provider,
+                "purpose": purpose,
+                "expires_at": expires_at,
+                "consumed_at": None,
+            }
+        return token
+
+    def consume_federated_challenge(self, provider: str, purpose: str, token: str) -> bool:
+        provider = provider.strip().lower()
+        token_hash = self._action_hash(token)
+        now = datetime.now(UTC)
+        if provider not in _EXTERNAL_PROVIDERS or purpose not in {"OIDC_NONCE", "OAUTH_STATE"}:
+            return False
+        if self._engine:
+            with self._engine.begin() as conn:
+                consumed = conn.execute(
+                    text(
+                        "UPDATE federated_auth_challenges SET consumed_at=now() "
+                        "WHERE challenge_hash=:challenge_hash AND provider=:provider "
+                        "AND purpose=:purpose AND consumed_at IS NULL AND expires_at>now() "
+                        "RETURNING challenge_hash"
+                    ),
+                    {
+                        "challenge_hash": token_hash,
+                        "provider": provider,
+                        "purpose": purpose,
+                    },
+                ).scalar_one_or_none()
+            return consumed is not None
+        with self._lock:
+            row = self._federated_challenges.get(token_hash)
+            if (
+                not row
+                or row["provider"] != provider
+                or row["purpose"] != purpose
+                or row["consumed_at"] is not None
+                or row["expires_at"] <= now
+            ):
+                return False
+            row["consumed_at"] = now
+        return True
+
+    def register_external_account(
+        self,
+        provider: str,
+        provider_subject: str,
+        *,
+        email: str | None,
+        email_verified: bool,
+    ) -> str:
+        provider = provider.strip().lower()
+        subject = provider_subject.strip()
+        if provider not in _EXTERNAL_PROVIDERS or not subject or len(subject) > 512:
+            raise ValueError("EXTERNAL_IDENTITY_INVALID")
+        normalized_email = self.normalize_email(email) if email else None
+        existing = self.external_identity_user(provider, subject)
+        if existing:
+            return existing
+        user_id = f"{provider}:{hashlib.sha256((provider + chr(0) + subject).encode()).hexdigest()[:48]}"
+        if self._engine:
+            with self._engine.begin() as conn:
+                if normalized_email:
+                    local_owner = conn.execute(
+                        text(
+                            "SELECT i.user_handle FROM users u "
+                            "JOIN identities i ON i.id=u.identity_id "
+                            "WHERE u.email=:email"
+                        ),
+                        {"email": normalized_email},
+                    ).scalar_one_or_none()
+                    if local_owner:
+                        raise ValueError("ACCOUNT_LINK_REQUIRED")
+                identity_id = conn.execute(
+                    text(
+                        "INSERT INTO identities(user_handle) VALUES (:user_id) "
+                        "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle "
+                        "RETURNING id"
+                    ),
+                    {"user_id": user_id},
+                ).scalar_one()
+                has_user = conn.execute(
+                    text("SELECT 1 FROM users WHERE identity_id=:identity"),
+                    {"identity": identity_id},
+                ).scalar_one_or_none()
+                if has_user is None:
+                    conn.execute(
+                        text(
+                            "INSERT INTO users(identity_id,email,password_hash,status,email_verified_at) "
+                            "VALUES (:identity,:email,NULL,'ACTIVE',"
+                            "CASE WHEN :verified THEN now() ELSE NULL END)"
+                        ),
+                        {
+                            "identity": identity_id,
+                            "email": normalized_email,
+                            "verified": bool(email_verified and normalized_email),
+                        },
+                    )
+                conn.execute(
+                    text(
+                        "INSERT INTO external_identities"
+                        "(identity_id,provider,provider_subject,email_at_link_time) "
+                        "VALUES (:identity,:provider,:subject,:email) "
+                        "ON CONFLICT (provider,provider_subject) DO NOTHING"
+                    ),
+                    {
+                        "identity": identity_id,
+                        "provider": provider,
+                        "subject": subject,
+                        "email": normalized_email,
+                    },
+                )
+                bound_user = conn.execute(
+                    text(
+                        "SELECT i.user_handle FROM external_identities e "
+                        "JOIN identities i ON i.id=e.identity_id "
+                        "WHERE e.provider=:provider AND e.provider_subject=:subject"
+                    ),
+                    {"provider": provider, "subject": subject},
+                ).scalar_one()
+            if str(bound_user) != user_id:
+                raise ValueError("EXTERNAL_IDENTITY_ALREADY_LINKED")
+            return user_id
+        with self._lock:
+            binding = self._external_identities.get((provider, subject))
+            if binding:
+                return str(binding["user_id"])
+            if normalized_email and any(
+                row.get("email") == normalized_email for row in self._users.values()
+            ):
+                raise ValueError("ACCOUNT_LINK_REQUIRED")
+            if user_id not in self._users:
+                self._users[user_id] = {
+                    "user_id": user_id,
+                    "email": normalized_email,
+                    "password_hash": None,
+                    "status": "ACTIVE",
+                    "email_verified_at": datetime.now(UTC)
+                    if email_verified and normalized_email
+                    else None,
+                    "created_at": datetime.now(UTC),
+                }
+            self._external_identities[(provider, subject)] = {
+                "user_id": user_id,
+                "email": normalized_email,
+            }
+        return user_id
 
     def restrict_session_scopes(self, store: Any, access_token: str, scopes: Iterable[str]) -> None:
         normalized = sorted(set(scopes))

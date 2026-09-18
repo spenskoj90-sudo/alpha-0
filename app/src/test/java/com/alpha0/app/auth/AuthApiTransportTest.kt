@@ -106,4 +106,146 @@ class AuthApiTransportTest {
         assertEquals("https://example.test/v1/auth/email-verification/confirm", requireNotNull(transport.request).url)
     }
 
+
+    @Test
+    fun providerCatalogParsesOnlyServerDeclaredProviderState() = runBlocking {
+        val transport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"providers\":[{\"provider\":\"google\",\"enabled\":true,\"flow\":\"credential-manager\",\"client_id\":\"web-client\"},{\"provider\":\"vk\",\"enabled\":false,\"flow\":\"oauth-pkce\",\"client_id\":null}]}",
+            ),
+        )
+        val result = AuthApi("https://example.test", transport).providerCatalog()
+
+        assertTrue(result is AuthApi.ProviderCatalogResult.Success)
+        val providers = (result as AuthApi.ProviderCatalogResult.Success).providers
+        assertEquals(2, providers.size)
+        assertEquals("google", providers[0].provider)
+        assertEquals(true, providers[0].enabled)
+        assertEquals("https://example.test/v1/auth/providers", requireNotNull(transport.request).url)
+        assertEquals(HttpMethod.GET, requireNotNull(transport.request).method)
+    }
+
+    @Test
+    fun googleChallengeAndLoginUseNonceBoundEndpoints() = runBlocking {
+        val challengeTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"provider\":\"google\",\"client_id\":\"web-client\",\"nonce\":\"abcdefghijklmnopqrstuvwxyz1234567890\"}",
+            ),
+        )
+        val challenge = AuthApi("https://example.test", challengeTransport).googleChallenge()
+        assertTrue(challenge is AuthApi.GoogleChallengeResult.Success)
+        assertEquals(
+            "https://example.test/v1/auth/providers/google/challenge",
+            requireNotNull(challengeTransport.request).url,
+        )
+
+        val loginTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"session_token\":\"access\",\"refresh_token\":\"refresh\",\"scopes\":[\"game:read\"]}",
+            ),
+        )
+        val login = AuthApi("https://example.test", loginTransport)
+            .loginGoogle("header.payload.signature", "abcdefghijklmnopqrstuvwxyz1234567890")
+        assertTrue(login is AuthApi.Result.Success)
+        val body = String(requireNotNull(requireNotNull(loginTransport.request).body))
+        assertTrue(body.contains("header.payload.signature"))
+        assertTrue(body.contains("abcdefghijklmnopqrstuvwxyz1234567890"))
+    }
+
+    @Test
+    fun browserProviderStartAndCompleteKeepPkceMaterialServerBound() = runBlocking {
+        val startTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"provider\":\"telegram\",\"authorization_url\":\"https://oauth.telegram.org/auth?state=public\",\"state\":\"abcdefghijklmnopqrstuvwxyz1234567890\",\"code_verifier\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~\"}",
+            ),
+        )
+        val start = AuthApi("https://example.test", startTransport).startBrowserProvider(
+            "telegram",
+            "com.alpha0.app.auth.dev://callback",
+        )
+        assertTrue(start is AuthApi.BrowserStartResult.Success)
+        val startRequest = requireNotNull(startTransport.request)
+        assertEquals(
+            "https://example.test/v1/auth/providers/telegram/start",
+            startRequest.url,
+        )
+        assertTrue(
+            String(requireNotNull(startRequest.body))
+                .contains("com.alpha0.app.auth.dev://callback")
+        )
+
+        val completeTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"session_token\":\"access\",\"refresh_token\":\"refresh\",\"scopes\":[\"game:read\"]}",
+            ),
+        )
+        val complete = AuthApi("https://example.test", completeTransport).completeBrowserProvider(
+            provider = "telegram",
+            code = "authorization-code",
+            state = "abcdefghijklmnopqrstuvwxyz1234567890",
+            codeVerifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~",
+            deviceId = null,
+        )
+        assertTrue(complete is AuthApi.Result.Success)
+        val request = requireNotNull(completeTransport.request)
+        assertEquals("https://example.test/v1/auth/providers/telegram/complete", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("authorization-code"))
+        assertTrue(body.contains("code_verifier"))
+    }
+
+
+    @Test
+    fun accountSecurityReadAndProviderLinkKeepBearerHeaderServerSide() = runBlocking {
+        val securityTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"email\":\"user@example.com\",\"email_verified\":true,\"password_enabled\":true,\"providers\":[\"google\"]}",
+            ),
+        )
+        val security = AuthApi("https://example.test", securityTransport).accountSecurity("access-secret")
+        assertTrue(security is AuthApi.AccountSecurityResult.Success)
+        val securityRequest = requireNotNull(securityTransport.request)
+        assertEquals("Bearer access-secret", securityRequest.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/security", securityRequest.url)
+
+        val linkTransport = FakeTransport(HttpResponse(200, "{\"status\":\"LINKED\"}"))
+        val linked = AuthApi("https://example.test", linkTransport).linkGoogle(
+            accessToken = "access-secret",
+            idToken = "header.payload.signature",
+            nonce = "abcdefghijklmnopqrstuvwxyz1234567890",
+        )
+        assertEquals(AuthApi.ActionResult.Success("LINKED"), linked)
+        val linkRequest = requireNotNull(linkTransport.request)
+        assertEquals("Bearer access-secret", linkRequest.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/providers/google/link", linkRequest.url)
+        assertTrue(String(requireNotNull(linkRequest.body)).contains("header.payload.signature"))
+    }
+
+    @Test
+    fun browserProviderLinkUsesAuthenticatedDedicatedEndpoint() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"LINKED\"}"))
+        val result = AuthApi("https://example.test", transport).linkBrowserProvider(
+            accessToken = "access-secret",
+            provider = "vk",
+            code = "vk-code",
+            state = "abcdefghijklmnopqrstuvwxyz1234567890",
+            codeVerifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~",
+            deviceId = "vk-device",
+        )
+
+        assertEquals(AuthApi.ActionResult.Success("LINKED"), result)
+        val request = requireNotNull(transport.request)
+        assertEquals("Bearer access-secret", request.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/providers/vk/link", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("vk-device"))
+        assertTrue(body.contains("code_verifier"))
+    }
+
 }

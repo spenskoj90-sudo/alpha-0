@@ -56,16 +56,56 @@ class PasswordResetConfirmRequest(AuthTokenRequest):
 
 
 class AuthActionResponse(BaseModel):
-    status: Literal["ACCEPTED", "VERIFIED", "PASSWORD_UPDATED"]
+    status: Literal["ACCEPTED", "VERIFIED", "PASSWORD_UPDATED", "LINKED"]
 
 
 class AccountSecurityResponse(BaseModel):
-    email: str
+    email: str | None
     email_verified: bool
     password_enabled: bool
     providers: list[Literal["google", "vk", "telegram"]]
 
 
+
+
+class FederatedProviderStatusResponse(BaseModel):
+    provider: Literal["google", "telegram", "vk"]
+    enabled: bool
+    flow: Literal["credential-manager", "oidc-pkce", "oauth-pkce"]
+    client_id: str | None = None
+
+
+class FederatedProvidersResponse(BaseModel):
+    providers: list[FederatedProviderStatusResponse]
+
+
+class GoogleAuthChallengeResponse(BaseModel):
+    provider: Literal["google"] = "google"
+    client_id: str
+    nonce: str
+
+
+class GoogleCredentialRequest(BaseModel):
+    id_token: str = Field(min_length=64, max_length=16_384)
+    nonce: str = Field(min_length=32, max_length=256)
+
+
+class BrowserAuthStartRequest(BaseModel):
+    redirect_uri: str = Field(min_length=10, max_length=1024)
+
+
+class BrowserAuthStartResponse(BaseModel):
+    provider: Literal["telegram", "vk"]
+    authorization_url: str = Field(min_length=20, max_length=4096)
+    state: str = Field(min_length=32, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=256)
+
+
+class BrowserAuthCompleteRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=4096)
+    state: str = Field(min_length=32, max_length=256)
+    code_verifier: str = Field(min_length=43, max_length=256)
+    device_id: str | None = Field(default=None, max_length=512)
 
 
 class DeviceRegisterRequest(BaseModel):

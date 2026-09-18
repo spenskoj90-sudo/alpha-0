@@ -1,5 +1,7 @@
 package com.alpha0.app.auth
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,12 +24,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -42,9 +46,13 @@ private enum class AuthMode { SIGN_IN, REGISTER, RESET, VERIFY_EMAIL }
 @Composable
 fun LoginScreen(
     api: AuthApi,
+    federatedAuth: FederatedAuthCoordinator,
+    federatedCallbackUri: Uri?,
+    onFederatedCallbackConsumed: () -> Unit,
     onAuthenticated: (AuthApi.Session) -> Unit,
 ) {
     val strings = LocalAppStrings.current
+    val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var actionCode by remember { mutableStateOf("") }
@@ -55,13 +63,96 @@ fun LoginScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    var providerStatuses by remember { mutableStateOf<List<AuthApi.ProviderStatus>>(emptyList()) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        providerStatuses = when (val result = api.providerCatalog()) {
+            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter {
+                it.enabled && federatedAuth.isProviderCompatible(it)
+            }
+            is AuthApi.ProviderCatalogResult.Failure -> emptyList()
+        }
+    }
+
+    LaunchedEffect(federatedCallbackUri) {
+        val callback = federatedCallbackUri ?: return@LaunchedEffect
+        busy = true
+        error = null
+        status = strings.text("federated_completing")
+        val result = federatedAuth.completeBrowserCallback(callback)
+        onFederatedCallbackConsumed()
+        busy = false
+        status = null
+        when (result) {
+            is AuthApi.Result.Success -> onAuthenticated(result.session)
+            is AuthApi.Result.Failure -> error = when (result.message) {
+                "AUTH_PROVIDER_CANCELLED" -> strings.text("federated_cancelled")
+                "ACCOUNT_LINK_REQUIRED" -> strings.text("account_link_required")
+                "AUTH_CALLBACK_EXPIRED" -> strings.text("federated_expired")
+                else -> strings.text("federated_failed", result.message)
+            }
+        }
+    }
 
     fun actionError(message: String): String = when (message) {
         "AUTH_ACTION_TOKEN_INVALID" -> strings.text("auth_code_invalid")
         "REQUEST_TIMEOUT" -> strings.text("request_timeout")
         "NETWORK_ERROR" -> strings.text("server_unreachable")
         else -> strings.text("auth_failed", message)
+    }
+
+    fun handleFederatedResult(result: AuthApi.Result) {
+        busy = false
+        status = null
+        when (result) {
+            is AuthApi.Result.Success -> onAuthenticated(result.session)
+            is AuthApi.Result.Failure -> error = when (result.message) {
+                "GOOGLE_CREDENTIAL_CANCELLED", "AUTH_PROVIDER_CANCELLED" -> strings.text("federated_cancelled")
+                "ACCOUNT_LINK_REQUIRED" -> strings.text("account_link_required")
+                "AUTH_PROVIDER_NOT_CONFIGURED" -> strings.text("provider_not_configured")
+                else -> strings.text("federated_failed", result.message)
+            }
+        }
+    }
+
+    fun signInWithGoogle() {
+        busy = true
+        error = null
+        status = strings.text("federated_opening", "Google")
+        scope.launch {
+            handleFederatedResult(federatedAuth.signInWithGoogle())
+        }
+    }
+
+    fun openBrowserProvider(provider: String) {
+        busy = true
+        error = null
+        val displayName = if (provider == "telegram") "Telegram" else "VK"
+        status = strings.text("federated_opening", displayName)
+        scope.launch {
+            when (val result = federatedAuth.beginBrowser(provider)) {
+                is FederatedAuthCoordinator.BrowserLaunchResult.Failure -> {
+                    busy = false
+                    status = null
+                    error = strings.text("federated_failed", result.message)
+                }
+                is FederatedAuthCoordinator.BrowserLaunchResult.Success -> {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.value.url))
+                    val launched = runCatching {
+                        context.startActivity(intent)
+                    }.isSuccess
+                    busy = false
+                    if (launched) {
+                        status = strings.text("federated_return_hint", displayName)
+                    } else {
+                        federatedAuth.cancelPendingBrowserFlow()
+                        status = null
+                        error = strings.text("browser_unavailable")
+                    }
+                }
+            }
+        }
     }
 
     fun submitCredentials() {
@@ -295,6 +386,40 @@ fun LoginScreen(
                         )
                     )
                 }
+            }
+
+            if ((mode == AuthMode.SIGN_IN || mode == AuthMode.REGISTER) && providerStatuses.isNotEmpty()) {
+                Text(
+                    strings.text("or_continue_with"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (providerStatuses.any { it.provider == "google" }) {
+                    OutlinedButton(
+                        onClick = ::signInWithGoogle,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    ) { Text(strings.text("continue_google")) }
+                }
+                if (providerStatuses.any { it.provider == "telegram" }) {
+                    OutlinedButton(
+                        onClick = { openBrowserProvider("telegram") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    ) { Text(strings.text("continue_telegram")) }
+                }
+                if (providerStatuses.any { it.provider == "vk" }) {
+                    OutlinedButton(
+                        onClick = { openBrowserProvider("vk") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !busy,
+                    ) { Text(strings.text("continue_vk")) }
+                }
+                Text(
+                    strings.text("federated_privacy"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             when (mode) {

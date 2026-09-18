@@ -20,7 +20,7 @@ Routine PR validation must not load release-signing material or receive attestat
 10. `Secret and image scan` — secret-pattern checks and Trivy filesystem scan with no HIGH/CRITICAL finding, including findings without a published fix.
 11. `P1 evidence artifacts` — dependency and P1 performance/test evidence.
 12. `Repository verification` — immutable Action references, deterministic dependency metadata, signing/attestation/final-acceptance boundaries, version and governance invariants.
-13. `Android product-shell contract` — `scripts/test_android_product_shell.py` verifies the pre-auth menu, RU/EN/System language choices, System/Light/Dark appearance choices, authenticated primary navigation, scroll-safe onboarding, Play In-App Updates integration and monotonically advanced Android `versionCode`.
+13. `Android product-shell contract` — `scripts/test_android_product_shell.py` verifies the pre-auth menu, RU/EN/System language choices, System/Light/Dark appearance choices, authenticated primary navigation, password recovery/email verification, server-driven federated-auth surfaces, Credential Manager/PKCE callback boundaries, explicit provider linking, scroll-safe onboarding, Play In-App Updates integration and monotonically advanced Android `versionCode`.
 
 Green compilation alone is not Android product-readiness evidence. A change that removes a required route, language/theme choice, reachable onboarding action or update boundary fails the product-shell gate even if the APK still builds.
 
@@ -102,7 +102,7 @@ Therefore a version tag alone is insufficient: publication fails closed if final
 - Only the remote job references the Owner-managed host/user/key secrets, and only after the read-only acceptance job succeeds.
 - `production-traffic` is a stronger recorded state requiring runtime penetration/security evidence. The repository does not autonomously enable production traffic.
 
-Environment-level evidence includes, as applicable, TLS/HSTS and ingress behavior, externally injected enrollment/database credentials, WAF/rate-limiting readiness, target PostgreSQL backup/restore, selected production provider network behavior, runtime observability delivery, and final runtime security testing. Do not convert configuration intent into a PASS without corresponding real evidence.
+Environment-level evidence includes, as applicable, TLS/HSTS and ingress behavior, externally injected enrollment/database credentials, WAF/rate-limiting readiness, target PostgreSQL backup/restore, selected production provider network behavior, real Google/Telegram/VK account authentication and callback acceptance where enabled, runtime observability delivery, and final runtime security testing. Do not convert configuration intent into a PASS without corresponding real evidence.
 
 ## Owner publication and deployment steps
 

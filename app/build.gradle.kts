@@ -102,7 +102,7 @@ android {
             buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"DEVELOPMENT\"")
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "2097152")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
-            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\\"development\\\"")
+            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\"development\\"")
         }
         create("physicalTest") {
             initWith(getByName("debug"))
@@ -115,7 +115,7 @@ android {
             buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"FORENSIC_TEST\"")
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
-            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\\"diagnostic\\\"")
+            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\"diagnostic\\"")
             // Render free-tier staging may need roughly a minute to wake. The
             // physical build must wait for the authoritative POST response so
             // registration cannot succeed server-side while the UI reports a
@@ -133,7 +133,7 @@ android {
             buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"PRODUCTION\"")
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "524288")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "false")
-            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\\"play\\\"")
+            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\\"play\\"")
         }
     }
 

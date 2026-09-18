@@ -107,3 +107,55 @@ def test_email_verification_is_hashed_single_use_and_updates_security_state(monk
     assert confirmed.json() == {"status": "VERIFIED"}
     assert client.post("/v1/auth/email-verification/confirm", json={"token": token}).status_code == 400
     assert client.get("/v1/account/security", headers=headers).json()["email_verified"] is True
+
+
+def test_account_action_requests_do_not_enumerate_unknown_email(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    missing = f"missing-{uuid.uuid4().hex}@example.com"
+
+    verification = client.post("/v1/auth/email-verification/request", json={"email": missing})
+    reset = client.post("/v1/auth/password-reset/request", json={"email": missing})
+
+    assert verification.status_code == 202
+    assert reset.status_code == 202
+    assert verification.json() == {"status": "ACCEPTED"}
+    assert reset.json() == {"status": "ACCEPTED"}
+    assert transport.snapshot() == ()
+
+
+def test_password_reset_changes_password_revokes_sessions_and_rejects_replay(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    email = f"reset-{uuid.uuid4().hex}@example.com"
+    old_password = "Account-reset-old-password-12345"
+    new_password = "Account-reset-new-password-98765"
+
+    registered = client.post("/v1/auth/register", json={"email": email, "password": old_password})
+    assert registered.status_code == 200
+    old_access = registered.json()["session_token"]
+    prior_messages = len(transport.snapshot())
+
+    requested = client.post("/v1/auth/password-reset/request", json={"email": email})
+    assert requested.status_code == 202
+    messages = transport.snapshot()
+    assert len(messages) == prior_messages + 1
+    token = _message_token(messages[-1].text, "Reset code")
+    assert token not in user_store._action_tokens
+    assert hashlib.sha256(token.encode()).hexdigest() in user_store._action_tokens
+
+    confirmed = client.post(
+        "/v1/auth/password-reset/confirm",
+        json={"token": token, "password": new_password},
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json() == {"status": "PASSWORD_UPDATED"}
+    assert store.get_session(old_access) is None
+
+    replay = client.post(
+        "/v1/auth/password-reset/confirm",
+        json={"token": token, "password": "Account-reset-third-password-45678"},
+    )
+    assert replay.status_code == 400
+    assert client.post("/v1/auth/login", json={"email": email, "password": old_password}).status_code == 401
+    assert client.post("/v1/auth/login", json={"email": email, "password": new_password}).status_code == 200

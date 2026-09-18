@@ -24,6 +24,14 @@ val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .get()
     .trim()
 val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
+val vkClientId = providers.environmentVariable("SENTINEL_VK_CLIENT_ID")
+    .orElse("0")
+    .get()
+    .trim()
+if (!Regex("[0-9]+").matches(vkClientId)) {
+    error("SENTINEL_VK_CLIENT_ID must contain decimal digits only")
+}
+
 val runtimeEnvironment = providers.environmentVariable("SENTINEL_RUNTIME_ENVIRONMENT")
     .orElse(if (sentryDsn.isNotEmpty() && githubActions) "release-candidate" else "")
     .get()
@@ -81,7 +89,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
         manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
+        manifestPlaceholders["vkRedirectScheme"] = "vk$vkClientId"
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
+        buildConfigField("String", "SENTINEL_VK_REDIRECT_URI", "\"vk$vkClientId://vk.ru/blank.html\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")

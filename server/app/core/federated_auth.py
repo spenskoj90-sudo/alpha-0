@@ -240,6 +240,7 @@ def verify_google_id_token(
     *,
     now: int | None = None,
     jwks_fetcher: Callable[[], dict[str, Any]] | None = None,
+    nonce: str | None = None,
 ) -> VerifiedFederatedIdentity:
     status = provider_status("google")
     if not status.enabled or not status.client_id:
@@ -291,6 +292,7 @@ def start_browser_flow(provider: str, state: str) -> BrowserAuthStart:
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
+            "nonce": state,
         }
         endpoint = "https://oauth.telegram.org/auth"
     else:
@@ -347,6 +349,7 @@ def complete_telegram(
         jwks_hosts={"oauth.telegram.org"},
         issuers={"https://oauth.telegram.org"},
         audience=status.client_id,
+        nonce=nonce,
         now=now,
         jwks_fetcher=jwks_fetcher,
     )

@@ -39,12 +39,12 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Run Android debug and physical-test unit tests
+      - name: Run Android unit tests across configured variants
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
           SENTINEL_SOURCE_SHA: ${{ env.PHYSICAL_TEST_SOURCE_SHA }}
           SENTINEL_RUNTIME_ENVIRONMENT: staging
-        run: ./gradlew --no-daemon testDebugUnitTest testPhysicalTestUnitTest
+        run: ./gradlew --no-daemon test
 
       - name: Build isolated physical-test APK against staging Core
         env:

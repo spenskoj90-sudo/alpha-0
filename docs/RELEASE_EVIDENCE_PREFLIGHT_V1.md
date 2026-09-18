@@ -35,7 +35,7 @@ Before a PR can be treated as release-preflight-clean, the collector requires th
 
 It also requires the GitHub Advanced Security check named `CodeQL`, from app slug `github-advanced-security`, to be successful on the exact PR head SHA.
 
-The required job set includes Core tests/coverage, PostgreSQL recovery, Android build/tests, API 35 emulator instrumentation, Web build, Launcher runtime tests, Block D evidence, container build/reproducibility/deployment smoke, security scans, both workflow CodeQL language jobs, P1 evidence, packaged Companion evidence, supply-chain SBOM evidence and standalone Android APK validation.
+The required job set includes Core tests/coverage, PostgreSQL recovery, Android build/tests, API 36 emulator instrumentation, Web build, Launcher runtime tests, Block D evidence, container build/reproducibility/deployment smoke, security scans, both workflow CodeQL language jobs, P1 evidence, packaged Companion evidence, supply-chain SBOM evidence and standalone Android APK validation.
 
 PR evidence does not mint artifact attestations. This keeps pull-request execution free of `id-token: write` and `attestations: write` authority.
 
@@ -49,7 +49,7 @@ For a `push` to `main`, the preflight requires the exact-SHA post-merge runs for
 - `Packaged Companion Host`;
 - `Supply Chain Evidence`.
 
-`ALPHA-0 Android CI` is PR-only and therefore is not invented as a post-merge requirement. The Build & Test API 35 emulator job remains required.
+`ALPHA-0 Android CI` is PR-only and therefore is not invented as a post-merge requirement. The Build & Test API 36 emulator job remains required.
 
 On protected-main, the Supply Chain and Packaged Companion workflows also contain downstream no-secret attestation jobs. Their workflow conclusion cannot be `success` until those jobs have created GitHub/Sigstore provenance for the canonical subjects.
 

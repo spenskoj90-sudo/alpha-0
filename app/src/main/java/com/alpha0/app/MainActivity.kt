@@ -202,6 +202,7 @@ private fun SentinelApplicationUi(
     val startDestination = when {
         activeSession == null -> "login"
         activeSession?.deviceId.isNullOrBlank() -> "device-setup"
+        federatedCallbackUri != null -> "security"
         else -> "home"
     }
     val backStack by navController.currentBackStackEntryAsState()
@@ -324,7 +325,18 @@ private fun SentinelApplicationUi(
                 }
                 composable("security") {
                     AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
-                        DeviceDetailsContent(current, dashboardApi, deviceIdentity, sessionStore, activity, navController) {
+                        DeviceDetailsContent(
+                            session = current,
+                            api = dashboardApi,
+                            authApi = authApi,
+                            federatedAuth = federatedAuth,
+                            federatedCallbackUri = federatedCallbackUri,
+                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
+                            identity = deviceIdentity,
+                            store = sessionStore,
+                            activity = activity,
+                            navController = navController,
+                        ) {
                             activeSession = it
                         }
                     }
@@ -332,7 +344,18 @@ private fun SentinelApplicationUi(
                 composable("activity") { ActivityScreen(activeSession?.deviceId) }
                 composable("device-details") {
                     AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
-                        DeviceDetailsContent(current, dashboardApi, deviceIdentity, sessionStore, activity, navController) {
+                        DeviceDetailsContent(
+                            session = current,
+                            api = dashboardApi,
+                            authApi = authApi,
+                            federatedAuth = federatedAuth,
+                            federatedCallbackUri = federatedCallbackUri,
+                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
+                            identity = deviceIdentity,
+                            store = sessionStore,
+                            activity = activity,
+                            navController = navController,
+                        ) {
                             activeSession = it
                         }
                     }
@@ -385,6 +408,10 @@ private fun AuthenticatedRoute(
 private fun DeviceDetailsContent(
     session: SecureSessionStore.Companion.Session,
     api: DashboardApi,
+    authApi: AuthApi,
+    federatedAuth: FederatedAuthCoordinator,
+    federatedCallbackUri: Uri?,
+    onFederatedCallbackConsumed: () -> Unit,
     identity: DeviceIdentity,
     store: SecureSessionStore,
     activity: ComponentActivity,
@@ -395,6 +422,10 @@ private fun DeviceDetailsContent(
         accessToken = session.accessToken,
         deviceId = session.deviceId!!,
         api = api,
+        authApi = authApi,
+        federatedAuth = federatedAuth,
+        federatedCallbackUri = federatedCallbackUri,
+        onFederatedCallbackConsumed = onFederatedCallbackConsumed,
         deviceIdentity = identity,
         onRevoked = {
             store.clear(activity)

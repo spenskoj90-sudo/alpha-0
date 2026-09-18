@@ -80,7 +80,7 @@ if CORS_ORIGINS:
         allow_origins=CORS_ORIGINS,
         allow_credentials=False,
         allow_methods=["GET", "POST"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Enrollment-Token", "Idempotency-Key", "X-Sentinel-Admin-Token"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Enrollment-Token", "Idempotency-Key", "X-Sentinel-Admin-Token", "X-Sentinel-Admin-TOTP"],
     )
 
 

@@ -210,6 +210,7 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
     body = start.json()
     assert body["authorization_url"].startswith("https://oauth.telegram.org/auth?")
     assert body["code_verifier"] not in body["authorization_url"]
+    assert f"nonce={body['state']}" in body["authorization_url"]
 
     complete = client.post(
         "/v1/auth/providers/telegram/complete",
@@ -264,11 +265,13 @@ def test_telegram_id_token_verification_uses_oidc_subject(monkeypatch):
             "aud": "123456",
             "iat": now,
             "exp": now + 300,
+            "nonce": "telegram-test-state",
         }
     )
     identity = complete_telegram(
         code="code",
         code_verifier="z" * 64,
+        nonce="telegram-test-state",
         now=now,
         token_fetcher=lambda: {"id_token": token},
         jwks_fetcher=lambda: jwks,

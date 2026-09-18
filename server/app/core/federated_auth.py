@@ -304,7 +304,7 @@ def start_browser_flow(provider: str, state: str) -> BrowserAuthStart:
             "code_challenge": challenge,
             "code_challenge_method": "S256",
         }
-        endpoint = "https://id.vk.com/authorize"
+        endpoint = "https://id.vk.ru/authorize"
     return BrowserAuthStart(normalized, f"{endpoint}?{urlencode(params)}", state, verifier)
 
 
@@ -369,21 +369,19 @@ def complete_vk(
     if token_fetcher:
         token_result = token_fetcher()
     else:
-        query = urlencode(
-            {
-                "grant_type": "authorization_code",
-                "redirect_uri": redirect_uri,
-                "client_id": status.client_id,
-                "code_verifier": code_verifier,
-                "state": state,
-                "device_id": device_id,
-            }
-        )
         token_result = _https_json(
-            f"https://id.vk.com/oauth2/auth?{query}",
-            allowed_hosts={"id.vk.com"},
+            "https://id.vk.ru/oauth2/auth",
+            allowed_hosts={"id.vk.ru"},
             method="POST",
-            form={"code": code},
+            form={
+                "grant_type": "authorization_code",
+                "code": code,
+                "code_verifier": code_verifier,
+                "client_id": status.client_id,
+                "device_id": device_id,
+                "redirect_uri": redirect_uri,
+                "state": state,
+            },
         )
     returned_state = token_result.get("state")
     if isinstance(returned_state, str) and not hmac.compare_digest(returned_state, state):
@@ -395,10 +393,13 @@ def complete_vk(
         user_result = user_fetcher(access_token)
     else:
         user_result = _https_json(
-            f"https://id.vk.com/oauth2/user_info?{urlencode({'client_id': status.client_id})}",
-            allowed_hosts={"id.vk.com"},
+            f"https://id.vk.ru/oauth2/user_info?{urlencode({'client_id': status.client_id})}",
+            allowed_hosts={"id.vk.ru"},
             method="POST",
-            form={"access_token": access_token},
+            form={
+                "access_token": access_token,
+                "device_id": device_id,
+            },
         )
     candidate = user_result.get("user")
     user = candidate if isinstance(candidate, dict) else user_result

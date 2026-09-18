@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from fastapi.testclient import TestClient
 
 from app import main as main_module
+from app.core import federated_auth as federated_module
 from app.core.federated_auth import (
     FederatedAuthError,
     VerifiedFederatedIdentity,
@@ -299,3 +300,117 @@ def test_disabled_providers_fail_closed(monkeypatch):
         monkeypatch.delenv(key, raising=False)
     assert all(item.enabled is False for item in provider_statuses())
     assert client.post("/v1/auth/providers/google/challenge").status_code == 503
+
+
+def test_browser_provider_rejects_redirect_not_in_server_allowlist(monkeypatch):
+    monkeypatch.setenv("SENTINEL_TELEGRAM_AUTH_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_ID", "123456")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_SECRET", "test-secret")
+    monkeypatch.setenv(
+        "SENTINEL_TELEGRAM_REDIRECT_URIS",
+        "com.alpha0.app.auth.dev://callback",
+    )
+    response = client.post(
+        "/v1/auth/providers/telegram/start",
+        json={"redirect_uri": "com.alpha0.app.auth://callback"},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "FEDERATED_REDIRECT_URI_INVALID"
+
+
+def test_google_provider_link_requires_authenticated_account_and_fresh_nonce(monkeypatch):
+    _google_env(monkeypatch)
+    email = f"link-{uuid.uuid4().hex}@example.com"
+    registered = client.post(
+        "/v1/auth/register",
+        json={"email": email, "password": "link-password-long-enough-123"},
+    )
+    assert registered.status_code == 200
+    access = registered.json()["session_token"]
+    provider_subject = f"google-link-{uuid.uuid4().hex}"
+    monkeypatch.setattr(
+        main_module,
+        "verify_google_id_token",
+        lambda _token, _nonce: VerifiedFederatedIdentity(
+            provider="google",
+            subject=provider_subject,
+            email=f"provider-{uuid.uuid4().hex}@gmail.com",
+            email_verified=True,
+        ),
+    )
+    challenge = client.post("/v1/auth/providers/google/challenge").json()
+    payload = {"id_token": "z" * 64, "nonce": challenge["nonce"]}
+
+    anonymous = client.post("/v1/account/providers/google/link", json=payload)
+    assert anonymous.status_code == 422
+
+    linked = client.post(
+        "/v1/account/providers/google/link",
+        headers={"Authorization": f"Bearer {access}"},
+        json=payload,
+    )
+    assert linked.status_code == 200
+    assert linked.json() == {"status": "LINKED"}
+
+    security = client.get(
+        "/v1/account/security",
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert security.status_code == 200
+    assert "google" in security.json()["providers"]
+
+    replay = client.post(
+        "/v1/account/providers/google/link",
+        headers={"Authorization": f"Bearer {access}"},
+        json=payload,
+    )
+    assert replay.status_code == 400
+    assert replay.json()["code"] == "FEDERATED_CHALLENGE_INVALID"
+
+
+def test_vk_network_exchange_matches_current_vkid_android_contract(monkeypatch):
+    monkeypatch.setenv("SENTINEL_VK_AUTH_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_VK_CLIENT_ID", "123456")
+    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "vk123456://vk.ru/blank.html")
+    calls = []
+
+    def fake_https_json(url, **kwargs):
+        calls.append((url, kwargs))
+        if url.endswith("/oauth2/auth"):
+            return {"access_token": "vk-access", "state": "state"}
+        return {"user": {"user_id": 42, "email": "vk42@example.com"}}
+
+    monkeypatch.setattr(federated_module, "_https_json", fake_https_json)
+    identity = complete_vk(
+        code="authorization-code",
+        state="state",
+        code_verifier="p" * 64,
+        device_id="vk-device",
+        redirect_uri="vk123456://vk.ru/blank.html",
+    )
+
+    assert identity.subject == "42"
+    assert calls[0][0] == "https://id.vk.ru/oauth2/auth"
+    assert calls[0][1]["allowed_hosts"] == {"id.vk.ru"}
+    assert calls[0][1]["form"] == {
+        "grant_type": "authorization_code",
+        "code": "authorization-code",
+        "code_verifier": "p" * 64,
+        "client_id": "123456",
+        "device_id": "vk-device",
+        "redirect_uri": "vk123456://vk.ru/blank.html",
+        "state": "state",
+    }
+    assert calls[1][0].startswith("https://id.vk.ru/oauth2/user_info?")
+    assert calls[1][1]["form"]["device_id"] == "vk-device"
+
+
+def test_vk_provider_requires_canonical_vk_mobile_redirect(monkeypatch):
+    monkeypatch.setenv("SENTINEL_VK_AUTH_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_VK_CLIENT_ID", "123456")
+    monkeypatch.setenv(
+        "SENTINEL_VK_REDIRECT_URIS",
+        "com.alpha0.app.auth.dev://callback",
+    )
+    vk = next(item for item in provider_statuses() if item.provider == "vk")
+    assert vk.enabled is False

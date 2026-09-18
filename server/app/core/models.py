@@ -90,6 +90,10 @@ class GoogleCredentialRequest(BaseModel):
     nonce: str = Field(min_length=32, max_length=256)
 
 
+class BrowserAuthStartRequest(BaseModel):
+    redirect_uri: str = Field(min_length=10, max_length=1024)
+
+
 class BrowserAuthStartResponse(BaseModel):
     provider: Literal["telegram", "vk"]
     authorization_url: str = Field(min_length=20, max_length=4096)

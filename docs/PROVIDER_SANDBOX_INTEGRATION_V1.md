@@ -122,7 +122,20 @@ Recipient, subject and plain-text body are validated and bounded. Provider crede
 
 Account registration/email-verification and password-recovery flows now use this transport. Requests remain non-enumerating, raw one-time credentials are never persisted, and provider delivery failure does not roll back account creation or reveal whether an email is registered. Real external delivery still requires the staging-only Resend configuration; production Resend activation remains an external Owner gate.
 
-## 5. Explicit non-claims
+## 5. Federated authentication boundary
+
+Google, Telegram and VK authentication are disabled by default and become visible to Android only when Core reports a complete provider configuration.
+
+- Google uses Android Credential Manager with a Core-issued one-time nonce. Core validates the Google ID token signature, issuer, audience, time bounds, nonce and provider subject.
+- Telegram uses Authorization Code + PKCE against `oauth.telegram.org`; the client secret exists only on Core, and the resulting RS256 ID token is verified server-side.
+- VK uses the current `id.vk.ru` Authorization Code + PKCE contract. Android registers the canonical `vk<clientId>://vk.ru/blank.html` callback using the public application ID; no VK client secret is embedded in the APK.
+- Telegram/VK redirect targets must match provider-specific server allowlists exactly. Core stores only the SHA-256 digest of the one-time state and its bounded redirect context under FORCE RLS.
+- Android encrypts pending provider/state/PKCE verifier data with AES-GCM under Android Keystore and consumes it on callback.
+- Existing accounts are never auto-linked from an email collision. Linking requires a valid SENTINEL Bearer session and a new verified provider proof.
+
+Provider-console setup and real-account external login are environment evidence, not repository claims. See `docs/FEDERATED_AUTH_V1.md`.
+
+## 6. Explicit non-claims
 
 This implementation does **not** claim or perform:
 

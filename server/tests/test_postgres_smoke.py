@@ -314,12 +314,18 @@ def test_postgres_federated_identity_and_challenge_persistence_are_rls_protected
     assert security["password_enabled"] is False
     assert security["providers"] == ["telegram"]
 
-    raw_state = user_store.issue_federated_challenge("telegram", "OAUTH_STATE", 300)
+    callback_uri = "com.alpha0.app.auth.dev://callback"
+    raw_state = user_store.issue_federated_challenge(
+        "telegram",
+        "OAUTH_STATE",
+        300,
+        redirect_uri=callback_uri,
+    )
     state_hash = hashlib.sha256(raw_state.encode()).hexdigest()
     with store.engine.connect() as conn:
         persisted = conn.execute(
             text(
-                "SELECT challenge_hash, provider, purpose "
+                "SELECT challenge_hash, provider, purpose, redirect_uri "
                 "FROM federated_auth_challenges WHERE challenge_hash=:challenge_hash"
             ),
             {"challenge_hash": state_hash},
@@ -338,7 +344,8 @@ def test_postgres_federated_identity_and_challenge_persistence_are_rls_protected
 
     assert persisted["provider"] == "telegram"
     assert persisted["purpose"] == "OAUTH_STATE"
+    assert persisted["redirect_uri"] == callback_uri
     assert raw_count == 0
     assert provider_binding == 1
-    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) == (True, None)
+    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) == (True, callback_uri)
     assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) == (False, None)

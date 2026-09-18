@@ -61,16 +61,35 @@ def _safe_redirect_uri(value: str) -> bool:
         return False
     if parsed.scheme == "https":
         return bool(parsed.hostname)
-    return parsed.scheme == "sentinel" and bool(parsed.netloc)
+    return (
+        parsed.scheme
+        in {
+            "com.alpha0.app.auth",
+            "com.alpha0.app.auth.dev",
+            "com.alpha0.app.physicaltest.auth",
+        }
+        and parsed.netloc == "callback"
+        and parsed.path in {"", "/"}
+    )
+
+
+def _configured_redirect_uris(provider: str) -> tuple[str, ...]:
+    env_name = f"SENTINEL_{provider.upper()}_REDIRECT_URIS"
+    values = tuple(
+        item.strip()
+        for item in (os.getenv(env_name) or "").split(",")
+        if item.strip()
+    )
+    return tuple(item for item in values if _safe_redirect_uri(item))
 
 
 def provider_statuses() -> list[ProviderStatus]:
     google_id = (os.getenv("SENTINEL_GOOGLE_WEB_CLIENT_ID") or "").strip()
     telegram_id = (os.getenv("SENTINEL_TELEGRAM_CLIENT_ID") or "").strip()
     telegram_secret = (os.getenv("SENTINEL_TELEGRAM_CLIENT_SECRET") or "").strip()
-    telegram_redirect = (os.getenv("SENTINEL_TELEGRAM_REDIRECT_URI") or "").strip()
+    telegram_redirects = _configured_redirect_uris("telegram")
     vk_id = (os.getenv("SENTINEL_VK_CLIENT_ID") or "").strip()
-    vk_redirect = (os.getenv("SENTINEL_VK_REDIRECT_URI") or "").strip()
+    vk_redirects = _configured_redirect_uris("vk")
     return [
         ProviderStatus(
             provider="google",
@@ -84,7 +103,7 @@ def provider_statuses() -> list[ProviderStatus]:
                 _enabled("SENTINEL_TELEGRAM_AUTH_ENABLED")
                 and bool(telegram_id)
                 and bool(telegram_secret)
-                and _safe_redirect_uri(telegram_redirect)
+                and bool(telegram_redirects)
             ),
             flow="oidc-pkce",
             client_id=telegram_id or None,
@@ -94,7 +113,7 @@ def provider_statuses() -> list[ProviderStatus]:
             enabled=(
                 _enabled("SENTINEL_VK_AUTH_ENABLED")
                 and bool(vk_id)
-                and _safe_redirect_uri(vk_redirect)
+                and bool(vk_redirects)
             ),
             flow="oauth-pkce",
             client_id=vk_id or None,
@@ -272,17 +291,18 @@ def verify_google_id_token(
     )
 
 
-def start_browser_flow(provider: str, state: str) -> BrowserAuthStart:
+def start_browser_flow(provider: str, state: str, redirect_uri: str) -> BrowserAuthStart:
     normalized = provider.strip().lower()
     status = provider_status(normalized)
     if not status.enabled or not status.client_id:
         raise FederatedAuthError("AUTH_PROVIDER_NOT_CONFIGURED")
     if normalized not in {"telegram", "vk"}:
         raise FederatedAuthError("AUTH_PROVIDER_FLOW_INVALID")
+    if redirect_uri not in _configured_redirect_uris(normalized):
+        raise FederatedAuthError("FEDERATED_REDIRECT_URI_INVALID")
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
     if normalized == "telegram":
-        redirect_uri = (os.getenv("SENTINEL_TELEGRAM_REDIRECT_URI") or "").strip()
         params = {
             "client_id": status.client_id,
             "redirect_uri": redirect_uri,
@@ -295,7 +315,6 @@ def start_browser_flow(provider: str, state: str) -> BrowserAuthStart:
         }
         endpoint = "https://oauth.telegram.org/auth"
     else:
-        redirect_uri = (os.getenv("SENTINEL_VK_REDIRECT_URI") or "").strip()
         params = {
             "client_id": status.client_id,
             "redirect_uri": redirect_uri,
@@ -313,6 +332,7 @@ def complete_telegram(
     *,
     code: str,
     code_verifier: str,
+    redirect_uri: str,
     nonce: str | None = None,
     now: int | None = None,
     token_fetcher: Callable[[], dict[str, Any]] | None = None,
@@ -320,9 +340,10 @@ def complete_telegram(
 ) -> VerifiedFederatedIdentity:
     status = provider_status("telegram")
     client_secret = (os.getenv("SENTINEL_TELEGRAM_CLIENT_SECRET") or "").strip()
-    redirect_uri = (os.getenv("SENTINEL_TELEGRAM_REDIRECT_URI") or "").strip()
     if not status.enabled or not status.client_id or not client_secret:
         raise FederatedAuthError("AUTH_PROVIDER_NOT_CONFIGURED")
+    if redirect_uri not in _configured_redirect_uris("telegram"):
+        raise FederatedAuthError("FEDERATED_REDIRECT_URI_INVALID")
     if token_fetcher:
         token_result = token_fetcher()
     else:
@@ -362,13 +383,15 @@ def complete_vk(
     state: str,
     code_verifier: str,
     device_id: str,
+    redirect_uri: str,
     token_fetcher: Callable[[], dict[str, Any]] | None = None,
     user_fetcher: Callable[[str], dict[str, Any]] | None = None,
 ) -> VerifiedFederatedIdentity:
     status = provider_status("vk")
-    redirect_uri = (os.getenv("SENTINEL_VK_REDIRECT_URI") or "").strip()
     if not status.enabled or not status.client_id:
         raise FederatedAuthError("AUTH_PROVIDER_NOT_CONFIGURED")
+    if redirect_uri not in _configured_redirect_uris("vk"):
+        raise FederatedAuthError("FEDERATED_REDIRECT_URI_INVALID")
     if token_fetcher:
         token_result = token_fetcher()
     else:

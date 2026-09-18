@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 AS builder
+FROM python:3.14.7-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS builder
 
 ARG SOURCE_DATE_EPOCH=0
 ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \
@@ -22,7 +22,7 @@ RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-build-isolation /build/server \
     && find /opt/venv /build/server -exec touch -h -d "@$SOURCE_DATE_EPOCH" {} +
 
-FROM python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36 AS runtime
+FROM python:3.14.7-slim@sha256:cad9a2c871761c413caa6fdd6441c783451e740a48aaeba60ae62a8b53525ef6 AS runtime
 
 ARG SOURCE_DATE_EPOCH=0
 ENV SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH \

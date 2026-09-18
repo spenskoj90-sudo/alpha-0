@@ -15,6 +15,12 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 - `POST /v1/auth/password-reset/request` — non-enumerating request for a 30-minute one-time password-reset code.
 - `POST /v1/auth/password-reset/confirm` — consume the reset code, replace the password and revoke all existing account sessions.
 - `GET /v1/account/security` — caller-scoped email-verification/password/provider-link security state.
+- `GET /v1/auth/providers` — public fail-closed provider capability catalog; exposes enablement/flow/public client ID only, never provider secrets.
+- `POST /v1/auth/providers/google/challenge` — issue a one-time server nonce for Credential Manager Google ID-token authentication.
+- `POST /v1/auth/providers/google/login` — verify a nonce-bound Google ID token server-side and issue a SENTINEL session.
+- `POST /v1/auth/providers/{telegram|vk}/start` — validate an exact allowlisted callback URI, persist a hashed one-time state and return the provider authorization URL plus PKCE verifier.
+- `POST /v1/auth/providers/{telegram|vk}/complete` — consume the state, perform the server-side code exchange and issue a SENTINEL session.
+- `POST /v1/account/providers/google/link` and `POST /v1/account/providers/{telegram|vk}/link` — require an existing SENTINEL Bearer session plus a fresh provider proof to add another sign-in identity.
 
 ## Device identity
 

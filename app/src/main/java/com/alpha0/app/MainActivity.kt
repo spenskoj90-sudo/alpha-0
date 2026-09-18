@@ -1,5 +1,7 @@
 package com.alpha0.app
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -36,6 +38,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.alpha0.app.auth.AuthApi
+import com.alpha0.app.auth.FederatedAuthCoordinator
 import com.alpha0.app.auth.LoginScreen
 import com.alpha0.app.auth.SessionManager
 import com.alpha0.app.dashboard.ActivityScreen
@@ -69,9 +72,11 @@ import com.alpha0.app.update.UpdateScreen
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
     private val deviceIdentity = DeviceIdentity()
+    private var federatedCallbackUri by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        federatedCallbackUri = validatedFederatedCallback(intent)
         val diag = DiagnosticLogger.get(this)
         diag.info(
             "APP",
@@ -90,6 +95,11 @@ class MainActivity : ComponentActivity() {
         val preferences = AppPreferences(this)
         val httpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
         val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
+        val federatedAuth = FederatedAuthCoordinator(
+            context = this,
+            api = authApi,
+            callbackScheme = BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME,
+        )
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
         val dashboardApi = DashboardApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
@@ -116,6 +126,9 @@ class MainActivity : ComponentActivity() {
                             diag.info("UI", "THEME_CHANGED", details = mapOf("theme" to it.name))
                         },
                         authApi = authApi,
+                        federatedAuth = federatedAuth,
+                        federatedCallbackUri = federatedCallbackUri,
+                        onFederatedCallbackConsumed = { federatedCallbackUri = null },
                         sessionManager = sessionManager,
                         deviceApi = deviceApi,
                         dashboardApi = dashboardApi,
@@ -128,6 +141,20 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        federatedCallbackUri = validatedFederatedCallback(intent)
+    }
+
+    private fun validatedFederatedCallback(intent: Intent?): Uri? {
+        val uri = intent?.data ?: return null
+        return uri.takeIf {
+            it.scheme == BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME &&
+                it.host == "callback"
+        }
+    }
 }
 
 @Composable
@@ -138,6 +165,9 @@ private fun SentinelApplicationUi(
     onLanguage: (AppLanguage) -> Unit,
     onTheme: (AppThemeMode) -> Unit,
     authApi: AuthApi,
+    federatedAuth: FederatedAuthCoordinator,
+    federatedCallbackUri: Uri?,
+    onFederatedCallbackConsumed: () -> Unit,
     sessionManager: SessionManager,
     deviceApi: DeviceApi,
     dashboardApi: DashboardApi,
@@ -243,7 +273,12 @@ private fun SentinelApplicationUi(
                 popExitTransition = { fadeOut(animationSpec = tween(150)) },
             ) {
                 composable("login") {
-                    LoginScreen(authApi) { authenticated ->
+                    LoginScreen(
+                        api = authApi,
+                        federatedAuth = federatedAuth,
+                        federatedCallbackUri = federatedCallbackUri,
+                        onFederatedCallbackConsumed = onFederatedCallbackConsumed,
+                    ) { authenticated ->
                         sessionStore.save(activity, authenticated.accessToken, authenticated.refreshToken)
                         activeSession = sessionStore.load(activity)
                         diagnostics.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")

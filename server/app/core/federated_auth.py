@@ -81,13 +81,19 @@ def _safe_redirect_uri(value: str) -> bool:
 
 
 def _configured_redirect_uris(provider: str) -> tuple[str, ...]:
-    env_name = f"SENTINEL_{provider.upper()}_REDIRECT_URIS"
+    normalized = provider.strip().lower()
+    env_name = f"SENTINEL_{normalized.upper()}_REDIRECT_URIS"
     values = tuple(
         item.strip()
         for item in (os.getenv(env_name) or "").split(",")
         if item.strip()
     )
-    return tuple(item for item in values if _safe_redirect_uri(item))
+    safe = tuple(item for item in values if _safe_redirect_uri(item))
+    if normalized == "vk":
+        return tuple(item for item in safe if urlparse(item).scheme.startswith("vk"))
+    if normalized == "telegram":
+        return tuple(item for item in safe if not urlparse(item).scheme.startswith("vk"))
+    return ()
 
 
 def provider_statuses() -> list[ProviderStatus]:

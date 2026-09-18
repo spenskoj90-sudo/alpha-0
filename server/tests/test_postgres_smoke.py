@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import time
+import uuid
 
 import pytest
 from cryptography.hazmat.primitives import hashes, serialization
@@ -200,3 +201,51 @@ def test_postgres_auth_event_and_audit_flow():
     assert revoked_state == "REVOKED"
     assert revoked_sessions >= 1
     assert still_active == 0
+
+
+def test_postgres_entitlement_listing_supports_scoped_and_admin_reads():
+    from app.main import REFRESH_TTL_SECONDS, SESSION_TTL_SECONDS, app, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    client = TestClient(app)
+    suffix = uuid.uuid4().hex
+    user_id = f"pg-entitlements-{suffix}@example.com"
+    entitlement_id = str(uuid.uuid4())
+    store.create_entitlement(
+        {
+            "id": entitlement_id,
+            "user_id": user_id,
+            "game_id": "diablo-immortal-android",
+            "source": "postgres-regression",
+            "status": "ACTIVE",
+            "valid_from": "2026-09-18T00:00:00+00:00",
+            "valid_until": "2027-09-18T00:00:00+00:00",
+        }
+    )
+
+    scoped = store.list_entitlements(user_id)
+    assert any(item["id"] == entitlement_id for item in scoped)
+    assert all(item["user_id"] == user_id for item in scoped)
+
+    unscoped = store.list_entitlements()
+    assert any(item["id"] == entitlement_id for item in unscoped)
+
+    access, _, _, _ = store.issue_session(
+        None,
+        user_id,
+        SESSION_TTL_SECONDS,
+        REFRESH_TTL_SECONDS,
+    )
+    response = client.get(
+        "/v1/entitlements/me",
+        headers={"Authorization": f"Bearer {access}"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()["entitlements"]
+    assert any(
+        item["id"] == entitlement_id
+        and item["game_name"] == "Diablo Immortal"
+        and item["platform"] == "android"
+        for item in payload
+    )

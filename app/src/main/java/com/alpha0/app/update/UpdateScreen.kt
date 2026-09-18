@@ -47,6 +47,12 @@ fun UpdateScreen() {
     val activity = context.findActivity()
     val manager = remember(context) { AppUpdateManagerFactory.create(context) }
     var state by remember { mutableStateOf(UpdateState.IDLE) }
+    val channelLabel = when (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL) {
+        "play" -> strings.text("channel_play")
+        "diagnostic" -> strings.text("channel_diagnostic")
+        "development" -> strings.text("channel_development")
+        else -> BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         state = if (it.resultCode == Activity.RESULT_OK) UpdateState.DOWNLOADING else UpdateState.FAILED
     }
@@ -101,7 +107,7 @@ fun UpdateScreen() {
             SentinelCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${strings.text("current_version")}: ${BuildConfig.VERSION_NAME}")
-                    Text("${strings.text("build_channel")}: ${BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT}")
+                    Text("${strings.text("build_channel")}: $channelLabel")
                     DataText("${strings.text("source_revision")}: ${BuildConfig.SENTINEL_SOURCE_SHA.take(12)}")
                 }
             }
@@ -123,7 +129,7 @@ fun UpdateScreen() {
         }
         item {
             val message = when (state) {
-                UpdateState.IDLE -> if (BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT == "staging") "update_sideload_notice" else "up_to_date"
+                UpdateState.IDLE -> if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic") "update_sideload_notice" else "up_to_date"
                 UpdateState.CHECKING -> "checking_updates"
                 UpdateState.CURRENT -> "up_to_date"
                 UpdateState.AVAILABLE -> "update_available"

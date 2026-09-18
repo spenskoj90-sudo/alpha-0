@@ -520,8 +520,18 @@ class PostgresStore(Store):
             return int(conn.execute(text("SELECT count(*) FROM security_failures WHERE subject=:s AND failed_at>now()-interval '15 minutes'"), {"s": subject}).scalar_one())
 
     def list_entitlements(self, user_id=None):
+        query = (
+            "SELECT e.id::text id,i.user_handle user_id,e.game_id,e.source,e.status,"
+            "e.valid_from,e.valid_until FROM entitlements e "
+            "JOIN identities i ON i.id=e.identity_id"
+        )
+        params: dict[str, Any] = {}
+        if user_id is not None:
+            query += " WHERE i.user_handle=:u"
+            params["u"] = user_id
+        query += " ORDER BY e.valid_until DESC"
         with self.engine.begin() as conn:
-            rows = conn.execute(text("SELECT e.id::text id,i.user_handle user_id,e.game_id,e.source,e.status,e.valid_from,e.valid_until FROM entitlements e JOIN identities i ON i.id=e.identity_id WHERE (:u IS NULL OR i.user_handle=:u) ORDER BY e.valid_until DESC"), {"u": user_id}).mappings().all()
+            rows = conn.execute(text(query), params).mappings().all()
         return [dict(row) for row in rows]
 
     def create_entitlement(self, item):

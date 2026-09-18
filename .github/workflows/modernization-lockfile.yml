@@ -29,11 +29,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$GITHUB_HEAD_REF" = "chore/platform-dependency-modernization"
+          cp web/package-lock.json "$RUNNER_TEMP/package-lock.json"
+          git fetch origin "$GITHUB_HEAD_REF"
+          git reset --hard "origin/$GITHUB_HEAD_REF"
+          cp "$RUNNER_TEMP/package-lock.json" web/package-lock.json
           if git diff --quiet -- web/package-lock.json; then
             echo "package-lock.json already current"
             exit 0
           fi
-          test "$GITHUB_HEAD_REF" = "chore/platform-dependency-modernization"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/package-lock.json

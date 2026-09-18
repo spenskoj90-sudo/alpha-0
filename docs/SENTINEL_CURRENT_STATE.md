@@ -6,7 +6,7 @@
 
 ## 1. Product surfaces
 
-- Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
+- Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, server-driven Google/Telegram/VK federated sign-in, explicit provider linking from Security, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
 - FastAPI Core exists under `server/`.
 - Next.js control plane exists under `web/`.
 - Electron launcher exists under `launcher/` and exposes account/Companion runtime state, local game launching, passive WoW checkpoint state, a read-only Companion overlay renderer and an explicit-consent push-to-talk voice surface.
@@ -19,6 +19,7 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 - Android device identity is Keystore-backed P-256 with SHA-256 fingerprinting.
 - Sessions use opaque tokens with one-time refresh rotation.
+- Federated auth is fail-closed and server-authoritative: Google uses nonce-bound Credential Manager ID tokens; Telegram uses OIDC Authorization Code + PKCE; VK uses current id.vk.ru OAuth/PKCE endpoints and its canonical mobile callback. Provider subjects, not email matches, own bindings; provider challenges are hashed and FORCE-RLS protected.
 - Authorization is server-authoritative and default-deny.
 - PostgreSQL is the production persistence architecture when `DATABASE_URL` is configured; migration `004_p1_rls_force.sql` applies FORCE RLS.
 - Service-role access no longer depends on a PostgreSQL startup GUC. SQLAlchemy service transactions and the migration/maintenance paths enable `app.service_role` with transaction-local `set_config(..., true)`, so the privilege bit clears at commit/rollback and is compatible with transaction-pooled PgBouncer/Neon connections while FORCE RLS remains enforced.

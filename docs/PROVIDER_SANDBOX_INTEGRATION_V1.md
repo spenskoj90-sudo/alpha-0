@@ -120,7 +120,7 @@ Email delivery now has a provider-neutral bounded transport contract:
 
 Recipient, subject and plain-text body are validated and bounded. Provider credentials are excluded from object representations and repository state.
 
-No product flow automatically sends email in this block. A real message requires a separately defined product event, intended recipient and staging credential. This prevents provider availability from being mistaken for an authorization to send mail.
+Account registration/email-verification and password-recovery flows now use this transport. Requests remain non-enumerating, raw one-time credentials are never persisted, and provider delivery failure does not roll back account creation or reveal whether an email is registered. Real external delivery still requires the staging-only Resend configuration; production Resend activation remains an external Owner gate.
 
 ## 5. Explicit non-claims
 

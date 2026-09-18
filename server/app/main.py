@@ -48,6 +48,7 @@ from app.core.models import (
     DeviceRegisterResponse,
     EmailActionRequest,
     BrowserAuthCompleteRequest,
+    BrowserAuthStartRequest,
     BrowserAuthStartResponse,
     FederatedProviderStatusResponse,
     FederatedProvidersResponse,
@@ -500,7 +501,8 @@ def _verified_google(payload: GoogleCredentialRequest) -> VerifiedFederatedIdent
         identity = verify_google_id_token(payload.id_token, payload.nonce)
     except FederatedAuthError as exc:
         raise _federated_error(exc) from exc
-    if not user_store.consume_federated_challenge("google", "OIDC_NONCE", payload.nonce):
+    consumed, _ = user_store.consume_federated_challenge("google", "OIDC_NONCE", payload.nonce)
+    if not consumed:
         raise HTTPException(status_code=400, detail="FEDERATED_CHALLENGE_INVALID")
     return identity
 
@@ -523,14 +525,23 @@ def google_provider_link(
 
 
 @app.post("/v1/auth/providers/{provider}/start", response_model=BrowserAuthStartResponse)
-def browser_federated_start(provider: str, request: Request) -> BrowserAuthStartResponse:
+def browser_federated_start(
+    provider: str,
+    payload: BrowserAuthStartRequest,
+    request: Request,
+) -> BrowserAuthStartResponse:
     rate_limit(request, f"auth-{provider}-start")
     normalized = provider.strip().lower()
     if normalized not in {"telegram", "vk"}:
         raise HTTPException(status_code=404, detail="AUTH_PROVIDER_UNSUPPORTED")
     try:
-        state = user_store.issue_federated_challenge(normalized, "OAUTH_STATE", 300)
-        started = start_browser_flow(normalized, state)
+        state = user_store.issue_federated_challenge(
+            normalized,
+            "OAUTH_STATE",
+            300,
+            redirect_uri=payload.redirect_uri,
+        )
+        started = start_browser_flow(normalized, state, payload.redirect_uri)
     except FederatedAuthError as exc:
         raise _federated_error(exc) from exc
     return BrowserAuthStartResponse(
@@ -548,13 +559,19 @@ def _verified_browser(
     normalized = provider.strip().lower()
     if normalized not in {"telegram", "vk"}:
         raise HTTPException(status_code=404, detail="AUTH_PROVIDER_UNSUPPORTED")
-    if not user_store.consume_federated_challenge(normalized, "OAUTH_STATE", payload.state):
+    consumed, redirect_uri = user_store.consume_federated_challenge(
+        normalized,
+        "OAUTH_STATE",
+        payload.state,
+    )
+    if not consumed or not redirect_uri:
         raise HTTPException(status_code=400, detail="FEDERATED_CHALLENGE_INVALID")
     try:
         if normalized == "telegram":
             return complete_telegram(
                 code=payload.code,
                 code_verifier=payload.code_verifier,
+                redirect_uri=redirect_uri,
                 nonce=payload.state,
             )
         if not payload.device_id:
@@ -564,6 +581,7 @@ def _verified_browser(
             state=payload.state,
             code_verifier=payload.code_verifier,
             device_id=payload.device_id,
+            redirect_uri=redirect_uri,
         )
     except FederatedAuthError as exc:
         raise _federated_error(exc) from exc

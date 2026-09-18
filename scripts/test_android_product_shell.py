@@ -49,6 +49,7 @@ class AndroidProductShellTests(unittest.TestCase):
         required = (
             "settings", "updates", "help", "about", "home", "games", "security", "activity",
             "sign_in", "create_account", "forgot_password", "reset_password", "verify_email",
+            "continue_google", "continue_telegram", "continue_vk",
             "device_setup", "bind_device", "theme_light", "theme_dark",
         )
         for key in required:
@@ -72,7 +73,30 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('implementation("com.google.android.play:app-update:2.1.0")', self.gradle)
         version = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
         self.assertIsNotNone(version)
-        self.assertGreaterEqual(int(version.group(1)), 10005)
+        self.assertGreaterEqual(int(version.group(1)), 10006)
+
+    def test_federated_auth_uses_credential_manager_pkce_and_isolated_callbacks(self) -> None:
+        auth_api = read("app/src/main/java/com/alpha0/app/auth/AuthApi.kt")
+        login = read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+        coordinator = read("app/src/main/java/com/alpha0/app/auth/FederatedAuthCoordinator.kt")
+        state_store = read("app/src/main/java/com/alpha0/app/auth/FederatedAuthStateStore.kt")
+        self.assertIn('implementation("androidx.credentials:credentials:1.6.0")', self.gradle)
+        self.assertIn('implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")', self.gradle)
+        self.assertIn("GetGoogleIdOption.Builder()", coordinator)
+        self.assertIn(".setNonce(challenge.nonce)", coordinator)
+        self.assertIn("MessageDigest.isEqual", coordinator)
+        self.assertIn("FederatedAuthStateStore.Pending", coordinator)
+        self.assertIn("AndroidKeyStore", state_store)
+        self.assertIn("code_verifier", auth_api)
+        self.assertIn("continue_google", self.strings)
+        self.assertIn("continue_telegram", self.strings)
+        self.assertIn("continue_vk", self.strings)
+        self.assertIn('android:scheme="${authCallbackScheme}"', self.manifest)
+        self.assertIn('android:host="callback"', self.manifest)
+        self.assertIn('android:launchMode="singleTask"', self.manifest)
+        self.assertIn("completeBrowserCallback", login)
+        for scheme in ("com.alpha0.app.auth.dev", "com.alpha0.app.physicaltest.auth", "com.alpha0.app.auth"):
+            self.assertIn(scheme, self.gradle)
 
     def test_launcher_identity_is_explicit_and_branded(self) -> None:
         self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)

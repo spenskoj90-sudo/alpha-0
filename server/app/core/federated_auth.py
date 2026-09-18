@@ -61,7 +61,7 @@ def _safe_redirect_uri(value: str) -> bool:
         return False
     if parsed.scheme == "https":
         return bool(parsed.hostname)
-    return (
+    sentinel_callback = (
         parsed.scheme
         in {
             "com.alpha0.app.auth",
@@ -71,6 +71,13 @@ def _safe_redirect_uri(value: str) -> bool:
         and parsed.netloc == "callback"
         and parsed.path in {"", "/"}
     )
+    vk_callback = (
+        parsed.scheme.startswith("vk")
+        and parsed.scheme[2:].isdigit()
+        and parsed.netloc == "vk.ru"
+        and parsed.path == "/blank.html"
+    )
+    return sentinel_callback or vk_callback
 
 
 def _configured_redirect_uris(provider: str) -> tuple[str, ...]:

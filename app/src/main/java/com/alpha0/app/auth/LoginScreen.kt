@@ -68,7 +68,9 @@ fun LoginScreen(
 
     LaunchedEffect(Unit) {
         providerStatuses = when (val result = api.providerCatalog()) {
-            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter { it.enabled }
+            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter {
+                it.enabled && federatedAuth.isProviderCompatible(it)
+            }
             is AuthApi.ProviderCatalogResult.Failure -> emptyList()
         }
     }

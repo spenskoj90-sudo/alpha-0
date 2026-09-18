@@ -334,6 +334,25 @@ class UserAccountStore:
                 ).scalar_one_or_none()
                 if identity_id is None:
                     raise ValueError("ACCOUNT_NOT_FOUND")
+                subject_owner = conn.execute(
+                    text(
+                        "SELECT i.user_handle FROM external_identities e "
+                        "JOIN identities i ON i.id=e.identity_id "
+                        "WHERE e.provider=:provider AND e.provider_subject=:subject"
+                    ),
+                    {"provider": provider, "subject": subject},
+                ).scalar_one_or_none()
+                if subject_owner is not None:
+                    raise ValueError("EXTERNAL_IDENTITY_ALREADY_LINKED")
+                provider_exists = conn.execute(
+                    text(
+                        "SELECT 1 FROM external_identities "
+                        "WHERE identity_id=:identity AND provider=:provider"
+                    ),
+                    {"identity": identity_id, "provider": provider},
+                ).scalar_one_or_none()
+                if provider_exists is not None:
+                    raise ValueError("PROVIDER_ALREADY_LINKED")
                 conn.execute(
                     text(
                         "INSERT INTO external_identities(identity_id,provider,provider_subject,email_at_link_time) "

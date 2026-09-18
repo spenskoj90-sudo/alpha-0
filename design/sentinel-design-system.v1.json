@@ -147,7 +147,7 @@
   },
   "accessibility": {
     "web": ["skip navigation", "focus-visible", "main landmark", "live status", "forced-colors", "busy state", "assertive failure state", "plan-specific action names"],
-    "android": ["polite/assertive live region", "progress semantics", "button/card semantics", "API 35 instrumentation"],
+    "android": ["polite/assertive live region", "progress semantics", "button/card semantics", "API 36 instrumentation"],
     "companion": ["skip navigation", "focus-visible", "live status", "forced-colors", "busy state", "assertive failure state", "overlay polite live region"],
     "physicalPreRelease": ["TalkBack", "NVDA/JAWS", "switch/keyboard on target hardware", "real packaged host overlay", "microphone/driver/acoustic acceptance"]
   },

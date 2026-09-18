@@ -23,6 +23,16 @@ from app.core.character_projection import apply_character_projections
 from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
 from app.core.email_provider import configured_email_transport
 from app.core.entitlements import EntitlementStatus
+from app.core.federated_auth import (
+    FederatedAuthError,
+    VerifiedFederatedIdentity,
+    complete_telegram,
+    complete_vk,
+    provider_status,
+    provider_statuses,
+    start_browser_flow,
+    verify_google_id_token,
+)
 from app.core.game_catalog import DIABLO_CATALOG, get_game
 from app.core.game_state_routes import install_game_state_routes
 from app.core.models import (
@@ -37,6 +47,12 @@ from app.core.models import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
     EmailActionRequest,
+    BrowserAuthCompleteRequest,
+    BrowserAuthStartResponse,
+    FederatedProviderStatusResponse,
+    FederatedProvidersResponse,
+    GoogleAuthChallengeResponse,
+    GoogleCredentialRequest,
     EventBatchRequest,
     LoginRequest,
     Recommendation,
@@ -367,6 +383,211 @@ def account_security(authorization_header: str = Header(..., alias="Authorizatio
     if not state:
         raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
     return AccountSecurityResponse(**state)
+
+
+def _federated_error(exc: FederatedAuthError) -> HTTPException:
+    code = str(exc)
+    if code in {"AUTH_PROVIDER_NOT_CONFIGURED", "FEDERATED_PROVIDER_UNAVAILABLE"}:
+        return HTTPException(status_code=503, detail=code)
+    if code == "AUTH_PROVIDER_UNSUPPORTED":
+        return HTTPException(status_code=404, detail=code)
+    return HTTPException(status_code=400, detail=code)
+
+
+def _federated_session(identity: VerifiedFederatedIdentity, request: Request) -> SessionResponse:
+    user_id = user_store.external_identity_user(identity.provider, identity.subject)
+    if user_id is None:
+        try:
+            user_id = user_store.register_external_account(
+                identity.provider,
+                identity.subject,
+                email=identity.email,
+                email_verified=identity.email_verified,
+            )
+        except ValueError as exc:
+            if "ACCOUNT_LINK_REQUIRED" in str(exc):
+                raise HTTPException(status_code=409, detail="ACCOUNT_LINK_REQUIRED") from exc
+            raise
+    access, refresh, expires_at, _ = store.issue_session(
+        None,
+        user_id,
+        SESSION_TTL_SECONDS,
+        REFRESH_TTL_SECONDS,
+    )
+    scopes = ["character:read", "game:read", "audit:read"]
+    user_store.restrict_session_scopes(store, access, scopes)
+    store.add_audit(
+        {
+            "actor_user_id": user_id,
+            "actor_device_id": None,
+            "action": "auth:federated-login",
+            "resource": f"provider:{identity.provider}",
+            "decision": "ALLOW",
+            "reason_code": "FEDERATED_IDENTITY_VALID",
+            "request_id": request_id(request),
+        }
+    )
+    return SessionResponse(
+        session_token=access,
+        refresh_token=refresh,
+        expires_at=expires_at,
+        scopes=scopes,
+    )
+
+
+def _link_federated_identity(
+    principal: Principal,
+    identity: VerifiedFederatedIdentity,
+    request: Request,
+) -> AuthActionResponse:
+    existing = user_store.external_identity_user(identity.provider, identity.subject)
+    if existing and existing != principal.user_id:
+        raise HTTPException(status_code=409, detail="EXTERNAL_IDENTITY_ALREADY_LINKED")
+    if existing is None:
+        try:
+            user_store.link_external_identity(
+                principal.user_id,
+                identity.provider,
+                identity.subject,
+                identity.email,
+            )
+        except ValueError as exc:
+            code = str(exc)
+            if "PROVIDER_ALREADY_LINKED" in code or "EXTERNAL_IDENTITY_ALREADY_LINKED" in code:
+                raise HTTPException(status_code=409, detail=code) from exc
+            raise
+    store.add_audit(
+        {
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "auth:provider-link",
+            "resource": f"provider:{identity.provider}",
+            "decision": "ALLOW",
+            "reason_code": "FEDERATED_IDENTITY_VALID",
+            "request_id": request_id(request),
+        }
+    )
+    return AuthActionResponse(status="LINKED")
+
+
+@app.get("/v1/auth/providers", response_model=FederatedProvidersResponse)
+def federated_provider_catalog() -> FederatedProvidersResponse:
+    return FederatedProvidersResponse(
+        providers=[
+            FederatedProviderStatusResponse(
+                provider=item.provider,
+                enabled=item.enabled,
+                flow=item.flow,
+                client_id=item.client_id,
+            )
+            for item in provider_statuses()
+        ]
+    )
+
+
+@app.post("/v1/auth/providers/google/challenge", response_model=GoogleAuthChallengeResponse)
+def google_auth_challenge(request: Request) -> GoogleAuthChallengeResponse:
+    rate_limit(request, "auth-google-challenge")
+    status = provider_status("google")
+    if not status.enabled or not status.client_id:
+        raise HTTPException(status_code=503, detail="AUTH_PROVIDER_NOT_CONFIGURED")
+    nonce = user_store.issue_federated_challenge("google", "OIDC_NONCE", 300)
+    return GoogleAuthChallengeResponse(client_id=status.client_id, nonce=nonce)
+
+
+def _verified_google(payload: GoogleCredentialRequest) -> VerifiedFederatedIdentity:
+    try:
+        identity = verify_google_id_token(payload.id_token, payload.nonce)
+    except FederatedAuthError as exc:
+        raise _federated_error(exc) from exc
+    if not user_store.consume_federated_challenge("google", "OIDC_NONCE", payload.nonce):
+        raise HTTPException(status_code=400, detail="FEDERATED_CHALLENGE_INVALID")
+    return identity
+
+
+@app.post("/v1/auth/providers/google/login", response_model=SessionResponse)
+def google_federated_login(payload: GoogleCredentialRequest, request: Request) -> SessionResponse:
+    rate_limit(request, "auth-google-login")
+    return _federated_session(_verified_google(payload), request)
+
+
+@app.post("/v1/account/providers/google/link", response_model=AuthActionResponse)
+def google_provider_link(
+    payload: GoogleCredentialRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> AuthActionResponse:
+    rate_limit(request, "auth-google-link")
+    principal = principal_from_token(require_bearer(authorization_header))
+    return _link_federated_identity(principal, _verified_google(payload), request)
+
+
+@app.post("/v1/auth/providers/{provider}/start", response_model=BrowserAuthStartResponse)
+def browser_federated_start(provider: str, request: Request) -> BrowserAuthStartResponse:
+    rate_limit(request, f"auth-{provider}-start")
+    normalized = provider.strip().lower()
+    if normalized not in {"telegram", "vk"}:
+        raise HTTPException(status_code=404, detail="AUTH_PROVIDER_UNSUPPORTED")
+    try:
+        state = user_store.issue_federated_challenge(normalized, "OAUTH_STATE", 300)
+        started = start_browser_flow(normalized, state)
+    except FederatedAuthError as exc:
+        raise _federated_error(exc) from exc
+    return BrowserAuthStartResponse(
+        provider=normalized,
+        authorization_url=started.authorization_url,
+        state=started.state,
+        code_verifier=started.code_verifier,
+    )
+
+
+def _verified_browser(
+    provider: str,
+    payload: BrowserAuthCompleteRequest,
+) -> VerifiedFederatedIdentity:
+    normalized = provider.strip().lower()
+    if normalized not in {"telegram", "vk"}:
+        raise HTTPException(status_code=404, detail="AUTH_PROVIDER_UNSUPPORTED")
+    if not user_store.consume_federated_challenge(normalized, "OAUTH_STATE", payload.state):
+        raise HTTPException(status_code=400, detail="FEDERATED_CHALLENGE_INVALID")
+    try:
+        if normalized == "telegram":
+            return complete_telegram(
+                code=payload.code,
+                code_verifier=payload.code_verifier,
+            )
+        if not payload.device_id:
+            raise FederatedAuthError("VK_DEVICE_ID_REQUIRED")
+        return complete_vk(
+            code=payload.code,
+            state=payload.state,
+            code_verifier=payload.code_verifier,
+            device_id=payload.device_id,
+        )
+    except FederatedAuthError as exc:
+        raise _federated_error(exc) from exc
+
+
+@app.post("/v1/auth/providers/{provider}/complete", response_model=SessionResponse)
+def browser_federated_complete(
+    provider: str,
+    payload: BrowserAuthCompleteRequest,
+    request: Request,
+) -> SessionResponse:
+    rate_limit(request, f"auth-{provider}-complete")
+    return _federated_session(_verified_browser(provider, payload), request)
+
+
+@app.post("/v1/account/providers/{provider}/link", response_model=AuthActionResponse)
+def browser_provider_link(
+    provider: str,
+    payload: BrowserAuthCompleteRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> AuthActionResponse:
+    rate_limit(request, f"auth-{provider}-link")
+    principal = principal_from_token(require_bearer(authorization_header))
+    return _link_federated_identity(principal, _verified_browser(provider, payload), request)
 
 
 @app.post("/v1/auth/login", response_model=SessionResponse)

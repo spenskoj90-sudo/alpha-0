@@ -31,6 +31,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.progressStatusSemantics
 import kotlinx.coroutines.launch
@@ -40,6 +41,7 @@ fun LoginScreen(
     api: AuthApi,
     onAuthenticated: (AuthApi.Session) -> Unit,
 ) {
+    val strings = LocalAppStrings.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -51,8 +53,8 @@ fun LoginScreen(
     fun submit() {
         val normalizedEmail = email.trim().lowercase()
         when {
-            !normalizedEmail.contains("@") -> error = "Enter a valid email address"
-            password.length < 12 -> error = "Password must be at least 12 characters"
+            !normalizedEmail.contains("@") -> error = strings.text("valid_email")
+            password.length < 12 -> error = strings.text("password_length")
             else -> {
                 busy = true
                 error = null
@@ -66,12 +68,12 @@ fun LoginScreen(
                     when (result) {
                         is AuthApi.Result.Success -> onAuthenticated(result.session)
                         is AuthApi.Result.Failure -> error = when (result.message) {
-                            "INVALID_CREDENTIALS" -> "Email or password is incorrect"
-                            "EMAIL_ALREADY_REGISTERED" -> "An account with this email already exists"
-                            "REGISTER_OUTCOME_UNKNOWN" -> "Registration response timed out. The account may already exist; wait for staging, then sign in."
-                            "REQUEST_TIMEOUT" -> "SENTINEL staging is still waking up. Wait a moment and try again."
-                            "NETWORK_ERROR" -> "Cannot reach SENTINEL server"
-                            else -> "Authentication failed: ${result.message}"
+                            "INVALID_CREDENTIALS" -> strings.text("invalid_credentials")
+                            "EMAIL_ALREADY_REGISTERED" -> strings.text("email_exists")
+                            "REGISTER_OUTCOME_UNKNOWN" -> strings.text("register_unknown")
+                            "REQUEST_TIMEOUT" -> strings.text("request_timeout")
+                            "NETWORK_ERROR" -> strings.text("server_unreachable")
+                            else -> strings.text("auth_failed", result.message)
                         }
                     }
                 }
@@ -79,27 +81,27 @@ fun LoginScreen(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = SentinelColors.Background) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("SENTINEL", style = MaterialTheme.typography.headlineLarge)
+            Text(strings.text("app_name"), style = MaterialTheme.typography.headlineLarge)
             Text(
-                if (registerMode) "Create your account" else "Sign in to your account",
+                strings.text(if (registerMode) "create_account_title" else "sign_in_title"),
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
-                "Your account is separate from this device identity. Device enrollment follows after authentication.",
+                strings.text("auth_explanation"),
                 style = MaterialTheme.typography.bodyLarge,
-                color = SentinelColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Email") },
+                label = { Text(strings.text("email")) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 enabled = !busy,
@@ -110,7 +112,7 @@ fun LoginScreen(
                 value = password,
                 onValueChange = { password = it; error = null },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Password") },
+                label = { Text(strings.text("password")) },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -118,7 +120,7 @@ fun LoginScreen(
                     IconButton(onClick = { passwordVisible = !passwordVisible }, enabled = !busy) {
                         Icon(
                             imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            contentDescription = strings.text(if (passwordVisible) "hide_password" else "show_password"),
                         )
                     }
                 },
@@ -130,7 +132,7 @@ fun LoginScreen(
                 Text(
                     error!!,
                     modifier = Modifier.assertiveStatusSemantics(),
-                    color = SentinelColors.Danger,
+                    color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -141,19 +143,19 @@ fun LoginScreen(
                 enabled = !busy,
                 shape = RoundedCornerShape(14.dp),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = SentinelColors.Primary,
-                    contentColor = SentinelColors.TextPrimary,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
                 if (busy) {
                     CircularProgressIndicator(
                         modifier = Modifier.progressStatusSemantics(
-                            if (registerMode) "Creating account" else "Signing in"
+                            strings.text(if (registerMode) "create_account" else "sign_in")
                         ),
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text(if (registerMode) "Create account" else "Sign in")
+                    Text(strings.text(if (registerMode) "create_account" else "sign_in"))
                 }
             }
 
@@ -163,7 +165,7 @@ fun LoginScreen(
                 enabled = !busy,
                 shape = RoundedCornerShape(14.dp),
             ) {
-                Text(if (registerMode) "I already have an account" else "Create a new account")
+                Text(strings.text(if (registerMode) "existing_account" else "new_account"))
             }
         }
     }

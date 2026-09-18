@@ -74,7 +74,9 @@ android {
         applicationId = "com.alpha0.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10002
+        // Monotonic application identity. Increment for every installable update;
+        // Android rejects an in-place replacement that does not advance this value.
+        versionCode = 10003
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
@@ -170,6 +172,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
     implementation("com.google.android.play:integrity:1.4.0")
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:app-update-ktx:2.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("io.sentry:sentry-android:8.54.0")
     debugImplementation("androidx.compose.ui:ui-tooling")

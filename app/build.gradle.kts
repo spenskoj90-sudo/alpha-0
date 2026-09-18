@@ -76,7 +76,7 @@ android {
         targetSdk = 35
         // Monotonic application identity. Increment for every installable update;
         // Android rejects an in-place replacement that does not advance this value.
-        versionCode = 10004
+        versionCode = 10005
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"

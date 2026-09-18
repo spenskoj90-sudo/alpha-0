@@ -71,7 +71,9 @@ fun DeviceDetailsScreen(
             is AuthApi.AccountSecurityResult.Failure -> accountError = result.message
         }
         providerStatuses = when (val result = authApi.providerCatalog()) {
-            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter { it.enabled }
+            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter {
+                it.enabled && federatedAuth.isProviderCompatible(it)
+            }
             is AuthApi.ProviderCatalogResult.Failure -> emptyList()
         }
     }

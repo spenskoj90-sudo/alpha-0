@@ -85,7 +85,7 @@ Required external configuration:
 ```text
 SENTINEL_VK_AUTH_ENABLED=true
 SENTINEL_VK_CLIENT_ID=<VK ID application ID>
-SENTINEL_VK_REDIRECT_URIS=com.alpha0.app.auth://callback,com.alpha0.app.physicaltest.auth://callback
+SENTINEL_VK_REDIRECT_URIS=vk<VK_CLIENT_ID>://vk.ru/blank.html
 ```
 
 ## 5. Redirect and callback boundary
@@ -97,6 +97,8 @@ Canonical Android callback schemes are separated by distribution identity:
 - debug/development: `com.alpha0.app.auth.dev://callback`;
 - physical-test diagnostic APK: `com.alpha0.app.physicaltest.auth://callback`;
 - release: `com.alpha0.app.auth://callback`.
+
+Telegram uses the SENTINEL callback schemes above when the provider configuration accepts them. VK mobile authorization uses the provider-mandated callback `vk<clientId>://vk.ru/blank.html`. The public VK client ID is compiled into the Android manifest to register that exact scheme; no VK client secret is compiled into the APK. An APK hides the VK option unless Core's declared client ID matches the callback identity compiled into that build.
 
 The Android manifest accepts only the build's compiled scheme plus host `callback`. MainActivity validates both again before forwarding a callback to the auth coordinator.
 

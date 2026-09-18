@@ -196,7 +196,7 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
     monkeypatch.setenv("SENTINEL_TELEGRAM_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_ID", "123456")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_SECRET", "test-only-secret")
-    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "sentinel://auth/telegram")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "com.alpha0.app.auth.dev://callback")
     monkeypatch.setattr(
         main_module,
         "complete_telegram",
@@ -239,7 +239,7 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
 def test_vk_exchange_uses_provider_subject_not_email(monkeypatch):
     monkeypatch.setenv("SENTINEL_VK_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_VK_CLIENT_ID", "123456")
-    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "sentinel://auth/vk")
+    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "com.alpha0.app.auth.dev://callback")
     identity = complete_vk(
         code="code",
         state="state",
@@ -260,7 +260,7 @@ def test_telegram_id_token_verification_uses_oidc_subject(monkeypatch):
     monkeypatch.setenv("SENTINEL_TELEGRAM_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_ID", "123456")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_SECRET", "test-secret")
-    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "sentinel://auth/telegram")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "com.alpha0.app.auth.dev://callback")
     now = int(time.time())
     jwks, token = _rsa_jwk_and_token(
         {

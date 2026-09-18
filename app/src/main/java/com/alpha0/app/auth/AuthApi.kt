@@ -32,6 +32,11 @@ class AuthApi(
         data class Failure(val message: String) : Result
     }
 
+    sealed interface ActionResult {
+        data class Success(val status: String) : ActionResult
+        data class Failure(val message: String) : ActionResult
+    }
+
     @Volatile
     private var diag: DiagnosticLogger? = null
 
@@ -52,6 +57,41 @@ class AuthApi(
             "/v1/sessions/refresh",
             JSONObject().apply { put("refresh_token", refreshToken) }.toString(),
             "REFRESH",
+        )
+    }
+
+    suspend fun requestEmailVerification(email: String): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/auth/email-verification/request",
+            JSONObject().apply { put("email", email.trim().lowercase()) }.toString(),
+            "EMAIL_VERIFY_REQUEST",
+        )
+    }
+
+    suspend fun confirmEmailVerification(token: String): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/auth/email-verification/confirm",
+            JSONObject().apply { put("token", token.trim()) }.toString(),
+            "EMAIL_VERIFY_CONFIRM",
+        )
+    }
+
+    suspend fun requestPasswordReset(email: String): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/auth/password-reset/request",
+            JSONObject().apply { put("email", email.trim().lowercase()) }.toString(),
+            "PASSWORD_RESET_REQUEST",
+        )
+    }
+
+    suspend fun confirmPasswordReset(token: String, password: String): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/auth/password-reset/confirm",
+            JSONObject().apply {
+                put("token", token.trim())
+                put("password", password)
+            }.toString(),
+            "PASSWORD_RESET_CONFIRM",
         )
     }
 
@@ -92,6 +132,48 @@ class AuthApi(
             val duration = System.currentTimeMillis() - t0
             diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
             Result.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
+    private fun requestAction(path: String, payload: String, op: String): ActionResult {
+        val t0 = System.currentTimeMillis()
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        return try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.POST,
+                    url = "$normalizedBase$path",
+                    headers = mapOf(
+                        "Content-Type" to "application/json",
+                        "Accept" to "application/json",
+                    ),
+                    body = payload.toByteArray(Charsets.UTF_8),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
+            if (response.status !in 200..299 || json == null) {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                diag?.warn("AUTH", op, "FAILURE", errorCode = code, durationMs = duration)
+                ActionResult.Failure(code)
+            } else {
+                val status = json.optString("status")
+                if (status.isBlank()) {
+                    ActionResult.Failure("AUTH_RESPONSE_INVALID")
+                } else {
+                    diag?.info("AUTH", op, "SUCCESS", durationMs = duration)
+                    ActionResult.Success(status)
+                }
+            }
+        } catch (e: SocketTimeoutException) {
+            diag?.warn("AUTH", op, "FAILURE", errorCode = "REQUEST_TIMEOUT", durationMs = System.currentTimeMillis() - t0)
+            ActionResult.Failure("REQUEST_TIMEOUT")
+        } catch (e: IOException) {
+            diag?.warn("AUTH", op, "FAILURE", errorCode = "NETWORK_ERROR", durationMs = System.currentTimeMillis() - t0)
+            ActionResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            diag?.error("AUTH", op, "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = System.currentTimeMillis() - t0, throwable = e)
+            ActionResult.Failure("UNEXPECTED_ERROR")
         }
     }
 

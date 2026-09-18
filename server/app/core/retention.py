@@ -20,6 +20,7 @@ _PURGE_RULES: tuple[tuple[str, str], ...] = (
     ("device_challenges", "expires_at < now() - interval '1 hour' OR consumed_at < now() - interval '1 hour'"),
     ("proof_request_ids", "created_at < now() - interval '1 day'"),
     ("security_failures", "failed_at < now() - interval '1 day'"),
+    ("auth_action_tokens", "expires_at < now() OR consumed_at < now() - interval '1 day'"),
     (
         "sessions",
         "expires_at < now() - interval '7 days' AND "

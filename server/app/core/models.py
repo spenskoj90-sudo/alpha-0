@@ -35,6 +35,39 @@ class LoginRequest(UserCredentials):
     pass
 
 
+class EmailActionRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized or normalized.startswith("@") or normalized.endswith("@"):
+            raise ValueError("INVALID_EMAIL")
+        return normalized
+
+
+class AuthTokenRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+
+
+class PasswordResetConfirmRequest(AuthTokenRequest):
+    password: str = Field(min_length=12, max_length=256)
+
+
+class AuthActionResponse(BaseModel):
+    status: Literal["ACCEPTED", "VERIFIED", "PASSWORD_UPDATED"]
+
+
+class AccountSecurityResponse(BaseModel):
+    email: str
+    email_verified: bool
+    password_enabled: bool
+    providers: list[Literal["google", "vk", "telegram"]]
+
+
+
+
 class DeviceRegisterRequest(BaseModel):
     user_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9._:@-]+$")
     platform: Literal["android"]

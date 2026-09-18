@@ -70,4 +70,40 @@ class AuthApiTransportTest {
 
         assertEquals(AuthApi.Result.Failure("REGISTER_OUTCOME_UNKNOWN"), result)
     }
+
+    @Test
+    fun passwordResetRequestUsesNonEnumeratingActionEndpoint() = runBlocking {
+        val transport = FakeTransport(HttpResponse(202, "{\"status\":\"ACCEPTED\"}"))
+        val result = AuthApi("https://example.test", transport).requestPasswordReset(" User@Example.TEST ")
+
+        assertEquals(AuthApi.ActionResult.Success("ACCEPTED"), result)
+        val request = requireNotNull(transport.request)
+        assertEquals("https://example.test/v1/auth/password-reset/request", request.url)
+        assertTrue(String(requireNotNull(request.body)).contains("user@example.test"))
+    }
+
+    @Test
+    fun passwordResetConfirmationSendsCodeAndNewPasswordToDedicatedEndpoint() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"PASSWORD_UPDATED\"}"))
+        val result = AuthApi("https://example.test", transport)
+            .confirmPasswordReset("one-time-code-value-that-is-long-enough", "new-password-value")
+
+        assertEquals(AuthApi.ActionResult.Success("PASSWORD_UPDATED"), result)
+        val request = requireNotNull(transport.request)
+        assertEquals("https://example.test/v1/auth/password-reset/confirm", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("one-time-code-value-that-is-long-enough"))
+        assertTrue(body.contains("new-password-value"))
+    }
+
+    @Test
+    fun emailVerificationConfirmationUsesDedicatedActionParser() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"VERIFIED\"}"))
+        val result = AuthApi("https://example.test", transport)
+            .confirmEmailVerification("one-time-email-verification-code-value")
+
+        assertEquals(AuthApi.ActionResult.Success("VERIFIED"), result)
+        assertEquals("https://example.test/v1/auth/email-verification/confirm", requireNotNull(transport.request).url)
+    }
+
 }

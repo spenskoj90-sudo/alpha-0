@@ -10,6 +10,9 @@
 - Fresh timestamp and one-time request/challenge replay protection.
 - Opaque access tokens with hashed persistence.
 - One-time refresh-token rotation and replay rejection.
+- Email verification and password recovery use high-entropy single-use credentials; only SHA-256 token digests are persisted.
+- Verification/reset requests are deliberately non-enumerating for unknown email addresses.
+- Password reset revokes all existing sessions for the affected identity before a new login can be trusted.
 - Device-bound event ingestion with sequence constraints.
 - Idempotency-key conflict detection.
 - Input validation and bounded payloads.

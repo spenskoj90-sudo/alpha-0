@@ -10,6 +10,11 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 
 - `POST /v1/auth/register` — create an account and issue a least-privilege user session.
 - `POST /v1/auth/login` — authenticate an existing account and issue a least-privilege user session.
+- `POST /v1/auth/email-verification/request` — non-enumerating request for a 24-hour one-time email-verification code.
+- `POST /v1/auth/email-verification/confirm` — consume a verification code exactly once and mark the account email verified.
+- `POST /v1/auth/password-reset/request` — non-enumerating request for a 30-minute one-time password-reset code.
+- `POST /v1/auth/password-reset/confirm` — consume the reset code, replace the password and revoke all existing account sessions.
+- `GET /v1/account/security` — caller-scoped email-verification/password/provider-link security state.
 
 ## Device identity
 

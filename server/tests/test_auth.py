@@ -1,6 +1,12 @@
+import hashlib
+import re
+import uuid
+
 from fastapi.testclient import TestClient
 
-from app.main import app, store
+from app import main as main_module
+from app.core.email_provider import TestEmailTransport
+from app.main import app, store, user_store
 
 
 client = TestClient(app)

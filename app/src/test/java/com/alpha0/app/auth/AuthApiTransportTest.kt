@@ -199,4 +199,53 @@ class AuthApiTransportTest {
         assertTrue(body.contains("code_verifier"))
     }
 
+
+    @Test
+    fun accountSecurityReadAndProviderLinkKeepBearerHeaderServerSide() = runBlocking {
+        val securityTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"email\":\"user@example.com\",\"email_verified\":true,\"password_enabled\":true,\"providers\":[\"google\"]}",
+            ),
+        )
+        val security = AuthApi("https://example.test", securityTransport).accountSecurity("access-secret")
+        assertTrue(security is AuthApi.AccountSecurityResult.Success)
+        val securityRequest = requireNotNull(securityTransport.request)
+        assertEquals("Bearer access-secret", securityRequest.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/security", securityRequest.url)
+
+        val linkTransport = FakeTransport(HttpResponse(200, "{\"status\":\"LINKED\"}"))
+        val linked = AuthApi("https://example.test", linkTransport).linkGoogle(
+            accessToken = "access-secret",
+            idToken = "header.payload.signature",
+            nonce = "abcdefghijklmnopqrstuvwxyz1234567890",
+        )
+        assertEquals(AuthApi.ActionResult.Success("LINKED"), linked)
+        val linkRequest = requireNotNull(linkTransport.request)
+        assertEquals("Bearer access-secret", linkRequest.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/providers/google/link", linkRequest.url)
+        assertTrue(String(requireNotNull(linkRequest.body)).contains("header.payload.signature"))
+    }
+
+    @Test
+    fun browserProviderLinkUsesAuthenticatedDedicatedEndpoint() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"LINKED\"}"))
+        val result = AuthApi("https://example.test", transport).linkBrowserProvider(
+            accessToken = "access-secret",
+            provider = "vk",
+            code = "vk-code",
+            state = "abcdefghijklmnopqrstuvwxyz1234567890",
+            codeVerifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~",
+            deviceId = "vk-device",
+        )
+
+        assertEquals(AuthApi.ActionResult.Success("LINKED"), result)
+        val request = requireNotNull(transport.request)
+        assertEquals("Bearer access-secret", request.headers["Authorization"])
+        assertEquals("https://example.test/v1/account/providers/vk/link", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("vk-device"))
+        assertTrue(body.contains("code_verifier"))
+    }
+
 }

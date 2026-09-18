@@ -555,6 +555,7 @@ def _verified_browser(
             return complete_telegram(
                 code=payload.code,
                 code_verifier=payload.code_verifier,
+                nonce=payload.state,
             )
         if not payload.device_id:
             raise FederatedAuthError("VK_DEVICE_ID_REQUIRED")

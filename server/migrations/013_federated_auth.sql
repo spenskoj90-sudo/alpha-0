@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS federated_auth_challenges (
     challenge_hash CHAR(64) PRIMARY KEY,
     provider TEXT NOT NULL CHECK (provider IN ('google', 'telegram', 'vk')),
     purpose TEXT NOT NULL CHECK (purpose IN ('OIDC_NONCE', 'OAUTH_STATE')),
+    redirect_uri TEXT,
     expires_at TIMESTAMPTZ NOT NULL,
     consumed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()

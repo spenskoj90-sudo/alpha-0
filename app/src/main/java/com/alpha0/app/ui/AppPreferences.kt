@@ -9,9 +9,9 @@ enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 class AppPreferences(context: Context) {
     private val values = context.getSharedPreferences("sentinel_ui_preferences", Context.MODE_PRIVATE)
 
-    fun language(): AppLanguage = enumValue(values.getString(KEY_LANGUAGE), AppLanguage.SYSTEM)
+    fun language(): AppLanguage = enumValue(values.getString(KEY_LANGUAGE, null), AppLanguage.SYSTEM)
 
-    fun theme(): AppThemeMode = enumValue(values.getString(KEY_THEME), AppThemeMode.SYSTEM)
+    fun theme(): AppThemeMode = enumValue(values.getString(KEY_THEME, null), AppThemeMode.SYSTEM)
 
     fun setLanguage(value: AppLanguage) {
         values.edit().putString(KEY_LANGUAGE, value.name).apply()

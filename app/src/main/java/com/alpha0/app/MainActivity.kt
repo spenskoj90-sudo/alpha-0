@@ -132,7 +132,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun SentinelApplicationUi(
-    initialSession: SecureSessionStore.Session?,
+    initialSession: SecureSessionStore.Companion.Session?,
     language: AppLanguage,
     theme: AppThemeMode,
     onLanguage: (AppLanguage) -> Unit,
@@ -328,11 +328,11 @@ private fun SentinelApplicationUi(
 
 @Composable
 private fun AuthenticatedRoute(
-    session: SecureSessionStore.Session?,
+    session: SecureSessionStore.Companion.Session?,
     store: SecureSessionStore,
     activity: ComponentActivity,
     navController: androidx.navigation.NavHostController,
-    content: @Composable (SecureSessionStore.Session) -> Unit,
+    content: @Composable (SecureSessionStore.Companion.Session) -> Unit,
 ) {
     val current = session ?: store.load(activity)
     if (current == null || current.deviceId.isNullOrBlank()) {
@@ -348,13 +348,13 @@ private fun AuthenticatedRoute(
 
 @Composable
 private fun DeviceDetailsContent(
-    session: SecureSessionStore.Session,
+    session: SecureSessionStore.Companion.Session,
     api: DashboardApi,
     identity: DeviceIdentity,
     store: SecureSessionStore,
     activity: ComponentActivity,
     navController: androidx.navigation.NavHostController,
-    onSessionChanged: (SecureSessionStore.Session?) -> Unit,
+    onSessionChanged: (SecureSessionStore.Companion.Session?) -> Unit,
 ) {
     DeviceDetailsScreen(
         accessToken = session.accessToken,

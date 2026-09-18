@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
             context = this,
             api = authApi,
             callbackScheme = BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME,
+            vkRedirectUri = BuildConfig.SENTINEL_VK_REDIRECT_URI,
         )
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
@@ -150,10 +151,14 @@ class MainActivity : ComponentActivity() {
 
     private fun validatedFederatedCallback(intent: Intent?): Uri? {
         val uri = intent?.data ?: return null
-        return uri.takeIf {
-            it.scheme == BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME &&
-                it.host == "callback"
-        }
+        val generic = uri.scheme == BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME &&
+            uri.host == "callback"
+        val expectedVk = runCatching { Uri.parse(BuildConfig.SENTINEL_VK_REDIRECT_URI) }.getOrNull()
+        val vk = expectedVk != null &&
+            uri.scheme == expectedVk.scheme &&
+            uri.host == expectedVk.host &&
+            uri.path == expectedVk.path
+        return uri.takeIf { generic || vk }
     }
 }
 

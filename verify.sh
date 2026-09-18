@@ -47,6 +47,7 @@ check 'Document authority map' test -f docs/DOCUMENT_STATUS.md
 check 'Design system contract' test -f docs/DESIGN_SYSTEM_V1.md
 check 'Design system manifest' test -f design/sentinel-design-system.v1.json
 check 'Design system tests' test -f scripts/test_design_system.py
+check 'Platform baseline tests' test -f scripts/test_platform_baseline.py
 check 'Telemetry contract' test -f docs/OBSERVABILITY.md
 check 'Telemetry manifest' test -f observability/telemetry-contract.v1.json
 check 'Telemetry contract tests' test -f scripts/test_telemetry_contract.py
@@ -87,7 +88,7 @@ if command -v python >/dev/null 2>&1; then
     scripts/release_evidence.py scripts/release_evidence_entrypoint.py \
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
     scripts/release_lineage.py scripts/test_release_lineage.py \
-    scripts/test_artifact_attestations.py scripts/test_design_system.py \
+    scripts/test_artifact_attestations.py scripts/test_design_system.py scripts/test_platform_baseline.py \
     scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
     scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py
@@ -98,6 +99,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Release lineage invariants' python scripts/test_release_lineage.py
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
   check 'Design system invariants' python scripts/test_design_system.py
+  check 'Platform baseline invariants' python scripts/test_platform_baseline.py
   check 'Telemetry contract invariants' python scripts/test_telemetry_contract.py
   check 'Provider runtime state invariants' python scripts/test_provider_runtime_state.py
   check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py

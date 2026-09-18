@@ -50,4 +50,4 @@ Server-issued attestation nonces are one-time and TTL-bound. Google Play Integri
 
 ## Admin control plane
 
-Admin endpoints require `SENTINEL_ADMIN_TOKEN`, are rate-limited, record failed attempts, and lock out the source after 5 failures in 15 minutes. Error bodies do not echo the presented token.
+Admin endpoints require both the high-entropy `SENTINEL_ADMIN_TOKEN` and a current RFC 6238-compatible six-digit TOTP derived from the server-side `SENTINEL_ADMIN_TOTP_SECRET`. The TOTP secret must contain at least 128 bits of Base32 key material and is compatible with Google Authenticator and equivalent authenticator apps. The server accepts only the current 30-second counter plus the adjacent counter on either side for clock skew. Missing server-side MFA configuration fails the admin plane closed with 503; invalid factors share the generic `ADMIN_ACCESS_DENIED` response, are rate-limited, record failed attempts, and participate in the existing source lockout. The Web admin surface forwards only the currently entered code and does not persist either factor. Owner/admin authority is server-authoritative and is never inferred from an Android APK variant.

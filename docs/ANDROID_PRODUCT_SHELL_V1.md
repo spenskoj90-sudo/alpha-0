@@ -24,7 +24,7 @@ Every build exposes a persistent top app bar and overflow menu before sign-in. T
 - Help;
 - About.
 
-Settings persist locally and do not require an account. Language choices are System, Russian and English. Appearance choices are System, Light and Dark. A language or theme change applies immediately and survives process restart. The authentication surface is scroll-safe and includes a non-enumerating password-recovery flow plus post-registration email verification with resend and verify-later paths.
+Settings persist locally and do not require an account. Language choices are System, Russian and English. Appearance choices are System, Light and Dark. A language or theme change applies immediately and survives process restart. The authentication surface is scroll-safe and includes a non-enumerating password-recovery flow plus post-registration email verification with resend and verify-later paths. When Core reports configured providers, the same surface offers Google Credential Manager and Telegram/VK PKCE sign-in. Security shows caller-scoped account-access state and supports explicit provider linking; email equality alone never links identities.
 
 ## Required authenticated shell
 
@@ -62,6 +62,9 @@ Routine Android acceptance must prove at least:
 - pre-auth menu routes exist;
 - all language/theme choices exist and preferences persist;
 - sign-in exposes password recovery and registration exposes email verification without trapping a user when external mail delivery is unavailable;
+- federated provider buttons are server-driven and hidden when a provider or this APK's callback identity is not configured;
+- Google uses Credential Manager with a Core-issued nonce; Telegram/VK browser PKCE state survives Activity recreation under Android Keystore protection;
+- Security can explicitly link an additional provider using the current SENTINEL session plus fresh provider proof;
 - both light and dark color schemes compile;
 - authenticated primary routes exist;
 - onboarding is scrollable and the card decoration uses `matchParentSize`, not `fillMaxSize` measurement;

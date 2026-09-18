@@ -72,6 +72,6 @@ Routine Android acceptance must prove at least:
 - the manifest names the SENTINEL launcher icon and product-shell tests lock its branded palette;
 - release uses the Play distribution channel while the isolated physical-test package reports the diagnostic channel;
 - `versionCode` is positive and monotonically advanced for each installable distribution;
-- API 35 instrumentation and JVM tests pass on the exact SHA.
+- API 36 instrumentation and JVM tests pass on the exact SHA.
 
 Physical acceptance remains required for the exact selected artifact. CI does not manufacture a physical PASS.

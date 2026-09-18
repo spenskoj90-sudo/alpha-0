@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readAdminAuthHeaders } from '../../../_auth';
 
 function upstreamUrl() {
   const value = process.env.SENTINEL_CORE_URL?.trim();
@@ -9,15 +10,15 @@ function upstreamUrl() {
 async function proxy(request: NextRequest, clusterId: string, method: 'GET' | 'POST') {
   const upstream = upstreamUrl();
   if (!upstream) return NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 });
-  const token = request.headers.get('x-sentinel-admin-token');
-  if (!token) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
+  const adminHeaders = readAdminAuthHeaders(request);
+  if (!adminHeaders) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
   try {
     const response = await fetch(`${upstream}/v1/admin/quality/clusters/${encodeURIComponent(clusterId)}`, {
       method,
       headers: {
         accept: 'application/json',
         'content-type': 'application/json',
-        'x-sentinel-admin-token': token,
+        ...adminHeaders,
       },
       body: method === 'POST' ? await request.text() : undefined,
       cache: 'no-store',

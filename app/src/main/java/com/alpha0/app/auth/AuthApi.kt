@@ -68,6 +68,18 @@ class AuthApi(
         data class Failure(val message: String) : BrowserStartResult
     }
 
+    data class AccountSecurity(
+        val email: String?,
+        val emailVerified: Boolean,
+        val passwordEnabled: Boolean,
+        val providers: List<String>,
+    )
+
+    sealed interface AccountSecurityResult {
+        data class Success(val value: AccountSecurity) : AccountSecurityResult
+        data class Failure(val message: String) : AccountSecurityResult
+    }
+
     @Volatile
     private var diag: DiagnosticLogger? = null
 
@@ -289,6 +301,87 @@ class AuthApi(
         )
     }
 
+    suspend fun accountSecurity(accessToken: String): AccountSecurityResult = withContext(Dispatchers.IO) {
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.GET,
+                    url = "$normalizedBase/v1/account/security",
+                    headers = mapOf(
+                        "Authorization" to "Bearer $accessToken",
+                        "Accept" to "application/json",
+                    ),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            if (response.status !in 200..299 || json == null) {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                AccountSecurityResult.Failure(code)
+            } else {
+                val providerArray = json.optJSONArray("providers")
+                val providers = buildList {
+                    if (providerArray != null) {
+                        for (i in 0 until providerArray.length()) {
+                            val provider = providerArray.optString(i)
+                            if (provider.isNotBlank()) add(provider)
+                        }
+                    }
+                }
+                AccountSecurityResult.Success(
+                    AccountSecurity(
+                        email = json.optString("email").takeIf { it.isNotBlank() },
+                        emailVerified = json.optBoolean("email_verified", false),
+                        passwordEnabled = json.optBoolean("password_enabled", false),
+                        providers = providers,
+                    )
+                )
+            }
+        } catch (_: IOException) {
+            AccountSecurityResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            diag?.error("AUTH", "ACCOUNT_SECURITY", "FAILURE", errorCode = "UNEXPECTED_ERROR", throwable = e)
+            AccountSecurityResult.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
+    suspend fun linkGoogle(
+        accessToken: String,
+        idToken: String,
+        nonce: String,
+    ): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/account/providers/google/link",
+            JSONObject().apply {
+                put("id_token", idToken)
+                put("nonce", nonce)
+            }.toString(),
+            "GOOGLE_LINK",
+            mapOf("Authorization" to "Bearer $accessToken"),
+        )
+    }
+
+    suspend fun linkBrowserProvider(
+        accessToken: String,
+        provider: String,
+        code: String,
+        state: String,
+        codeVerifier: String,
+        deviceId: String?,
+    ): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/account/providers/${provider.trim().lowercase()}/link",
+            JSONObject().apply {
+                put("code", code)
+                put("state", state)
+                put("code_verifier", codeVerifier)
+                if (!deviceId.isNullOrBlank()) put("device_id", deviceId)
+            }.toString(),
+            "BROWSER_AUTH_LINK",
+            mapOf("Authorization" to "Bearer $accessToken"),
+        )
+    }
+
     private fun requestCredentials(path: String, email: String, password: String, op: String): Result {
         val payload = JSONObject().apply {
             put("email", email.trim().lowercase())
@@ -329,7 +422,12 @@ class AuthApi(
         }
     }
 
-    private fun requestAction(path: String, payload: String, op: String): ActionResult {
+    private fun requestAction(
+        path: String,
+        payload: String,
+        op: String,
+        extraHeaders: Map<String, String> = emptyMap(),
+    ): ActionResult {
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         return try {
@@ -340,7 +438,7 @@ class AuthApi(
                     headers = mapOf(
                         "Content-Type" to "application/json",
                         "Accept" to "application/json",
-                    ),
+                    ) + extraHeaders,
                     body = payload.toByteArray(Charsets.UTF_8),
                 )
             )

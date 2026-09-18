@@ -129,8 +129,8 @@ def test_federated_challenge_is_hashed_and_single_use():
     accounts = UserAccountStore(None)
     raw = accounts.issue_federated_challenge("google", "OIDC_NONCE", 300)
     assert raw not in accounts._federated_challenges
-    assert accounts.consume_federated_challenge("google", "OIDC_NONCE", raw) is True
-    assert accounts.consume_federated_challenge("google", "OIDC_NONCE", raw) is False
+    assert accounts.consume_federated_challenge("google", "OIDC_NONCE", raw) == (True, None)
+    assert accounts.consume_federated_challenge("google", "OIDC_NONCE", raw) == (False, None)
 
 
 def test_google_api_login_consumes_nonce_once_and_does_not_expose_secret_config(monkeypatch):
@@ -196,7 +196,7 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
     monkeypatch.setenv("SENTINEL_TELEGRAM_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_ID", "123456")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_SECRET", "test-only-secret")
-    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URI", "sentinel://auth/telegram")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "sentinel://auth/telegram")
     monkeypatch.setattr(
         main_module,
         "complete_telegram",
@@ -205,7 +205,10 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
             subject=f"telegram-{uuid.uuid4().hex}",
         ),
     )
-    start = client.post("/v1/auth/providers/telegram/start")
+    start = client.post(
+        "/v1/auth/providers/telegram/start",
+        json={"redirect_uri": "com.alpha0.app.auth.dev://callback"},
+    )
     assert start.status_code == 200
     body = start.json()
     assert body["authorization_url"].startswith("https://oauth.telegram.org/auth?")
@@ -236,12 +239,13 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
 def test_vk_exchange_uses_provider_subject_not_email(monkeypatch):
     monkeypatch.setenv("SENTINEL_VK_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_VK_CLIENT_ID", "123456")
-    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URI", "sentinel://auth/vk")
+    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "sentinel://auth/vk")
     identity = complete_vk(
         code="code",
         state="state",
         code_verifier="v" * 64,
         device_id="device",
+        redirect_uri="com.alpha0.app.auth.dev://callback",
         token_fetcher=lambda: {"access_token": "access", "state": "state"},
         user_fetcher=lambda _token: {
             "user": {"user_id": 777, "email": "vk-user@example.com"}
@@ -256,7 +260,7 @@ def test_telegram_id_token_verification_uses_oidc_subject(monkeypatch):
     monkeypatch.setenv("SENTINEL_TELEGRAM_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_ID", "123456")
     monkeypatch.setenv("SENTINEL_TELEGRAM_CLIENT_SECRET", "test-secret")
-    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URI", "sentinel://auth/telegram")
+    monkeypatch.setenv("SENTINEL_TELEGRAM_REDIRECT_URIS", "sentinel://auth/telegram")
     now = int(time.time())
     jwks, token = _rsa_jwk_and_token(
         {
@@ -271,6 +275,7 @@ def test_telegram_id_token_verification_uses_oidc_subject(monkeypatch):
     identity = complete_telegram(
         code="code",
         code_verifier="z" * 64,
+        redirect_uri="com.alpha0.app.auth.dev://callback",
         nonce="telegram-test-state",
         now=now,
         token_fetcher=lambda: {"id_token": token},
@@ -286,10 +291,10 @@ def test_disabled_providers_fail_closed(monkeypatch):
         "SENTINEL_TELEGRAM_AUTH_ENABLED",
         "SENTINEL_TELEGRAM_CLIENT_ID",
         "SENTINEL_TELEGRAM_CLIENT_SECRET",
-        "SENTINEL_TELEGRAM_REDIRECT_URI",
+        "SENTINEL_TELEGRAM_REDIRECT_URIS",
         "SENTINEL_VK_AUTH_ENABLED",
         "SENTINEL_VK_CLIENT_ID",
-        "SENTINEL_VK_REDIRECT_URI",
+        "SENTINEL_VK_REDIRECT_URIS",
     ]:
         monkeypatch.delenv(key, raising=False)
     assert all(item.enabled is False for item in provider_statuses())

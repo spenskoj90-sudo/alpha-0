@@ -101,8 +101,10 @@ jobs:
           if ($smoke.sourceSha -ne $env:SENTINEL_SOURCE_SHA) {
             throw "runtime smoke evidence is not bound to exact source SHA $env:SENTINEL_SOURCE_SHA"
           }
-          if ($smoke.electronVersion -ne "37.2.0") {
-            throw "unexpected packaged Electron version $($smoke.electronVersion)"
+          $launcher = Get-Content -Raw "launcher/package.json" | ConvertFrom-Json
+          $expectedElectron = [string]$launcher.sentinelPackaging.electronVersion
+          if ($smoke.electronVersion -ne $expectedElectron) {
+            throw "unexpected packaged Electron version $($smoke.electronVersion); expected $expectedElectron"
           }
           if ($smoke.main -ne "bootstrap.js") {
             throw "packaged runtime did not boot through bootstrap.js"

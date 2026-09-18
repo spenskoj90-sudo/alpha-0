@@ -239,13 +239,13 @@ def test_telegram_pkce_start_and_completion_reject_state_replay(monkeypatch):
 def test_vk_exchange_uses_provider_subject_not_email(monkeypatch):
     monkeypatch.setenv("SENTINEL_VK_AUTH_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_VK_CLIENT_ID", "123456")
-    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "com.alpha0.app.auth.dev://callback")
+    monkeypatch.setenv("SENTINEL_VK_REDIRECT_URIS", "vk123456://vk.ru/blank.html")
     identity = complete_vk(
         code="code",
         state="state",
         code_verifier="v" * 64,
         device_id="device",
-        redirect_uri="com.alpha0.app.auth.dev://callback",
+        redirect_uri="vk123456://vk.ru/blank.html",
         token_fetcher=lambda: {"access_token": "access", "state": "state"},
         user_fetcher=lambda _token: {
             "user": {"user_id": 777, "email": "vk-user@example.com"}

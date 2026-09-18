@@ -48,11 +48,17 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_bilingual_contract_covers_critical_navigation(self) -> None:
         required = (
             "settings", "updates", "help", "about", "home", "games", "security", "activity",
-            "sign_in", "create_account", "device_setup", "bind_device", "theme_light", "theme_dark",
+            "sign_in", "create_account", "forgot_password", "reset_password", "verify_email",
+            "device_setup", "bind_device", "theme_light", "theme_dark",
         )
         for key in required:
             self.assertGreaterEqual(self.strings.count(f'"{key}" to '), 2, key)
         self.assertIn('"language_ru" to "Русский"', self.strings)
+        login = read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+        self.assertIn("requestPasswordReset", login)
+        self.assertIn("confirmPasswordReset", login)
+        self.assertIn("confirmEmailVerification", login)
+        self.assertIn("verticalScroll(rememberScrollState())", login)
 
     def test_onboarding_layout_cannot_be_stretched_by_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
@@ -66,7 +72,7 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('implementation("com.google.android.play:app-update:2.1.0")', self.gradle)
         version = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
         self.assertIsNotNone(version)
-        self.assertGreaterEqual(int(version.group(1)), 10004)
+        self.assertGreaterEqual(int(version.group(1)), 10005)
 
     def test_launcher_identity_is_explicit_and_branded(self) -> None:
         self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)

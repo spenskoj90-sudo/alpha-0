@@ -106,4 +106,89 @@ class AuthApiTransportTest {
         assertEquals("https://example.test/v1/auth/email-verification/confirm", requireNotNull(transport.request).url)
     }
 
+
+    @Test
+    fun providerCatalogParsesOnlyServerDeclaredProviderState() = runBlocking {
+        val transport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"providers\":[{\"provider\":\"google\",\"enabled\":true,\"flow\":\"credential-manager\",\"client_id\":\"web-client\"},{\"provider\":\"vk\",\"enabled\":false,\"flow\":\"oauth-pkce\",\"client_id\":null}]}",
+            ),
+        )
+        val result = AuthApi("https://example.test", transport).providerCatalog()
+
+        assertTrue(result is AuthApi.ProviderCatalogResult.Success)
+        val providers = (result as AuthApi.ProviderCatalogResult.Success).providers
+        assertEquals(2, providers.size)
+        assertEquals("google", providers[0].provider)
+        assertEquals(true, providers[0].enabled)
+        assertEquals("https://example.test/v1/auth/providers", requireNotNull(transport.request).url)
+        assertEquals(HttpMethod.GET, requireNotNull(transport.request).method)
+    }
+
+    @Test
+    fun googleChallengeAndLoginUseNonceBoundEndpoints() = runBlocking {
+        val challengeTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"provider\":\"google\",\"client_id\":\"web-client\",\"nonce\":\"abcdefghijklmnopqrstuvwxyz1234567890\"}",
+            ),
+        )
+        val challenge = AuthApi("https://example.test", challengeTransport).googleChallenge()
+        assertTrue(challenge is AuthApi.GoogleChallengeResult.Success)
+        assertEquals(
+            "https://example.test/v1/auth/providers/google/challenge",
+            requireNotNull(challengeTransport.request).url,
+        )
+
+        val loginTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"session_token\":\"access\",\"refresh_token\":\"refresh\",\"scopes\":[\"game:read\"]}",
+            ),
+        )
+        val login = AuthApi("https://example.test", loginTransport)
+            .loginGoogle("header.payload.signature", "abcdefghijklmnopqrstuvwxyz1234567890")
+        assertTrue(login is AuthApi.Result.Success)
+        val body = String(requireNotNull(requireNotNull(loginTransport.request).body))
+        assertTrue(body.contains("header.payload.signature"))
+        assertTrue(body.contains("abcdefghijklmnopqrstuvwxyz1234567890"))
+    }
+
+    @Test
+    fun browserProviderStartAndCompleteKeepPkceMaterialServerBound() = runBlocking {
+        val startTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"provider\":\"telegram\",\"authorization_url\":\"https://oauth.telegram.org/auth?state=public\",\"state\":\"abcdefghijklmnopqrstuvwxyz1234567890\",\"code_verifier\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~\"}",
+            ),
+        )
+        val start = AuthApi("https://example.test", startTransport).startBrowserProvider("telegram")
+        assertTrue(start is AuthApi.BrowserStartResult.Success)
+        assertEquals(
+            "https://example.test/v1/auth/providers/telegram/start",
+            requireNotNull(startTransport.request).url,
+        )
+
+        val completeTransport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"session_token\":\"access\",\"refresh_token\":\"refresh\",\"scopes\":[\"game:read\"]}",
+            ),
+        )
+        val complete = AuthApi("https://example.test", completeTransport).completeBrowserProvider(
+            provider = "telegram",
+            code = "authorization-code",
+            state = "abcdefghijklmnopqrstuvwxyz1234567890",
+            codeVerifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~",
+            deviceId = null,
+        )
+        assertTrue(complete is AuthApi.Result.Success)
+        val request = requireNotNull(completeTransport.request)
+        assertEquals("https://example.test/v1/auth/providers/telegram/complete", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("authorization-code"))
+        assertTrue(body.contains("code_verifier"))
+    }
+
 }

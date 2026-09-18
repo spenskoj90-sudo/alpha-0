@@ -54,7 +54,7 @@ class PlatformBaselineTests(unittest.TestCase):
         self.assertEqual(package["engines"]["node"], "24.x")
         self.assertEqual(package["dependencies"]["next"], "16.3.5")
         self.assertEqual(package["dependencies"]["react"], "19.3.0")
-        self.assertEqual(package["devDependencies"]["typescript"], "7.0.2")
+        self.assertEqual(package["devDependencies"]["typescript"], "6.0.3")
         self.assertEqual(package["devDependencies"]["eslint"], "10.10.0")
         self.assertEqual(package["devDependencies"]["vitest"], "5.0.0")
         self.assertEqual(lock["packages"][""]["engines"]["node"], "24.x")

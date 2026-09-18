@@ -12,7 +12,7 @@ The provider's verified immutable subject is the external identity key. SENTINEL
 - New provider subjects may create provider-only SENTINEL accounts.
 - Provider-only accounts may have no email and no local password.
 - If a provider returns an email already owned by a local SENTINEL account, federated login returns `ACCOUNT_LINK_REQUIRED`.
-- Linking a provider to an existing account requires an already authenticated SENTINEL session plus a freshly verified provider identity.
+- Linking a provider to an existing account requires a device-bound SENTINEL session obtained after device proof plus a freshly verified provider identity. A pre-device login session is insufficient.
 - A provider subject already bound to another SENTINEL identity cannot be moved implicitly.
 - External access tokens, authorization codes, provider passwords and client secrets are never persisted as SENTINEL account credentials.
 

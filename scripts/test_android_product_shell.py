@@ -93,8 +93,17 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("continue_vk", self.strings)
         self.assertIn('android:scheme="${authCallbackScheme}"', self.manifest)
         self.assertIn('android:host="callback"', self.manifest)
+        self.assertIn('android:scheme="${vkRedirectScheme}"', self.manifest)
+        self.assertIn('android:host="vk.ru"', self.manifest)
+        self.assertIn('android:path="/blank.html"', self.manifest)
+        self.assertIn('SENTINEL_VK_REDIRECT_URI', self.gradle)
+        self.assertIn('vk$vkClientId://vk.ru/blank.html', self.gradle)
         self.assertIn('android:launchMode="singleTask"', self.manifest)
         self.assertIn("completeBrowserCallback", login)
+        device_security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        self.assertIn("completeBrowserLinkCallback", device_security)
+        self.assertIn("linkGoogle", device_security)
+        self.assertIn("verticalScroll(rememberScrollState())", device_security)
         for scheme in ("com.alpha0.app.auth.dev", "com.alpha0.app.physicaltest.auth", "com.alpha0.app.auth"):
             self.assertIn(scheme, self.gradle)
 

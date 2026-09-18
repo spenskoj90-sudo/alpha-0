@@ -7,6 +7,14 @@
 
 An installable APK, successful authentication, device proof and green CI are necessary but are not sufficient product-readiness evidence. The Android application must expose a coherent user journey before and after authentication.
 
+## Product identity and distribution
+
+The installed application must use a SENTINEL-owned launcher icon rather than an Android/template fallback. The icon is part of the product contract and is referenced explicitly from the application manifest.
+
+Ordinary users and invited testers use the same release application ID and signing lineage. Access is separated by Google Play tracks (Internal/Closed testing before wider release), not by embedding tester or owner privilege in a different APK. The dedicated `physicalTest` build is an isolated diagnostic instrument with the `.physicaltest` application-ID suffix, a distinct label and forensic diagnostics.
+
+Owner/admin authority is never derived from the Android package variant. Privilege remains server-authoritative and must be protected independently by strong authentication/MFA.
+
 ## Required pre-authentication surface
 
 Every build exposes a persistent top app bar and overflow menu before sign-in. The menu provides:
@@ -57,6 +65,8 @@ Routine Android acceptance must prove at least:
 - authenticated primary routes exist;
 - onboarding is scrollable and the card decoration uses `matchParentSize`, not `fillMaxSize` measurement;
 - Update Center is backed by Play In-App Updates libraries;
+- the manifest names the SENTINEL launcher icon and product-shell tests lock its branded palette;
+- release uses the Play distribution channel while the isolated physical-test package reports the diagnostic channel;
 - `versionCode` is positive and monotonically advanced for each installable distribution;
 - API 35 instrumentation and JVM tests pass on the exact SHA.
 

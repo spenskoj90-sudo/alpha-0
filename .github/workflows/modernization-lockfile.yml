@@ -5,14 +5,17 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   web-lockfile:
-    name: Resolve modern Web lockfile
+    if: github.head_ref == 'chore/platform-dependency-modernization'
+    name: Resolve and apply modern Web lockfile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
@@ -22,10 +25,17 @@ jobs:
       - name: Validate lock/package agreement
         working-directory: web
         run: npm ci --ignore-scripts --no-audit
-      - name: Upload resolved lock
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: modernization-web-lock
-          path: web/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+      - name: Apply lockfile only to modernization branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- web/package-lock.json; then
+            echo "package-lock.json already current"
+            exit 0
+          fi
+          test "$GITHUB_HEAD_REF" = "chore/platform-dependency-modernization"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/package-lock.json
+          git commit -m "build(web): refresh deterministic npm lockfile"
+          git push origin "HEAD:$GITHUB_HEAD_REF"

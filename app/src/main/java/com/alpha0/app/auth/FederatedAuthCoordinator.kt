@@ -24,10 +24,47 @@ class FederatedAuthCoordinator(
         data class Failure(val message: String) : BrowserLaunchResult
     }
 
+    private data class BrowserCallback(
+        val provider: String,
+        val operation: String,
+        val code: String,
+        val state: String,
+        val codeVerifier: String,
+        val deviceId: String?,
+    )
+
+    private sealed interface GoogleCredentialResult {
+        data class Success(val idToken: String, val nonce: String) : GoogleCredentialResult
+        data class Failure(val message: String) : GoogleCredentialResult
+    }
+
+    private sealed interface CallbackResult {
+        data class Success(val value: BrowserCallback) : CallbackResult
+        data class Failure(val message: String) : CallbackResult
+    }
+
     suspend fun signInWithGoogle(): AuthApi.Result {
+        return when (val credential = googleCredential()) {
+            is GoogleCredentialResult.Failure -> AuthApi.Result.Failure(credential.message)
+            is GoogleCredentialResult.Success -> api.loginGoogle(credential.idToken, credential.nonce)
+        }
+    }
+
+    suspend fun linkGoogle(accessToken: String): AuthApi.ActionResult {
+        return when (val credential = googleCredential()) {
+            is GoogleCredentialResult.Failure -> AuthApi.ActionResult.Failure(credential.message)
+            is GoogleCredentialResult.Success -> api.linkGoogle(
+                accessToken,
+                credential.idToken,
+                credential.nonce,
+            )
+        }
+    }
+
+    private suspend fun googleCredential(): GoogleCredentialResult {
         val challenge = when (val result = api.googleChallenge()) {
             is AuthApi.GoogleChallengeResult.Success -> result.value
-            is AuthApi.GoogleChallengeResult.Failure -> return AuthApi.Result.Failure(result.message)
+            is AuthApi.GoogleChallengeResult.Failure -> return GoogleCredentialResult.Failure(result.message)
         }
         val option = GetGoogleIdOption.Builder()
             .setServerClientId(challenge.clientId)
@@ -41,29 +78,35 @@ class FederatedAuthCoordinator(
         val credential = try {
             credentialManager.getCredential(context, request).credential
         } catch (_: GetCredentialException) {
-            return AuthApi.Result.Failure("GOOGLE_CREDENTIAL_CANCELLED")
+            return GoogleCredentialResult.Failure("GOOGLE_CREDENTIAL_CANCELLED")
         } catch (_: Exception) {
-            return AuthApi.Result.Failure("GOOGLE_CREDENTIAL_ERROR")
+            return GoogleCredentialResult.Failure("GOOGLE_CREDENTIAL_ERROR")
         }
         if (
             credential !is CustomCredential ||
             credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
         ) {
-            return AuthApi.Result.Failure("GOOGLE_CREDENTIAL_INVALID")
+            return GoogleCredentialResult.Failure("GOOGLE_CREDENTIAL_INVALID")
         }
         val token = try {
             GoogleIdTokenCredential.createFrom(credential.data).idToken
         } catch (_: Exception) {
-            return AuthApi.Result.Failure("GOOGLE_CREDENTIAL_INVALID")
+            return GoogleCredentialResult.Failure("GOOGLE_CREDENTIAL_INVALID")
         }
-        if (token.isBlank()) return AuthApi.Result.Failure("GOOGLE_CREDENTIAL_INVALID")
-        return api.loginGoogle(token, challenge.nonce)
+        if (token.isBlank()) return GoogleCredentialResult.Failure("GOOGLE_CREDENTIAL_INVALID")
+        return GoogleCredentialResult.Success(token, challenge.nonce)
     }
 
-    suspend fun beginBrowser(provider: String): BrowserLaunchResult {
+    suspend fun beginBrowser(
+        provider: String,
+        operation: String = "login",
+    ): BrowserLaunchResult {
         val normalized = provider.trim().lowercase()
         if (normalized !in setOf("telegram", "vk")) {
             return BrowserLaunchResult.Failure("AUTH_PROVIDER_UNSUPPORTED")
+        }
+        if (operation !in setOf("login", "link")) {
+            return BrowserLaunchResult.Failure("AUTH_OPERATION_INVALID")
         }
         return when (
             val result = api.startBrowserProvider(
@@ -84,6 +127,7 @@ class FederatedAuthCoordinator(
                     context,
                     FederatedAuthStateStore.Pending(
                         provider = normalized,
+                        operation = operation,
                         state = start.state,
                         codeVerifier = start.codeVerifier,
                         createdAtMillis = System.currentTimeMillis(),
@@ -95,32 +139,68 @@ class FederatedAuthCoordinator(
     }
 
     suspend fun completeBrowserCallback(uri: Uri): AuthApi.Result {
+        return when (val callback = consumeCallback(uri, "login")) {
+            is CallbackResult.Failure -> AuthApi.Result.Failure(callback.message)
+            is CallbackResult.Success -> api.completeBrowserProvider(
+                provider = callback.value.provider,
+                code = callback.value.code,
+                state = callback.value.state,
+                codeVerifier = callback.value.codeVerifier,
+                deviceId = callback.value.deviceId,
+            )
+        }
+    }
+
+    suspend fun completeBrowserLinkCallback(
+        uri: Uri,
+        accessToken: String,
+    ): AuthApi.ActionResult {
+        return when (val callback = consumeCallback(uri, "link")) {
+            is CallbackResult.Failure -> AuthApi.ActionResult.Failure(callback.message)
+            is CallbackResult.Success -> api.linkBrowserProvider(
+                accessToken = accessToken,
+                provider = callback.value.provider,
+                code = callback.value.code,
+                state = callback.value.state,
+                codeVerifier = callback.value.codeVerifier,
+                deviceId = callback.value.deviceId,
+            )
+        }
+    }
+
+    private fun consumeCallback(uri: Uri, expectedOperation: String): CallbackResult {
         if (uri.scheme != callbackScheme || uri.host != "callback") {
-            return AuthApi.Result.Failure("AUTH_CALLBACK_INVALID")
+            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         }
         val pending = stateStore.consume(context)
-            ?: return AuthApi.Result.Failure("AUTH_CALLBACK_EXPIRED")
+            ?: return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
+        if (pending.operation != expectedOperation) {
+            return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
+        }
         val callbackState = uri.getQueryParameter("state")
-            ?: return AuthApi.Result.Failure("AUTH_CALLBACK_INVALID")
+            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         if (!constantTimeEquals(callbackState, pending.state)) {
-            return AuthApi.Result.Failure("AUTH_CALLBACK_STATE_MISMATCH")
+            return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
         }
         val providerError = uri.getQueryParameter("error")
         if (!providerError.isNullOrBlank()) {
-            return AuthApi.Result.Failure("AUTH_PROVIDER_CANCELLED")
+            return CallbackResult.Failure("AUTH_PROVIDER_CANCELLED")
         }
         val code = uri.getQueryParameter("code")
-            ?: return AuthApi.Result.Failure("AUTH_CALLBACK_INVALID")
+            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         if (code.isBlank() || code.length > 4096) {
-            return AuthApi.Result.Failure("AUTH_CALLBACK_INVALID")
+            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         }
         val deviceId = uri.getQueryParameter("device_id")?.takeIf { it.isNotBlank() && it.length <= 512 }
-        return api.completeBrowserProvider(
-            provider = pending.provider,
-            code = code,
-            state = callbackState,
-            codeVerifier = pending.codeVerifier,
-            deviceId = deviceId,
+        return CallbackResult.Success(
+            BrowserCallback(
+                provider = pending.provider,
+                operation = pending.operation,
+                code = code,
+                state = callbackState,
+                codeVerifier = pending.codeVerifier,
+                deviceId = deviceId,
+            )
         )
     }
 

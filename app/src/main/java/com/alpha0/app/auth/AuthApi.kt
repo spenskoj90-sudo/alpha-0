@@ -220,7 +220,7 @@ class AuthApi(
         )
     }
 
-    suspend fun startBrowserProvider(provider: String): BrowserStartResult = withContext(Dispatchers.IO) {
+    suspend fun startBrowserProvider(provider: String, redirectUri: String): BrowserStartResult = withContext(Dispatchers.IO) {
         val normalizedProvider = provider.trim().lowercase()
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
@@ -229,7 +229,13 @@ class AuthApi(
                 HttpRequest(
                     method = HttpMethod.POST,
                     url = "$normalizedBase/v1/auth/providers/$normalizedProvider/start",
-                    headers = mapOf("Accept" to "application/json"),
+                    headers = mapOf(
+                        "Content-Type" to "application/json",
+                        "Accept" to "application/json",
+                    ),
+                    body = JSONObject().apply { put("redirect_uri", redirectUri) }
+                        .toString()
+                        .toByteArray(Charsets.UTF_8),
                 )
             )
             val json = runCatching { JSONObject(response.body) }.getOrNull()

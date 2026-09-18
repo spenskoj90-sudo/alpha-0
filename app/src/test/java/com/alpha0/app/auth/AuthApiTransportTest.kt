@@ -163,11 +163,19 @@ class AuthApiTransportTest {
                 "{\"provider\":\"telegram\",\"authorization_url\":\"https://oauth.telegram.org/auth?state=public\",\"state\":\"abcdefghijklmnopqrstuvwxyz1234567890\",\"code_verifier\":\"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-._~\"}",
             ),
         )
-        val start = AuthApi("https://example.test", startTransport).startBrowserProvider("telegram")
+        val start = AuthApi("https://example.test", startTransport).startBrowserProvider(
+            "telegram",
+            "com.alpha0.app.auth.dev://callback",
+        )
         assertTrue(start is AuthApi.BrowserStartResult.Success)
+        val startRequest = requireNotNull(startTransport.request)
         assertEquals(
             "https://example.test/v1/auth/providers/telegram/start",
-            requireNotNull(startTransport.request).url,
+            startRequest.url,
+        )
+        assertTrue(
+            String(requireNotNull(startRequest.body))
+                .contains("com.alpha0.app.auth.dev://callback")
         )
 
         val completeTransport = FakeTransport(

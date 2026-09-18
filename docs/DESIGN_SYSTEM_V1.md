@@ -106,7 +106,7 @@ Android deliberately retains its platform palette:
 
 Typography roles are Outfit for display, Inter for body and JetBrains Mono for data. `StatusBadge`, `SentinelCard`, `PrimaryButton`, `DangerButton` and accessibility semantic modifiers are the reusable Compose anchors.
 
-API 35 instrumentation is the routine automated device-level gate. Physical TalkBack/device acceptance is deliberately deferred to final pre-release validation.
+API 36 instrumentation is the routine automated device-level gate. Physical TalkBack/device acceptance is deliberately deferred to final pre-release validation.
 
 ### Companion launcher and overlay
 
@@ -142,7 +142,7 @@ Repository-automated acceptance covers the semantics that can be verified determ
 - assertive error semantics for failures requiring attention while ordinary runtime status remains polite;
 - Web password requirement association and repeated plan-action accessible names;
 - Android live-region/progress/button/card semantics;
-- API 35 emulator instrumentation;
+- API 36 emulator instrumentation;
 - responsive source contracts and disabled-state behavior;
 - text-bearing status states rather than color-only status.
 

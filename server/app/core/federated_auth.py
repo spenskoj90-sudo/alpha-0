@@ -258,12 +258,17 @@ def verify_google_id_token(
     if not isinstance(email, str) or "@" not in email:
         email = None
     verified_value = claims.get("email_verified")
-    email_verified = verified_value is True or verified_value == "true"
+    provider_verified = verified_value is True or verified_value == "true"
+    authoritative_email = bool(
+        email
+        and provider_verified
+        and (email.lower().endswith("@gmail.com") or isinstance(claims.get("hd"), str))
+    )
     return VerifiedFederatedIdentity(
         provider="google",
         subject=str(claims["sub"]),
         email=email.lower() if email else None,
-        email_verified=email_verified,
+        email_verified=authoritative_email,
     )
 
 

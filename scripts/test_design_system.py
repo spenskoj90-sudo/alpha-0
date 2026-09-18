@@ -158,7 +158,7 @@ class DesignSystemContractTests(unittest.TestCase):
     def test_accessibility_and_authority_contract_is_explicit(self) -> None:
         access = self.manifest["accessibility"]
         self.assertIn("physicalPreRelease", access)
-        self.assertIn("API 35 instrumentation", access["android"])
+        self.assertIn("API 36 instrumentation", access["android"])
         self.assertIn("busy state", access["web"])
         self.assertIn("assertive failure state", access["web"])
         self.assertIn("plan-specific action names", access["web"])

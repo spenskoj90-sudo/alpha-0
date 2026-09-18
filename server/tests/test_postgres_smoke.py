@@ -296,3 +296,49 @@ def test_postgres_account_security_tokens_are_hashed_single_use_and_recovery_rev
         "/v1/auth/password-reset/confirm",
         json={"token": reset_token, "password": "Postgres-account-replay-password-789"},
     ).status_code == 400
+
+
+def test_postgres_federated_identity_and_challenge_persistence_are_rls_protected():
+    from app.main import store, user_store
+
+    subject = f"telegram-{uuid.uuid4().hex}"
+    user_id = user_store.register_external_account(
+        "telegram",
+        subject,
+        email=None,
+        email_verified=False,
+    )
+    security = user_store.security_state(user_id)
+    assert security is not None
+    assert security["email"] is None
+    assert security["password_enabled"] is False
+    assert security["providers"] == ["telegram"]
+
+    raw_state = user_store.issue_federated_challenge("telegram", "OAUTH_STATE", 300)
+    state_hash = hashlib.sha256(raw_state.encode()).hexdigest()
+    with store.engine.connect() as conn:
+        persisted = conn.execute(
+            text(
+                "SELECT challenge_hash, provider, purpose "
+                "FROM federated_auth_challenges WHERE challenge_hash=:challenge_hash"
+            ),
+            {"challenge_hash": state_hash},
+        ).mappings().one()
+        raw_count = conn.execute(
+            text("SELECT COUNT(*) FROM federated_auth_challenges WHERE challenge_hash=:raw"),
+            {"raw": raw_state},
+        ).scalar_one()
+        provider_binding = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM external_identities "
+                "WHERE provider='telegram' AND provider_subject=:subject"
+            ),
+            {"subject": subject},
+        ).scalar_one()
+
+    assert persisted["provider"] == "telegram"
+    assert persisted["purpose"] == "OAUTH_STATE"
+    assert raw_count == 0
+    assert provider_binding == 1
+    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) is True
+    assert user_store.consume_federated_challenge("telegram", "OAUTH_STATE", raw_state) is False

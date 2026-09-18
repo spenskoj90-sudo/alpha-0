@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - chore/runtime-modernization-2026q3
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read

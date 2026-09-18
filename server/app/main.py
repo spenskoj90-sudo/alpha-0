@@ -436,6 +436,13 @@ def _federated_session(identity: VerifiedFederatedIdentity, request: Request) ->
     )
 
 
+def _require_provider_link_principal(authorization_header: str) -> Principal:
+    principal = principal_from_token(require_bearer(authorization_header))
+    if not principal.device_id:
+        raise HTTPException(status_code=403, detail="DEVICE_BOUND_SESSION_REQUIRED")
+    return principal
+
+
 def _link_federated_identity(
     principal: Principal,
     identity: VerifiedFederatedIdentity,
@@ -520,7 +527,7 @@ def google_provider_link(
     authorization_header: str = Header(..., alias="Authorization"),
 ) -> AuthActionResponse:
     rate_limit(request, "auth-google-link")
-    principal = principal_from_token(require_bearer(authorization_header))
+    principal = _require_provider_link_principal(authorization_header)
     return _link_federated_identity(principal, _verified_google(payload), request)
 
 
@@ -605,7 +612,7 @@ def browser_provider_link(
     authorization_header: str = Header(..., alias="Authorization"),
 ) -> AuthActionResponse:
     rate_limit(request, f"auth-{provider}-link")
-    principal = principal_from_token(require_bearer(authorization_header))
+    principal = _require_provider_link_principal(authorization_header)
     return _link_federated_identity(principal, _verified_browser(provider, payload), request)
 
 

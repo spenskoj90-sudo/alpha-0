@@ -72,6 +72,7 @@ async function readJson<T>(response: Response): Promise<T | null> {
 
 export default function AdminPage() {
   const [token, setToken] = useState('');
+  const [totp, setTotp] = useState('');
   const [userId, setUserId] = useState('');
   const [gameId, setGameId] = useState('');
   const [games, setGames] = useState<Game[]>([]);
@@ -84,7 +85,7 @@ export default function AdminPage() {
   const [clusterSeverityFilter, setClusterSeverityFilter] = useState('ALL');
   const [clusterCategoryFilter, setClusterCategoryFilter] = useState('ALL');
   const [mergeTarget, setMergeTarget] = useState('');
-  const [status, setStatus] = useState('TOKEN REQUIRED');
+  const [status, setStatus] = useState('MFA REQUIRED');
   const [busy, setBusy] = useState(false);
 
   const visibleClusters = useMemo(() => qualityClusters.filter(cluster =>
@@ -94,14 +95,14 @@ export default function AdminPage() {
   ), [qualityClusters, clusterStatusFilter, clusterSeverityFilter, clusterCategoryFilter]);
 
   async function loadControlData() {
-    if (!token) {
-      setStatus('ADMIN TOKEN REQUIRED');
+    if (!token || !totp) {
+      setStatus('ADMIN TOKEN + TOTP REQUIRED');
       return;
     }
     setBusy(true);
     setStatus('LOADING');
     try {
-      const headers = { 'x-sentinel-admin-token': token };
+      const headers = { 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp };
       const [gamesResponse, entitlementsResponse, qualityResponse, clustersResponse] = await Promise.all([
         fetch('/api/admin/games', { headers, cache: 'no-store' }),
         fetch('/api/admin/entitlements', { headers, cache: 'no-store' }),
@@ -142,8 +143,8 @@ export default function AdminPage() {
   }
 
   async function grant() {
-    if (!token || !userId || !gameId) {
-      setStatus('TOKEN, USER AND GAME REQUIRED');
+    if (!token || !totp || !userId || !gameId) {
+      setStatus('TOKEN, TOTP, USER AND GAME REQUIRED');
       return;
     }
     setBusy(true);
@@ -151,7 +152,7 @@ export default function AdminPage() {
     try {
       const response = await fetch('/api/admin/entitlements', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token },
+        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         body: JSON.stringify({
           user_id: userId,
           game_id: gameId,
@@ -172,12 +173,12 @@ export default function AdminPage() {
   }
 
   async function inspectQualityReport(reportId: string) {
-    if (!token) return;
+    if (!token || !totp) return;
     setBusy(true);
     setStatus('LOADING QUALITY EVIDENCE');
     try {
       const response = await fetch(`/api/admin/quality/${encodeURIComponent(reportId)}`, {
-        headers: { 'x-sentinel-admin-token': token },
+        headers: { 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         cache: 'no-store',
       });
       if (!response.ok) {
@@ -193,13 +194,13 @@ export default function AdminPage() {
   }
 
   async function updateQualityStatus(reportId: string, nextStatus: 'TRIAGED' | 'IN_PROGRESS' | 'RESOLVED' | 'WONT_FIX') {
-    if (!token) return;
+    if (!token || !totp) return;
     setBusy(true);
     setStatus(`SETTING ${nextStatus}`);
     try {
       const response = await fetch(`/api/admin/quality/${encodeURIComponent(reportId)}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token },
+        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         body: JSON.stringify({ status: nextStatus }),
       });
       if (!response.ok) {
@@ -218,12 +219,12 @@ export default function AdminPage() {
   }
 
   async function inspectQualityCluster(clusterId: string) {
-    if (!token) return;
+    if (!token || !totp) return;
     setBusy(true);
     setStatus('LOADING PROBLEM GROUP');
     try {
       const response = await fetch(`/api/admin/quality/clusters/${encodeURIComponent(clusterId)}`, {
-        headers: { 'x-sentinel-admin-token': token },
+        headers: { 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         cache: 'no-store',
       });
       if (!response.ok) {
@@ -240,13 +241,13 @@ export default function AdminPage() {
   }
 
   async function updateQualityCluster(clusterId: string, change: { status?: QualityCluster['status']; severity?: QualityCluster['severity'] }) {
-    if (!token) return;
+    if (!token || !totp) return;
     setBusy(true);
     setStatus('UPDATING PROBLEM GROUP');
     try {
       const response = await fetch(`/api/admin/quality/clusters/${encodeURIComponent(clusterId)}`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token },
+        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         body: JSON.stringify(change),
       });
       if (!response.ok) {
@@ -272,7 +273,7 @@ export default function AdminPage() {
     try {
       const response = await fetch(`/api/admin/quality/clusters/${encodeURIComponent(sourceId)}/merge`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token },
+        headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': token, 'x-sentinel-admin-totp': totp },
         body: JSON.stringify({ target_cluster_id: targetId }),
       });
       if (!response.ok) {
@@ -302,7 +303,18 @@ export default function AdminPage() {
         <article className="card">
           <div className="label">ADMIN TOKEN</div>
           <input value={token} onChange={event => setToken(event.target.value)} type="password" autoComplete="off" placeholder="Environment-issued token" />
-          <button className="ghost-btn" onClick={() => void loadControlData()} disabled={busy || !token}>LOAD CORE DATA</button>
+
+          <div className="label field-gap">AUTHENTICATOR CODE</div>
+          <input
+            value={totp}
+            onChange={event => setTotp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="6-digit TOTP"
+          />
+          <button className="ghost-btn" onClick={() => void loadControlData()} disabled={busy || !token || !totp}>LOAD CORE DATA</button>
 
           <div className="label field-gap">USER</div>
           <input value={userId} onChange={event => setUserId(event.target.value)} placeholder="User ID" />
@@ -312,9 +324,9 @@ export default function AdminPage() {
             {games.length === 0 && <option value="">Load Core catalog first</option>}
             {games.map(game => <option key={game.id} value={game.id}>{game.name} — {game.platform}</option>)}
           </select>
-          <button className="btn" onClick={() => void grant()} disabled={busy || !token || !userId || !gameId}>GRANT 30-DAY ENTITLEMENT</button>
+          <button className="btn" onClick={() => void grant()} disabled={busy || !token || !totp || !userId || !gameId}>GRANT 30-DAY ENTITLEMENT</button>
           <div className="status-message" aria-live="polite">STATUS: {status}</div>
-          <p className="boundary-copy">The admin token stays in this browser session only and is forwarded to the Core control-plane boundary. The Web server does not persist it.</p>
+          <p className="boundary-copy">The admin token and current authenticator code stay in this browser session only and are forwarded to the Core control-plane boundary. The Web server does not persist either factor.</p>
         </article>
 
         <article className="card">
@@ -360,7 +372,7 @@ export default function AdminPage() {
           </div>
           <div className="muted">{cluster.category} · {cluster.status} · {cluster.signature_kind.toLowerCase()} fingerprint</div>
           <div className="microcopy">{cluster.occurrence_count} reports · {cluster.affected_user_count} users · {cluster.affected_device_count} devices · {cluster.affected_version_count} versions · last seen {new Date(cluster.last_seen_at).toLocaleString()}</div>
-          <button className="ghost-btn" onClick={() => void inspectQualityCluster(cluster.id)} disabled={busy || !token}>TRIAGE GROUP</button>
+          <button className="ghost-btn" onClick={() => void inspectQualityCluster(cluster.id)} disabled={busy || !token || !totp}>TRIAGE GROUP</button>
         </div>)}
       </article>
 
@@ -394,7 +406,7 @@ export default function AdminPage() {
           {selectedCluster.reports.map(report => <div className="item" key={report.id}>
             <div className="row-between"><strong>{report.title}</strong><span className="state">{report.status}</span></div>
             <div className="muted">{new Date(report.created_at).toLocaleString()} · {report.inferred_severity ?? 'severity n/a'}</div>
-            <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token}>INSPECT EVIDENCE</button>
+            <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>INSPECT EVIDENCE</button>
           </div>)}
         </details>}
       </article>}
@@ -407,7 +419,7 @@ export default function AdminPage() {
           <div className="row-between"><strong>{report.title}</strong><span className="state">{report.status}</span></div>
           <div className="muted">{report.category} · {report.inferred_severity ?? 'unscored'} · {new Date(report.created_at).toLocaleString()}</div>
           <div className="microcopy">Group: {report.problem_group_id ?? 'none'} · diagnostics {report.diagnostics_retained ? `${Math.ceil(report.diagnostics_bytes / 1024)} KiB retained` : 'not retained'} · quality program {report.quality_program_opt_in ? 'opt-in' : 'support only'}</div>
-          <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token}>INSPECT REPORT</button>
+          <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>INSPECT REPORT</button>
         </div>)}
       </article>
 

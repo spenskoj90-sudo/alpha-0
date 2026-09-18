@@ -387,6 +387,7 @@ class UserAccountStore:
         provider: str,
         purpose: str,
         ttl_seconds: int = 300,
+        redirect_uri: str | None = None,
     ) -> str:
         provider = provider.strip().lower()
         if provider not in _EXTERNAL_PROVIDERS or purpose not in {"OIDC_NONCE", "OAUTH_STATE"}:
@@ -401,13 +402,14 @@ class UserAccountStore:
                 conn.execute(
                     text(
                         "INSERT INTO federated_auth_challenges"
-                        "(challenge_hash,provider,purpose,expires_at) "
-                        "VALUES (:challenge_hash,:provider,:purpose,:expires_at)"
+                        "(challenge_hash,provider,purpose,redirect_uri,expires_at) "
+                        "VALUES (:challenge_hash,:provider,:purpose,:redirect_uri,:expires_at)"
                     ),
                     {
                         "challenge_hash": token_hash,
                         "provider": provider,
                         "purpose": purpose,
+                        "redirect_uri": redirect_uri,
                         "expires_at": expires_at,
                     },
                 )
@@ -416,33 +418,41 @@ class UserAccountStore:
             self._federated_challenges[token_hash] = {
                 "provider": provider,
                 "purpose": purpose,
+                "redirect_uri": redirect_uri,
                 "expires_at": expires_at,
                 "consumed_at": None,
             }
         return token
 
-    def consume_federated_challenge(self, provider: str, purpose: str, token: str) -> bool:
+    def consume_federated_challenge(
+        self,
+        provider: str,
+        purpose: str,
+        token: str,
+    ) -> tuple[bool, str | None]:
         provider = provider.strip().lower()
         token_hash = self._action_hash(token)
         now = datetime.now(UTC)
         if provider not in _EXTERNAL_PROVIDERS or purpose not in {"OIDC_NONCE", "OAUTH_STATE"}:
-            return False
+            return False, None
         if self._engine:
             with self._engine.begin() as conn:
-                consumed = conn.execute(
+                row = conn.execute(
                     text(
                         "UPDATE federated_auth_challenges SET consumed_at=now() "
                         "WHERE challenge_hash=:challenge_hash AND provider=:provider "
                         "AND purpose=:purpose AND consumed_at IS NULL AND expires_at>now() "
-                        "RETURNING challenge_hash"
+                        "RETURNING redirect_uri"
                     ),
                     {
                         "challenge_hash": token_hash,
                         "provider": provider,
                         "purpose": purpose,
                     },
-                ).scalar_one_or_none()
-            return consumed is not None
+                ).mappings().first()
+            if row is None:
+                return False, None
+            return True, row["redirect_uri"]
         with self._lock:
             row = self._federated_challenges.get(token_hash)
             if (
@@ -452,9 +462,9 @@ class UserAccountStore:
                 or row["consumed_at"] is not None
                 or row["expires_at"] <= now
             ):
-                return False
+                return False, None
             row["consumed_at"] = now
-        return True
+            return True, row.get("redirect_uri")
 
     def register_external_account(
         self,

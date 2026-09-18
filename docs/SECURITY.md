@@ -13,7 +13,7 @@
 - Email verification and password recovery use high-entropy single-use credentials; only SHA-256 token digests are persisted.
 - Verification/reset requests are deliberately non-enumerating for unknown email addresses.
 - Password reset revokes all existing sessions for the affected identity before a new login can be trusted.
-- Federated identities are keyed by provider subject, never by email equality. Existing-email collisions require explicit authenticated linking.
+- Federated identities are keyed by provider subject, never by email equality. Existing-email collisions require explicit authenticated linking, and adding a persistent provider identity requires a device-bound SENTINEL session obtained after device proof; a pre-device account session is insufficient.
 - Google ID tokens are checked server-side for signature, issuer, audience, time bounds and one-time nonce.
 - Telegram OIDC and VK ID browser flows use PKCE plus one-time hashed state. Redirect URIs are exact server allowlists; arbitrary client redirects are rejected.
 - Android persists browser PKCE state only as AES-GCM ciphertext protected by Android Keystore and consumes it on callback.

@@ -37,6 +37,37 @@ class AuthApi(
         data class Failure(val message: String) : ActionResult
     }
 
+    data class ProviderStatus(
+        val provider: String,
+        val enabled: Boolean,
+        val flow: String,
+        val clientId: String?,
+    )
+
+    sealed interface ProviderCatalogResult {
+        data class Success(val providers: List<ProviderStatus>) : ProviderCatalogResult
+        data class Failure(val message: String) : ProviderCatalogResult
+    }
+
+    data class GoogleChallenge(val clientId: String, val nonce: String)
+
+    sealed interface GoogleChallengeResult {
+        data class Success(val value: GoogleChallenge) : GoogleChallengeResult
+        data class Failure(val message: String) : GoogleChallengeResult
+    }
+
+    data class BrowserStart(
+        val provider: String,
+        val authorizationUrl: String,
+        val state: String,
+        val codeVerifier: String,
+    )
+
+    sealed interface BrowserStartResult {
+        data class Success(val value: BrowserStart) : BrowserStartResult
+        data class Failure(val message: String) : BrowserStartResult
+    }
+
     @Volatile
     private var diag: DiagnosticLogger? = null
 
@@ -92,6 +123,163 @@ class AuthApi(
                 put("password", password)
             }.toString(),
             "PASSWORD_RESET_CONFIRM",
+        )
+    }
+
+    suspend fun providerCatalog(): ProviderCatalogResult = withContext(Dispatchers.IO) {
+        val t0 = System.currentTimeMillis()
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.GET,
+                    url = "$normalizedBase/v1/auth/providers",
+                    headers = mapOf("Accept" to "application/json"),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
+            if (response.status !in 200..299 || json == null) {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                diag?.warn("AUTH", "PROVIDER_CATALOG", "FAILURE", errorCode = code, durationMs = duration)
+                ProviderCatalogResult.Failure(code)
+            } else {
+                val items = json.optJSONArray("providers")
+                val providers = buildList {
+                    if (items != null) {
+                        for (i in 0 until items.length()) {
+                            val item = items.optJSONObject(i) ?: continue
+                            val provider = item.optString("provider")
+                            val flow = item.optString("flow")
+                            if (provider.isBlank() || flow.isBlank()) continue
+                            add(
+                                ProviderStatus(
+                                    provider = provider,
+                                    enabled = item.optBoolean("enabled", false),
+                                    flow = flow,
+                                    clientId = item.optString("client_id").takeIf { it.isNotBlank() },
+                                )
+                            )
+                        }
+                    }
+                }
+                diag?.info("AUTH", "PROVIDER_CATALOG", "SUCCESS", durationMs = duration)
+                ProviderCatalogResult.Success(providers)
+            }
+        } catch (e: IOException) {
+            diag?.warn("AUTH", "PROVIDER_CATALOG", "FAILURE", errorCode = "NETWORK_ERROR")
+            ProviderCatalogResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            diag?.error("AUTH", "PROVIDER_CATALOG", "FAILURE", errorCode = "UNEXPECTED_ERROR", throwable = e)
+            ProviderCatalogResult.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
+    suspend fun googleChallenge(): GoogleChallengeResult = withContext(Dispatchers.IO) {
+        val t0 = System.currentTimeMillis()
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.POST,
+                    url = "$normalizedBase/v1/auth/providers/google/challenge",
+                    headers = mapOf("Accept" to "application/json"),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
+            if (response.status !in 200..299 || json == null) {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                diag?.warn("AUTH", "GOOGLE_CHALLENGE", "FAILURE", errorCode = code, durationMs = duration)
+                GoogleChallengeResult.Failure(code)
+            } else {
+                val clientId = json.optString("client_id")
+                val nonce = json.optString("nonce")
+                if (clientId.isBlank() || nonce.length < 32) {
+                    GoogleChallengeResult.Failure("AUTH_RESPONSE_INVALID")
+                } else {
+                    GoogleChallengeResult.Success(GoogleChallenge(clientId, nonce))
+                }
+            }
+        } catch (e: IOException) {
+            GoogleChallengeResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            diag?.error("AUTH", "GOOGLE_CHALLENGE", "FAILURE", errorCode = "UNEXPECTED_ERROR", throwable = e)
+            GoogleChallengeResult.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
+    suspend fun loginGoogle(idToken: String, nonce: String): Result = withContext(Dispatchers.IO) {
+        requestJson(
+            "/v1/auth/providers/google/login",
+            JSONObject().apply {
+                put("id_token", idToken)
+                put("nonce", nonce)
+            }.toString(),
+            "GOOGLE_LOGIN",
+        )
+    }
+
+    suspend fun startBrowserProvider(provider: String): BrowserStartResult = withContext(Dispatchers.IO) {
+        val normalizedProvider = provider.trim().lowercase()
+        val t0 = System.currentTimeMillis()
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.POST,
+                    url = "$normalizedBase/v1/auth/providers/$normalizedProvider/start",
+                    headers = mapOf("Accept" to "application/json"),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
+            if (response.status !in 200..299 || json == null) {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() } ?: "HTTP_${response.status}"
+                diag?.warn("AUTH", "BROWSER_AUTH_START", "FAILURE", errorCode = code, durationMs = duration)
+                BrowserStartResult.Failure(code)
+            } else {
+                val returnedProvider = json.optString("provider")
+                val authorizationUrl = json.optString("authorization_url")
+                val state = json.optString("state")
+                val verifier = json.optString("code_verifier")
+                if (
+                    returnedProvider != normalizedProvider ||
+                    !authorizationUrl.startsWith("https://") ||
+                    state.length < 32 ||
+                    verifier.length < 43
+                ) {
+                    BrowserStartResult.Failure("AUTH_RESPONSE_INVALID")
+                } else {
+                    BrowserStartResult.Success(
+                        BrowserStart(returnedProvider, authorizationUrl, state, verifier)
+                    )
+                }
+            }
+        } catch (e: IOException) {
+            BrowserStartResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            diag?.error("AUTH", "BROWSER_AUTH_START", "FAILURE", errorCode = "UNEXPECTED_ERROR", throwable = e)
+            BrowserStartResult.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
+    suspend fun completeBrowserProvider(
+        provider: String,
+        code: String,
+        state: String,
+        codeVerifier: String,
+        deviceId: String?,
+    ): Result = withContext(Dispatchers.IO) {
+        requestJson(
+            "/v1/auth/providers/${provider.trim().lowercase()}/complete",
+            JSONObject().apply {
+                put("code", code)
+                put("state", state)
+                put("code_verifier", codeVerifier)
+                if (!deviceId.isNullOrBlank()) put("device_id", deviceId)
+            }.toString(),
+            "BROWSER_AUTH_COMPLETE",
         )
     }
 

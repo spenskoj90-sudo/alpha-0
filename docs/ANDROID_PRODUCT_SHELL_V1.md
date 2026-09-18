@@ -24,7 +24,7 @@ Every build exposes a persistent top app bar and overflow menu before sign-in. T
 - Help;
 - About.
 
-Settings persist locally and do not require an account. Language choices are System, Russian and English. Appearance choices are System, Light and Dark. A language or theme change applies immediately and survives process restart.
+Settings persist locally and do not require an account. Language choices are System, Russian and English. Appearance choices are System, Light and Dark. A language or theme change applies immediately and survives process restart. The authentication surface is scroll-safe and includes a non-enumerating password-recovery flow plus post-registration email verification with resend and verify-later paths.
 
 ## Required authenticated shell
 
@@ -61,6 +61,7 @@ Routine Android acceptance must prove at least:
 
 - pre-auth menu routes exist;
 - all language/theme choices exist and preferences persist;
+- sign-in exposes password recovery and registration exposes email verification without trapping a user when external mail delivery is unavailable;
 - both light and dark color schemes compile;
 - authenticated primary routes exist;
 - onboarding is scrollable and the card decoration uses `matchParentSize`, not `fillMaxSize` measurement;

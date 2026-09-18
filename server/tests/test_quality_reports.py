@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 import os
+import time
 
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("SENTINEL_ADMIN_TOKEN", "quality-admin-test-token")
+os.environ.setdefault("SENTINEL_ADMIN_TOTP_SECRET", "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ")
 
-from app.core.quality_api import repository
+from app.core.admin import _decode_totp_secret, _totp_at
+from app.core.quality_api import DiagnosticSnapshot, repository
 from app.main import app, store
 
 client = TestClient(app)
-ADMIN_HEADERS = {"X-Sentinel-Admin-Token": os.environ["SENTINEL_ADMIN_TOKEN"]}
+def admin_headers() -> dict[str, str]:
+    secret = os.environ["SENTINEL_ADMIN_TOTP_SECRET"]
+    code = _totp_at(_decode_totp_secret(secret), int(time.time() // 30))
+    return {
+        "X-Sentinel-Admin-Token": os.environ["SENTINEL_ADMIN_TOKEN"],
+        "X-Sentinel-Admin-TOTP": code,
+    }
 
 
 def reset_quality_state() -> None:
@@ -57,6 +66,14 @@ def snapshot(*, details: dict | None = None, error_code: str = "HTTP_503") -> di
             }
         ],
     }
+
+
+def test_diagnostic_snapshot_preserves_schema_wire_alias() -> None:
+    parsed = DiagnosticSnapshot.model_validate(snapshot())
+    assert parsed.schema_name == "sentinel.diagnostic-snapshot.v1"
+    dumped = parsed.model_dump(mode="json")
+    assert dumped["schema"] == "sentinel.diagnostic-snapshot.v1"
+    assert "schema_name" not in dumped
 
 
 def report_payload(*, with_diagnostics: bool = True, error_code: str = "HTTP_503") -> dict:
@@ -212,17 +229,17 @@ def test_admin_can_triage_and_read_retained_diagnostics() -> None:
     )
     report_id = created.json()["report"]["id"]
 
-    listing = client.get("/v1/admin/quality/reports", headers=ADMIN_HEADERS)
+    listing = client.get("/v1/admin/quality/reports", headers=admin_headers())
     assert listing.status_code == 200
     assert any(item["id"] == report_id for item in listing.json()["reports"])
 
-    detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=ADMIN_HEADERS)
+    detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=admin_headers())
     assert detail.status_code == 200
     assert detail.json()["report"]["diagnostics"]["schema"] == "sentinel.diagnostic-snapshot.v1"
 
     updated = client.post(
         f"/v1/admin/quality/reports/{report_id}/status",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
         json={"status": "TRIAGED"},
     )
     assert updated.status_code == 200
@@ -242,7 +259,7 @@ def test_identical_diagnostic_failure_clusters_across_users_and_titles() -> None
     assert first["problem_group_id"] == second["problem_group_id"]
     assert second["related_report_count"] == 2
 
-    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    listing = client.get("/v1/admin/quality/clusters", headers=admin_headers())
     assert listing.status_code == 200
     cluster = next(item for item in listing.json()["clusters"] if item["id"] == second["problem_group_id"])
     assert cluster["signature_kind"] == "DIAGNOSTIC"
@@ -280,7 +297,7 @@ def test_cluster_triage_updates_all_member_reports_and_locks_severity() -> None:
 
     updated = client.post(
         f"/v1/admin/quality/clusters/{cluster_id}",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
         json={"status": "IN_PROGRESS", "severity": "CRITICAL"},
     )
     assert updated.status_code == 200
@@ -290,7 +307,7 @@ def test_cluster_triage_updates_all_member_reports_and_locks_severity() -> None:
     assert cluster["severity_locked"] is True
 
     for report_id in (first["id"], second["id"]):
-        detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=ADMIN_HEADERS)
+        detail = client.get(f"/v1/admin/quality/reports/{report_id}", headers=admin_headers())
         assert detail.status_code == 200
         assert detail.json()["report"]["status"] == "IN_PROGRESS"
 
@@ -304,7 +321,7 @@ def test_admin_can_merge_confirmed_related_clusters_without_losing_reports() -> 
 
     merged = client.post(
         f"/v1/admin/quality/clusters/{source}/merge",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
         json={"target_cluster_id": target},
     )
     assert merged.status_code == 200
@@ -313,12 +330,12 @@ def test_admin_can_merge_confirmed_related_clusters_without_losing_reports() -> 
     assert cluster["occurrence_count"] == 2
     assert cluster["affected_user_count"] == 2
 
-    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    listing = client.get("/v1/admin/quality/clusters", headers=admin_headers())
     ids = {item["id"] for item in listing.json()["clusters"]}
     assert target in ids
     assert source not in ids
 
-    source_report = client.get(f"/v1/admin/quality/reports/{first['id']}", headers=ADMIN_HEADERS)
+    source_report = client.get(f"/v1/admin/quality/reports/{first['id']}", headers=admin_headers())
     assert source_report.status_code == 200
     assert source_report.json()["report"]["problem_group_id"] == target
 
@@ -334,13 +351,13 @@ def test_chained_cluster_merges_flatten_aliases_and_route_future_reports_to_root
 
     first_merge = client.post(
         f"/v1/admin/quality/clusters/{first_id}/merge",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
         json={"target_cluster_id": second_id},
     )
     assert first_merge.status_code == 200
     second_merge = client.post(
         f"/v1/admin/quality/clusters/{second_id}/merge",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
         json={"target_cluster_id": root_id},
     )
     assert second_merge.status_code == 200
@@ -349,21 +366,21 @@ def test_chained_cluster_merges_flatten_aliases_and_route_future_reports_to_root
     assert routed["problem_group_id"] == root_id
     assert routed["related_report_count"] == 4
 
-    listing = client.get("/v1/admin/quality/clusters", headers=ADMIN_HEADERS)
+    listing = client.get("/v1/admin/quality/clusters", headers=admin_headers())
     assert listing.status_code == 200
     active_ids = {item["id"] for item in listing.json()["clusters"]}
     assert root_id in active_ids
     assert first_id not in active_ids
     assert second_id not in active_ids
 
-    first_alias = client.get(f"/v1/admin/quality/clusters/{first_id}", headers=ADMIN_HEADERS)
-    second_alias = client.get(f"/v1/admin/quality/clusters/{second_id}", headers=ADMIN_HEADERS)
+    first_alias = client.get(f"/v1/admin/quality/clusters/{first_id}", headers=admin_headers())
+    second_alias = client.get(f"/v1/admin/quality/clusters/{second_id}", headers=admin_headers())
     assert first_alias.status_code == 200
     assert second_alias.status_code == 200
     assert first_alias.json()["cluster"]["merged_into_id"] == root_id
     assert second_alias.json()["cluster"]["merged_into_id"] == root_id
 
-    root = client.get(f"/v1/admin/quality/clusters/{root_id}", headers=ADMIN_HEADERS)
+    root = client.get(f"/v1/admin/quality/clusters/{root_id}", headers=admin_headers())
     assert root.status_code == 200
     cluster = root.json()["cluster"]
     assert cluster["occurrence_count"] == 4
@@ -383,7 +400,7 @@ def test_security_privacy_category_alone_cannot_self_promote_to_critical() -> No
 
     cluster = client.get(
         f"/v1/admin/quality/clusters/{report['problem_group_id']}",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
     )
     assert cluster.status_code == 200
     assert cluster.json()["cluster"]["severity"] == "MEDIUM"
@@ -402,7 +419,7 @@ def test_security_privacy_requires_diagnostic_signal_for_critical_inference() ->
 
     cluster = client.get(
         f"/v1/admin/quality/clusters/{report['problem_group_id']}",
-        headers=ADMIN_HEADERS,
+        headers=admin_headers(),
     )
     assert cluster.status_code == 200
     assert cluster.json()["cluster"]["severity"] == "CRITICAL"

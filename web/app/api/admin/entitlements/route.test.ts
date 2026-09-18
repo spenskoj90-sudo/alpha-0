@@ -8,7 +8,7 @@ describe('/api/admin/entitlements', () => {
     vi.unstubAllEnvs();
   });
 
-  it('denies reads and writes without the admin token', async () => {
+  it('denies reads and writes without both admin factors', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     const read = await GET(new NextRequest('http://localhost/api/admin/entitlements'));
     expect(read.status).toBe(403);
@@ -23,7 +23,7 @@ describe('/api/admin/entitlements', () => {
   it('fails closed when the upstream is not configured', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', '');
     const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
-      headers: { 'x-sentinel-admin-token': 'test-token' },
+      headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
     }));
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' });
@@ -36,14 +36,16 @@ describe('/api/admin/entitlements', () => {
       headers: { 'content-type': 'application/json' },
     }));
     const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
-      headers: { 'x-sentinel-admin-token': 'test-token' },
+      headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
     }));
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"entitlements":[]}');
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('https://core.example/v1/admin/entitlements');
     expect(new Headers(init?.headers).get('x-sentinel-admin-token')).toBe('test-token');
+    expect(new Headers(init?.headers).get('x-sentinel-admin-totp')).toBe('123456');
     expect(response.headers.get('set-cookie') ?? '').not.toContain('test-token');
+    expect(response.headers.get('set-cookie') ?? '').not.toContain('123456');
   });
 
   it('forwards authorized grants and preserves the request body', async () => {
@@ -56,7 +58,7 @@ describe('/api/admin/entitlements', () => {
     const response = await POST(new NextRequest('http://localhost/api/admin/entitlements', {
       method: 'POST',
       body,
-      headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': 'test-token' },
+      headers: { 'content-type': 'application/json', 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
     }));
     expect(response.status).toBe(200);
     const [url, init] = fetchMock.mock.calls[0];
@@ -64,5 +66,6 @@ describe('/api/admin/entitlements', () => {
     expect(init?.method).toBe('POST');
     expect(init?.body).toBe(body);
     expect(new Headers(init?.headers).get('x-sentinel-admin-token')).toBe('test-token');
+    expect(new Headers(init?.headers).get('x-sentinel-admin-totp')).toBe('123456');
   });
 });

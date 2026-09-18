@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import re
+import time
 import uuid
 
 from fastapi.testclient import TestClient
 
+from app.core.admin import _decode_totp_secret, _totp_at
 from app.core.operational_observability import BoundedOperationalRegistry, normalize_request_id, operational_registry
 from app.main import app
 
@@ -74,18 +76,27 @@ def test_invalid_http_request_id_is_replaced_before_endpoint_and_error_handling(
 
 def test_admin_observability_and_metrics_are_fail_closed_and_never_expose_admin_token(monkeypatch) -> None:
     operational_registry.clear()
+    totp_secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
     monkeypatch.setenv("SENTINEL_ADMIN_TOKEN", "admin-observability-secret")
+    monkeypatch.setenv("SENTINEL_ADMIN_TOTP_SECRET", totp_secret)
     denied = admin_client.get("/v1/admin/observability")
     assert denied.status_code == 403
 
-    headers = {"X-Sentinel-Admin-Token": "admin-observability-secret", "X-Request-ID": "admin-observe"}
+    totp = _totp_at(_decode_totp_secret(totp_secret), int(time.time() // 30))
+    headers = {
+        "X-Sentinel-Admin-Token": "admin-observability-secret",
+        "X-Sentinel-Admin-TOTP": totp,
+        "X-Request-ID": "admin-observe",
+    }
     response = admin_client.get("/v1/admin/observability", headers=headers)
     assert response.status_code == 200
     assert "series" in response.json()
     assert "recent_traces" in response.json()
     assert "admin-observability-secret" not in response.text
+    assert totp not in response.text
 
     metrics = admin_client.get("/v1/admin/metrics", headers=headers)
     assert metrics.status_code == 200
     assert "sentinel_operational_events_total" in metrics.text
     assert "admin-observability-secret" not in metrics.text
+    assert totp not in metrics.text

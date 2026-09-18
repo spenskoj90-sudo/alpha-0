@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readAdminAuthHeaders } from '../../_auth';
 
 function upstreamUrl() {
   const value = process.env.SENTINEL_CORE_URL?.trim();
@@ -9,8 +10,8 @@ function upstreamUrl() {
 export async function GET(request: NextRequest) {
   const upstream = upstreamUrl();
   if (!upstream) return NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 });
-  const token = request.headers.get('x-sentinel-admin-token');
-  if (!token) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
+  const adminHeaders = readAdminAuthHeaders(request);
+  if (!adminHeaders) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
   const query = new URLSearchParams();
   for (const key of ['limit', 'status', 'severity', 'category']) {
     const value = request.nextUrl.searchParams.get(key);
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (!query.has('limit')) query.set('limit', '100');
   try {
     const response = await fetch(`${upstream}/v1/admin/quality/clusters?${query.toString()}`, {
-      headers: { accept: 'application/json', 'x-sentinel-admin-token': token },
+      headers: { accept: 'application/json', ...adminHeaders },
       cache: 'no-store',
     });
     return new NextResponse(await response.text(), {

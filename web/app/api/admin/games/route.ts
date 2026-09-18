@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readAdminAuthHeaders } from '../_auth';
 
 function upstreamUrl() {
   const value = process.env.SENTINEL_CORE_URL?.trim();
@@ -13,11 +14,11 @@ function upstreamUrl() {
 export async function GET(request: NextRequest) {
   const upstream = upstreamUrl();
   if (!upstream) return NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 });
-  const token = request.headers.get('x-sentinel-admin-token');
-  if (!token) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
+  const adminHeaders = readAdminAuthHeaders(request);
+  if (!adminHeaders) return NextResponse.json({ error: 'ADMIN_ACCESS_DENIED' }, { status: 403 });
   try {
     const response = await fetch(`${upstream}/v1/admin/games`, {
-      headers: { 'x-sentinel-admin-token': token, accept: 'application/json' },
+      headers: { ...adminHeaders, accept: 'application/json' },
       cache: 'no-store',
     });
     return new NextResponse(await response.text(), {

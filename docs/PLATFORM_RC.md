@@ -24,7 +24,7 @@ This document describes the implementation added by `agent/sentinel-complete-pla
 
 ## Security invariants
 
-The server remains authoritative. Client input does not grant roles, permissions or entitlements. Game access requires a server session, an applicable authorization policy and an active entitlement for the requested game. Administrative operations fail closed when `SENTINEL_ADMIN_TOKEN` is absent or invalid.
+The server remains authoritative. Client input does not grant roles, permissions or entitlements. Game access requires a server session, an applicable authorization policy and an active entitlement for the requested game. Administrative operations fail closed unless both `SENTINEL_ADMIN_TOKEN` and the RFC 6238 `SENTINEL_ADMIN_TOTP_SECRET` are configured and the request presents both valid factors.
 
 ## Required environment
 
@@ -32,6 +32,7 @@ Server:
 
 ```text
 SENTINEL_ADMIN_TOKEN=<high-entropy secret>
+SENTINEL_ADMIN_TOTP_SECRET=<base32 authenticator seed>
 DATABASE_URL=postgresql+psycopg://...
 ```
 

@@ -2,7 +2,6 @@ import java.net.URI
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -76,15 +75,15 @@ if (physicalTestRequested) {
 android {
     namespace = "com.alpha0.app"
 
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.alpha0.app"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         // Monotonic application identity. Increment for every installable update;
         // Android rejects an in-place replacement that does not advance this value.
-        versionCode = 10006
+        versionCode = 10007
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
@@ -103,6 +102,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // Gradle itself runs on the modern CI JDK, while Android bytecode remains
+    // explicitly Java 17 compatible. Built-in Kotlin inherits targetCompatibility.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     signingConfigs {
@@ -175,16 +181,15 @@ android {
         ciRelease.keyPassword = keyPassword
     }
 
-    kotlin { jvmToolchain(17) }
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2025.01.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.navigation:navigation-compose:2.8.9")
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.navigation:navigation-compose:2.10.1")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.ui:ui-text-google-fonts")
@@ -192,12 +197,12 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
-    implementation("com.google.android.play:integrity:1.4.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")
+    implementation("com.google.android.play:integrity:1.6.0")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:app-update-ktx:2.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("io.sentry:sentry-android:8.54.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("io.sentry:sentry-android:8.57.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")

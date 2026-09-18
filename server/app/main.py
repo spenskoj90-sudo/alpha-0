@@ -15,27 +15,34 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core.account_notifications import send_password_reset_email, send_verification_email
 from app.core.admin import require_admin
 from app.core.billing import BillingService, BillingWebhookEvent
 from app.core.p1_runtime import BillingState
 from app.core.character_projection import apply_character_projections
 from app.core.integrity import IntegrityNonceStore, IntegrityTier, PlayIntegrityVerifier
+from app.core.email_provider import configured_email_transport
 from app.core.entitlements import EntitlementStatus
 from app.core.game_catalog import DIABLO_CATALOG, get_game
 from app.core.game_state_routes import install_game_state_routes
 from app.core.models import (
+    AccountSecurityResponse,
     AdminEntitlementRequest,
+    AuthActionResponse,
+    AuthTokenRequest,
     AuthorizeRequest,
     AuthorizeResponse,
     DeviceBindRequest,
     DeviceProofRequest,
     DeviceRegisterRequest,
     DeviceRegisterResponse,
+    EmailActionRequest,
     EventBatchRequest,
     LoginRequest,
     Recommendation,
     RecommendationRequest,
     RecommendationResponse,
+    PasswordResetConfirmRequest,
     RefreshRequest,
     RegisterRequest,
     SessionResponse,
@@ -97,6 +104,7 @@ async def security_headers(request: Request, call_next):
 
 store: Store = PostgresStore(DATABASE_URL) if DATABASE_URL else MemoryStore()
 user_store = UserAccountStore(DATABASE_URL)
+email_transport = configured_email_transport()
 policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "character:read", "character:*", scopes=frozenset({"character:read"})),
     Policy(Decision.ALLOW, "event:write", "game:event", scopes=frozenset({"game:write"})),
@@ -312,7 +320,53 @@ def register_user(payload: RegisterRequest, request: Request):
     user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
     scopes = ["character:read", "game:read", "audit:read"]
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
+    verification_token = user_store.issue_action_token(payload.email, "EMAIL_VERIFY", 86_400)
+    if verification_token:
+        send_verification_email(email_transport, payload.email, verification_token)
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/auth/email-verification/request", response_model=AuthActionResponse, status_code=202)
+def request_email_verification(payload: EmailActionRequest, request: Request) -> AuthActionResponse:
+    rate_limit(request, "auth-email-verification-request")
+    token = user_store.issue_action_token(payload.email, "EMAIL_VERIFY", 86_400)
+    if token:
+        send_verification_email(email_transport, payload.email, token)
+    return AuthActionResponse(status="ACCEPTED")
+
+
+@app.post("/v1/auth/email-verification/confirm", response_model=AuthActionResponse)
+def confirm_email_verification(payload: AuthTokenRequest, request: Request) -> AuthActionResponse:
+    rate_limit(request, "auth-email-verification-confirm")
+    if not user_store.confirm_email(payload.token):
+        raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
+    return AuthActionResponse(status="VERIFIED")
+
+
+@app.post("/v1/auth/password-reset/request", response_model=AuthActionResponse, status_code=202)
+def request_password_reset(payload: EmailActionRequest, request: Request) -> AuthActionResponse:
+    rate_limit(request, "auth-password-reset-request")
+    token = user_store.issue_action_token(payload.email, "PASSWORD_RESET", 1_800)
+    if token:
+        send_password_reset_email(email_transport, payload.email, token)
+    return AuthActionResponse(status="ACCEPTED")
+
+
+@app.post("/v1/auth/password-reset/confirm", response_model=AuthActionResponse)
+def confirm_password_reset(payload: PasswordResetConfirmRequest, request: Request) -> AuthActionResponse:
+    rate_limit(request, "auth-password-reset-confirm")
+    if not user_store.reset_password(payload.token, payload.password, store):
+        raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
+    return AuthActionResponse(status="PASSWORD_UPDATED")
+
+
+@app.get("/v1/account/security", response_model=AccountSecurityResponse)
+def account_security(authorization_header: str = Header(..., alias="Authorization")) -> AccountSecurityResponse:
+    principal = principal_from_token(require_bearer(authorization_header))
+    state = user_store.security_state(principal.user_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
+    return AccountSecurityResponse(**state)
 
 
 @app.post("/v1/auth/login", response_model=SessionResponse)

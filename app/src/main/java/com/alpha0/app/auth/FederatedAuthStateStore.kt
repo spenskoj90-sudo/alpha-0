@@ -21,6 +21,7 @@ import javax.crypto.spec.GCMParameterSpec
 class FederatedAuthStateStore {
     data class Pending(
         val provider: String,
+        val operation: String,
         val state: String,
         val codeVerifier: String,
         val createdAtMillis: Long,
@@ -38,6 +39,7 @@ class FederatedAuthStateStore {
     fun save(context: Context, pending: Pending) {
         val raw = listOf(
             pending.provider,
+            pending.operation,
             pending.state,
             pending.codeVerifier,
             pending.createdAtMillis.toString(),
@@ -54,15 +56,21 @@ class FederatedAuthStateStore {
         prefs.edit().remove(PAYLOAD).apply()
         return try {
             val parts = decrypt(encoded).split("\n")
-            if (parts.size != 4) return null
-            val created = parts[3].toLongOrNull() ?: return null
+            if (parts.size != 5) return null
+            val created = parts[4].toLongOrNull() ?: return null
             if (created > System.currentTimeMillis() + 60_000L) return null
             if (System.currentTimeMillis() - created > MAX_AGE_MILLIS) return null
             val provider = parts[0]
-            val state = parts[1]
-            val verifier = parts[2]
-            if (provider !in setOf("telegram", "vk") || state.length < 32 || verifier.length < 43) return null
-            Pending(provider, state, verifier, created)
+            val operation = parts[1]
+            val state = parts[2]
+            val verifier = parts[3]
+            if (
+                provider !in setOf("telegram", "vk") ||
+                operation !in setOf("login", "link") ||
+                state.length < 32 ||
+                verifier.length < 43
+            ) return null
+            Pending(provider, operation, state, verifier, created)
         } catch (_: Exception) {
             null
         }

@@ -76,3 +76,34 @@ def test_user_session_can_refresh_and_revoke_without_scope_escalation():
     revoked = client.post("/v1/sessions/revoke", headers={"Authorization": f"Bearer {new_token}"})
     assert revoked.status_code == 200
     assert client.post("/v1/sessions/revoke", headers={"Authorization": f"Bearer {new_token}"}).status_code == 401
+
+
+def _message_token(text: str, label: str) -> str:
+    match = re.search(rf"{label}: ([A-Za-z0-9_-]+)", text)
+    assert match is not None
+    return match.group(1)
+
+
+def test_email_verification_is_hashed_single_use_and_updates_security_state(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    email = f"verify-{uuid.uuid4().hex}@example.com"
+    password = "Account-verification-test-password-123"
+
+    registered = client.post("/v1/auth/register", json={"email": email, "password": password})
+    assert registered.status_code == 200
+    token = _message_token(transport.snapshot()[0].text, "Verification code")
+    assert token not in user_store._action_tokens
+    assert hashlib.sha256(token.encode()).hexdigest() in user_store._action_tokens
+
+    headers = {"Authorization": f"Bearer {registered.json()['session_token']}"}
+    before = client.get("/v1/account/security", headers=headers)
+    assert before.status_code == 200
+    assert before.json()["email_verified"] is False
+    assert before.json()["providers"] == []
+
+    confirmed = client.post("/v1/auth/email-verification/confirm", json={"token": token})
+    assert confirmed.status_code == 200
+    assert confirmed.json() == {"status": "VERIFIED"}
+    assert client.post("/v1/auth/email-verification/confirm", json={"token": token}).status_code == 400
+    assert client.get("/v1/account/security", headers=headers).json()["email_verified"] is True

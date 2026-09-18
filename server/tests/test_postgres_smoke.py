@@ -249,3 +249,50 @@ def test_postgres_entitlement_listing_supports_scoped_and_admin_reads():
         and item["platform"] == "android"
         for item in payload
     )
+
+
+def test_postgres_account_security_tokens_are_hashed_single_use_and_recovery_revokes_sessions(monkeypatch):
+    from app import main as main_module
+    from app.core.email_provider import TestEmailTransport
+    from app.main import app, store
+
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    client = TestClient(app)
+    email = f"pg-auth-{uuid.uuid4().hex}@example.com"
+    old_password = "Postgres-account-old-password-123"
+    new_password = "Postgres-account-new-password-456"
+
+    registered = client.post("/v1/auth/register", json={"email": email, "password": old_password})
+    assert registered.status_code == 200
+    old_access = registered.json()["session_token"]
+
+    verification_token = transport.snapshot()[-1].text.split("Verification code: ", 1)[1].splitlines()[0]
+    with store.engine.connect() as conn:
+        stored = conn.execute(
+            text("SELECT token_hash FROM auth_action_tokens WHERE token_hash=:token_hash"),
+            {"token_hash": hashlib.sha256(verification_token.encode()).hexdigest()},
+        ).scalar_one()
+        raw_matches = conn.execute(
+            text("SELECT COUNT(*) FROM auth_action_tokens WHERE token_hash=:raw"),
+            {"raw": verification_token},
+        ).scalar_one()
+    assert stored == hashlib.sha256(verification_token.encode()).hexdigest()
+    assert raw_matches == 0
+    assert client.post("/v1/auth/email-verification/confirm", json={"token": verification_token}).status_code == 200
+
+    requested = client.post("/v1/auth/password-reset/request", json={"email": email})
+    assert requested.status_code == 202
+    reset_token = transport.snapshot()[-1].text.split("Reset code: ", 1)[1].splitlines()[0]
+    confirmed = client.post(
+        "/v1/auth/password-reset/confirm",
+        json={"token": reset_token, "password": new_password},
+    )
+    assert confirmed.status_code == 200
+    assert store.get_session(old_access) is None
+    assert client.post("/v1/auth/login", json={"email": email, "password": old_password}).status_code == 401
+    assert client.post("/v1/auth/login", json={"email": email, "password": new_password}).status_code == 200
+    assert client.post(
+        "/v1/auth/password-reset/confirm",
+        json={"token": reset_token, "password": "Postgres-account-replay-password-789"},
+    ).status_code == 400

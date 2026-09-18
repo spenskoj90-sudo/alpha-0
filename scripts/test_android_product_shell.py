@@ -81,7 +81,7 @@ class AndroidProductShellTests(unittest.TestCase):
         coordinator = read("app/src/main/java/com/alpha0/app/auth/FederatedAuthCoordinator.kt")
         state_store = read("app/src/main/java/com/alpha0/app/auth/FederatedAuthStateStore.kt")
         self.assertIn('implementation("androidx.credentials:credentials:1.6.0")', self.gradle)
-        self.assertIn('implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")', self.gradle)
+        self.assertIn('implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")', self.gradle)
         self.assertIn("GetGoogleIdOption.Builder()", coordinator)
         self.assertIn(".setNonce(challenge.nonce)", coordinator)
         self.assertIn("MessageDigest.isEqual", coordinator)

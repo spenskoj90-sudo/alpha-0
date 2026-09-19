@@ -113,7 +113,7 @@ export function AccountControl() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [mfaChallenge, setMfaChallenge] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -184,16 +184,16 @@ export function AccountControl() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const payload = await responseJson<{ error?: string; code?: string; mfa_required?: boolean; challenge_token?: string }>(response);
+      const payload = await responseJson<{ error?: string; code?: string; mfa_required?: boolean }>(response);
       if (!response.ok) {
         setMessage(payload?.code ?? payload?.error ?? `Authentication failed (${response.status}).`);
         setMessageTone('error');
         setView('SIGNED_OUT');
         return;
       }
-      if (payload?.mfa_required === true && typeof payload.challenge_token === 'string') {
+      if (payload?.mfa_required === true) {
         setPassword('');
-        setMfaChallenge(payload.challenge_token);
+        setMfaRequired(true);
         setMfaCode('');
         setMessage('Second-factor verification required.');
         setMessageTone('status');
@@ -209,14 +209,14 @@ export function AccountControl() {
 
   async function completeMfa(event: FormEvent) {
     event.preventDefault();
-    if (!mfaChallenge || mfaCode.trim().length < 6) return;
+    if (!mfaRequired || mfaCode.trim().length < 6) return;
     setBusy(true);
     setMessage('');
     try {
       const response = await fetch('/api/session/mfa', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ challenge_token: mfaChallenge, code: mfaCode.trim() }),
+        body: JSON.stringify({ code: mfaCode.trim() }),
       });
       const payload = await responseJson<{ error?: string; code?: string }>(response);
       if (!response.ok) {
@@ -224,7 +224,7 @@ export function AccountControl() {
         setMessageTone('error');
         return;
       }
-      setMfaChallenge('');
+      setMfaRequired(false);
       setMfaCode('');
       await reloadAccount();
     } finally {
@@ -239,6 +239,8 @@ export function AccountControl() {
       setPlans([]);
       setSubscriptions([]);
       setEntitlements([]);
+      setMfaRequired(false);
+      setMfaCode('');
       setView('SIGNED_OUT');
       setMessage('Session cleared.');
       setMessageTone('status');
@@ -304,7 +306,7 @@ export function AccountControl() {
           <div><div className="label">ACCOUNT CONTROL</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
           <span className="badge">HTTPONLY SESSION</span>
         </div>
-        {mfaChallenge ? (
+        {mfaRequired ? (
           <form onSubmit={completeMfa}>
             <label className="field-label">
               AUTHENTICATOR OR RECOVERY CODE
@@ -338,7 +340,7 @@ export function AccountControl() {
               <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
               <button className="btn" disabled={busy}>{busy ? 'WORKING…' : mode === 'login' ? 'SIGN IN' : 'REGISTER'}</button>
             </form>
-            <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage(''); setMessageTone('status'); }} disabled={busy}>
+            <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMfaRequired(false); setMfaCode(''); setMessage(''); setMessageTone('status'); }} disabled={busy}>
               {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
             </button>
           </>

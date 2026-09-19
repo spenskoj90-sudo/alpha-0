@@ -17,6 +17,7 @@
 - Account TOTP seeds are encrypted at rest with the deployment-managed `SENTINEL_ACCOUNT_MFA_KEY`; the raw key is never committed. Missing/invalid encryption configuration fails enrollment and MFA verification closed.
 - TOTP counters are replay-protected. Recovery codes are high-entropy, stored only as SHA-256 digests, consumed once, and are shown only when initially generated or explicitly rotated.
 - Enabling or disabling account MFA revokes existing sessions so a previously issued refresh token cannot bypass the changed security policy.
+- The Web control plane keeps raw MFA challenges in a short-lived HttpOnly, SameSite=Strict cookie; browser JavaScript receives only the fact that MFA is required and submits only the user-entered second factor.
 - Federated identities are keyed by provider subject, never by email equality. Existing-email collisions require explicit authenticated linking, and adding a persistent provider identity requires a device-bound SENTINEL session obtained after device proof; a pre-device account session is insufficient.
 - Google ID tokens are checked server-side for signature, issuer, audience, time bounds and one-time nonce.
 - Telegram OIDC and VK ID browser flows use PKCE plus one-time hashed state. Redirect URIs are exact server allowlists; arbitrary client redirects are rejected.

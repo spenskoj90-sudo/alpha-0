@@ -30,6 +30,13 @@
         <button id="companion-start" class="btn" disabled>START COMPANION</button>
         <button id="companion-stop" class="btn secondary" disabled>STOP / KILL SWITCH</button>
       </div>
+      <div id="mfa-panel" class="row" hidden>
+        <div class="field">
+          <label for="mfa-code">AUTHENTICATOR OR RECOVERY CODE</label>
+          <input id="mfa-code" type="text" autocomplete="one-time-code">
+        </div>
+        <div class="actions"><button id="mfa-complete" class="btn">VERIFY MFA</button></div>
+      </div>
       <div id="account-status" class="status" role="status" aria-live="polite" aria-atomic="true">ACCOUNT: SIGNED OUT</div>
       <div id="companion-status" class="status" role="status" aria-live="polite" aria-atomic="true">COMPANION: STOPPED</div>
       <div id="wow-checkpoint-status" class="status" role="status" aria-live="polite" aria-atomic="true">WOW CHECKPOINT: STOPPED</div>

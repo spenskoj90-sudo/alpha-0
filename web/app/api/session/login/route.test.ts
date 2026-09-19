@@ -48,6 +48,33 @@ describe('POST /api/session/login', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps an MFA challenge out of JavaScript and stores it in an HttpOnly cookie', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const challenge = 'mfa-' + 'x'.repeat(44);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      mfa_required: true,
+      challenge_token: challenge,
+      expires_at: '2030-01-01T00:00:00Z',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    const response = await POST(new NextRequest('http://localhost/api/session/login', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
+    }));
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload).toMatchObject({ mfa_required: true });
+    expect(JSON.stringify(payload)).not.toContain(challenge);
+    const cookie = response.headers.get('set-cookie') ?? '';
+    expect(cookie).toContain(`sentinel_mfa=${challenge}`);
+    expect(cookie).not.toContain('access-secret');
+    expect(cookie).not.toContain('refresh-secret');
+    expect(cookie.toLowerCase()).toContain('httponly');
+    expect(cookie.toLowerCase()).toContain('samesite=strict');
+  });
+
   it('fails closed when Core is not configured', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', '');
     const response = await POST(new NextRequest('http://localhost/api/session/login', {

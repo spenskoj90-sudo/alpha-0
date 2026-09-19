@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const ACCESS_COOKIE = 'sentinel_access';
 export const REFRESH_COOKIE = 'sentinel_refresh';
+export const MFA_COOKIE = 'sentinel_mfa';
 const DEFAULT_REFRESH_MAX_AGE_SECONDS = 2_592_000;
+const DEFAULT_MFA_MAX_AGE_SECONDS = 300;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -12,6 +14,12 @@ type SessionPayload = {
   refresh_token: string;
   expires_at: string;
   scopes: string[];
+};
+
+type MfaChallengePayload = {
+  mfa_required: true;
+  challenge_token: string;
+  expires_at: string;
 };
 
 function configuredCoreUrl(): string | null {
@@ -80,6 +88,19 @@ export function clearSessionCookies(response: NextResponse): void {
   response.cookies.set(REFRESH_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
 }
 
+export function clearMfaCookie(response: NextResponse): void {
+  response.cookies.set(MFA_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
+}
+
+function applyMfaCookie(response: NextResponse, challenge: MfaChallengePayload): void {
+  const expires = new Date(challenge.expires_at);
+  response.cookies.set(MFA_COOKIE, challenge.challenge_token, {
+    ...cookieBaseOptions(),
+    maxAge: Number.isNaN(expires.getTime()) ? DEFAULT_MFA_MAX_AGE_SECONDS : undefined,
+    expires: Number.isNaN(expires.getTime()) ? undefined : expires,
+  });
+}
+
 async function coreFetch(coreUrl: string, path: string, requestId: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
@@ -97,6 +118,21 @@ async function parseSession(response: Response): Promise<SessionPayload | null> 
       !Array.isArray(payload.scopes)
     ) return null;
     return payload as SessionPayload;
+  } catch {
+    return null;
+  }
+}
+
+async function parseMfaChallenge(response: Response): Promise<MfaChallengePayload | null> {
+  try {
+    const payload = await response.clone().json() as Partial<MfaChallengePayload>;
+    if (
+      payload.mfa_required !== true ||
+      typeof payload.challenge_token !== 'string' ||
+      payload.challenge_token.length < 32 ||
+      typeof payload.expires_at !== 'string'
+    ) return null;
+    return payload as MfaChallengePayload;
   } catch {
     return null;
   }
@@ -137,6 +173,67 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       headers: { 'content-type': 'application/json' },
       body: await request.text(),
     });
+    if (!response.ok) {
+      const result = await copyUpstream(response, requestId);
+      clearMfaCookie(result);
+      return result;
+    }
+    const mfa = await parseMfaChallenge(response);
+    if (mfa) {
+      const result = applyCorrelation(NextResponse.json({
+        mfa_required: true,
+        expires_at: mfa.expires_at,
+      }), requestId, response);
+      clearSessionCookies(result);
+      applyMfaCookie(result, mfa);
+      return result;
+    }
+    const session = await parseSession(response);
+    if (!session) {
+      return applyCorrelation(NextResponse.json({ error: 'INVALID_CORE_SESSION_RESPONSE' }, { status: 502 }), requestId, response);
+    }
+    const result = applyCorrelation(NextResponse.json({
+      authenticated: true,
+      expires_at: session.expires_at,
+      scopes: session.scopes,
+    }), requestId, response);
+    clearMfaCookie(result);
+    applySessionCookies(result, session);
+    return result;
+  } catch {
+    return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);
+  }
+}
+
+export async function completeMfaWeb(request: NextRequest): Promise<NextResponse> {
+  const requestId = correlationId(request);
+  if (!sameOriginWrite(request)) {
+    return applyCorrelation(NextResponse.json({ error: 'CROSS_SITE_REQUEST_DENIED' }, { status: 403 }), requestId);
+  }
+  const coreUrl = configuredCoreUrl();
+  if (!coreUrl) {
+    return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
+  }
+  const challengeToken = request.cookies.get(MFA_COOKIE)?.value;
+  if (!challengeToken) {
+    return applyCorrelation(NextResponse.json({ error: 'WEB_MFA_CHALLENGE_REQUIRED' }, { status: 401 }), requestId);
+  }
+  let code: string;
+  try {
+    const payload = await request.json() as { code?: unknown };
+    code = typeof payload.code === 'string' ? payload.code.trim() : '';
+  } catch {
+    code = '';
+  }
+  if (code.length < 6 || code.length > 64) {
+    return applyCorrelation(NextResponse.json({ error: 'MFA_CODE_INVALID' }, { status: 400 }), requestId);
+  }
+  try {
+    const response = await coreFetch(coreUrl, '/v1/auth/mfa/complete', requestId, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ challenge_token: challengeToken, code }),
+    });
     if (!response.ok) return copyUpstream(response, requestId);
     const session = await parseSession(response);
     if (!session) {
@@ -147,6 +244,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       expires_at: session.expires_at,
       scopes: session.scopes,
     }), requestId, response);
+    clearMfaCookie(result);
     applySessionCookies(result, session);
     return result;
   } catch {
@@ -232,5 +330,6 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
 
   const result = applyCorrelation(NextResponse.json({ authenticated: false, server_revoked: serverRevoked }), requestId, upstream);
   clearSessionCookies(result);
+  clearMfaCookie(result);
   return result;
 }

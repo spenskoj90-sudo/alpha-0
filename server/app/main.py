@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.account_notifications import send_password_reset_email, send_verification_email
+from app.core.account_mfa import AccountMfaConfigurationError, AccountMfaService
 from app.core.admin import require_admin
 from app.core.billing import BillingService, BillingWebhookEvent
 from app.core.p1_runtime import BillingState
@@ -55,6 +56,11 @@ from app.core.models import (
     GoogleCredentialRequest,
     EventBatchRequest,
     LoginRequest,
+    MfaChallengeResponse,
+    MfaCompleteRequest,
+    MfaRecoveryCodesResponse,
+    TotpCodeRequest,
+    TotpEnrollmentResponse,
     Recommendation,
     RecommendationRequest,
     RecommendationResponse,
@@ -120,6 +126,7 @@ async def security_headers(request: Request, call_next):
 
 store: Store = PostgresStore(DATABASE_URL) if DATABASE_URL else MemoryStore()
 user_store = UserAccountStore(DATABASE_URL)
+account_mfa = AccountMfaService(DATABASE_URL)
 email_transport = configured_email_transport()
 policy_engine = AuthorizationEngine([
     Policy(Decision.ALLOW, "character:read", "character:*", scopes=frozenset({"character:read"})),
@@ -382,7 +389,12 @@ def account_security(authorization_header: str = Header(..., alias="Authorizatio
     state = user_store.security_state(principal.user_id)
     if not state:
         raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
-    return AccountSecurityResponse(**state)
+    mfa_state = account_mfa.state(principal.user_id)
+    return AccountSecurityResponse(
+        **state,
+        mfa_enabled=bool(mfa_state["enabled"]),
+        mfa_recovery_codes_remaining=int(mfa_state["recovery_codes_remaining"]),
+    )
 
 
 def _federated_error(exc: FederatedAuthError) -> HTTPException:
@@ -394,7 +406,97 @@ def _federated_error(exc: FederatedAuthError) -> HTTPException:
     return HTTPException(status_code=400, detail=code)
 
 
-def _federated_session(identity: VerifiedFederatedIdentity, request: Request) -> SessionResponse:
+def revoke_user_sessions(user_id: str) -> None:
+    if isinstance(store, MemoryStore):
+        with store.lock:
+            for record in store.sessions.values():
+                if record.get("user_id") == user_id:
+                    record["revoked"] = True
+        return
+    with store.engine.begin() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()) "
+                "WHERE identity_id=(SELECT id FROM identities WHERE user_handle=:user_id)"
+            ),
+            {"user_id": user_id},
+        )
+
+
+def _issue_account_session(
+    user_id: str,
+    request: Request,
+    *,
+    action: str,
+    reason_code: str,
+    resource: str = "session",
+) -> SessionResponse:
+    access, refresh, expires_at, _ = store.issue_session(
+        None,
+        user_id,
+        SESSION_TTL_SECONDS,
+        REFRESH_TTL_SECONDS,
+    )
+    scopes = ["character:read", "game:read", "audit:read"]
+    user_store.restrict_session_scopes(store, access, scopes)
+    store.add_audit(
+        {
+            "actor_user_id": user_id,
+            "actor_device_id": None,
+            "action": action,
+            "resource": resource,
+            "decision": "ALLOW",
+            "reason_code": reason_code,
+            "request_id": request_id(request),
+        }
+    )
+    return SessionResponse(
+        session_token=access,
+        refresh_token=refresh,
+        expires_at=expires_at,
+        scopes=scopes,
+    )
+
+
+def _session_or_mfa(
+    user_id: str,
+    request: Request,
+    *,
+    action: str,
+    first_factor_reason: str,
+    resource: str = "session",
+) -> SessionResponse | MfaChallengeResponse:
+    challenge = account_mfa.issue_login_challenge(user_id)
+    if challenge is not None:
+        challenge_token, expires_at = challenge
+        store.add_audit(
+            {
+                "actor_user_id": user_id,
+                "actor_device_id": None,
+                "action": action,
+                "resource": "mfa-challenge",
+                "decision": "ALLOW",
+                "reason_code": "FIRST_FACTOR_VALID_MFA_REQUIRED",
+                "request_id": request_id(request),
+            }
+        )
+        return MfaChallengeResponse(
+            challenge_token=challenge_token,
+            expires_at=expires_at,
+        )
+    return _issue_account_session(
+        user_id,
+        request,
+        action=action,
+        reason_code=first_factor_reason,
+        resource=resource,
+    )
+
+
+def _federated_session(
+    identity: VerifiedFederatedIdentity,
+    request: Request,
+) -> SessionResponse | MfaChallengeResponse:
     user_id = user_store.external_identity_user(identity.provider, identity.subject)
     if user_id is None:
         try:
@@ -408,30 +510,12 @@ def _federated_session(identity: VerifiedFederatedIdentity, request: Request) ->
             if "ACCOUNT_LINK_REQUIRED" in str(exc):
                 raise HTTPException(status_code=409, detail="ACCOUNT_LINK_REQUIRED") from exc
             raise
-    access, refresh, expires_at, _ = store.issue_session(
-        None,
+    return _session_or_mfa(
         user_id,
-        SESSION_TTL_SECONDS,
-        REFRESH_TTL_SECONDS,
-    )
-    scopes = ["character:read", "game:read", "audit:read"]
-    user_store.restrict_session_scopes(store, access, scopes)
-    store.add_audit(
-        {
-            "actor_user_id": user_id,
-            "actor_device_id": None,
-            "action": "auth:federated-login",
-            "resource": f"provider:{identity.provider}",
-            "decision": "ALLOW",
-            "reason_code": "FEDERATED_IDENTITY_VALID",
-            "request_id": request_id(request),
-        }
-    )
-    return SessionResponse(
-        session_token=access,
-        refresh_token=refresh,
-        expires_at=expires_at,
-        scopes=scopes,
+        request,
+        action="auth:federated-login",
+        first_factor_reason="FEDERATED_IDENTITY_VALID",
+        resource=f"provider:{identity.provider}",
     )
 
 
@@ -513,8 +597,14 @@ def _verified_google(payload: GoogleCredentialRequest) -> VerifiedFederatedIdent
     return identity
 
 
-@app.post("/v1/auth/providers/google/login", response_model=SessionResponse)
-def google_federated_login(payload: GoogleCredentialRequest, request: Request) -> SessionResponse:
+@app.post(
+    "/v1/auth/providers/google/login",
+    response_model=SessionResponse | MfaChallengeResponse,
+)
+def google_federated_login(
+    payload: GoogleCredentialRequest,
+    request: Request,
+) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, "auth-google-login")
     return _federated_session(_verified_google(payload), request)
 
@@ -593,12 +683,15 @@ def _verified_browser(
         raise _federated_error(exc) from exc
 
 
-@app.post("/v1/auth/providers/{provider}/complete", response_model=SessionResponse)
+@app.post(
+    "/v1/auth/providers/{provider}/complete",
+    response_model=SessionResponse | MfaChallengeResponse,
+)
 def browser_federated_complete(
     provider: str,
     payload: BrowserAuthCompleteRequest,
     request: Request,
-) -> SessionResponse:
+) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, f"auth-{provider}-complete")
     return _federated_session(_verified_browser(provider, payload), request)
 
@@ -615,8 +708,11 @@ def browser_provider_link(
     return _link_federated_identity(principal, _verified_browser(provider, payload), request)
 
 
-@app.post("/v1/auth/login", response_model=SessionResponse)
-def login_user(payload: LoginRequest, request: Request):
+@app.post("/v1/auth/login", response_model=SessionResponse | MfaChallengeResponse)
+def login_user(
+    payload: LoginRequest,
+    request: Request,
+) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, "auth-login")
     subject = payload.email.strip().lower()
     threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
@@ -627,11 +723,158 @@ def login_user(payload: LoginRequest, request: Request):
         if subject:
             store.record_security_failure(subject, "auth-login")
         raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
-    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
-    scopes = ["character:read", "game:read", "audit:read"]
-    store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:login", "resource": "session", "decision": "ALLOW", "reason_code": "CREDENTIALS_VALID", "request_id": request_id(request)})
-    return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+    return _session_or_mfa(
+        user_id,
+        request,
+        action="auth:login",
+        first_factor_reason="CREDENTIALS_VALID",
+    )
+
+
+@app.post("/v1/auth/mfa/complete", response_model=SessionResponse)
+def complete_mfa_login(payload: MfaCompleteRequest, request: Request) -> SessionResponse:
+    rate_limit(request, "auth-mfa-complete")
+    try:
+        user_id = account_mfa.complete_login_challenge(payload.challenge_token, payload.code)
+    except AccountMfaConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not user_id:
+        raise HTTPException(status_code=401, detail="MFA_INVALID")
+    return _issue_account_session(
+        user_id,
+        request,
+        action="auth:mfa-complete",
+        reason_code="MFA_VALID",
+    )
+
+
+@app.post("/v1/account/mfa/totp/enroll", response_model=TotpEnrollmentResponse)
+def enroll_account_totp(
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> TotpEnrollmentResponse:
+    rate_limit(request, "account-mfa-enroll")
+    principal = _require_provider_link_principal(authorization_header)
+    security_state = user_store.security_state(principal.user_id)
+    if not security_state:
+        raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
+    label = str(security_state.get("email") or principal.user_id)
+    try:
+        result = account_mfa.begin_enrollment(principal.user_id, label)
+    except AccountMfaConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        code = str(exc)
+        if code == "MFA_ALREADY_ENABLED":
+            raise HTTPException(status_code=409, detail=code) from exc
+        raise HTTPException(status_code=400, detail=code) from exc
+    store.add_audit(
+        {
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "account:mfa-enroll",
+            "resource": "account-security",
+            "decision": "ALLOW",
+            "reason_code": "MFA_ENROLLMENT_STARTED",
+            "request_id": request_id(request),
+        }
+    )
+    return TotpEnrollmentResponse(**result)
+
+
+@app.post("/v1/account/mfa/totp/confirm", response_model=MfaRecoveryCodesResponse)
+def confirm_account_totp(
+    payload: TotpCodeRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> MfaRecoveryCodesResponse:
+    rate_limit(request, "account-mfa-confirm")
+    principal = _require_provider_link_principal(authorization_header)
+    try:
+        recovery_codes = account_mfa.confirm_enrollment(principal.user_id, payload.code)
+    except AccountMfaConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if recovery_codes is None:
+        raise HTTPException(status_code=400, detail="MFA_CODE_INVALID")
+    revoke_user_sessions(principal.user_id)
+    store.add_audit(
+        {
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "account:mfa-enable",
+            "resource": "account-security",
+            "decision": "ALLOW",
+            "reason_code": "MFA_ENABLED_SESSIONS_REVOKED",
+            "request_id": request_id(request),
+        }
+    )
+    return MfaRecoveryCodesResponse(
+        status="MFA_ENABLED",
+        recovery_codes=recovery_codes,
+    )
+
+
+@app.post("/v1/account/mfa/totp/disable", response_model=AuthActionResponse)
+def disable_account_totp(
+    payload: TotpCodeRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> AuthActionResponse:
+    rate_limit(request, "account-mfa-disable")
+    principal = _require_provider_link_principal(authorization_header)
+    try:
+        disabled = account_mfa.disable(principal.user_id, payload.code)
+    except AccountMfaConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if not disabled:
+        raise HTTPException(status_code=401, detail="MFA_INVALID")
+    revoke_user_sessions(principal.user_id)
+    store.add_audit(
+        {
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "account:mfa-disable",
+            "resource": "account-security",
+            "decision": "ALLOW",
+            "reason_code": "MFA_DISABLED_SESSIONS_REVOKED",
+            "request_id": request_id(request),
+        }
+    )
+    return AuthActionResponse(status="MFA_DISABLED")
+
+
+@app.post(
+    "/v1/account/mfa/recovery-codes/rotate",
+    response_model=MfaRecoveryCodesResponse,
+)
+def rotate_account_recovery_codes(
+    payload: TotpCodeRequest,
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> MfaRecoveryCodesResponse:
+    rate_limit(request, "account-mfa-recovery-rotate")
+    principal = _require_provider_link_principal(authorization_header)
+    try:
+        recovery_codes = account_mfa.rotate_recovery_codes(principal.user_id, payload.code)
+    except AccountMfaConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if recovery_codes is None:
+        raise HTTPException(status_code=401, detail="MFA_INVALID")
+    store.add_audit(
+        {
+            "actor_user_id": principal.user_id,
+            "actor_device_id": principal.device_id,
+            "action": "account:mfa-recovery-rotate",
+            "resource": "account-security",
+            "decision": "ALLOW",
+            "reason_code": "MFA_RECOVERY_CODES_ROTATED",
+            "request_id": request_id(request),
+        }
+    )
+    return MfaRecoveryCodesResponse(
+        status="RECOVERY_CODES_ROTATED",
+        recovery_codes=recovery_codes,
+    )
 
 
 @app.post("/v1/devices/register", response_model=DeviceRegisterResponse)

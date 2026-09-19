@@ -9,12 +9,17 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 ## User authentication
 
 - `POST /v1/auth/register` — create an account and issue a least-privilege user session.
-- `POST /v1/auth/login` — authenticate an existing account and issue a least-privilege user session.
+- `POST /v1/auth/login` — authenticate an existing account; accounts with TOTP MFA enabled receive a short-lived MFA challenge instead of a session until the second factor succeeds.
+- `POST /v1/auth/mfa/complete` — consume a short-lived MFA challenge with a current non-replayed TOTP or one unused recovery code and only then issue the least-privilege user session.
 - `POST /v1/auth/email-verification/request` — non-enumerating request for a 24-hour one-time email-verification code.
 - `POST /v1/auth/email-verification/confirm` — consume a verification code exactly once and mark the account email verified.
 - `POST /v1/auth/password-reset/request` — non-enumerating request for a 30-minute one-time password-reset code.
 - `POST /v1/auth/password-reset/confirm` — consume the reset code, replace the password and revoke all existing account sessions.
-- `GET /v1/account/security` — caller-scoped email-verification/password/provider-link security state.
+- `GET /v1/account/security` — caller-scoped email-verification/password/provider-link/MFA security state and remaining recovery-code count.
+- `POST /v1/account/mfa/totp/enroll` — device-bound authenticated start of TOTP enrollment; returns the one-time enrollment seed/otpauth URI. Requires environment-managed `SENTINEL_ACCOUNT_MFA_KEY`.
+- `POST /v1/account/mfa/totp/confirm` — verify the enrollment TOTP, enable MFA, create one-time recovery codes and revoke existing account sessions.
+- `POST /v1/account/mfa/totp/disable` — disable MFA only after a valid TOTP or unused recovery code, then revoke existing account sessions.
+- `POST /v1/account/mfa/recovery-codes/rotate` — replace all recovery codes after a fresh, non-replayed TOTP verification.
 - `GET /v1/auth/providers` — public fail-closed provider capability catalog; exposes enablement/flow/public client ID only, never provider secrets.
 - `POST /v1/auth/providers/google/challenge` — issue a one-time server nonce for Credential Manager Google ID-token authentication.
 - `POST /v1/auth/providers/google/login` — verify a nonce-bound Google ID token server-side and issue a SENTINEL session.

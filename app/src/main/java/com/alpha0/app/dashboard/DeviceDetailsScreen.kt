@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +59,11 @@ fun DeviceDetailsScreen(
     var accountError by remember { mutableStateOf<String?>(null) }
     var actionInProgress by remember { mutableStateOf(false) }
     var providerActionInProgress by remember { mutableStateOf(false) }
+    var mfaActionInProgress by remember { mutableStateOf(false) }
+    var mfaEnrollment by remember { mutableStateOf<AuthApi.TotpEnrollment?>(null) }
+    var mfaCode by remember { mutableStateOf("") }
+    var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
+    var mfaSessionRevoked by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var revoked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -160,6 +166,115 @@ fun DeviceDetailsScreen(
         }
     }
 
+    fun beginMfaEnrollment() {
+        mfaActionInProgress = true
+        accountError = null
+        recoveryCodes = emptyList()
+        scope.launch {
+            when (val result = authApi.enrollTotp(accessToken)) {
+                is AuthApi.TotpEnrollmentResult.Success -> {
+                    mfaEnrollment = result.value
+                    mfaCode = ""
+                    actionMessage = strings.text("mfa_enrollment_started")
+                }
+                is AuthApi.TotpEnrollmentResult.Failure ->
+                    accountError = strings.text("auth_failed", result.message)
+            }
+            mfaActionInProgress = false
+        }
+    }
+
+    fun openMfaAuthenticator(enrollment: AuthApi.TotpEnrollment) {
+        val launched = runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(enrollment.otpauthUri)))
+        }.isSuccess
+        if (!launched) {
+            accountError = strings.text("authenticator_unavailable")
+        }
+    }
+
+    fun confirmMfaEnrollment() {
+        if (mfaCode.trim().length < 6) {
+            accountError = strings.text("mfa_code_required")
+            return
+        }
+        mfaActionInProgress = true
+        accountError = null
+        scope.launch {
+            when (val result = authApi.confirmTotp(accessToken, mfaCode)) {
+                is AuthApi.RecoveryCodesResult.Success -> {
+                    recoveryCodes = result.codes
+                    mfaEnrollment = null
+                    mfaCode = ""
+                    mfaSessionRevoked = true
+                    accountSecurity = accountSecurity?.copy(
+                        mfaEnabled = true,
+                        mfaRecoveryCodesRemaining = result.codes.size,
+                    )
+                    actionMessage = strings.text("mfa_enabled_relogin")
+                }
+                is AuthApi.RecoveryCodesResult.Failure ->
+                    accountError = if (result.message == "MFA_CODE_INVALID") {
+                        strings.text("mfa_invalid")
+                    } else {
+                        strings.text("auth_failed", result.message)
+                    }
+            }
+            mfaActionInProgress = false
+        }
+    }
+
+    fun disableMfa() {
+        if (mfaCode.trim().length < 6) {
+            accountError = strings.text("mfa_code_required")
+            return
+        }
+        mfaActionInProgress = true
+        accountError = null
+        scope.launch {
+            when (val result = authApi.disableTotp(accessToken, mfaCode)) {
+                is AuthApi.ActionResult.Success -> {
+                    actionMessage = strings.text("mfa_disabled")
+                    mfaCode = ""
+                    onRevoked()
+                }
+                is AuthApi.ActionResult.Failure ->
+                    accountError = if (result.message == "MFA_INVALID") {
+                        strings.text("mfa_invalid")
+                    } else {
+                        strings.text("auth_failed", result.message)
+                    }
+            }
+            mfaActionInProgress = false
+        }
+    }
+
+    fun rotateRecoveryCodes() {
+        if (mfaCode.trim().length < 6) {
+            accountError = strings.text("mfa_code_required")
+            return
+        }
+        mfaActionInProgress = true
+        accountError = null
+        scope.launch {
+            when (val result = authApi.rotateRecoveryCodes(accessToken, mfaCode)) {
+                is AuthApi.RecoveryCodesResult.Success -> {
+                    recoveryCodes = result.codes
+                    mfaCode = ""
+                    actionMessage = strings.text("mfa_recovery_rotated")
+                    accountSecurity = accountSecurity?.copy(mfaRecoveryCodesRemaining = result.codes.size)
+                }
+                is AuthApi.RecoveryCodesResult.Failure ->
+                    accountError = if (result.message == "MFA_INVALID") {
+                        strings.text("mfa_invalid")
+                    } else {
+                        strings.text("auth_failed", result.message)
+                    }
+            }
+            mfaActionInProgress = false
+        }
+    }
+
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier
@@ -189,6 +304,19 @@ fun DeviceDetailsScreen(
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        StatusBadge(
+                            strings.text(
+                                "mfa_status",
+                                strings.text(if (account.mfaEnabled) "enabled" else "disabled"),
+                            ),
+                            active = account.mfaEnabled,
+                        )
+                        if (account.mfaEnabled) {
+                            Text(
+                                strings.text("mfa_recovery_remaining", account.mfaRecoveryCodesRemaining),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                         val linked = account.providers.toSet()
                         Text(
                             strings.text(
@@ -197,6 +325,62 @@ fun DeviceDetailsScreen(
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
+                        if (!mfaSessionRevoked) {
+                            val enrollment = mfaEnrollment
+                            if (!account.mfaEnabled && enrollment == null) {
+                                PrimaryButton(
+                                    text = strings.text("enable_mfa"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = ::beginMfaEnrollment,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            if (enrollment != null) {
+                                Text(strings.text("mfa_setup_instructions"), style = MaterialTheme.typography.bodyMedium)
+                                PrimaryButton(
+                                    text = strings.text("open_authenticator"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = { openMfaAuthenticator(enrollment) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                DataText(strings.text("mfa_secret", enrollment.secret))
+                                OutlinedTextField(
+                                    value = mfaCode,
+                                    onValueChange = { mfaCode = it.trim(); accountError = null },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text(strings.text("mfa_code")) },
+                                    singleLine = true,
+                                    enabled = !mfaActionInProgress,
+                                )
+                                PrimaryButton(
+                                    text = strings.text("confirm_mfa"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = ::confirmMfaEnrollment,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else if (account.mfaEnabled) {
+                                OutlinedTextField(
+                                    value = mfaCode,
+                                    onValueChange = { mfaCode = it.trim(); accountError = null },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    label = { Text(strings.text("mfa_or_recovery_code")) },
+                                    singleLine = true,
+                                    enabled = !mfaActionInProgress,
+                                )
+                                PrimaryButton(
+                                    text = strings.text("rotate_recovery_codes"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = ::rotateRecoveryCodes,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                DangerButton(
+                                    text = strings.text("disable_mfa"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = ::disableMfa,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
                         val available = providerStatuses.filter { it.provider !in linked }
                         if (available.isNotEmpty()) {
                             Text(strings.text("link_provider"), style = MaterialTheme.typography.bodyMedium)
@@ -233,6 +417,24 @@ fun DeviceDetailsScreen(
                     }
                     accountError?.let {
                         Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            if (recoveryCodes.isNotEmpty()) {
+                SentinelCard(scan = false) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(strings.text("mfa_recovery_title"), style = MaterialTheme.typography.labelLarge)
+                        Text(strings.text("mfa_recovery_warning"), style = MaterialTheme.typography.bodyMedium)
+                        recoveryCodes.forEach { DataText(it) }
+                        if (mfaSessionRevoked) {
+                            PrimaryButton(
+                                text = strings.text("continue_sign_in"),
+                                enabled = !mfaActionInProgress,
+                                onClick = onRevoked,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
             }

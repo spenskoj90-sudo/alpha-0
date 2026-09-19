@@ -113,6 +113,8 @@ export function AccountControl() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [entitlements, setEntitlements] = useState<Entitlement[]>([]);
@@ -182,14 +184,48 @@ export function AccountControl() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const payload = await responseJson<{ error?: string; code?: string }>(response);
+      const payload = await responseJson<{ error?: string; code?: string; mfa_required?: boolean }>(response);
       if (!response.ok) {
         setMessage(payload?.code ?? payload?.error ?? `Authentication failed (${response.status}).`);
         setMessageTone('error');
         setView('SIGNED_OUT');
         return;
       }
+      if (payload?.mfa_required === true) {
+        setPassword('');
+        setMfaRequired(true);
+        setMfaCode('');
+        setMessage('Second-factor verification required.');
+        setMessageTone('status');
+        setView('SIGNED_OUT');
+        return;
+      }
       setPassword('');
+      await reloadAccount();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function completeMfa(event: FormEvent) {
+    event.preventDefault();
+    if (!mfaRequired || mfaCode.trim().length < 6) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/session/mfa', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: mfaCode.trim() }),
+      });
+      const payload = await responseJson<{ error?: string; code?: string }>(response);
+      if (!response.ok) {
+        setMessage(payload?.code ?? payload?.error ?? `MFA verification failed (${response.status}).`);
+        setMessageTone('error');
+        return;
+      }
+      setMfaRequired(false);
+      setMfaCode('');
       await reloadAccount();
     } finally {
       setBusy(false);
@@ -203,6 +239,8 @@ export function AccountControl() {
       setPlans([]);
       setSubscriptions([]);
       setEntitlements([]);
+      setMfaRequired(false);
+      setMfaCode('');
       setView('SIGNED_OUT');
       setMessage('Session cleared.');
       setMessageTone('status');
@@ -268,26 +306,45 @@ export function AccountControl() {
           <div><div className="label">ACCOUNT CONTROL</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
           <span className="badge">HTTPONLY SESSION</span>
         </div>
-        <form onSubmit={authenticate}>
-          <label className="field-label">EMAIL<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
-          <label className="field-label">
-            PASSWORD
-            <input
-              type="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              minLength={12}
-              aria-describedby="password-requirement"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
-          <button className="btn" disabled={busy}>{busy ? 'WORKING…' : mode === 'login' ? 'SIGN IN' : 'REGISTER'}</button>
-        </form>
-        <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMessage(''); setMessageTone('status'); }} disabled={busy}>
-          {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
-        </button>
+        {mfaRequired ? (
+          <form onSubmit={completeMfa}>
+            <label className="field-label">
+              AUTHENTICATOR OR RECOVERY CODE
+              <input
+                type="text"
+                autoComplete="one-time-code"
+                value={mfaCode}
+                onChange={event => setMfaCode(event.target.value)}
+                required
+              />
+            </label>
+            <div className="microcopy">A session is issued only after this second factor succeeds.</div>
+            <button className="btn" disabled={busy || mfaCode.trim().length < 6}>{busy ? 'WORKING…' : 'VERIFY MFA'}</button>
+          </form>
+        ) : (
+          <>
+            <form onSubmit={authenticate}>
+              <label className="field-label">EMAIL<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
+              <label className="field-label">
+                PASSWORD
+                <input
+                  type="password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  minLength={12}
+                  aria-describedby="password-requirement"
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
+                  required
+                />
+              </label>
+              <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
+              <button className="btn" disabled={busy}>{busy ? 'WORKING…' : mode === 'login' ? 'SIGN IN' : 'REGISTER'}</button>
+            </form>
+            <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMfaRequired(false); setMfaCode(''); setMessage(''); setMessageTone('status'); }} disabled={busy}>
+              {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
+            </button>
+          </>
+        )}
         {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
         <p className="boundary-copy">Credentials are sent only to the same-origin Web control plane. Core access and refresh tokens are never exposed to client-side JavaScript.</p>
       </article>

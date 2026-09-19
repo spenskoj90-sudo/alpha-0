@@ -32,6 +32,8 @@ class CoreSessionManager {
   #fetch;
   #session = null;
   #coreUrl = null;
+  #mfaChallenge = null;
+  #mfaExpiresAt = null;
 
   constructor({ fetchImpl = globalThis.fetch } = {}) {
     if (typeof fetchImpl !== 'function') throw new Error('FETCH_UNAVAILABLE');
@@ -42,6 +44,11 @@ class CoreSessionManager {
   get accessToken() { return this.#session?.session_token || null; }
   get refreshToken() { return this.#session?.refresh_token || null; }
   get status() { return publicSession(this.#session); }
+  get mfaStatus() {
+    return this.#mfaChallenge
+      ? Object.freeze({ required: true, expiresAt: this.#mfaExpiresAt || null })
+      : null;
+  }
 
   async login({ coreUrl, email, password }) {
     const normalized = normalizeCoreUrl(coreUrl);
@@ -56,7 +63,36 @@ class CoreSessionManager {
     });
     const payload = await readJson(response);
     if (!response.ok) throw new Error(errorCode(payload, 'LOGIN_FAILED'));
+    if (payload?.mfa_required === true) {
+      if (typeof payload.challenge_token !== 'string' || payload.challenge_token.length < 32) {
+        throw new Error('INVALID_MFA_CHALLENGE_RESPONSE');
+      }
+      this.#session = null;
+      this.#coreUrl = normalized;
+      this.#mfaChallenge = payload.challenge_token;
+      this.#mfaExpiresAt = typeof payload.expires_at === 'string' ? payload.expires_at : null;
+      return this.status;
+    }
     this.#setSession(normalized, payload);
+    return this.status;
+  }
+
+  async completeMfa(code) {
+    if (!this.#coreUrl || !this.#mfaChallenge) throw new Error('MFA_CHALLENGE_REQUIRED');
+    const normalizedCode = typeof code === 'string' ? code.trim() : '';
+    if (normalizedCode.length < 6 || normalizedCode.length > 64) throw new Error('MFA_CODE_INVALID');
+    const rid = requestId();
+    const response = await this.#fetch(`${this.#coreUrl}/v1/auth/mfa/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
+      body: JSON.stringify({
+        challenge_token: this.#mfaChallenge,
+        code: normalizedCode,
+      }),
+    });
+    const payload = await readJson(response);
+    if (!response.ok) throw new Error(errorCode(payload, 'MFA_VERIFICATION_FAILED'));
+    this.#setSession(this.#coreUrl, payload);
     return this.status;
   }
 
@@ -111,6 +147,8 @@ class CoreSessionManager {
   clear() {
     this.#session = null;
     this.#coreUrl = null;
+    this.#mfaChallenge = null;
+    this.#mfaExpiresAt = null;
   }
 
   async #authorizedJson(path, { method = 'GET', body = null } = {}, fallback = 'CORE_REQUEST_FAILED') {
@@ -142,6 +180,8 @@ class CoreSessionManager {
       throw new Error('INVALID_SESSION_RESPONSE');
     }
     this.#coreUrl = coreUrl;
+    this.#mfaChallenge = null;
+    this.#mfaExpiresAt = null;
     this.#session = {
       session_token: payload.session_token,
       refresh_token: payload.refresh_token,

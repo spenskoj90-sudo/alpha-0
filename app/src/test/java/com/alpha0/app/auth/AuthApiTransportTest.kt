@@ -41,6 +41,39 @@ class AuthApiTransportTest {
     }
 
     @Test
+    fun loginParsesMfaChallengeWithoutTreatingItAsSession() = runBlocking {
+        val transport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"mfa_required\":true,\"challenge_token\":\"abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG\",\"expires_at\":\"2030-01-01T00:00:00Z\"}",
+            ),
+        )
+        val result = AuthApi("https://example.test", transport).login("user@example.test", "secret")
+        assertTrue(result is AuthApi.Result.MfaRequired)
+        val challenge = result as AuthApi.Result.MfaRequired
+        assertEquals("abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", challenge.challengeToken)
+        assertEquals("2030-01-01T00:00:00Z", challenge.expiresAt)
+    }
+
+    @Test
+    fun mfaCompletionUsesDedicatedChallengeEndpoint() = runBlocking {
+        val transport = FakeTransport(
+            HttpResponse(
+                200,
+                "{\"session_token\":\"access\",\"refresh_token\":\"refresh\",\"scopes\":[\"game:read\"]}",
+            ),
+        )
+        val result = AuthApi("https://example.test", transport)
+            .completeMfa("abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG", "123456")
+        assertTrue(result is AuthApi.Result.Success)
+        val request = requireNotNull(transport.request)
+        assertEquals("https://example.test/v1/auth/mfa/complete", request.url)
+        val body = String(requireNotNull(request.body))
+        assertTrue(body.contains("challenge_token"))
+        assertTrue(body.contains("123456"))
+    }
+
+    @Test
     fun transportFailureRemainsNetworkError() = runBlocking {
         val transport = object : HttpTransport {
             override fun execute(request: HttpRequest): HttpResponse = throw IOException("offline")
@@ -205,7 +238,7 @@ class AuthApiTransportTest {
         val securityTransport = FakeTransport(
             HttpResponse(
                 200,
-                "{\"email\":\"user@example.com\",\"email_verified\":true,\"password_enabled\":true,\"providers\":[\"google\"]}",
+                "{\"email\":\"user@example.com\",\"email_verified\":true,\"password_enabled\":true,\"providers\":[\"google\"],\"mfa_enabled\":true,\"mfa_recovery_codes_remaining\":8}",
             ),
         )
         val security = AuthApi("https://example.test", securityTransport).accountSecurity("access-secret")
@@ -213,6 +246,9 @@ class AuthApiTransportTest {
         val securityRequest = requireNotNull(securityTransport.request)
         assertEquals("Bearer access-secret", securityRequest.headers["Authorization"])
         assertEquals("https://example.test/v1/account/security", securityRequest.url)
+        val state = (security as AuthApi.AccountSecurityResult.Success).value
+        assertEquals(true, state.mfaEnabled)
+        assertEquals(8, state.mfaRecoveryCodesRemaining)
 
         val linkTransport = FakeTransport(HttpResponse(200, "{\"status\":\"LINKED\"}"))
         val linked = AuthApi("https://example.test", linkTransport).linkGoogle(

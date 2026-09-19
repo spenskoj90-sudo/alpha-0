@@ -55,7 +55,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Companion | Electron 44.4.2 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
-| Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx 0.28.1 |
+| Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.0 |
 | PostgreSQL repository baseline | 18 |
 | Android observability/test refresh | Sentry Android 8.57.0, AndroidX Test ext.junit 1.3.0, runner 1.7.0, Espresso 3.7.0 |
 

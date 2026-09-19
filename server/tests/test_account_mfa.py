@@ -109,6 +109,34 @@ def test_mfa_login_challenge_blocks_session_until_second_factor(monkeypatch):
     assert replay.status_code == 401
 
 
+def test_mfa_login_challenge_is_consumed_after_bounded_invalid_attempts(monkeypatch):
+    email = f"mfa-attempts-{uuid.uuid4().hex}@example.com"
+    password = "Correct-Horse-Battery-Staple-MFA-Attempts"
+    _, recovery = _enable_mfa(monkeypatch, email, password)
+
+    first = client.post("/v1/auth/login", json={"email": email, "password": password}).json()
+    challenge = first["challenge_token"]
+    for _ in range(8):
+        denied = client.post(
+            "/v1/auth/mfa/complete",
+            json={"challenge_token": challenge, "code": "INVALID-RECOVERY-CODE"},
+        )
+        assert denied.status_code == 401
+
+    locked = client.post(
+        "/v1/auth/mfa/complete",
+        json={"challenge_token": challenge, "code": recovery[0]},
+    )
+    assert locked.status_code == 401
+
+    fresh = client.post("/v1/auth/login", json={"email": email, "password": password}).json()
+    completed = client.post(
+        "/v1/auth/mfa/complete",
+        json={"challenge_token": fresh["challenge_token"], "code": recovery[0]},
+    )
+    assert completed.status_code == 200
+
+
 def test_recovery_code_is_one_time_login_factor(monkeypatch):
     email = f"mfa-recovery-{uuid.uuid4().hex}@example.com"
     password = "Correct-Horse-Battery-Staple-MFA-2"

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS account_mfa_login_challenges (
     identity_id UUID NOT NULL REFERENCES identities(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL,
     consumed_at TIMESTAMPTZ,
+    attempt_count SMALLINT NOT NULL DEFAULT 0 CHECK (attempt_count BETWEEN 0 AND 8),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS account_mfa_login_challenges_identity_expiry_idx

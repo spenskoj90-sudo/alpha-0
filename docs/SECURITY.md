@@ -15,7 +15,7 @@
 - Password reset revokes all existing sessions for the affected identity before a new login can be trusted.
 - Account TOTP MFA is server-authoritative across password and federated first factors: a successful first factor yields only a five-minute hashed one-time challenge, never a session, until MFA succeeds.
 - Account TOTP seeds are encrypted at rest with the deployment-managed `SENTINEL_ACCOUNT_MFA_KEY`; the raw key is never committed. Missing/invalid encryption configuration fails enrollment and MFA verification closed.
-- TOTP counters are replay-protected. Recovery codes are high-entropy, stored only as SHA-256 digests, consumed once, and are shown only when initially generated or explicitly rotated.
+- TOTP counters are replay-protected. Recovery codes are high-entropy, stored only as SHA-256 digests, consumed once, and are shown only when initially generated or explicitly rotated. Each login challenge is also capped at eight failed second-factor attempts before it is consumed.
 - Enabling or disabling account MFA revokes existing sessions so a previously issued refresh token cannot bypass the changed security policy.
 - The Web control plane keeps raw MFA challenges in a short-lived HttpOnly, SameSite=Strict cookie; browser JavaScript receives only the fact that MFA is required and submits only the user-entered second factor.
 - Federated identities are keyed by provider subject, never by email equality. Existing-email collisions require explicit authenticated linking, and adding a persistent provider identity requires a device-bound SENTINEL session obtained after device proof; a pre-device account session is insufficient.

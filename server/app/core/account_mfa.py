@@ -16,6 +16,7 @@ from app.core.totp import matching_totp_counter
 
 _MFA_KEY_ENV = "SENTINEL_ACCOUNT_MFA_KEY"
 _MFA_CHALLENGE_TTL_SECONDS = 300
+_MFA_MAX_CHALLENGE_ATTEMPTS = 8
 _RECOVERY_CODE_COUNT = 10
 
 
@@ -279,6 +280,7 @@ class AccountMfaService:
                     "user_id": user_id,
                     "expires_at": expires_at,
                     "consumed_at": None,
+                    "attempt_count": 0,
                 }
         return token, expires_at
 
@@ -299,15 +301,19 @@ class AccountMfaService:
             with self._engine.begin() as conn:
                 row = conn.execute(
                     text(
-                        "SELECT c.identity_id,i.user_handle,m.secret_ciphertext,m.last_totp_counter "
+                        "SELECT c.identity_id,c.attempt_count,i.user_handle,m.secret_ciphertext,m.last_totp_counter "
                         "FROM account_mfa_login_challenges c "
                         "JOIN identities i ON i.id=c.identity_id "
                         "JOIN account_mfa_totp m ON m.identity_id=c.identity_id "
                         "WHERE c.challenge_hash=:challenge_hash AND c.consumed_at IS NULL "
-                        "AND c.expires_at>now() AND m.enabled_at IS NOT NULL "
+                        "AND c.expires_at>now() AND c.attempt_count<:max_attempts "
+                        "AND m.enabled_at IS NOT NULL "
                         "FOR UPDATE OF c,m"
                     ),
-                    {"challenge_hash": challenge_hash},
+                    {
+                        "challenge_hash": challenge_hash,
+                        "max_attempts": _MFA_MAX_CHALLENGE_ATTEMPTS,
+                    },
                 ).mappings().first()
                 if not row:
                     return None
@@ -326,6 +332,18 @@ class AccountMfaService:
                 else:
                     accepted = self._consume_recovery_db(conn, row["identity_id"], code)
                 if not accepted:
+                    conn.execute(
+                        text(
+                            "UPDATE account_mfa_login_challenges "
+                            "SET attempt_count=attempt_count+1, "
+                            "consumed_at=CASE WHEN attempt_count+1>=:max_attempts THEN now() ELSE consumed_at END "
+                            "WHERE challenge_hash=:challenge_hash"
+                        ),
+                        {
+                            "challenge_hash": challenge_hash,
+                            "max_attempts": _MFA_MAX_CHALLENGE_ATTEMPTS,
+                        },
+                    )
                     return None
                 conn.execute(
                     text(
@@ -343,6 +361,7 @@ class AccountMfaService:
                 not challenge
                 or challenge.get("consumed_at") is not None
                 or challenge["expires_at"] <= now
+                or int(challenge.get("attempt_count", 0)) >= _MFA_MAX_CHALLENGE_ATTEMPTS
             ):
                 return None
             user_id = str(challenge["user_id"])
@@ -366,6 +385,10 @@ class AccountMfaService:
                     recovery[digest] = True
                     accepted = True
             if not accepted:
+                attempts = int(challenge.get("attempt_count", 0)) + 1
+                challenge["attempt_count"] = attempts
+                if attempts >= _MFA_MAX_CHALLENGE_ATTEMPTS:
+                    challenge["consumed_at"] = now
                 return None
             challenge["consumed_at"] = now
             return user_id

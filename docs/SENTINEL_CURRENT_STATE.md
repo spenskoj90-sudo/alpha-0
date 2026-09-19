@@ -20,7 +20,7 @@ Existence of a source tree does not by itself establish that the surface is pack
 - Native repository runtimes are pinned to Node.js 24.21.0 LTS and Python 3.14.7.
 - Web uses Next.js 16.3.5 / React 19.3.0; the Companion packaging baseline is Electron 44.4.2.
 - Android builds use AGP 9.3.1, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
-- Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. The connected Neon pre-release database was observed on PostgreSQL 17.11 during the current modernization pass; that managed major-version migration is separate from repository image changes and is not claimed complete.
+- Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. The connected Neon pre-release source remains PostgreSQL 17.11. On 2026-09-19 an isolated same-region PostgreSQL 18.6 target (`sentinel-pre-release-pg18`) was created and all 15 repository migrations through `014_account_mfa` were applied with checksum parity; all 39 application tables that use RLS also have FORCE RLS. The target is **SCHEMA-READY / DATA-IMPORT-READY**, but application data has not yet been imported and staging has not been cut over, so managed major-version migration is not claimed complete.
 - Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
 
 ## 2. Security and persistence baseline

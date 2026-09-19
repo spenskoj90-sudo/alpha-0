@@ -158,7 +158,10 @@ def check_versions(checks: Checks) -> None:
 
     checks.require(package == canonical, "web version matches VERSION")
     checks.require(python_version == canonical, "Core package version matches VERSION")
-    checks.require("from app.version import APP_VERSION" in main, "API runtime version uses canonical resolver")\n    version_module = read("server/app/version.py")\n    checks.require('Path(__file__).resolve().parents[2] / "VERSION"' in version_module, "source runtime version reads VERSION")\n    checks.require('distribution_version(_PACKAGE_NAME)' in version_module, "installed runtime version uses package metadata")
+    checks.require("from app.version import APP_VERSION" in main, "API runtime version uses canonical resolver")
+    version_module = read("server/app/version.py")
+    checks.require('Path(__file__).resolve().parents[2] / "VERSION"' in version_module, "source runtime version reads VERSION")
+    checks.require('distribution_version(_PACKAGE_NAME)' in version_module, "installed runtime version uses package metadata")
     checks.require(
         'versionName = rootProject.file("VERSION").readText().trim()' in android,
         "Android versionName reads VERSION",

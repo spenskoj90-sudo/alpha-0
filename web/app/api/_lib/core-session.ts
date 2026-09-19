@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const ACCESS_COOKIE = 'sentinel_access';
 export const REFRESH_COOKIE = 'sentinel_refresh';
+export const MFA_COOKIE = 'sentinel_mfa';
 const DEFAULT_REFRESH_MAX_AGE_SECONDS = 2_592_000;
+const DEFAULT_MFA_MAX_AGE_SECONDS = 300;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -86,6 +88,19 @@ export function clearSessionCookies(response: NextResponse): void {
   response.cookies.set(REFRESH_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
 }
 
+export function clearMfaCookie(response: NextResponse): void {
+  response.cookies.set(MFA_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
+}
+
+function applyMfaCookie(response: NextResponse, challenge: MfaChallengePayload): void {
+  const expires = new Date(challenge.expires_at);
+  response.cookies.set(MFA_COOKIE, challenge.challenge_token, {
+    ...cookieBaseOptions(),
+    maxAge: Number.isNaN(expires.getTime()) ? DEFAULT_MFA_MAX_AGE_SECONDS : undefined,
+    expires: Number.isNaN(expires.getTime()) ? undefined : expires,
+  });
+}
+
 async function coreFetch(coreUrl: string, path: string, requestId: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
@@ -158,14 +173,20 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       headers: { 'content-type': 'application/json' },
       body: await request.text(),
     });
-    if (!response.ok) return copyUpstream(response, requestId);
+    if (!response.ok) {
+      const result = await copyUpstream(response, requestId);
+      clearMfaCookie(result);
+      return result;
+    }
     const mfa = await parseMfaChallenge(response);
     if (mfa) {
-      return applyCorrelation(NextResponse.json({
+      const result = applyCorrelation(NextResponse.json({
         mfa_required: true,
-        challenge_token: mfa.challenge_token,
         expires_at: mfa.expires_at,
       }), requestId, response);
+      clearSessionCookies(result);
+      applyMfaCookie(result, mfa);
+      return result;
     }
     const session = await parseSession(response);
     if (!session) {
@@ -176,6 +197,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       expires_at: session.expires_at,
       scopes: session.scopes,
     }), requestId, response);
+    clearMfaCookie(result);
     applySessionCookies(result, session);
     return result;
   } catch {
@@ -192,11 +214,25 @@ export async function completeMfaWeb(request: NextRequest): Promise<NextResponse
   if (!coreUrl) {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
   }
+  const challengeToken = request.cookies.get(MFA_COOKIE)?.value;
+  if (!challengeToken) {
+    return applyCorrelation(NextResponse.json({ error: 'WEB_MFA_CHALLENGE_REQUIRED' }, { status: 401 }), requestId);
+  }
+  let code: string;
+  try {
+    const payload = await request.json() as { code?: unknown };
+    code = typeof payload.code === 'string' ? payload.code.trim() : '';
+  } catch {
+    code = '';
+  }
+  if (code.length < 6 || code.length > 64) {
+    return applyCorrelation(NextResponse.json({ error: 'MFA_CODE_INVALID' }, { status: 400 }), requestId);
+  }
   try {
     const response = await coreFetch(coreUrl, '/v1/auth/mfa/complete', requestId, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: await request.text(),
+      body: JSON.stringify({ challenge_token: challengeToken, code }),
     });
     if (!response.ok) return copyUpstream(response, requestId);
     const session = await parseSession(response);
@@ -208,6 +244,7 @@ export async function completeMfaWeb(request: NextRequest): Promise<NextResponse
       expires_at: session.expires_at,
       scopes: session.scopes,
     }), requestId, response);
+    clearMfaCookie(result);
     applySessionCookies(result, session);
     return result;
   } catch {
@@ -293,5 +330,6 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
 
   const result = applyCorrelation(NextResponse.json({ authenticated: false, server_revoked: serverRevoked }), requestId, upstream);
   clearSessionCookies(result);
+  clearMfaCookie(result);
   return result;
 }

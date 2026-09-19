@@ -65,6 +65,8 @@ The Windows Companion packaging path remains dependency-install independent: it 
 
 The managed Neon pre-release database was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The same runtime already contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies. This confirms schema parity for the current feature set, not PostgreSQL-major parity. A managed-database 17→18 migration remains a separate environment operation and must not be inferred from repository image changes.
 
+A read-only 17→18 compatibility assessment against that Neon database found only the built-in `plpgsql` and `pgcrypto` extensions, no custom collations, no event triggers, no prepared transactions, no function/expression indexes, no `PUBLIC CREATE` privilege on schema `public`, and no public tables without a primary key. These findings remove several common migration blockers but are not a cutover authorization. Neon documents that projects are pinned to the major version they were created with, so a 17→18 transition requires a new target project and data migration rather than an in-place version flip; cutover/connection-string mutation remains an environment operation.
+
 GitHub Actions used by the active workflows are pinned to immutable commit SHAs. The modernization pass moved checkout/setup/runtime, Gradle, Docker, CodeQL, OSV, artifact and emulator actions to their audited stable release lines while retaining existing security gates.
 
 ## Supply-chain rule

@@ -63,7 +63,7 @@ Web and Core container bases are pinned by immutable SHA-256 digest. The Web loc
 
 The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.2 Win32 x64 archive and verifies SHA-256 `6aae435b6cd5c0eedf9fd38824bae4045ffdaecd029f0b8c8328bac3f5b71f03` before staging the application payload.
 
-The managed Neon pre-release database observed during this pass remains PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. A managed-database major upgrade is therefore a separate migration boundary and must not be inferred from repository image changes.
+The managed Neon pre-release database was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The same runtime already contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies. This confirms schema parity for the current feature set, not PostgreSQL-major parity. A managed-database 17→18 migration remains a separate environment operation and must not be inferred from repository image changes.
 
 GitHub Actions used by the active workflows are pinned to immutable commit SHAs. The modernization pass moved checkout/setup/runtime, Gradle, Docker, CodeQL, OSV, artifact and emulator actions to their audited stable release lines while retaining existing security gates.
 

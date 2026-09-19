@@ -6,6 +6,11 @@ import uuid
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
+os.environ.setdefault("SENTINEL_ENROLLMENT_TOKEN", "u1:secret")
+os.environ.setdefault("SENTINEL_REQUIRE_ENROLLMENT", "true")
+
+from app import main as main_module
+from app.core.federated_auth import VerifiedFederatedIdentity
 from app.core.security import session_hash
 from app.core.totp import decode_totp_secret, totp_at
 from app.main import (
@@ -157,6 +162,66 @@ def test_mfa_security_state_and_disable_revoke_sessions(monkeypatch):
     password_only = client.post("/v1/auth/login", json={"email": email, "password": password})
     assert password_only.status_code == 200
     assert password_only.json()["session_token"]
+
+
+def test_federated_first_factor_cannot_bypass_enabled_mfa(monkeypatch):
+    monkeypatch.setenv("SENTINEL_ACCOUNT_MFA_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("SENTINEL_GOOGLE_AUTH_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_GOOGLE_WEB_CLIENT_ID", "mfa-test.apps.googleusercontent.com")
+    subject = f"google-mfa-{uuid.uuid4().hex}"
+    email = f"google-mfa-{uuid.uuid4().hex}@gmail.com"
+    monkeypatch.setattr(
+        main_module,
+        "verify_google_id_token",
+        lambda _token, _nonce: VerifiedFederatedIdentity(
+            provider="google",
+            subject=subject,
+            email=email,
+            email_verified=True,
+        ),
+    )
+
+    first_nonce = client.post("/v1/auth/providers/google/challenge").json()["nonce"]
+    first_login = client.post(
+        "/v1/auth/providers/google/login",
+        json={"id_token": "g" * 64, "nonce": first_nonce},
+    )
+    assert first_login.status_code == 200
+    assert first_login.json()["session_token"]
+    user_id = user_store.external_identity_user("google", subject)
+    assert user_id is not None
+
+    bound = _bound_session(user_id)
+    enrolled = client.post(
+        "/v1/account/mfa/totp/enroll",
+        headers={"Authorization": f"Bearer {bound}"},
+    )
+    assert enrolled.status_code == 200
+    secret = enrolled.json()["secret"]
+    enabled = client.post(
+        "/v1/account/mfa/totp/confirm",
+        headers={"Authorization": f"Bearer {bound}"},
+        json={"code": _current_code(secret)},
+    )
+    assert enabled.status_code == 200
+    recovery = enabled.json()["recovery_codes"]
+
+    second_nonce = client.post("/v1/auth/providers/google/challenge").json()["nonce"]
+    second_login = client.post(
+        "/v1/auth/providers/google/login",
+        json={"id_token": "h" * 64, "nonce": second_nonce},
+    )
+    assert second_login.status_code == 200
+    payload = second_login.json()
+    assert payload["mfa_required"] is True
+    assert "session_token" not in payload
+
+    completed = client.post(
+        "/v1/auth/mfa/complete",
+        json={"challenge_token": payload["challenge_token"], "code": recovery[0]},
+    )
+    assert completed.status_code == 200
+    assert completed.json()["session_token"]
 
 
 def test_mfa_enrollment_fails_closed_without_encryption_key(monkeypatch):

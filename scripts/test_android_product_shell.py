@@ -50,6 +50,8 @@ class AndroidProductShellTests(unittest.TestCase):
             "settings", "updates", "help", "about", "home", "games", "security", "activity",
             "sign_in", "create_account", "forgot_password", "reset_password", "verify_email",
             "continue_google", "continue_telegram", "continue_vk",
+            "mfa_title", "mfa_code", "verify_mfa", "enable_mfa", "disable_mfa",
+            "mfa_recovery_title", "continue_sign_in",
             "device_setup", "bind_device", "theme_light", "theme_dark",
         )
         for key in required:
@@ -59,7 +61,15 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("requestPasswordReset", login)
         self.assertIn("confirmPasswordReset", login)
         self.assertIn("confirmEmailVerification", login)
+        self.assertIn("completeMfa", login)
+        self.assertIn("AuthMode.MFA", login)
         self.assertIn("verticalScroll(rememberScrollState())", login)
+        auth_api = read("app/src/main/java/com/alpha0/app/auth/AuthApi.kt")
+        security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        self.assertIn("/v1/auth/mfa/complete", auth_api)
+        self.assertIn("/v1/account/mfa/totp/enroll", auth_api)
+        self.assertIn("confirmMfaEnrollment", security)
+        self.assertIn("rotateRecoveryCodes", security)
 
     def test_onboarding_layout_cannot_be_stretched_by_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)

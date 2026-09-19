@@ -184,6 +184,15 @@ fun DeviceDetailsScreen(
         }
     }
 
+    fun openMfaAuthenticator(enrollment: AuthApi.TotpEnrollment) {
+        val launched = runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(enrollment.otpauthUri)))
+        }.isSuccess
+        if (!launched) {
+            accountError = strings.text("authenticator_unavailable")
+        }
+    }
+
     fun confirmMfaEnrollment() {
         if (mfaCode.trim().length < 6) {
             accountError = strings.text("mfa_code_required")
@@ -328,6 +337,12 @@ fun DeviceDetailsScreen(
                             }
                             if (enrollment != null) {
                                 Text(strings.text("mfa_setup_instructions"), style = MaterialTheme.typography.bodyMedium)
+                                PrimaryButton(
+                                    text = strings.text("open_authenticator"),
+                                    enabled = !mfaActionInProgress,
+                                    onClick = { openMfaAuthenticator(enrollment) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
                                 DataText(strings.text("mfa_secret", enrollment.secret))
                                 OutlinedTextField(
                                     value = mfaCode,

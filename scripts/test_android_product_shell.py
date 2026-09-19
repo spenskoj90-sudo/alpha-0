@@ -51,6 +51,7 @@ class AndroidProductShellTests(unittest.TestCase):
             "sign_in", "create_account", "forgot_password", "reset_password", "verify_email",
             "continue_google", "continue_telegram", "continue_vk",
             "mfa_title", "mfa_code", "verify_mfa", "enable_mfa", "disable_mfa",
+            "open_authenticator", "authenticator_unavailable",
             "mfa_recovery_title", "continue_sign_in",
             "device_setup", "bind_device", "theme_light", "theme_dark",
         )
@@ -70,6 +71,8 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("/v1/account/mfa/totp/enroll", auth_api)
         self.assertIn("confirmMfaEnrollment", security)
         self.assertIn("rotateRecoveryCodes", security)
+        self.assertIn("enrollment.otpauthUri", security)
+        self.assertIn('strings.text("open_authenticator")', security)
 
     def test_onboarding_layout_cannot_be_stretched_by_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)

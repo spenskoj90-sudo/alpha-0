@@ -18,6 +18,10 @@ class SessionManager(
                 store.save(context, result.session.accessToken, result.session.refreshToken, current.deviceId)
                 result
             }
+            is AuthApi.Result.MfaRequired -> {
+                store.clear(context)
+                AuthApi.Result.Failure("INVALID_REFRESH_RESPONSE")
+            }
             is AuthApi.Result.Failure -> {
                 if (result.message == "INVALID_REFRESH" || result.message == "SESSION_REVOKED") {
                     store.clear(context)

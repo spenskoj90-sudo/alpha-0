@@ -41,7 +41,7 @@ import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.progressStatusSemantics
 import kotlinx.coroutines.launch
 
-private enum class AuthMode { SIGN_IN, REGISTER, RESET, VERIFY_EMAIL }
+private enum class AuthMode { SIGN_IN, REGISTER, RESET, VERIFY_EMAIL, MFA }
 
 @Composable
 fun LoginScreen(
@@ -60,6 +60,7 @@ fun LoginScreen(
     var mode by remember { mutableStateOf(AuthMode.SIGN_IN) }
     var resetCodeRequested by remember { mutableStateOf(false) }
     var pendingSession by remember { mutableStateOf<AuthApi.Session?>(null) }
+    var mfaChallenge by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -86,6 +87,12 @@ fun LoginScreen(
         status = null
         when (result) {
             is AuthApi.Result.Success -> onAuthenticated(result.session)
+            is AuthApi.Result.MfaRequired -> {
+                mfaChallenge = result.challengeToken
+                actionCode = ""
+                mode = AuthMode.MFA
+                status = strings.text("mfa_required")
+            }
             is AuthApi.Result.Failure -> error = when (result.message) {
                 "AUTH_PROVIDER_CANCELLED" -> strings.text("federated_cancelled")
                 "ACCOUNT_LINK_REQUIRED" -> strings.text("account_link_required")
@@ -107,6 +114,12 @@ fun LoginScreen(
         status = null
         when (result) {
             is AuthApi.Result.Success -> onAuthenticated(result.session)
+            is AuthApi.Result.MfaRequired -> {
+                mfaChallenge = result.challengeToken
+                actionCode = ""
+                mode = AuthMode.MFA
+                status = strings.text("mfa_required")
+            }
             is AuthApi.Result.Failure -> error = when (result.message) {
                 "GOOGLE_CREDENTIAL_CANCELLED", "AUTH_PROVIDER_CANCELLED" -> strings.text("federated_cancelled")
                 "ACCOUNT_LINK_REQUIRED" -> strings.text("account_link_required")
@@ -182,6 +195,13 @@ fun LoginScreen(
                                 onAuthenticated(result.session)
                             }
                         }
+                        is AuthApi.Result.MfaRequired -> {
+                            mfaChallenge = result.challengeToken
+                            password = ""
+                            actionCode = ""
+                            mode = AuthMode.MFA
+                            status = strings.text("mfa_required")
+                        }
                         is AuthApi.Result.Failure -> error = when (result.message) {
                             "INVALID_CREDENTIALS" -> strings.text("invalid_credentials")
                             "EMAIL_ALREADY_REGISTERED" -> strings.text("email_exists")
@@ -193,6 +213,38 @@ fun LoginScreen(
                     }
                 }
             }
+        }
+    }
+
+    fun completeMfa() {
+        val challenge = mfaChallenge
+        if (challenge.isNullOrBlank()) {
+            mode = AuthMode.SIGN_IN
+            error = strings.text("mfa_expired")
+            return
+        }
+        if (actionCode.trim().length < 6) {
+            error = strings.text("mfa_code_required")
+            return
+        }
+        busy = true
+        error = null
+        scope.launch {
+            when (val result = api.completeMfa(challenge, actionCode)) {
+                is AuthApi.Result.Success -> onAuthenticated(result.session)
+                is AuthApi.Result.MfaRequired -> {
+                    mfaChallenge = result.challengeToken
+                    actionCode = ""
+                    error = strings.text("mfa_invalid")
+                }
+                is AuthApi.Result.Failure -> error = when (result.message) {
+                    "MFA_INVALID" -> strings.text("mfa_invalid")
+                    "REQUEST_TIMEOUT" -> strings.text("request_timeout")
+                    "NETWORK_ERROR" -> strings.text("server_unreachable")
+                    else -> strings.text("auth_failed", result.message)
+                }
+            }
+            busy = false
         }
     }
 
@@ -281,6 +333,7 @@ fun LoginScreen(
                         AuthMode.REGISTER -> "create_account_title"
                         AuthMode.RESET -> "reset_password_title"
                         AuthMode.VERIFY_EMAIL -> "verify_email_title"
+                        AuthMode.MFA -> "mfa_title"
                     }
                 ),
                 style = MaterialTheme.typography.headlineSmall,
@@ -290,6 +343,7 @@ fun LoginScreen(
                     when (mode) {
                         AuthMode.RESET -> "reset_password_explanation"
                         AuthMode.VERIFY_EMAIL -> "verify_email_explanation"
+                        AuthMode.MFA -> "mfa_explanation"
                         else -> "auth_explanation"
                     }
                 ),
@@ -297,7 +351,7 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (mode != AuthMode.VERIFY_EMAIL) {
+            if (mode != AuthMode.VERIFY_EMAIL && mode != AuthMode.MFA) {
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it; error = null; status = null },
@@ -310,12 +364,12 @@ fun LoginScreen(
                 )
             }
 
-            if (mode == AuthMode.RESET && resetCodeRequested || mode == AuthMode.VERIFY_EMAIL) {
+            if (mode == AuthMode.RESET && resetCodeRequested || mode == AuthMode.VERIFY_EMAIL || mode == AuthMode.MFA) {
                 OutlinedTextField(
                     value = actionCode,
                     onValueChange = { actionCode = it.trim(); error = null },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.text("auth_code")) },
+                    label = { Text(strings.text(if (mode == AuthMode.MFA) "mfa_code" else "auth_code")) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     enabled = !busy,
@@ -363,6 +417,7 @@ fun LoginScreen(
                         AuthMode.SIGN_IN, AuthMode.REGISTER -> submitCredentials()
                         AuthMode.RESET -> if (resetCodeRequested) confirmReset() else requestReset()
                         AuthMode.VERIFY_EMAIL -> confirmVerification()
+                        AuthMode.MFA -> completeMfa()
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -382,6 +437,7 @@ fun LoginScreen(
                                 AuthMode.REGISTER -> "create_account"
                                 AuthMode.RESET -> if (resetCodeRequested) "reset_password" else "send_reset_code"
                                 AuthMode.VERIFY_EMAIL -> "verify_email"
+                                AuthMode.MFA -> "verify_mfa"
                             }
                         )
                     )
@@ -453,6 +509,17 @@ fun LoginScreen(
                         resetCodeRequested = false
                         actionCode = ""
                         password = ""
+                        error = null
+                        status = null
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !busy,
+                ) { Text(strings.text("back_to_sign_in")) }
+                AuthMode.MFA -> OutlinedButton(
+                    onClick = {
+                        mfaChallenge = null
+                        actionCode = ""
+                        mode = AuthMode.SIGN_IN
                         error = null
                         status = null
                     },

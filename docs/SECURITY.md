@@ -13,6 +13,10 @@
 - Email verification and password recovery use high-entropy single-use credentials; only SHA-256 token digests are persisted.
 - Verification/reset requests are deliberately non-enumerating for unknown email addresses.
 - Password reset revokes all existing sessions for the affected identity before a new login can be trusted.
+- Account TOTP MFA is server-authoritative across password and federated first factors: a successful first factor yields only a five-minute hashed one-time challenge, never a session, until MFA succeeds.
+- Account TOTP seeds are encrypted at rest with the deployment-managed `SENTINEL_ACCOUNT_MFA_KEY`; the raw key is never committed. Missing/invalid encryption configuration fails enrollment and MFA verification closed.
+- TOTP counters are replay-protected. Recovery codes are high-entropy, stored only as SHA-256 digests, consumed once, and are shown only when initially generated or explicitly rotated.
+- Enabling or disabling account MFA revokes existing sessions so a previously issued refresh token cannot bypass the changed security policy.
 - Federated identities are keyed by provider subject, never by email equality. Existing-email collisions require explicit authenticated linking, and adding a persistent provider identity requires a device-bound SENTINEL session obtained after device proof; a pre-device account session is insufficient.
 - Google ID tokens are checked server-side for signature, issuer, audience, time bounds and one-time nonce.
 - Telegram OIDC and VK ID browser flows use PKCE plus one-time hashed state. Redirect URIs are exact server allowlists; arbitrary client redirects are rejected.

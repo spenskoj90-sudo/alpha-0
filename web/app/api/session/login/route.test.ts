@@ -48,6 +48,28 @@ describe('POST /api/session/login', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('forwards an MFA challenge without setting session cookies', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      mfa_required: true,
+      challenge_token: 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG',
+      expires_at: '2030-01-01T00:00:00Z',
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    const response = await POST(new NextRequest('http://localhost/api/session/login', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      mfa_required: true,
+      challenge_token: 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG',
+    });
+    expect(response.headers.get('set-cookie')).toBeNull();
+  });
+
   it('fails closed when Core is not configured', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', '');
     const response = await POST(new NextRequest('http://localhost/api/session/login', {

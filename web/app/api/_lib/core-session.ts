@@ -14,6 +14,12 @@ type SessionPayload = {
   scopes: string[];
 };
 
+type MfaChallengePayload = {
+  mfa_required: true;
+  challenge_token: string;
+  expires_at: string;
+};
+
 function configuredCoreUrl(): string | null {
   const value = process.env.SENTINEL_CORE_URL?.trim();
   if (!value) return null;
@@ -102,6 +108,21 @@ async function parseSession(response: Response): Promise<SessionPayload | null> 
   }
 }
 
+async function parseMfaChallenge(response: Response): Promise<MfaChallengePayload | null> {
+  try {
+    const payload = await response.clone().json() as Partial<MfaChallengePayload>;
+    if (
+      payload.mfa_required !== true ||
+      typeof payload.challenge_token !== 'string' ||
+      payload.challenge_token.length < 32 ||
+      typeof payload.expires_at !== 'string'
+    ) return null;
+    return payload as MfaChallengePayload;
+  } catch {
+    return null;
+  }
+}
+
 async function refreshSession(coreUrl: string, refreshToken: string, requestId: string): Promise<SessionPayload | null> {
   const response = await coreFetch(coreUrl, '/v1/sessions/refresh', requestId, {
     method: 'POST',
@@ -133,6 +154,46 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
   }
   try {
     const response = await coreFetch(coreUrl, `/v1/auth/${mode}`, requestId, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: await request.text(),
+    });
+    if (!response.ok) return copyUpstream(response, requestId);
+    const mfa = await parseMfaChallenge(response);
+    if (mfa) {
+      return applyCorrelation(NextResponse.json({
+        mfa_required: true,
+        challenge_token: mfa.challenge_token,
+        expires_at: mfa.expires_at,
+      }), requestId, response);
+    }
+    const session = await parseSession(response);
+    if (!session) {
+      return applyCorrelation(NextResponse.json({ error: 'INVALID_CORE_SESSION_RESPONSE' }, { status: 502 }), requestId, response);
+    }
+    const result = applyCorrelation(NextResponse.json({
+      authenticated: true,
+      expires_at: session.expires_at,
+      scopes: session.scopes,
+    }), requestId, response);
+    applySessionCookies(result, session);
+    return result;
+  } catch {
+    return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);
+  }
+}
+
+export async function completeMfaWeb(request: NextRequest): Promise<NextResponse> {
+  const requestId = correlationId(request);
+  if (!sameOriginWrite(request)) {
+    return applyCorrelation(NextResponse.json({ error: 'CROSS_SITE_REQUEST_DENIED' }, { status: 403 }), requestId);
+  }
+  const coreUrl = configuredCoreUrl();
+  if (!coreUrl) {
+    return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
+  }
+  try {
+    const response = await coreFetch(coreUrl, '/v1/auth/mfa/complete', requestId, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: await request.text(),

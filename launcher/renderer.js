@@ -10,10 +10,14 @@ const voiceConsent = $('voice-consent');
 const voiceLocale = $('voice-locale');
 const voicePtt = $('voice-ptt');
 const loginButton = $('login');
+const mfaPanel = $('mfa-panel');
+const mfaCode = $('mfa-code');
+const mfaCompleteButton = $('mfa-complete');
 const logoutButton = $('logout');
 const startButton = $('companion-start');
 const stopButton = $('companion-stop');
 let signedIn = false;
+let mfaRequired = false;
 let companionState = 'STOPPED';
 let grantedFeatures = [];
 let currentVoice = {
@@ -28,8 +32,10 @@ let voiceCaptureDiscarded = false;
 let voiceBusy = false;
 
 function refreshButtons() {
-  loginButton.disabled = signedIn;
-  logoutButton.disabled = !signedIn;
+  loginButton.disabled = signedIn || mfaRequired;
+  mfaPanel.hidden = !mfaRequired;
+  mfaCompleteButton.disabled = !mfaRequired || String(mfaCode.value || '').trim().length < 6;
+  logoutButton.disabled = !signedIn && !mfaRequired;
   startButton.disabled = !signedIn || companionState !== 'STOPPED' || !grantedFeatures.includes('companion');
   stopButton.disabled = companionState === 'STOPPED';
 
@@ -41,13 +47,16 @@ function refreshButtons() {
   voicePtt.textContent = voiceRecorder ? 'STOP & SEND' : voiceBusy ? 'PROCESSING…' : 'START PUSH-TO-TALK';
 }
 
-function setAccount(status, features = []) {
+function setAccount(status, features = [], mfa = null) {
   signedIn = Boolean(status?.authenticated);
+  mfaRequired = !signedIn && mfa?.required === true;
   grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
-  accountStatus.className = `status ${signedIn ? 'ok' : ''}`;
+  accountStatus.className = 'status ' + (signedIn ? 'ok' : mfaRequired ? 'warn' : '');
   accountStatus.textContent = signedIn
-    ? `ACCOUNT: AUTHENTICATED / ${grantedFeatures.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED'}`
-    : 'ACCOUNT: SIGNED OUT';
+    ? 'ACCOUNT: AUTHENTICATED / ' + (grantedFeatures.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED')
+    : mfaRequired
+      ? 'ACCOUNT: FIRST FACTOR VERIFIED / MFA REQUIRED'
+      : 'ACCOUNT: SIGNED OUT';
   refreshButtons();
 }
 
@@ -290,11 +299,30 @@ loginButton.onclick = async () => {
   try {
     const result = await window.sentinel.login($('core-url').value, $('email').value, $('password').value);
     $('password').value = '';
-    setAccount(result.session, result.features || []);
-    await refreshVoiceStatus();
+    setAccount(result.session, result.features || [], result.mfa);
+    if (result.mfa?.required) {
+      mfaCode.focus();
+    } else {
+      await refreshVoiceStatus();
+    }
   } catch (error) {
     loginButton.disabled = false;
     showError(accountStatus, error);
+  }
+};
+
+mfaCode.oninput = refreshButtons;
+
+mfaCompleteButton.onclick = async () => {
+  mfaCompleteButton.disabled = true;
+  try {
+    const result = await window.sentinel.completeMfa(mfaCode.value);
+    mfaCode.value = '';
+    setAccount(result.session, result.features || [], result.mfa);
+    await refreshVoiceStatus();
+  } catch (error) {
+    showError(accountStatus, error);
+    refreshButtons();
   }
 };
 
@@ -303,7 +331,8 @@ logoutButton.onclick = async () => {
   await window.sentinel.logout();
   setCompanion({ state: 'STOPPED', reason: 'ACCOUNT_LOGOUT' });
   setWowCheckpoint({ state: 'STOPPED', queueDepth: 0 });
-  setAccount(null, []);
+  mfaCode.value = '';
+  setAccount(null, [], null);
   setVoice({ state: 'SIGNED_OUT', consentGranted: false, sttAvailable: false, ttsAvailable: false, maxAudioBytes: 512000, maxCaptureMs: 6000, captureContentType: 'audio/webm;codecs=opus', actionCapable: false });
 };
 
@@ -340,13 +369,13 @@ voicePtt.onclick = async () => {
 };
 
 window.sentinel.onCompanionStatus(setCompanion);
-window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || []));
+window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || [], snapshot?.mfa));
 window.sentinel.onWowCheckpointStatus(setWowCheckpoint);
 window.sentinel.onVoiceStatus(setVoice);
 
 Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), window.sentinel.voiceStatus(), renderGames()])
   .then(([snapshot, companion, voice]) => {
-    setAccount(snapshot?.session, snapshot?.features || []);
+    setAccount(snapshot?.session, snapshot?.features || [], snapshot?.mfa);
     setCompanion(companion);
     setVoice(voice);
     setWowCheckpoint({ state: 'STOPPED' });

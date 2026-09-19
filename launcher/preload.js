@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('sentinel', {
   setExecutable: (id, executable) => ipcRenderer.invoke('config:set', id, executable),
   launch: id => ipcRenderer.invoke('game:launch', id),
   login: (coreUrl, email, password) => ipcRenderer.invoke('account:login', coreUrl, email, password),
+  completeMfa: code => ipcRenderer.invoke('account:mfa-complete', code),
   logout: () => ipcRenderer.invoke('account:logout'),
   accountStatus: () => ipcRenderer.invoke('account:status'),
   companionStatus: () => ipcRenderer.invoke('companion:status'),

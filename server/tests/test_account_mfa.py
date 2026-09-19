@@ -72,7 +72,7 @@ def _enable_mfa(monkeypatch, email: str, password: str) -> tuple[str, list[str]]
 def test_mfa_login_challenge_blocks_session_until_second_factor(monkeypatch):
     email = f"mfa-login-{uuid.uuid4().hex}@example.com"
     password = "Correct-Horse-Battery-Staple-MFA-1"
-    secret, _ = _enable_mfa(monkeypatch, email, password)
+    secret, recovery = _enable_mfa(monkeypatch, email, password)
 
     first_factor = client.post("/v1/auth/login", json={"email": email, "password": password})
     assert first_factor.status_code == 200
@@ -89,15 +89,17 @@ def test_mfa_login_challenge_blocks_session_until_second_factor(monkeypatch):
     )
     assert denied.status_code == 401
 
+    # Enrollment consumes the current TOTP counter, so the same 30-second
+    # code must not be accepted again for the immediately following login.
     completed = client.post(
         "/v1/auth/mfa/complete",
-        json={"challenge_token": challenge, "code": _current_code(secret)},
+        json={"challenge_token": challenge, "code": recovery[0]},
     )
     assert completed.status_code == 200, completed.text
     assert completed.json()["session_token"]
     replay = client.post(
         "/v1/auth/mfa/complete",
-        json={"challenge_token": challenge, "code": _current_code(secret)},
+        json={"challenge_token": challenge, "code": recovery[1]},
     )
     assert replay.status_code == 401
 

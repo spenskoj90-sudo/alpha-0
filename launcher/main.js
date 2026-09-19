@@ -49,12 +49,16 @@ let voiceStateReason = 'VOICE_CONSENT_REQUIRED';
 let voiceCapturePermissionExpiresAt = 0;
 
 async function accountSnapshot() {
-  if (!session.status) return { session: null, features: [] };
+  if (!session.status) return { session: null, features: [], mfa: session.mfaStatus };
   try {
     const payload = await session.featureStatus();
-    return { session: session.status, features: Array.isArray(payload.features) ? payload.features : [] };
+    return {
+      session: session.status,
+      features: Array.isArray(payload.features) ? payload.features : [],
+      mfa: null,
+    };
   } catch {
-    return { session: session.status, features: [] };
+    return { session: session.status, features: [], mfa: null };
   }
 }
 
@@ -291,6 +295,11 @@ ipcMain.handle('game:launch', (_, id) => {
 });
 ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
   await session.login({ coreUrl, email, password });
+  resetVoiceState(session.status ? 'VOICE_CONSENT_REQUIRED' : 'AUTHENTICATION_REQUIRED');
+  return accountSnapshot();
+});
+ipcMain.handle('account:mfa-complete', async (_, code) => {
+  await session.completeMfa(code);
   resetVoiceState('VOICE_CONSENT_REQUIRED');
   return accountSnapshot();
 });

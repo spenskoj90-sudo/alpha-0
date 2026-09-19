@@ -85,6 +85,10 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
+          cp web/package-lock.json "$RUNNER_TEMP/web-package-lock.json"
+          git fetch origin "$HEAD_BRANCH"
+          git checkout -B "$HEAD_BRANCH" "origin/$HEAD_BRANCH"
+          cp "$RUNNER_TEMP/web-package-lock.json" web/package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add web/package-lock.json
@@ -93,4 +97,4 @@ jobs:
             exit 0
           fi
           git commit -m "build(web): refresh deterministic package lock"
-          git push origin "HEAD:$HEAD_BRANCH"
+          git push origin "$HEAD_BRANCH"

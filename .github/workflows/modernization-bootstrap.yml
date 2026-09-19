@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: modernization-bootstrap-${{ github.ref }}
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Setup Node 24 LTS
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -77,3 +77,20 @@ jobs:
           path: artifacts/modernization/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Commit generated Web lockfile to same-repository PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/package-lock.json
+          if git diff --cached --quiet; then
+            echo "Generated lockfile already matches repository state."
+            exit 0
+          fi
+          git commit -m "build(web): refresh deterministic package lock"
+          git push origin "HEAD:$HEAD_BRANCH"

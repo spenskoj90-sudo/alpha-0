@@ -331,7 +331,7 @@ jobs:
           test "$(sha256sum attestation-input/release-presecret-binding.json | awk '{print $1}')" = "$EXPECTED_BINDING_SHA256"
 
       - name: Attest exact signed release candidate
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             attestation-input/app-release.apk

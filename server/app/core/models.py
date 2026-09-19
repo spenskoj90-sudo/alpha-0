@@ -56,7 +56,32 @@ class PasswordResetConfirmRequest(AuthTokenRequest):
 
 
 class AuthActionResponse(BaseModel):
-    status: Literal["ACCEPTED", "VERIFIED", "PASSWORD_UPDATED", "LINKED"]
+    status: Literal["ACCEPTED", "VERIFIED", "PASSWORD_UPDATED", "LINKED", "MFA_DISABLED"]
+
+
+class MfaChallengeResponse(BaseModel):
+    mfa_required: Literal[True] = True
+    challenge_token: str
+    expires_at: datetime
+
+
+class MfaCompleteRequest(BaseModel):
+    challenge_token: str = Field(min_length=32, max_length=512)
+    code: str = Field(min_length=6, max_length=64)
+
+
+class TotpCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=64)
+
+
+class TotpEnrollmentResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class MfaRecoveryCodesResponse(BaseModel):
+    status: Literal["MFA_ENABLED", "RECOVERY_CODES_ROTATED"]
+    recovery_codes: list[str]
 
 
 class AccountSecurityResponse(BaseModel):
@@ -64,6 +89,8 @@ class AccountSecurityResponse(BaseModel):
     email_verified: bool
     password_enabled: bool
     providers: list[Literal["google", "vk", "telegram"]]
+    mfa_enabled: bool
+    mfa_recovery_codes_remaining: int
 
 
 

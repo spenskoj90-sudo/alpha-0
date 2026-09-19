@@ -2,10 +2,11 @@
 
 ## Runtime
 
-- Android client: API 29+, target SDK 35.
-- Core: Python 3.12+, FastAPI/Uvicorn.
-- Database: PostgreSQL 17 in the reference Compose stack.
-- Web: Next.js App Router.
+- Android client: min SDK 29, target SDK 36, compile SDK 37.
+- Core: Python 3.14.7, FastAPI 0.141.1 / Uvicorn 0.53.0; native runtimes are pinned by `.python-version`.
+- Database: PostgreSQL 18 in the reference Compose/integration/recovery stack.
+- Web: Node.js 24.21.0 LTS with Next.js 16.3.5 / React 19.3.0; native Node resolution is pinned by `.node-version`.
+- Companion packaging: Node.js 24.21.0 LTS with Electron 44.4.2 and an immutable official Win32 x64 runtime digest.
 
 ## Reference deployment
 
@@ -54,7 +55,7 @@ Production startup intentionally fails closed if `DATABASE_URL` or enrollment co
 
 ## Database rollout
 
-1. Provision PostgreSQL 17 (or compatible managed instance such as Supabase free-tier Postgres).
+1. Provision PostgreSQL 18 for a new reference deployment. Existing managed databases require an explicit, evidence-backed major-version migration; repository image changes do not migrate them.
 2. Run `python server/migrate.py` or start the Core container.
 3. Verify `/healthz`.
 4. Run API/security smoke tests against a disposable database.

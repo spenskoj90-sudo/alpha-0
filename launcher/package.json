@@ -9,13 +9,13 @@
     "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-windows.ps1"
   },
   "engines": {
-    "node": ">=22"
+    "node": "24.x"
   },
   "dependencies": {
-    "electron": "37.2.0"
+    "electron": "44.4.2"
   },
   "sentinelPackaging": {
-    "electronVersion": "37.2.0",
-    "electronWin32X64Sha256": "4d4451179993fa22a1125bbc0130858903bc16e5c87900a969fa7bbac5c8f6a3"
+    "electronVersion": "44.4.2",
+    "electronWin32X64Sha256": "6aae435b6cd5c0eedf9fd38824bae4045ffdaecd029f0b8c8328bac3f5b71f03"
   }
 }

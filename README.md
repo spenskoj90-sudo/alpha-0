@@ -89,12 +89,12 @@ The Android device identity remains Keystore-backed: P-256 / `secp256r1` with SH
 
 ## Requirements
 
-- JDK 17.
-- Android SDK 35 for Android builds.
-- Python 3.12 for Core.
-- Node.js 20 for web.
+- JDK 25 LTS for Gradle/CI; Android Java/Kotlin bytecode remains JVM 17.
+- Android SDK 37 for compilation with target SDK 36 and min SDK 29.
+- Python 3.14.7 for Core, pinned by `.python-version` and the Core container image.
+- Node.js 24.21.0 LTS for Web and Companion tooling, pinned by `.node-version`.
 - Docker / Docker Compose for the reference stack.
-- PostgreSQL 17 for production reference deployment.
+- PostgreSQL 18 for repository integration, recovery and reference deployment evidence. Managed environments are verified separately before any major-version migration.
 
 ## Quick start
 

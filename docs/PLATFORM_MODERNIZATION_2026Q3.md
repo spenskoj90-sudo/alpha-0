@@ -43,23 +43,29 @@ Repository development, integration, migration, backup/restore and deployment-sm
 
 Production-database migration remains an Owner/environment deployment gate. Updating CI/local images does not itself migrate a production database.
 
-## Runtime modernization frontier
+## Accepted runtime baseline
 
-The whole repository is audited, not only Android. The active audit includes:
+The repository-wide modernization pass uses stable supported software and immutable provenance:
 
-- Node.js / Next.js / React / TypeScript / ESLint / Vitest;
-- Python / FastAPI / Uvicorn / Pydantic / SQLAlchemy / psycopg / cryptography / pytest;
-- PostgreSQL;
-- Docker base images and their immutable provenance;
-- GitHub Actions and security scanners;
-- AndroidX, Google Play SDKs, Sentry and Kotlin ecosystem libraries.
+| Surface | Accepted baseline |
+| --- | --- |
+| Native Node runtime | 24.21.0 LTS via `.node-version` |
+| Web | Next.js 16.3.5, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.1 |
+| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.5; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
+| Companion | Electron 44.4.2 on Node 24 LTS |
+| Native Python runtime | 3.14.7 via `.python-version` |
+| Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
+| Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.0 |
+| PostgreSQL repository baseline | 18 |
+| Android observability/test refresh | Sentry Android 8.57.0, AndroidX Test ext.junit 1.3.0, runner 1.7.0, Espresso 3.7.0 |
 
-The intended runtime direction is stable LTS/current-supported software, not pre-release software:
+Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is regenerated under Node 24.21.0 and is required to remain consistent with `package.json`.
 
-- Node 24 LTS is the candidate Web/launcher runtime baseline.
-- Python 3.14 is the candidate Core runtime baseline only after dependency-wheel compatibility and an exact pinned official container image are validated.
-- PostgreSQL 18 is the active database test/runtime baseline.
-- Pre-release PostgreSQL 19 and other RC/beta dependencies are excluded from the normal baseline.
+The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.2 Win32 x64 archive and verifies SHA-256 `6aae435b6cd5c0eedf9fd38824bae4045ffdaecd029f0b8c8328bac3f5b71f03` before staging the application payload.
+
+The managed Neon pre-release database observed during this pass remains PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. A managed-database major upgrade is therefore a separate migration boundary and must not be inferred from repository image changes.
+
+GitHub Actions used by the active workflows are pinned to immutable commit SHAs. The modernization pass moved checkout/setup/runtime, Gradle, Docker, CodeQL, OSV, artifact and emulator actions to their audited stable release lines while retaining existing security gates.
 
 ## Supply-chain rule
 

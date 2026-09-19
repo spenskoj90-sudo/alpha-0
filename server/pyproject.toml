@@ -8,20 +8,20 @@ version = "1.0.0rc2"
 description = "SENTINEL CORE security-first modular monolith"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi>=0.116,<1.0",
-  "uvicorn[standard]>=0.35,<1.0",
-  "websockets>=15,<16",
-  "pydantic>=2.11,<3.0",
-  "sqlalchemy>=2.0,<3.0",
-  "psycopg[binary]>=3.2,<4.0",
-  "cryptography>=50,<51",
+  "fastapi==0.141.1",
+  "uvicorn[standard]==0.53.0",
+  "websockets==17.1",
+  "pydantic==2.13.5",
+  "sqlalchemy==2.0.54",
+  "psycopg[binary]==3.3.6",
+  "cryptography==50.0.1",
 ]
 
 [project.optional-dependencies]
 test = [
-  "pytest>=9.0.3,<10.0",
-  "httpx>=0.28,<1.0",
-  "pytest-cov>=6.2,<7.0",
+  "pytest==9.1.1",
+  "httpx2==2.13.0",
+  "pytest-cov==7.1.0",
 ]
 
 [tool.setuptools.packages.find]

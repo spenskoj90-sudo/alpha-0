@@ -15,6 +15,14 @@
 
 Existence of a source tree does not by itself establish that the surface is packaged, integrated or accepted in a real target environment.
 
+### Current platform baseline
+
+- Native repository runtimes are pinned to Node.js 24.21.0 LTS and Python 3.14.7.
+- Web uses Next.js 16.3.5 / React 19.3.0; the Companion packaging baseline is Electron 44.4.2.
+- Android builds use AGP 9.3.1, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
+- Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. The connected Neon pre-release database was observed on PostgreSQL 17.11 during the current modernization pass; that managed major-version migration is separate from repository image changes and is not claimed complete.
+- Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
+
 ## 2. Security and persistence baseline
 
 - Android device identity is Keystore-backed P-256 with SHA-256 fingerprinting.

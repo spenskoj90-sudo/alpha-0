@@ -8,8 +8,9 @@ describe('POST /api/session/mfa', () => {
     vi.unstubAllEnvs();
   });
 
-  it('exchanges a short-lived MFA challenge for HttpOnly session cookies', async () => {
+  it('exchanges the HttpOnly MFA challenge for session cookies without exposing it to JavaScript', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const challenge = 'mfa-' + 'x'.repeat(44);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       session_token: 'access-secret',
       refresh_token: 'refresh-secret',
@@ -19,11 +20,12 @@ describe('POST /api/session/mfa', () => {
 
     const response = await POST(new NextRequest('http://localhost/api/session/mfa', {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        challenge_token: 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG',
-        code: '123456',
-      }),
+      headers: {
+        origin: 'http://localhost',
+        'content-type': 'application/json',
+        cookie: `sentinel_mfa=${challenge}`,
+      },
+      body: JSON.stringify({ code: '123456' }),
     }));
 
     expect(response.status).toBe(200);
@@ -31,10 +33,27 @@ describe('POST /api/session/mfa', () => {
     expect(body).toContain('"authenticated":true');
     expect(body).not.toContain('access-secret');
     expect(body).not.toContain('refresh-secret');
+    expect(body).not.toContain(challenge);
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(cookie).toContain('sentinel_access=access-secret');
+    expect(cookie).toContain('sentinel_mfa=');
     expect(cookie.toLowerCase()).toContain('httponly');
+    const upstreamBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? '{}'));
+    expect(upstreamBody).toEqual({ challenge_token: challenge, code: '123456' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the browser has no MFA challenge cookie', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const response = await POST(new NextRequest('http://localhost/api/session/mfa', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      body: JSON.stringify({ code: '123456' }),
+    }));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'WEB_MFA_CHALLENGE_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects cross-site MFA completion before calling Core', async () => {

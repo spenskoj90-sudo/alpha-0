@@ -43,6 +43,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 
 ## External / Owner-gated evidence
 
+- [ ] Complete the Neon pre-release PostgreSQL 17→18 migration: the isolated PG18.6 target is schema-ready with exact migration/FORCE-RLS parity, but managed data import, target verification and staging connection cutover remain environment work; preserve the PG17 rollback source until acceptance completes.
 - [ ] Exact WoW 3.3.5a/private-server L3 validation; capabilities remain `UNVERIFIED` until exercised in that environment.
 - [ ] Production Stripe credentials plus live account/price/webhook/network/payment acceptance, production PostHog/Resend account configuration where selected, production database/ingress configuration and signing-key custody.
 - [ ] Selected production STT/TTS provider credentials/network acceptance plus physical microphone/driver/acoustic-quality evidence on the release host.

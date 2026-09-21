@@ -65,10 +65,22 @@ class AccountMfaService:
         raw = os.getenv(_MFA_KEY_ENV, "").strip()
         if not raw:
             raise AccountMfaConfigurationError("ACCOUNT_MFA_KEY_NOT_CONFIGURED")
+
+        # Preserve exact Fernet-key compatibility for existing deployments.
         try:
             return Fernet(raw.encode("ascii"))
-        except (ValueError, TypeError) as exc:
-            raise AccountMfaConfigurationError("ACCOUNT_MFA_KEY_INVALID") from exc
+        except (UnicodeEncodeError, ValueError, TypeError):
+            pass
+
+        # Secret stores commonly generate high-entropy opaque strings rather
+        # than Fernet's urlsafe-base64 representation. Accept those values
+        # without weakening key material by deriving a domain-separated
+        # 32-byte key. Short/human-scale values still fail closed.
+        raw_bytes = raw.encode("utf-8")
+        if len(raw_bytes) < 32:
+            raise AccountMfaConfigurationError("ACCOUNT_MFA_KEY_INVALID")
+        derived = hashlib.sha256(b"SENTINEL_ACCOUNT_MFA_KEY\x00" + raw_bytes).digest()
+        return Fernet(base64.urlsafe_b64encode(derived))
 
     @classmethod
     def _encrypt_secret(cls, secret: str) -> str:

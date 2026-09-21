@@ -10,6 +10,7 @@ os.environ.setdefault("SENTINEL_ENROLLMENT_TOKEN", "u1:secret")
 os.environ.setdefault("SENTINEL_REQUIRE_ENROLLMENT", "true")
 
 from app import main as main_module
+from app.core.account_mfa import AccountMfaConfigurationError
 from app.core.federated_auth import VerifiedFederatedIdentity
 from app.core.security import session_hash
 from app.core.totp import decode_totp_secret, totp_at
@@ -265,3 +266,34 @@ def test_mfa_enrollment_fails_closed_without_encryption_key(monkeypatch):
     )
     assert response.status_code == 503
     assert response.json()["code"] == "ACCOUNT_MFA_KEY_NOT_CONFIGURED"
+
+
+def test_mfa_cipher_accepts_high_entropy_secret_store_value(monkeypatch):
+    raw = "render-generated-secret-" + ("x" * 40)
+    monkeypatch.setenv("SENTINEL_ACCOUNT_MFA_KEY", raw)
+
+    first = account_mfa._cipher()
+    second = account_mfa._cipher()
+
+    plaintext = b"totp-seed"
+    ciphertext = first.encrypt(plaintext)
+    assert second.decrypt(ciphertext) == plaintext
+
+
+def test_mfa_cipher_preserves_native_fernet_key(monkeypatch):
+    raw = Fernet.generate_key().decode("ascii")
+    monkeypatch.setenv("SENTINEL_ACCOUNT_MFA_KEY", raw)
+
+    cipher = account_mfa._cipher()
+    plaintext = b"totp-seed"
+    assert Fernet(raw.encode("ascii")).decrypt(cipher.encrypt(plaintext)) == plaintext
+
+
+def test_mfa_cipher_rejects_short_non_fernet_secret(monkeypatch):
+    monkeypatch.setenv("SENTINEL_ACCOUNT_MFA_KEY", "too-short")
+    try:
+        account_mfa._cipher()
+    except AccountMfaConfigurationError as exc:
+        assert str(exc) == "ACCOUNT_MFA_KEY_INVALID"
+    else:
+        raise AssertionError("short non-Fernet MFA key must fail closed")

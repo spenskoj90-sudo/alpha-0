@@ -61,10 +61,50 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["sourceSha"], SHA)
         self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
         self.assertEqual(manifest["runtimeEnvironment"], "staging")
+        self.assertEqual(manifest["signingMode"], "ephemeral-debug")
+        self.assertFalse(manifest["updateCompatible"])
+        self.assertEqual(manifest["workflow"]["name"], "Physical Test APK")
         self.assertEqual(manifest["httpReadTimeoutMs"], 75_000)
         self.assertTrue(manifest["coldStartAware"])
         self.assertEqual(manifest["apk"]["applicationId"], "com.alpha0.app.physicaltest")
         self.assertEqual(len(manifest["apk"]["sha256"]), 64)
+
+    def test_stable_update_manifest_is_explicitly_update_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            manifest = build_manifest(
+                apk=apk,
+                output_metadata=metadata,
+                version_file=version,
+                source_sha=SHA,
+                api_base_url=ORIGIN,
+                repository="spenskoj90-sudo/alpha-0",
+                run_id="12345",
+                run_attempt="2",
+                signing_mode="stable-test",
+                workflow_name="Physical Test Update APK",
+                generated_at="2026-09-21T15:00:00Z",
+            )
+        self.assertTrue(manifest["updateCompatible"])
+        self.assertEqual(manifest["signingMode"], "stable-test")
+        self.assertEqual(manifest["workflow"]["name"], "Physical Test Update APK")
+        self.assertEqual(manifest["artifactName"], f"sentinel-physical-test-update-apk-{SHA}")
+
+    def test_stable_signing_cannot_claim_routine_secret_free_workflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            with self.assertRaisesRegex(ValueError, "dedicated update workflow"):
+                build_manifest(
+                    apk=apk,
+                    output_metadata=metadata,
+                    version_file=version,
+                    source_sha=SHA,
+                    api_base_url=ORIGIN,
+                    repository="spenskoj90-sudo/alpha-0",
+                    run_id="12345",
+                    run_attempt="2",
+                    signing_mode="stable-test",
+                )
 
     def test_loopback_bytes_in_compiled_dex_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

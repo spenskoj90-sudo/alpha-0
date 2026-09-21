@@ -5,7 +5,9 @@
     "fileName": "SENTINEL — Canonical Product Design System",
     "fileKey": "vRIHsesWZNMEEEjNJu8TjB",
     "url": "https://www.figma.com/design/vRIHsesWZNMEEEjNJu8TjB",
-    "authoredPages": ["00 Foundations"],
+    "authoredPages": [
+      "00 Foundations"
+    ],
     "liveInventoryStatus": "FOUNDATIONS_ONLY",
     "foundationPageNodeId": "0:1",
     "foundationFrameNodeId": "1:4",
@@ -19,15 +21,51 @@
       "frameName": "SENTINEL Foundations",
       "frameNodeId": "1:4",
       "webAndCompanionColorTokens": {
-        "background": {"frameNodeId": "1:8", "swatchNodeId": "1:9", "codeAnchor": "--bg"},
-        "surface": {"frameNodeId": "1:11", "swatchNodeId": "1:12", "codeAnchor": "--panel"},
-        "surfaceRaised": {"frameNodeId": "1:14", "swatchNodeId": "1:15", "codeAnchor": "--panel-2"},
-        "textPrimary": {"frameNodeId": "1:17", "swatchNodeId": "1:18", "codeAnchor": "--text"},
-        "textSecondary": {"frameNodeId": "1:20", "swatchNodeId": "1:21", "codeAnchor": "--muted"},
-        "primary": {"frameNodeId": "1:23", "swatchNodeId": "1:24", "codeAnchor": "--accent"},
-        "signal": {"frameNodeId": "1:26", "swatchNodeId": "1:27", "codeAnchor": "--accent-2"},
-        "danger": {"frameNodeId": "1:29", "swatchNodeId": "1:30", "codeAnchor": "--danger"},
-        "border": {"frameNodeId": "1:32", "swatchNodeId": "1:33", "codeAnchor": "--border"}
+        "background": {
+          "frameNodeId": "1:8",
+          "swatchNodeId": "1:9",
+          "codeAnchor": "--bg"
+        },
+        "surface": {
+          "frameNodeId": "1:11",
+          "swatchNodeId": "1:12",
+          "codeAnchor": "--panel"
+        },
+        "surfaceRaised": {
+          "frameNodeId": "1:14",
+          "swatchNodeId": "1:15",
+          "codeAnchor": "--panel-2"
+        },
+        "textPrimary": {
+          "frameNodeId": "1:17",
+          "swatchNodeId": "1:18",
+          "codeAnchor": "--text"
+        },
+        "textSecondary": {
+          "frameNodeId": "1:20",
+          "swatchNodeId": "1:21",
+          "codeAnchor": "--muted"
+        },
+        "primary": {
+          "frameNodeId": "1:23",
+          "swatchNodeId": "1:24",
+          "codeAnchor": "--accent"
+        },
+        "signal": {
+          "frameNodeId": "1:26",
+          "swatchNodeId": "1:27",
+          "codeAnchor": "--accent-2"
+        },
+        "danger": {
+          "frameNodeId": "1:29",
+          "swatchNodeId": "1:30",
+          "codeAnchor": "--danger"
+        },
+        "border": {
+          "frameNodeId": "1:32",
+          "swatchNodeId": "1:33",
+          "codeAnchor": "--border"
+        }
       }
     }
   },
@@ -55,36 +93,41 @@
     "web": {
       "source": "web/app/globals.css",
       "tokens": {
-        "background": "#070A0D",
-        "surface": "#0D1217",
-        "surfaceRaised": "#111820",
-        "border": "#1D2832",
-        "primary": "#9ACB52",
-        "signal": "#4CA3FF",
-        "danger": "#FF6B6B",
-        "textPrimary": "#E7EDF2",
-        "textSecondary": "#8996A3",
-        "focus": "#4CA3FF"
+        "background": "#07121F",
+        "surface": "#0D1B2A",
+        "surfaceRaised": "#13263A",
+        "border": "#27445D",
+        "primary": "#70DBFF",
+        "signal": "#5BE3D0",
+        "danger": "#FF6F82",
+        "textPrimary": "#F1F8FC",
+        "textSecondary": "#9EB4C5",
+        "focus": "#5BE3D0"
       },
-      "shape": {"cardRadiusPx": 16, "nestedRadiusPx": 12, "controlRadiusPx": 10},
+      "shape": {
+        "cardRadiusPx": 20,
+        "nestedRadiusPx": 16,
+        "controlRadiusPx": 14
+      },
       "responsiveCollapseMaxWidthPx": 800
     },
     "companion": {
       "source": "launcher/index.html",
       "overlaySource": "launcher/overlay.html",
       "tokens": {
-        "background": "#070A0D",
-        "surface": "#0D1217",
-        "border": "#1D2832",
-        "primary": "#9ACB52",
-        "signal": "#4CA3FF",
-        "danger": "#FF6B6B",
-        "textPrimary": "#E7EDF2",
-        "textSecondary": "#8996A3",
-        "focus": "#4CA3FF"
+        "background": "#07121F",
+        "surface": "#0D1B2A",
+        "surfaceRaised": "#13263A",
+        "border": "#27445D",
+        "primary": "#70DBFF",
+        "signal": "#5BE3D0",
+        "danger": "#FF6F82",
+        "textPrimary": "#F1F8FC",
+        "textSecondary": "#9EB4C5",
+        "focus": "#5BE3D0"
       },
       "overlay": {
-        "background": "rgba(8, 13, 18, .86)",
+        "background": "rgba(7, 18, 31, .88)",
         "textPrimary": "#EEF3F7",
         "radiusPx": 14,
         "pointerEvents": "none",
@@ -95,17 +138,24 @@
       "source": "app/src/main/java/com/alpha0/app/ui/DesignTokens.kt",
       "themeSource": "app/src/main/java/com/alpha0/app/ui/SentinelTheme.kt",
       "tokens": {
-        "background": "#0D1117",
-        "surface": "#161B22",
-        "border": "#30363D",
-        "primary": "#B356FF",
-        "signal": "#00E5FF",
-        "danger": "#FF3366",
-        "textPrimary": "#F0F6FC",
-        "textSecondary": "#8B949E"
+        "background": "#07121F",
+        "surface": "#0D1B2A",
+        "border": "#27445D",
+        "primary": "#70DBFF",
+        "signal": "#5BE3D0",
+        "danger": "#FF6F82",
+        "textPrimary": "#F1F8FC",
+        "textSecondary": "#9EB4C5"
       },
-      "typography": {"display": "Outfit", "body": "Inter", "data": "JetBrains Mono"},
-      "shape": {"sentinelCardRadiusDp": 4, "buttonRadiusDp": 14}
+      "typography": {
+        "display": "Outfit",
+        "body": "Inter",
+        "data": "JetBrains Mono"
+      },
+      "shape": {
+        "sentinelCardRadiusDp": 20,
+        "buttonRadiusDp": 16
+      }
     }
   },
   "components": {
@@ -114,42 +164,87 @@
       "android": "PrimaryButton",
       "companion": ".btn",
       "figma": "UNAUTHORED",
-      "semantics": ["enabled/disabled", "visible focus", "explicit text label"]
+      "semantics": [
+        "enabled/disabled",
+        "visible focus",
+        "explicit text label"
+      ]
     },
     "DangerAction": {
       "web": "danger state/action copy where applicable",
       "android": "DangerButton",
       "companion": "STOP / KILL SWITCH",
       "figma": "UNAUTHORED",
-      "semantics": ["destructive or terminal action is explicit", "no color-only meaning"]
+      "semantics": [
+        "destructive or terminal action is explicit",
+        "no color-only meaning"
+      ]
     },
     "Status": {
       "web": ".state / .status-message",
       "android": "StatusBadge",
       "companion": ".status",
       "figma": "UNAUTHORED",
-      "semantics": ["text label required", "aria/live-region or Compose semantics where dynamic"]
+      "semantics": [
+        "text label required",
+        "aria/live-region or Compose semantics where dynamic"
+      ]
     },
     "OperationalCard": {
       "web": ".card",
       "android": "SentinelCard / Material Card",
       "companion": ".panel / .card",
       "figma": "UNAUTHORED",
-      "semantics": ["structural only", "does not imply elevated authority"]
+      "semantics": [
+        "structural only",
+        "does not imply elevated authority"
+      ]
     },
     "RecommendationPresentation": {
       "web": "RecommendationPanel",
       "android": "presentation UI only",
       "companion": "overlay.html presentation list",
       "figma": "UNAUTHORED",
-      "semantics": ["observational", "no game-write action", "source/authority boundary remains explicit"]
+      "semantics": [
+        "observational",
+        "no game-write action",
+        "source/authority boundary remains explicit"
+      ]
     }
   },
   "accessibility": {
-    "web": ["skip navigation", "focus-visible", "main landmark", "live status", "forced-colors", "busy state", "assertive failure state", "plan-specific action names"],
-    "android": ["polite/assertive live region", "progress semantics", "button/card semantics", "API 35 instrumentation"],
-    "companion": ["skip navigation", "focus-visible", "live status", "forced-colors", "busy state", "assertive failure state", "overlay polite live region"],
-    "physicalPreRelease": ["TalkBack", "NVDA/JAWS", "switch/keyboard on target hardware", "real packaged host overlay", "microphone/driver/acoustic acceptance"]
+    "web": [
+      "skip navigation",
+      "focus-visible",
+      "main landmark",
+      "live status",
+      "forced-colors",
+      "busy state",
+      "assertive failure state",
+      "plan-specific action names"
+    ],
+    "android": [
+      "polite/assertive live region",
+      "progress semantics",
+      "button/card semantics",
+      "API 35 instrumentation"
+    ],
+    "companion": [
+      "skip navigation",
+      "focus-visible",
+      "live status",
+      "forced-colors",
+      "busy state",
+      "assertive failure state",
+      "overlay polite live region"
+    ],
+    "physicalPreRelease": [
+      "TalkBack",
+      "NVDA/JAWS",
+      "switch/keyboard on target hardware",
+      "real packaged host overlay",
+      "microphone/driver/acoustic acceptance"
+    ]
   },
   "authorityStates": {
     "ACTIVE": "Authoritative state confirms the capability is currently granted/healthy.",

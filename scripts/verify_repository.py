@@ -184,8 +184,28 @@ def check_versions(checks: Checks) -> None:
         'versionName = rootProject.file("VERSION").readText().trim()' in android,
         "Android versionName reads VERSION",
     )
-    version_code = re.search(r"versionCode\s*=\s*(\d+)", android)
-    checks.require(bool(version_code and int(version_code.group(1)) > 0), "Android versionCode is positive and explicit")
+    canonical_version_code = re.search(r"^val canonicalVersionCode\s*=\s*(\d+)\s*$", android, re.MULTILINE)
+    checks.require(
+        bool(canonical_version_code and int(canonical_version_code.group(1)) > 0),
+        "Android canonical versionCode is positive and explicit",
+    )
+    checks.require(
+        "versionCode = if (physicalTestRequested) physicalTestVersionCode else canonicalVersionCode" in android,
+        "Android versionCode selects canonical or physical-test identity explicitly",
+    )
+    checks.require(
+        'providers.environmentVariable("SENTINEL_PHYSICAL_TEST_VERSION_CODE")' in android
+        and "physicalTestVersionCodeRaw.toIntOrNull()" in android
+        and "if (physicalTestVersionCode <= 0)" in android,
+        "Android physical-test versionCode override rejects missing/non-positive identity",
+    )
+    for workflow_name in ("physical-test-apk.yml", "physical-test-update-apk.yml"):
+        workflow = read(f".github/workflows/{workflow_name}")
+        checks.require(
+            "value=$((100000000 + GITHUB_RUN_NUMBER))" in workflow
+            and 'SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value' in workflow,
+            f"{workflow_name} derives monotonic physical-test versionCode from GitHub run number",
+        )
 
     wrapper = read("gradle/wrapper/gradle-wrapper.properties")
     checksum = re.search(r"^distributionSha256Sum=([0-9a-f]{64})$", wrapper, re.MULTILINE)

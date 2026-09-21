@@ -9,7 +9,7 @@
 
 The design system is **semantic-first**. A semantic role such as `primary`, `signal`, `danger`, `surface`, `focus` or `observational` has one product meaning across surfaces, but its raw visual alias may differ by platform.
 
-This is deliberate. Web and Companion currently share the dark green/blue operational palette. Android has an established Compose palette with violet primary, cyan signal, Outfit display type, Inter body type and JetBrains Mono data type. The contract does not rewrite one mature surface merely to make hexadecimal values identical. It prevents semantic drift instead.
+The current system deliberately converges all product surfaces on one calm security-instrumentation family: deep naval backgrounds, steel-blue surfaces, cyan primary signal, restrained teal secondary signal/success, and soft red danger. Platform-specific implementation remains appropriate, but the product no longer uses a separate violet Android identity or green Companion identity.
 
 The executable source of truth is the combination of:
 
@@ -70,17 +70,17 @@ Implementation anchors:
 
 The current Web palette uses:
 
-- background `#070A0D`;
-- panel `#0D1217`;
-- raised panel `#111820`;
-- text `#E7EDF2`;
-- secondary text `#8996A3`;
-- primary/healthy accent `#9ACB52`;
-- focus/information `#4CA3FF`;
-- danger `#FF6B6B`;
-- border `#1D2832`.
+- background `#07121F`;
+- panel `#0D1B2A`;
+- raised panel `#13263A`;
+- text `#F1F8FC`;
+- secondary text `#9EB4C5`;
+- primary action `#70DBFF`;
+- signal/focus `#5BE3D0`;
+- danger `#FF6F82`;
+- border `#27445D`.
 
-Cards use a 16 px outer radius, nested operational surfaces use 12 px, ordinary controls use 10 px. The layout collapses to one column below the current 800 px breakpoint.
+Cards use a 20 px outer radius, nested operational surfaces use 16 px, ordinary controls use 14 px. The layout collapses to one column below the current 800 px breakpoint.
 
 The Web surface must retain skip navigation, a focusable main landmark, visible focus, forced-colors behavior, live status/error semantics, operation busy state and plan-specific accessible names for repeated billing actions. Password requirements must be programmatically associated with the password field rather than existing only as an implicit validation rule.
 
@@ -93,16 +93,19 @@ Implementation anchors:
 - `app/src/main/java/com/alpha0/app/ui/AccessibilitySemantics.kt`
 - `app/src/main/java/com/alpha0/app/ui/CharacterDashboard.kt`
 
-Android deliberately retains its platform palette:
+Android uses the same semantic visual family as Web and Companion:
 
-- background `#0D1117`;
-- surface `#161B22`;
-- border `#30363D`;
-- primary `#B356FF`;
-- signal `#00E5FF`;
-- danger `#FF3366`;
-- primary text `#F0F6FC`;
-- secondary text `#8B949E`.
+- background `#07121F`;
+- surface `#0D1B2A`;
+- raised surface `#13263A`;
+- border `#27445D`;
+- primary `#70DBFF`;
+- signal `#5BE3D0`;
+- danger `#FF6F82`;
+- primary text `#F1F8FC`;
+- secondary text `#9EB4C5`.
+
+The shared Compose card radius is 20 dp and action radius is 16 dp. Decorative scan-line/HUD motion is intentionally absent from the shared card primitive.
 
 Typography roles are Outfit for display, Inter for body and JetBrains Mono for data. `StatusBadge`, `SentinelCard`, `PrimaryButton`, `DangerButton` and accessibility semantic modifiers are the reusable Compose anchors.
 
@@ -116,7 +119,7 @@ Implementation anchors:
 - `launcher/renderer.js`
 - `launcher/overlay.html`
 
-The launcher shares the Web operational palette and interaction language. It must retain skip navigation, visible focus, live status regions, forced-colors support, explicit disabled states and an `aria-busy` operation boundary for account work. Routine status changes remain polite; bounded runtime failures that require immediate user awareness are promoted to assertive alert semantics and return to polite status semantics on the next normal update.
+The launcher shares the Web naval/cyan/teal palette, the shield/S/radar identity, and the same interaction language. It must retain skip navigation, visible focus, live status regions, forced-colors support, explicit disabled states and an `aria-busy` operation boundary for account work. Routine status changes remain polite; bounded runtime failures that require immediate user awareness are promoted to assertive alert semantics and return to polite status semantics on the next normal update.
 
 The overlay is a distinct transparent presentation surface. It is click-through/read-only, announces presentation changes politely, accepts only sanitized presentation state from the trusted runtime path, and must not visually imply game-write authority.
 

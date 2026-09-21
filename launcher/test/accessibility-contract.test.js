@@ -12,7 +12,7 @@ test('launcher exposes keyboard and landmark accessibility contract', () => {
   assert.match(index, /<html lang="en">/);
   assert.match(index, /class="skip-link" href="#main-content"/);
   assert.match(index, /<main id="main-content" tabindex="-1">/);
-  assert.match(index, /:focus-visible\{outline:3px solid #4ca3ff/);
+  assert.match(index, /:focus-visible\{outline:3px solid #70dbff/);
   assert.match(index, /@media\(forced-colors:active\)/);
 });
 

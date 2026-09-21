@@ -12,10 +12,13 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +45,13 @@ fun SentinelTopBar(
     val strings = LocalAppStrings.current
     var expanded by remember { mutableStateOf(false) }
     TopAppBar(
-        title = { Text(title) },
+        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.onBackground,
+            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
         navigationIcon = {
             if (canGoBack) {
                 IconButton(onClick = onBack) {
@@ -77,7 +86,10 @@ fun SentinelTopBar(
 @Composable
 fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
     val strings = LocalAppStrings.current
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         PrimaryDestinations.forEach { destination ->
             val icon = when (destination.route) {
                 "home" -> Icons.Default.Home
@@ -90,6 +102,13 @@ fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
                 onClick = { onNavigate(destination.route) },
                 icon = { Icon(icon, contentDescription = null) },
                 label = { Text(strings.text(destination.labelKey)) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondary,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    indicatorColor = MaterialTheme.colorScheme.secondary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
             )
         }
     }

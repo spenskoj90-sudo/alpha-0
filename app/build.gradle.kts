@@ -23,6 +23,30 @@ val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .get()
     .trim()
 val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
+val canonicalVersionCode = 10007
+val physicalTestVersionCodeRaw = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_VERSION_CODE")
+    .orElse(canonicalVersionCode.toString())
+    .get()
+    .trim()
+val physicalTestVersionCode = physicalTestVersionCodeRaw.toIntOrNull()
+    ?: error("SENTINEL_PHYSICAL_TEST_VERSION_CODE must be a positive integer")
+if (physicalTestVersionCode <= 0) {
+    error("SENTINEL_PHYSICAL_TEST_VERSION_CODE must be a positive integer")
+}
+val physicalTestKeystorePath = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_KEYSTORE_PATH").orNull?.trim().orEmpty()
+val physicalTestKeystorePassword = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD").orNull.orEmpty()
+val physicalTestKeyAlias = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_KEY_ALIAS").orNull.orEmpty()
+val physicalTestKeyPassword = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_KEY_PASSWORD").orNull.orEmpty()
+val physicalTestSigningValues = listOf(
+    physicalTestKeystorePath,
+    physicalTestKeystorePassword,
+    physicalTestKeyAlias,
+    physicalTestKeyPassword,
+)
+val physicalTestStableSigningConfigured = physicalTestSigningValues.all { it.isNotEmpty() }
+if (physicalTestSigningValues.any { it.isNotEmpty() } && !physicalTestStableSigningConfigured) {
+    error("Physical-test signing must provide path, store password, alias, and key password together")
+}
 val vkClientId = providers.environmentVariable("SENTINEL_VK_CLIENT_ID")
     .orElse("0")
     .get()
@@ -81,9 +105,9 @@ android {
         applicationId = "com.alpha0.app"
         minSdk = 29
         targetSdk = 36
-        // Monotonic application identity. Increment for every installable update;
-        // Android rejects an in-place replacement that does not advance this value.
-        versionCode = 10007
+        // Production remains explicitly versioned in source. Physical-test builds
+        // receive a workflow-monotonic code so Android can replace the prior test APK.
+        versionCode = if (physicalTestRequested) physicalTestVersionCode else canonicalVersionCode
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
@@ -106,6 +130,7 @@ android {
 
     signingConfigs {
         create("ciRelease")
+        create("physicalTestStable")
     }
 
     buildTypes {
@@ -129,6 +154,9 @@ android {
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "16777216")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
             buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"diagnostic\"")
+            if (physicalTestStableSigningConfigured) {
+                signingConfig = signingConfigs.getByName("physicalTestStable")
+            }
             // Render free-tier staging may need roughly a minute to wake. The
             // physical build must wait for the authoritative POST response so
             // registration cannot succeed server-side while the UI reports a
@@ -150,6 +178,14 @@ android {
             manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth"
             buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth\"")
         }
+    }
+
+    if (physicalTestStableSigningConfigured) {
+        val physicalTestStable = android.signingConfigs.getByName("physicalTestStable")
+        physicalTestStable.storeFile = file(physicalTestKeystorePath)
+        physicalTestStable.storePassword = physicalTestKeystorePassword
+        physicalTestStable.keyAlias = physicalTestKeyAlias
+        physicalTestStable.keyPassword = physicalTestKeyPassword
     }
 
     val androidKeystorePath = providers.environmentVariable("ANDROID_KEYSTORE_PATH")

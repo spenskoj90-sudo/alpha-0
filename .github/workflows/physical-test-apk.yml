@@ -39,6 +39,16 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Establish monotonic physical-test version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          value=$((100000000 + GITHUB_RUN_NUMBER))
+          echo "SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value" >> "$GITHUB_ENV"
+
+      - name: Mark diagnostic signing mode
+        run: echo "SENTINEL_PHYSICAL_TEST_SIGNING_MODE=ephemeral-debug" >> "$GITHUB_ENV"
+
       - name: Run Android unit tests across configured variants
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
@@ -66,6 +76,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signing-mode "$SENTINEL_PHYSICAL_TEST_SIGNING_MODE" \
             --output physical-test-manifest.json
 
       - name: Hash physical-test APK

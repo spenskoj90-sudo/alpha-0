@@ -74,19 +74,21 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("enrollment.otpauthUri", security)
         self.assertIn('strings.text("open_authenticator")', security)
 
-    def test_onboarding_layout_cannot_be_stretched_by_decoration(self) -> None:
+    def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
-        self.assertIn(".matchParentSize()", self.tokens)
-        canvas = self.tokens.split("Canvas(", 1)[1]
-        self.assertNotIn(".fillMaxSize()", canvas.split(") {", 1)[0])
+        self.assertNotIn("Canvas(", self.tokens)
+        self.assertIn("RoundedCornerShape(20.dp)", self.tokens)
+        self.assertIn("Surface(", self.tokens)
 
     def test_update_center_uses_play_update_api_and_monotonic_version(self) -> None:
         self.assertIn("AppUpdateManagerFactory.create", self.update)
         self.assertIn("startUpdateFlowForResult", self.update)
         self.assertIn('implementation("com.google.android.play:app-update:2.1.0")', self.gradle)
-        version = re.search(r"versionCode\s*=\s*(\d+)", self.gradle)
+        version = re.search(r"canonicalVersionCode\s*=\s*(\d+)", self.gradle)
         self.assertIsNotNone(version)
         self.assertGreaterEqual(int(version.group(1)), 10007)
+        self.assertIn("SENTINEL_PHYSICAL_TEST_VERSION_CODE", self.gradle)
+        self.assertIn("physicalTestVersionCode", self.gradle)
 
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
@@ -144,10 +146,15 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_launcher_identity_is_explicit_and_branded(self) -> None:
         self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)
         self.assertIn('android:roundIcon="@mipmap/ic_launcher"', self.manifest)
-        self.assertIn("#0D1117", self.launcher)
-        self.assertIn("#B356FF", self.launcher)
-        self.assertIn("#00E5FF", self.launcher)
-        self.assertIn("#F0F6FC", self.launcher)
+        self.assertIn("#07121F", self.launcher)
+        self.assertIn("#10283D", self.launcher)
+        self.assertIn("#78E7FF", self.launcher)
+        self.assertIn("#6FD6FF", self.launcher)
+        self.assertIn("#5BE3D0", self.launcher)
+        adaptive = read("app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")
+        monochrome = read("app/src/main/res/drawable/ic_sentinel_launcher_monochrome.xml")
+        self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_monochrome"', adaptive)
+        self.assertIn("#FFFFFFFF", monochrome)
 
     def test_distribution_channels_keep_play_and_diagnostics_separate(self) -> None:
         self.assertIn('applicationIdSuffix = ".physicaltest"', self.gradle)

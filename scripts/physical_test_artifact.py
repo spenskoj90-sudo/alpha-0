@@ -79,12 +79,20 @@ def build_manifest(
     repository: str,
     run_id: str,
     run_attempt: str,
+    signing_mode: str = "ephemeral-debug",
+    workflow_name: str = "Physical Test APK",
     generated_at: str | None = None,
 ) -> dict[str, object]:
     require(SHA40.fullmatch(source_sha) is not None, "source SHA must be 40-character lowercase hex")
     require(repository == "spenskoj90-sudo/alpha-0", "physical-test artifact repository mismatch")
     require(run_id.isdigit() and int(run_id) > 0, "workflow run ID must be a positive integer")
     require(run_attempt.isdigit() and int(run_attempt) > 0, "workflow run attempt must be a positive integer")
+    require(signing_mode in {"stable-test", "ephemeral-debug"}, "invalid physical-test signing mode")
+    require(workflow_name in {"Physical Test APK", "Physical Test Update APK"}, "invalid physical-test workflow name")
+    require(
+        (signing_mode == "stable-test") == (workflow_name == "Physical Test Update APK"),
+        "stable-test signing must use the dedicated update workflow",
+    )
     origin = validate_staging_origin(api_base_url)
     canonical_version = version_file.read_text(encoding="utf-8").strip()
     require(bool(canonical_version), "canonical VERSION is empty")
@@ -97,11 +105,15 @@ def build_manifest(
         "repository": repository,
         "sourceSha": source_sha,
         "workflow": {
-            "name": "Physical Test APK",
+            "name": workflow_name,
             "runId": int(run_id),
             "runAttempt": int(run_attempt),
         },
-        "artifactName": f"sentinel-physical-test-apk-{source_sha}",
+        "artifactName": (
+            f"sentinel-physical-test-update-apk-{source_sha}"
+            if signing_mode == "stable-test"
+            else f"sentinel-physical-test-apk-{source_sha}"
+        ),
         "apk": {
             "fileName": apk.name,
             "sha256": hashlib.sha256(apk_bytes).hexdigest(),
@@ -116,6 +128,8 @@ def build_manifest(
         "apiEnvironment": "staging",
         "apiBaseUrl": origin,
         "runtimeEnvironment": "staging",
+        "signingMode": signing_mode,
+        "updateCompatible": signing_mode == "stable-test",
         "httpReadTimeoutMs": EXPECTED_HTTP_READ_TIMEOUT_MS,
         "coldStartAware": True,
         "diagnosticsMode": "FORENSIC_TEST",
@@ -133,6 +147,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--run-attempt", required=True)
+    parser.add_argument("--signing-mode", default="ephemeral-debug")
+    parser.add_argument("--workflow-name", default="Physical Test APK")
     parser.add_argument("--generated-at")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -150,6 +166,8 @@ def main() -> int:
             repository=args.repository,
             run_id=args.run_id,
             run_attempt=args.run_attempt,
+            signing_mode=args.signing_mode,
+            workflow_name=args.workflow_name,
             generated_at=args.generated_at,
         )
     except (OSError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:

@@ -1,0 +1,137 @@
+name: Physical Test Update APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact protected-main commit SHA to build"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: physical-test-update
+  cancel-in-progress: false
+
+env:
+  PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com
+
+jobs:
+  build-update-apk:
+    name: Build stable-signed physical test update APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Validate exact protected-main source
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "main"
+          case "$SOURCE_SHA" in
+            *[!0-9a-f]*|'') echo "source_sha must be lowercase hexadecimal"; exit 1 ;;
+          esac
+          test "${#SOURCE_SHA}" -eq 40
+          test "$GITHUB_SHA" = "$SOURCE_SHA"
+
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+
+      - name: Setup Java 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Establish monotonic physical-test version code
+        run: |
+          set -euo pipefail
+          value=$((100000000 + GITHUB_RUN_NUMBER))
+          echo "SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value" >> "$GITHUB_ENV"
+
+      - name: Decode dedicated physical-test keystore
+        env:
+          PHYSICAL_TEST_KEYSTORE_BASE64: ${{ secrets.PHYSICAL_TEST_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "$PHYSICAL_TEST_KEYSTORE_BASE64"
+          python - <<'PY'
+          import base64, os, pathlib
+          raw = os.environ["PHYSICAL_TEST_KEYSTORE_BASE64"]
+          compact = "".join(raw.split())
+          padded = compact + ("=" * (-len(compact) % 4))
+          data = base64.b64decode(padded, validate=True)
+          if not data:
+              raise SystemExit("decoded physical-test keystore is empty")
+          path = pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-physical-test.jks")
+          path.write_bytes(data)
+          PY
+          chmod 600 "$RUNNER_TEMP/sentinel-physical-test.jks"
+          echo "SENTINEL_PHYSICAL_TEST_KEYSTORE_PATH=$RUNNER_TEMP/sentinel-physical-test.jks" >> "$GITHUB_ENV"
+
+      - name: Build exact-SHA stable-signed physical-test APK
+        env:
+          SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
+          SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
+          SENTINEL_RUNTIME_ENVIRONMENT: staging
+          SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEYSTORE_PASSWORD }}
+          SENTINEL_PHYSICAL_TEST_KEY_ALIAS: ${{ secrets.PHYSICAL_TEST_KEY_ALIAS }}
+          SENTINEL_PHYSICAL_TEST_KEY_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD"
+          test -n "$SENTINEL_PHYSICAL_TEST_KEY_ALIAS"
+          test -n "$SENTINEL_PHYSICAL_TEST_KEY_PASSWORD"
+          ./gradlew --no-daemon test assemblePhysicalTest
+
+      - name: Verify update artifact identity
+        run: |
+          set -euo pipefail
+          python scripts/physical_test_artifact.py \
+            --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk \
+            --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json \
+            --version-file VERSION \
+            --source-sha "${{ inputs.source_sha }}" \
+            --api-base-url "$PHYSICAL_TEST_API_BASE_URL" \
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signing-mode stable-test \
+            --workflow-name "Physical Test Update APK" \
+            --output physical-test-manifest.json
+          test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
+
+      - name: Verify signer and hash APK
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
+          grep -q "Signer #1 certificate SHA-256 digest:" physical-test-signer.txt
+          sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
+
+      - name: Upload update-compatible exact-SHA APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sentinel-physical-test-update-apk-${{ inputs.source_sha }}
+          path: |
+            app/build/outputs/apk/physicalTest/app-physicalTest.apk
+            physical-test-apk.sha256
+            physical-test-manifest.json
+            physical-test-signer.txt
+          if-no-files-found: error
+          retention-days: 90

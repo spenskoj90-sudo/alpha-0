@@ -111,8 +111,8 @@ class DesignSystemContractTests(unittest.TestCase):
         typography = self.manifest["surfaces"]["android"]["typography"]
         for family in typography.values():
             self.assertIn(f'GoogleFont("{family}")', self.android)
-        self.assertIn("RoundedCornerShape(4.dp)", self.android)
-        self.assertIn("RoundedCornerShape(14.dp)", self.android)
+        self.assertIn("RoundedCornerShape(20.dp)", self.android)
+        self.assertIn("RoundedCornerShape(16.dp)", self.android)
         for component in ("StatusBadge", "SentinelCard", "PrimaryButton", "DangerButton"):
             self.assertIn(f"fun {component}(", self.android)
 
@@ -124,7 +124,7 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn('id="main-content"', self.launcher)
         self.assertGreaterEqual(self.launcher.count('aria-live="polite"'), 5)
         self.assertIn("@media(forced-colors:active)", self.launcher)
-        self.assertIn("outline:3px solid #4ca3ff", self.launcher)
+        self.assertIn("outline:3px solid #70dbff", self.launcher)
         self.assertIn("STOP / KILL SWITCH", self.launcher)
         self.assertIn("presentation-only", self.launcher)
         self.assertIn('id="account-panel"', self.launcher)
@@ -140,7 +140,7 @@ class DesignSystemContractTests(unittest.TestCase):
         overlay = self.manifest["surfaces"]["companion"]["overlay"]
         self.assertIn("pointer-events: none", self.overlay)
         self.assertIn('aria-live="polite"', self.overlay)
-        self.assertIn("background: rgba(8, 13, 18, .86)", self.overlay)
+        self.assertIn("background: rgba(7, 18, 31, .88)", self.overlay)
         self.assertIn("color: #eef3f7", self.overlay)
         self.assertEqual(overlay["pointerEvents"], "none")
         self.assertEqual(overlay["authority"], "presentation-only")

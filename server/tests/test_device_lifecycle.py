@@ -227,3 +227,67 @@ def test_foreign_session_cannot_refresh_device_challenge():
     )
     assert denied.status_code == 403
     assert denied.json()["code"] == "DEVICE_SCOPE_MISMATCH"
+
+
+def test_authenticated_rebind_same_active_key_reuses_device():
+    reset_store()
+    key = ec.generate_private_key(ec.SECP256R1())
+    first_access, _, first = bind_with_session(key, user_id="u1")
+
+    second_access, _, _, _ = store.issue_session(None, "u1", SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(
+        store,
+        second_access,
+        {"character:read", "game:read", "audit:read"},
+    )
+    public = key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    rebound = client.post(
+        "/v1/devices/bind",
+        headers={"Authorization": "Bearer " + second_access},
+        json={
+            "platform": "android",
+            "public_key_der_b64": base64.b64encode(public).decode(),
+            "fingerprint_sha256": hashlib.sha256(public).hexdigest(),
+        },
+    )
+
+    assert rebound.status_code == 200, rebound.text
+    assert rebound.json()["device_id"] == first["device_id"]
+    assert rebound.json()["challenge"] != first["challenge"]
+    assert store.get_session(first_access)["device_id"] == first["device_id"]
+    assert store.get_session(second_access)["device_id"] == first["device_id"]
+    if hasattr(store, "devices"):
+        assert len(store.devices) == 1
+
+
+def test_foreign_account_cannot_bind_existing_device_key():
+    reset_store()
+    key = ec.generate_private_key(ec.SECP256R1())
+    _, _, first = bind_with_session(key, user_id="u1")
+
+    foreign_access, _, _, _ = store.issue_session(None, "u2", SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    user_store.restrict_session_scopes(
+        store,
+        foreign_access,
+        {"character:read", "game:read", "audit:read"},
+    )
+    public = key.public_key().public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    denied = client.post(
+        "/v1/devices/bind",
+        headers={"Authorization": "Bearer " + foreign_access},
+        json={
+            "platform": "android",
+            "public_key_der_b64": base64.b64encode(public).decode(),
+            "fingerprint_sha256": hashlib.sha256(public).hexdigest(),
+        },
+    )
+
+    assert denied.status_code == 409
+    assert denied.json()["code"] == "DEVICE_KEY_CONFLICT"
+    assert store.get_device(first["device_id"])["user_id"] == "u1"

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
+import uuid
 
 import pytest
 
@@ -70,4 +71,39 @@ def test_postgres_concurrent_refresh_does_not_issue_multiple_valid_pairs():
     assert store.get_session(old_access) is None
     assert store.get_session(new_access) is not None
     assert store.rotate_refresh(old_refresh, 3600, 7200) is None
+    store.engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_device_rebind_is_idempotent_and_owner_scoped():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    suffix = uuid.uuid4().hex
+    user_id = f"pg-rebind-{suffix}"
+    fingerprint = (suffix * 2)[:64]
+    public_key = "cHVibGljLXJlYmluZC0" + suffix
+
+    first = store.register_device(
+        user_id,
+        "android",
+        public_key,
+        fingerprint,
+        "challenge-first",
+    )
+    second = store.register_device(
+        user_id,
+        "android",
+        public_key,
+        fingerprint,
+        "challenge-second",
+    )
+
+    assert second == first
+    with pytest.raises(ValueError, match="DEVICE_KEY_CONFLICT"):
+        store.register_device(
+            f"pg-rebind-foreign-{suffix}",
+            "android",
+            public_key,
+            fingerprint,
+            "challenge-foreign",
+        )
     store.engine.dispose()

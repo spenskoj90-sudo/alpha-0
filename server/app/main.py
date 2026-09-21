@@ -877,6 +877,27 @@ def rotate_account_recovery_codes(
     )
 
 
+def _register_device_binding(
+    user_id: str,
+    platform: str,
+    public_key_der_b64: str,
+    fingerprint: str,
+    challenge: str,
+) -> str:
+    try:
+        return store.register_device(
+            user_id,
+            platform,
+            public_key_der_b64,
+            fingerprint,
+            challenge,
+        )
+    except ValueError as exc:
+        if str(exc) == "DEVICE_KEY_CONFLICT":
+            raise HTTPException(status_code=409, detail="DEVICE_KEY_CONFLICT") from exc
+        raise
+
+
 @app.post("/v1/devices/register", response_model=DeviceRegisterResponse)
 def register_device(
     payload: DeviceRegisterRequest,
@@ -902,7 +923,7 @@ def register_device(
     if fingerprint.lower() != payload.fingerprint_sha256.lower():
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
     challenge = secrets.token_urlsafe(32)
-    device_id = store.register_device(user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    device_id = _register_device_binding(user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 
@@ -924,7 +945,7 @@ def bind_device(
     if fingerprint.lower() != payload.fingerprint_sha256.lower():
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
     challenge = secrets.token_urlsafe(32)
-    device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
+    device_id = _register_device_binding(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
     bind_session_to_device(token, device_id)
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND_SESSION_LINKED", "request_id": rid})
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)

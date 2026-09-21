@@ -106,10 +106,39 @@ class MemoryStore(Store):
         self.lock = Lock()
 
     def register_device(self, user_id, platform, public_key_b64, fingerprint, challenge):
-        device_id = str(uuid.uuid4())
         with self.lock:
-            self.devices[device_id] = {"user_id": user_id, "platform": platform, "public_key": public_key_b64, "fingerprint": fingerprint, "state": "ACTIVE", "key_version": 1, "last_sequence": -1}
-            self.challenges[session_hash(challenge)] = {"device_id": device_id, "expires_at": time.time() + 120, "consumed": False}
+            existing = next(
+                (
+                    (device_id, record)
+                    for device_id, record in self.devices.items()
+                    if str(record.get("fingerprint", "")).lower() == fingerprint.lower()
+                ),
+                None,
+            )
+            if existing is not None:
+                device_id, record = existing
+                if (
+                    record.get("user_id") != user_id
+                    or record.get("state") != "ACTIVE"
+                    or record.get("public_key") != public_key_b64
+                ):
+                    raise ValueError("DEVICE_KEY_CONFLICT")
+            else:
+                device_id = str(uuid.uuid4())
+                self.devices[device_id] = {
+                    "user_id": user_id,
+                    "platform": platform,
+                    "public_key": public_key_b64,
+                    "fingerprint": fingerprint,
+                    "state": "ACTIVE",
+                    "key_version": 1,
+                    "last_sequence": -1,
+                }
+            self.challenges[session_hash(challenge)] = {
+                "device_id": device_id,
+                "expires_at": time.time() + 120,
+                "consumed": False,
+            }
         return device_id
 
     def get_device(self, device_id):
@@ -378,11 +407,54 @@ class PostgresStore(Store):
         self.lock = Lock()
 
     def register_device(self, user_id, platform, public_key_b64, fingerprint, challenge):
-        device_id = str(uuid.uuid4())
+        candidate_id = str(uuid.uuid4())
         with self.engine.begin() as conn:
-            identity = conn.execute(text("INSERT INTO identities(user_handle) VALUES (:u) ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"), {"u": user_id}).scalar_one()
-            conn.execute(text("INSERT INTO device_bindings(id,identity_id,state,platform,public_key_der_b64,fingerprint_sha256,key_version) VALUES (:id,:uid,'ACTIVE',:platform,:key,:fp,1)"), {"id": device_id, "uid": identity, "platform": platform, "key": public_key_b64, "fp": fingerprint})
-            conn.execute(text("INSERT INTO device_challenges(device_id,nonce_hash,expires_at) VALUES (:id,:nonce,now()+interval '120 seconds')"), {"id": device_id, "nonce": session_hash(challenge)})
+            identity = conn.execute(
+                text(
+                    "INSERT INTO identities(user_handle) VALUES (:u) "
+                    "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle "
+                    "RETURNING id"
+                ),
+                {"u": user_id},
+            ).scalar_one()
+            device_id = conn.execute(
+                text(
+                    "INSERT INTO device_bindings("
+                    "id,identity_id,state,platform,public_key_der_b64,fingerprint_sha256,key_version"
+                    ") VALUES (:id,:uid,'ACTIVE',:platform,:key,:fp,1) "
+                    "ON CONFLICT (fingerprint_sha256) DO NOTHING "
+                    "RETURNING id::text"
+                ),
+                {
+                    "id": candidate_id,
+                    "uid": identity,
+                    "platform": platform,
+                    "key": public_key_b64,
+                    "fp": fingerprint,
+                },
+            ).scalar_one_or_none()
+            if device_id is None:
+                existing = conn.execute(
+                    text(
+                        "SELECT id::text AS device_id,identity_id,state,public_key_der_b64 "
+                        "FROM device_bindings WHERE fingerprint_sha256=:fp FOR UPDATE"
+                    ),
+                    {"fp": fingerprint},
+                ).mappings().one()
+                if (
+                    existing["identity_id"] != identity
+                    or existing["state"] != "ACTIVE"
+                    or existing["public_key_der_b64"] != public_key_b64
+                ):
+                    raise ValueError("DEVICE_KEY_CONFLICT")
+                device_id = str(existing["device_id"])
+            conn.execute(
+                text(
+                    "INSERT INTO device_challenges(device_id,nonce_hash,expires_at) "
+                    "VALUES (:id,:nonce,now()+interval '120 seconds')"
+                ),
+                {"id": device_id, "nonce": session_hash(challenge)},
+            )
         return device_id
 
     def get_device(self, device_id):

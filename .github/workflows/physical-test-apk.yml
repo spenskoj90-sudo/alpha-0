@@ -39,6 +39,47 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Establish monotonic physical-test version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          value=$((100000000 + GITHUB_RUN_NUMBER))
+          echo "SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value" >> "$GITHUB_ENV"
+
+      - name: Configure dedicated stable physical-test signing when available
+        shell: bash
+        env:
+          PHYSICAL_TEST_KEYSTORE_BASE64: ${{ secrets.PHYSICAL_TEST_KEYSTORE_BASE64 }}
+          PHYSICAL_TEST_KEYSTORE_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEYSTORE_PASSWORD }}
+          PHYSICAL_TEST_KEY_ALIAS: ${{ secrets.PHYSICAL_TEST_KEY_ALIAS }}
+          PHYSICAL_TEST_KEY_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          present=0
+          for value in "$PHYSICAL_TEST_KEYSTORE_BASE64" "$PHYSICAL_TEST_KEYSTORE_PASSWORD" "$PHYSICAL_TEST_KEY_ALIAS" "$PHYSICAL_TEST_KEY_PASSWORD"; do
+            if [ -n "$value" ]; then present=$((present + 1)); fi
+          done
+          if [ "$present" -eq 0 ]; then
+            echo "SENTINEL_PHYSICAL_TEST_SIGNING_MODE=ephemeral-debug" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          test "$present" -eq 4
+          python - <<'PY'
+          import base64, os, pathlib
+          raw = os.environ["PHYSICAL_TEST_KEYSTORE_BASE64"]
+          compact = "".join(raw.split())
+          padded = compact + ("=" * (-len(compact) % 4))
+          data = base64.b64decode(padded, validate=True)
+          if not data:
+              raise SystemExit("decoded physical-test keystore is empty")
+          path = pathlib.Path(os.environ["RUNNER_TEMP"], "sentinel-physical-test.jks")
+          path.write_bytes(data)
+          PY
+          chmod 600 "$RUNNER_TEMP/sentinel-physical-test.jks"
+          echo "SENTINEL_PHYSICAL_TEST_KEYSTORE_PATH=$RUNNER_TEMP/sentinel-physical-test.jks" >> "$GITHUB_ENV"
+          echo "SENTINEL_PHYSICAL_TEST_SIGNING_MODE=stable-test" >> "$GITHUB_ENV"
+
       - name: Run Android unit tests across configured variants
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
@@ -51,6 +92,9 @@ jobs:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
           SENTINEL_SOURCE_SHA: ${{ env.PHYSICAL_TEST_SOURCE_SHA }}
           SENTINEL_RUNTIME_ENVIRONMENT: staging
+          SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEYSTORE_PASSWORD }}
+          SENTINEL_PHYSICAL_TEST_KEY_ALIAS: ${{ secrets.PHYSICAL_TEST_KEY_ALIAS }}
+          SENTINEL_PHYSICAL_TEST_KEY_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assemblePhysicalTest
 
       - name: Verify compiled APK identity, staging binding, and production separation
@@ -66,6 +110,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signing-mode "$SENTINEL_PHYSICAL_TEST_SIGNING_MODE" \
             --output physical-test-manifest.json
 
       - name: Hash physical-test APK

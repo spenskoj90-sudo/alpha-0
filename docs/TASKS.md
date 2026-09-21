@@ -43,7 +43,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 
 ## External / Owner-gated evidence
 
-- [ ] Complete the Neon pre-release PostgreSQL 17→18 migration: the isolated PG18.6 target is schema-ready with exact migration/FORCE-RLS parity, but managed data import, target verification and staging connection cutover remain environment work; preserve the PG17 rollback source until acceptance completes.
+- [x] **Neon pre-release PostgreSQL 18 cutover.** On 2026-09-21 the staging Core was intentionally reset onto the prepared PostgreSQL 18.6 `sentinel-pre-release` database instead of importing the historical PG17 application dataset. The exact migration/FORCE-RLS baseline is preserved, the Render deployment reached `live`, and the former PG17 project is retained as `sentinel-pre-release-pg17-rollback` for rollback/evidence. Historical pre-release identities/users/devices/sessions are intentionally not part of the new baseline.
 - [ ] Exact WoW 3.3.5a/private-server L3 validation; capabilities remain `UNVERIFIED` until exercised in that environment.
 - [ ] Production Stripe credentials plus live account/price/webhook/network/payment acceptance, production PostHog/Resend account configuration where selected, production database/ingress configuration and signing-key custody.
 - [ ] Selected production STT/TTS provider credentials/network acceptance plus physical microphone/driver/acoustic-quality evidence on the release host.

@@ -1,33 +1,21 @@
 package com.alpha0.app.ui
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
@@ -36,14 +24,16 @@ import androidx.compose.ui.unit.dp
 import com.alpha0.app.R
 
 object SentinelColors {
-    val Background = Color(0xFF0D1117)
-    val Surface = Color(0xFF161B22)
-    val Border = Color(0xFF30363D)
-    val Primary = Color(0xFFB356FF)
-    val Signal = Color(0xFF00E5FF)
-    val Danger = Color(0xFFFF3366)
-    val TextPrimary = Color(0xFFF0F6FC)
-    val TextSecondary = Color(0xFF8B949E)
+    val Background = Color(0xFF07121F)
+    val Surface = Color(0xFF0D1B2A)
+    val SurfaceRaised = Color(0xFF13263A)
+    val Border = Color(0xFF27445D)
+    val Primary = Color(0xFF70DBFF)
+    val Signal = Color(0xFF5BE3D0)
+    val Success = Color(0xFF61D6A7)
+    val Danger = Color(0xFFFF6F82)
+    val TextPrimary = Color(0xFFF1F8FC)
+    val TextSecondary = Color(0xFF9EB4C5)
 }
 
 private val SentinelGoogleFontProvider = GoogleFont.Provider(
@@ -59,6 +49,7 @@ val SentinelDisplayFont = FontFamily(
 val SentinelBodyFont = FontFamily(
     Font(GoogleFont("Inter"), fontProvider = SentinelGoogleFontProvider, weight = FontWeight.Normal),
     Font(GoogleFont("Inter"), fontProvider = SentinelGoogleFontProvider, weight = FontWeight.Medium),
+    Font(GoogleFont("Inter"), fontProvider = SentinelGoogleFontProvider, weight = FontWeight.SemiBold),
 )
 val SentinelDataFont = FontFamily(
     Font(GoogleFont("JetBrains Mono"), fontProvider = SentinelGoogleFontProvider, weight = FontWeight.Normal),
@@ -66,16 +57,26 @@ val SentinelDataFont = FontFamily(
 
 @Composable
 fun DataText(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier, style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
 fun StatusBadge(text: String, active: Boolean = true, modifier: Modifier = Modifier) {
     val color = if (active) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.error
-    Surface(modifier = modifier, color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(50)) {
+    Surface(
+        modifier = modifier,
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.24f)),
+    ) {
         Text(
-            text = text.uppercase(),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            text = text,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
             color = color,
             style = MaterialTheme.typography.labelLarge,
         )
@@ -88,51 +89,19 @@ fun SentinelCard(
     scan: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(4.dp)
-    val primaryColor = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shape),
+    val borderColor = if (scan) {
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.72f)
+    }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, borderColor),
     ) {
-        Box(modifier = Modifier.padding(start = 10.dp, top = 16.dp, end = 16.dp, bottom = 16.dp), content = content)
-
-        var scanHeightPx by remember { mutableStateOf(0) }
-        var started by remember { mutableStateOf(false) }
-        val progress = remember { Animatable(0f) }
-        if (scan) {
-            LaunchedEffect(scanHeightPx) {
-                if (scanHeightPx > 0 && !started) {
-                    started = true
-                    progress.snapTo(0f)
-                    progress.animateTo(1f, animationSpec = tween(1000))
-                }
-            }
-        }
-
-        Canvas(
-            modifier = Modifier
-                .matchParentSize()
-                .onSizeChanged { scanHeightPx = it.height },
-        ) {
-            if (scan && progress.value < 1f) {
-                drawLine(
-                    color = primaryColor,
-                    start = Offset(0f, size.height * progress.value),
-                    end = Offset(size.width, size.height * progress.value),
-                    strokeWidth = 1.dp.toPx(),
-                    alpha = 0.9f,
-                )
-            }
-            drawLine(
-                color = primaryColor,
-                start = Offset(1.dp.toPx(), 0f),
-                end = Offset(1.dp.toPx(), size.height),
-                strokeWidth = 2.dp.toPx(),
-            )
-        }
+        Box(modifier = Modifier.padding(20.dp), content = content)
     }
 }
 
@@ -144,14 +113,17 @@ fun PrimaryButton(
     enabled: Boolean = true,
     content: @Composable (() -> Unit)? = null,
 ) {
-    androidx.compose.material3.Button(
+    Button(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
     ) {
-        content?.invoke() ?: Text(text)
+        content?.invoke() ?: Text(text, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -159,10 +131,12 @@ fun PrimaryButton(
 fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = 52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.72f)),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-    ) { Text(text) }
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge)
+    }
 }

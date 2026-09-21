@@ -32,14 +32,16 @@ app/build.gradle.kts now supports a dedicated test signing config through:
 - SENTINEL_PHYSICAL_TEST_KEY_ALIAS
 - SENTINEL_PHYSICAL_TEST_KEY_PASSWORD
 
-The Physical Test APK workflow accepts matching GitHub Actions secrets:
+The routine `Physical Test APK` workflow remains deliberately secret-free and emits `signingMode=ephemeral-debug` / `updateCompatible=false`.
+
+The separate Owner-dispatched `Physical Test Update APK` workflow accepts these dedicated test-only GitHub Actions secrets:
 
 - PHYSICAL_TEST_KEYSTORE_BASE64
 - PHYSICAL_TEST_KEYSTORE_PASSWORD
 - PHYSICAL_TEST_KEY_ALIAS
 - PHYSICAL_TEST_KEY_PASSWORD
 
-If these secrets are absent, CI may still build an ephemeral-debug artifact for validation, but its manifest explicitly reports updateCompatible=false; it must not be handed to the Owner as an in-place-update candidate.
+If these secrets are absent, the routine CI workflow still builds an ephemeral-debug artifact for validation, but its manifest explicitly reports `updateCompatible=false`; it must not be handed to the Owner as an in-place-update candidate. The stable-update workflow fails closed if its dedicated signing material is unavailable.
 
 ## One-time migration consequence
 

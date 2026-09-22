@@ -74,6 +74,22 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("enrollment.otpauthUri", security)
         self.assertIn('strings.text("open_authenticator")', security)
 
+
+    def test_runtime_session_refresh_and_mfa_revocation_fail_closed(self) -> None:
+        transport = read("app/src/main/java/com/alpha0/app/net/HttpTransport.kt")
+        security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        self.assertIn("class SessionRefreshingHttpTransport", transport)
+        self.assertIn('url = "$normalizedBaseUrl/v1/sessions/refresh"', transport)
+        self.assertIn("if (first.status != 401) return first", transport)
+        self.assertIn("onSessionInvalidated()", transport)
+        self.assertIn("sessionSignals.collect", self.main)
+        self.assertIn('navController.navigate("mfa-recovery-codes")', self.main)
+        self.assertIn("sessionStore.clear(activity)", self.main)
+        self.assertIn("activeSession = null", self.main)
+        self.assertIn("MfaRecoveryCodesScreen", security)
+        self.assertIn("onMfaEnabled(result.codes)", security)
+        self.assertNotIn("mfaSessionRevoked", security)
+
     def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
         self.assertNotIn("Canvas(", self.tokens)

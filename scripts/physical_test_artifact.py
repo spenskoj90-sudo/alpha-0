@@ -80,9 +80,9 @@ def build_manifest(
     repository: str,
     run_id: str,
     run_attempt: str,
+    signer_sha256: str = "",
     signing_mode: str = "ephemeral-debug",
     workflow_name: str = "Physical Test APK",
-    signer_sha256: str,
     expected_signer_sha256: str = "",
     generated_at: str | None = None,
 ) -> dict[str, object]:

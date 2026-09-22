@@ -68,4 +68,31 @@ class DeviceApiTest {
         assertEquals("application/json", request.headers["Content-Type"])
         assertTrue(String(requireNotNull(request.body)).contains("fingerprint"))
     }
+
+    @Test
+    fun rotationRecoveryIsUnauthenticatedAndDoesNotCreateASecondBinding() {
+        var captured: HttpRequest? = null
+        val transport = object : HttpTransport {
+            override fun execute(request: HttpRequest): HttpResponse {
+                captured = request
+                return HttpResponse(
+                    200,
+                    "{\"device_id\":\"device-rotated\",\"state\":\"ACTIVE\",\"challenge\":\"fresh-challenge\"}",
+                )
+            }
+        }
+
+        val result = DeviceApi("https://example.test/", transport).recoverRotation(
+            publicKeyDerB64 = "public-key",
+            fingerprintSha256 = "fingerprint",
+        )
+
+        assertTrue(result is DeviceApi.Result.Success)
+        val request = requireNotNull(captured)
+        assertEquals(HttpMethod.POST, request.method)
+        assertEquals("https://example.test/v1/devices/recover", request.url)
+        assertEquals(null, request.headers["Authorization"])
+        assertTrue(String(requireNotNull(request.body)).contains("fingerprint"))
+    }
+
 }

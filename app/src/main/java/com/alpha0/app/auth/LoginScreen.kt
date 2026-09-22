@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,7 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,13 +30,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.R
+import com.alpha0.app.ui.GhostButton
 import com.alpha0.app.ui.LocalAppStrings
+import com.alpha0.app.ui.SecondaryButton
 import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.progressStatusSemantics
 import kotlinx.coroutines.launch
@@ -324,8 +329,15 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(strings.text("app_name"), style = MaterialTheme.typography.headlineLarge)
+            Icon(
+                painter = painterResource(R.drawable.ic_sentinel_brand_mark),
+                contentDescription = null,
+                modifier = Modifier.size(88.dp),
+                tint = androidx.compose.ui.graphics.Color.Unspecified,
+            )
+            Text(strings.text("app_name"), style = MaterialTheme.typography.headlineMedium)
             Text(
                 strings.text(
                     when (mode) {
@@ -451,25 +463,13 @@ fun LoginScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (providerStatuses.any { it.provider == "google" }) {
-                    OutlinedButton(
-                        onClick = ::signInWithGoogle,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    ) { Text(strings.text("continue_google")) }
+                    SecondaryButton(strings.text("continue_google"), ::signInWithGoogle, Modifier.fillMaxWidth(), !busy)
                 }
                 if (providerStatuses.any { it.provider == "telegram" }) {
-                    OutlinedButton(
-                        onClick = { openBrowserProvider("telegram") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    ) { Text(strings.text("continue_telegram")) }
+                    SecondaryButton(strings.text("continue_telegram"), { openBrowserProvider("telegram") }, Modifier.fillMaxWidth(), !busy)
                 }
                 if (providerStatuses.any { it.provider == "vk" }) {
-                    OutlinedButton(
-                        onClick = { openBrowserProvider("vk") },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    ) { Text(strings.text("continue_vk")) }
+                    SecondaryButton(strings.text("continue_vk"), { openBrowserProvider("vk") }, Modifier.fillMaxWidth(), !busy)
                 }
                 Text(
                     strings.text("federated_privacy"),
@@ -480,12 +480,14 @@ fun LoginScreen(
 
             when (mode) {
                 AuthMode.SIGN_IN -> {
-                    OutlinedButton(
+                    GhostButton(
+                        text = strings.text("new_account"),
                         onClick = { mode = AuthMode.REGISTER; error = null; status = null },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !busy,
-                    ) { Text(strings.text("new_account")) }
-                    OutlinedButton(
+                    )
+                    GhostButton(
+                        text = strings.text("forgot_password"),
                         onClick = {
                             mode = AuthMode.RESET
                             resetCodeRequested = false
@@ -496,14 +498,16 @@ fun LoginScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !busy,
-                    ) { Text(strings.text("forgot_password")) }
+                    )
                 }
-                AuthMode.REGISTER -> OutlinedButton(
+                AuthMode.REGISTER -> GhostButton(
+                    text = strings.text("existing_account"),
                     onClick = { mode = AuthMode.SIGN_IN; error = null; status = null },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !busy,
-                ) { Text(strings.text("existing_account")) }
-                AuthMode.RESET -> OutlinedButton(
+                )
+                AuthMode.RESET -> GhostButton(
+                    text = strings.text("back_to_sign_in"),
                     onClick = {
                         mode = AuthMode.SIGN_IN
                         resetCodeRequested = false
@@ -514,8 +518,9 @@ fun LoginScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !busy,
-                ) { Text(strings.text("back_to_sign_in")) }
-                AuthMode.MFA -> OutlinedButton(
+                )
+                AuthMode.MFA -> GhostButton(
+                    text = strings.text("back_to_sign_in"),
                     onClick = {
                         mfaChallenge = null
                         actionCode = ""
@@ -525,9 +530,10 @@ fun LoginScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !busy,
-                ) { Text(strings.text("back_to_sign_in")) }
+                )
                 AuthMode.VERIFY_EMAIL -> {
-                    OutlinedButton(
+                    GhostButton(
+                        text = strings.text("resend_code"),
                         onClick = {
                             busy = true
                             error = null
@@ -541,14 +547,13 @@ fun LoginScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !busy,
-                    ) { Text(strings.text("resend_code")) }
-                    OutlinedButton(
-                        onClick = {
-                            pendingSession?.let(onAuthenticated) ?: run { mode = AuthMode.SIGN_IN }
-                        },
+                    )
+                    GhostButton(
+                        text = strings.text("verify_later"),
+                        onClick = { pendingSession?.let(onAuthenticated) ?: run { mode = AuthMode.SIGN_IN } },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !busy,
-                    ) { Text(strings.text("verify_later")) }
+                    )
                 }
             }
         }

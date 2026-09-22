@@ -75,7 +75,9 @@ jobs:
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$apksigner"
           "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
-          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
+          signer_line="$(grep -im1 'certificate SHA-256 digest' physical-test-signer.txt || true)"
+          test -n "$signer_line"
+          signer_sha256="$(printf '%s' "$signer_line" | sed -E 's/^.*digest:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
           case "$signer_sha256" in
             *[!0-9a-f]*|'') echo "invalid signer certificate SHA-256"; exit 1 ;;
           esac

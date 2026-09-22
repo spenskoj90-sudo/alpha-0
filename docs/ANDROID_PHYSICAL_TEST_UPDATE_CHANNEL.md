@@ -46,3 +46,14 @@ If these secrets are absent, the routine CI workflow still builds an ephemeral-d
 ## One-time migration consequence
 
 The already-installed APK was signed by an ephemeral key whose private material is no longer available. The first transition to the stable physical-test signer therefore requires one uninstall/reinstall. After that one-time transition, future physical-test APKs can update in place as long as the dedicated test signer is retained and the versionCode continues to increase.
+
+
+## Signer continuity pin
+
+The stable physical-test update workflow is fail-closed against a non-secret repository variable:
+
+- `PHYSICAL_TEST_SIGNER_SHA256` — lowercase 64-hex SHA-256 fingerprint of the dedicated test-only signing certificate.
+
+The workflow extracts the actual certificate fingerprint with Android `apksigner` and requires exact equality before `signerLineageVerified=true` and `updateCompatible=true` can be emitted. Replacing or rotating the test keystore without deliberately updating this pin therefore cannot silently produce an in-place-update claim.
+
+The routine secret-free diagnostic Physical Test APK also records its actual signer fingerprint, but remains `signingMode=ephemeral-debug` and `updateCompatible=false`. Production signing material is forbidden for this channel.

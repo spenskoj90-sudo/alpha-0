@@ -17,6 +17,7 @@ concurrency:
 
 env:
   PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com
+  PHYSICAL_TEST_EXPECTED_SIGNER_SHA256: ${{ vars.PHYSICAL_TEST_SIGNER_SHA256 }}
 
 jobs:
   build-update-apk:
@@ -30,11 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "main"
-          case "$SOURCE_SHA" in
-            *[!0-9a-f]*|'') echo "source_sha must be lowercase hexadecimal"; exit 1 ;;
-          esac
+          case "$SOURCE_SHA" in *[!0-9a-f]*|'') echo "source_sha must be lowercase hexadecimal"; exit 1 ;; esac
           test "${#SOURCE_SHA}" -eq 40
           test "$GITHUB_SHA" = "$SOURCE_SHA"
+
+      - name: Validate pinned physical-test signer lineage
+        run: |
+          set -euo pipefail
+          signer="$(printf '%s' "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          case "$signer" in *[!0-9a-f]*|'') echo "PHYSICAL_TEST_SIGNER_SHA256 repository variable must be 64-character hexadecimal"; exit 1 ;; esac
+          test "${#signer}" -eq 64
+          echo "PHYSICAL_TEST_EXPECTED_SIGNER_SHA256=$signer" >> "$GITHUB_ENV"
 
       - name: Checkout exact source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -96,24 +103,7 @@ jobs:
           test -n "$SENTINEL_PHYSICAL_TEST_KEY_PASSWORD"
           ./gradlew --no-daemon test assemblePhysicalTest
 
-      - name: Verify update artifact identity
-        run: |
-          set -euo pipefail
-          python scripts/physical_test_artifact.py \
-            --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk \
-            --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json \
-            --version-file VERSION \
-            --source-sha "${{ inputs.source_sha }}" \
-            --api-base-url "$PHYSICAL_TEST_API_BASE_URL" \
-            --repository "$GITHUB_REPOSITORY" \
-            --run-id "$GITHUB_RUN_ID" \
-            --run-attempt "$GITHUB_RUN_ATTEMPT" \
-            --signing-mode stable-test \
-            --workflow-name "Physical Test Update APK" \
-            --output physical-test-manifest.json
-          test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
-
-      - name: Verify signer and hash APK
+      - name: Verify stable signer lineage and hash APK
         run: |
           set -euo pipefail
           sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
@@ -121,8 +111,21 @@ jobs:
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$apksigner"
           "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
-          grep -q "Signer #1 certificate SHA-256 digest:" physical-test-signer.txt
+          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
+          case "$signer_sha256" in *[!0-9a-f]*|'') echo "invalid signer certificate SHA-256"; exit 1 ;; esac
+          test "${#signer_sha256}" -eq 64
+          test "$signer_sha256" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"
+          echo "SENTINEL_PHYSICAL_TEST_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
           sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
+
+      - name: Verify update artifact identity and signer lineage
+        run: |
+          set -euo pipefail
+          python scripts/physical_test_artifact.py             --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk             --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json             --version-file VERSION             --source-sha "${{ inputs.source_sha }}"             --api-base-url "$PHYSICAL_TEST_API_BASE_URL"             --repository "$GITHUB_REPOSITORY"             --run-id "$GITHUB_RUN_ID"             --run-attempt "$GITHUB_RUN_ATTEMPT"             --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"             --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"             --signing-mode stable-test             --workflow-name "Physical Test Update APK"             --output physical-test-manifest.json
+          test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
+          test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["signerLineageVerified"]).lower())')" = "true"
+          test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"
+          test "$(cut -d ' ' -f 1 physical-test-apk.sha256)" = "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["apk"]["sha256"])')"
 
       - name: Upload update-compatible exact-SHA APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

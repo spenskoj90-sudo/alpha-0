@@ -32,7 +32,7 @@ app/build.gradle.kts now supports a dedicated test signing config through:
 - SENTINEL_PHYSICAL_TEST_KEY_ALIAS
 - SENTINEL_PHYSICAL_TEST_KEY_PASSWORD
 
-The routine `Physical Test APK` workflow remains deliberately secret-free and emits `signingMode=ephemeral-debug` / `updateCompatible=false`.
+The routine `Physical Test APK` workflow remains deliberately secret-free and emits `signingMode=ephemeral-debug` / `updateCompatible=false`. It also records the actual APK signer certificate SHA-256 in `physical-test-signer.txt` and `signerCertificateSha256` so incompatible diagnostic builds are observable rather than inferred.
 
 The separate Owner-dispatched `Physical Test Update APK` workflow accepts these dedicated test-only GitHub Actions secrets:
 
@@ -41,7 +41,13 @@ The separate Owner-dispatched `Physical Test Update APK` workflow accepts these 
 - PHYSICAL_TEST_KEY_ALIAS
 - PHYSICAL_TEST_KEY_PASSWORD
 
-If these secrets are absent, the routine CI workflow still builds an ephemeral-debug artifact for validation, but its manifest explicitly reports `updateCompatible=false`; it must not be handed to the Owner as an in-place-update candidate. The stable-update workflow fails closed if its dedicated signing material is unavailable.
+In addition, the Owner must configure the non-secret repository variable:
+
+- `PHYSICAL_TEST_SIGNER_SHA256` — the lowercase 64-hex SHA-256 fingerprint of the dedicated physical-test certificate.
+
+The workflow extracts the actual signer fingerprint with Android `apksigner`, requires exact equality with that pinned variable, and only then allows the manifest to set `signerLineageVerified=true` and `updateCompatible=true`. Replacing or rotating the test keystore without deliberately updating this pinned lineage causes the build to fail closed instead of producing a falsely compatible artifact.
+
+If these secrets or the pinned signer fingerprint variable are absent, the routine CI workflow still builds an ephemeral-debug artifact for validation, but its manifest explicitly reports `updateCompatible=false`; it must not be handed to the Owner as an in-place-update candidate. The stable-update workflow fails closed if its dedicated signing material or pinned lineage is unavailable or inconsistent.
 
 ## One-time migration consequence
 

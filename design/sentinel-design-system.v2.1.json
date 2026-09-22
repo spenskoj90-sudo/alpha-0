@@ -1,17 +1,6 @@
 {
   "schema": "sentinel.design-system.v2.1",
-  "status": [
-    "VERIFIED",
-    "ACTIVE",
-    "PENDING",
-    "WARNING",
-    "DENIED",
-    "REVOKED",
-    "FAILED",
-    "UNKNOWN",
-    "UNAVAILABLE",
-    "STOPPED"
-  ],
+  "status": "ACTIVE",
   "direction": "calm security instrumentation",
   "ownerApprovedIdentity": "shield-S-signal depth mark",
   "auditedBaseSha": "613211b5bf61dd1a7f01dc7586edb6cbd5da173a",
@@ -166,5 +155,17 @@
     "minDesktopTargetPx": 44,
     "dynamicTextPercent": 200,
     "webNarrowPx": 320
-  }
+  },
+  "semanticStatuses": [
+    "VERIFIED",
+    "ACTIVE",
+    "PENDING",
+    "WARNING",
+    "DENIED",
+    "REVOKED",
+    "FAILED",
+    "UNKNOWN",
+    "UNAVAILABLE",
+    "STOPPED"
+  ]
 }

@@ -33,7 +33,7 @@ class DesignSystemContractTests(unittest.TestCase):
 
     def test_semantic_status_model_is_explicit(self) -> None:
         expected = {"VERIFIED","ACTIVE","PENDING","WARNING","DENIED","REVOKED","FAILED","UNKNOWN","UNAVAILABLE","STOPPED"}
-        self.assertEqual(set(self.manifest["status"]), expected)
+        self.assertEqual(set(self.manifest["semanticStatuses"]), expected)
         self.assertIn("enum class SentinelStatus", self.android)
         for status in expected:
             self.assertIn(status, self.android)

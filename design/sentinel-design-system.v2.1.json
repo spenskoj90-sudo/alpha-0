@@ -1,0 +1,170 @@
+{
+  "schema": "sentinel.design-system.v2.1",
+  "status": [
+    "VERIFIED",
+    "ACTIVE",
+    "PENDING",
+    "WARNING",
+    "DENIED",
+    "REVOKED",
+    "FAILED",
+    "UNKNOWN",
+    "UNAVAILABLE",
+    "STOPPED"
+  ],
+  "direction": "calm security instrumentation",
+  "ownerApprovedIdentity": "shield-S-signal depth mark",
+  "auditedBaseSha": "613211b5bf61dd1a7f01dc7586edb6cbd5da173a",
+  "figma": {
+    "fileKey": "vRIHsesWZNMEEEjNJu8TjB",
+    "url": "https://www.figma.com/design/vRIHsesWZNMEEEjNJu8TjB",
+    "liveInventoryStatus": "FOUNDATIONS_ONLY",
+    "foundationPageNodeId": "0:1",
+    "foundationFrameNodeId": "1:4",
+    "writeStatus": "PENDING_CONNECTOR_LIMIT"
+  },
+  "colors": {
+    "dark": {
+      "background": "#061018",
+      "surface": "#0D1B29",
+      "surfaceRaised": "#13263A",
+      "surfaceSunken": "#091722",
+      "border": "#29485F",
+      "borderStrong": "#3A627D",
+      "primary": "#2DD4FF",
+      "signal": "#00E0C2",
+      "success": "#22C55E",
+      "warning": "#F59E0B",
+      "danger": "#F43F5E",
+      "textPrimary": "#E6F1F7",
+      "textSecondary": "#A6B7C5",
+      "textTertiary": "#7F95A4",
+      "disabled": "#657783",
+      "focus": "#91E7FF"
+    },
+    "light": {
+      "background": "#F4F8FB",
+      "surface": "#FFFFFF",
+      "surfaceRaised": "#EAF1F6",
+      "surfaceSunken": "#E2EBF1",
+      "border": "#B8C8D3",
+      "borderStrong": "#8299A8",
+      "primary": "#006C88",
+      "signal": "#0B6F67",
+      "success": "#147251",
+      "warning": "#9A5A00",
+      "danger": "#B4233A",
+      "textPrimary": "#10202B",
+      "textSecondary": "#506875",
+      "textTertiary": "#6C7F8B",
+      "disabled": "#8A9AA4",
+      "focus": "#006D8F"
+    }
+  },
+  "typography": {
+    "display": "Onest",
+    "ui": "Inter",
+    "data": "JetBrains Mono"
+  },
+  "spacing": [
+    0,
+    4,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64
+  ],
+  "shapes": {
+    "card": 18,
+    "control": 12,
+    "modal": 22,
+    "badge": 8,
+    "navigationIndicator": 10,
+    "dialog": 24
+  },
+  "motion": {
+    "fastMs": 120,
+    "standardMs": 180,
+    "slowMs": 240,
+    "reducedMotion": true,
+    "decorativeLooping": false
+  },
+  "components": {
+    "PrimaryButton": "PrimaryButton",
+    "SecondaryButton": "SecondaryButton",
+    "GhostButton": "GhostButton",
+    "DangerButton": "DangerButton",
+    "StatusBadge": "StatusBadge(SentinelStatus)",
+    "SecurityCard": "SentinelCardKind.SECURITY",
+    "DeviceCard": "SentinelCardKind.DEVICE",
+    "OperationalCard": "SentinelCardKind.OPERATIONAL",
+    "RecommendationCard": "SentinelCardKind.RECOMMENDATION"
+  },
+  "surfaces": {
+    "android": {
+      "navigation": [
+        "Home",
+        "Games",
+        "Security",
+        "Activity"
+      ],
+      "homeOrder": [
+        "Account",
+        "Device",
+        "Required action",
+        "Game access",
+        "Recent activity",
+        "Support"
+      ],
+      "security": [
+        "Account security",
+        "Multi-factor authentication",
+        "Recovery",
+        "Sessions",
+        "Device identity",
+        "Linked providers"
+      ]
+    },
+    "web": {
+      "breakpoints": [
+        "wide",
+        "laptop",
+        "tablet",
+        "narrow"
+      ],
+      "decorativeGrid": false,
+      "ambientRadial": false
+    },
+    "companion": {
+      "sections": [
+        "Overview",
+        "Account",
+        "Runtime",
+        "Host configuration",
+        "Games",
+        "Voice",
+        "Diagnostics"
+      ],
+      "overlayAuthority": "presentation-only"
+    }
+  },
+  "authority": {
+    "serverState": "authoritative",
+    "recommendation": "observational-only",
+    "overlay": "presentation-only",
+    "voiceActionCapable": false,
+    "unknownIsHealthy": false
+  },
+  "acceptance": {
+    "noColorOnlyStatus": true,
+    "minAndroidTouchDp": 48,
+    "minDesktopTargetPx": 44,
+    "dynamicTextPercent": 200,
+    "webNarrowPx": 320
+  }
+}

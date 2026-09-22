@@ -791,7 +791,7 @@ class PostgresStore(Store):
                     "s.refresh_expires_at,s.refresh_used_at,s.revoked_at,i.id identity_id,d.state device_state "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
-                    "WHERE s.refresh_token_hash=:rh FOR UPDATE"
+                    "WHERE s.refresh_token_hash=:rh FOR UPDATE OF s"
                 ),
                 {"rh": session_hash(refresh_token)},
             ).mappings().first()

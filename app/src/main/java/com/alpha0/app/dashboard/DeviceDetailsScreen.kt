@@ -32,7 +32,10 @@ import com.alpha0.app.ui.DangerButton
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelCardKind
+import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
+import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -284,7 +287,7 @@ fun DeviceDetailsScreen(
         ) {
             Text(strings.text("device_details"), style = MaterialTheme.typography.headlineMedium)
 
-            SentinelCard(scan = false) {
+            SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(strings.text("account_security"), style = MaterialTheme.typography.labelLarge)
                     val account = accountSecurity
@@ -294,7 +297,7 @@ fun DeviceDetailsScreen(
                         DataText(strings.text("account_email", account.email ?: strings.text("not_available")))
                         StatusBadge(
                             strings.text(if (account.emailVerified) "email_verified_status" else "email_unverified_status"),
-                            active = account.emailVerified,
+                            if (account.emailVerified) SentinelStatus.VERIFIED else SentinelStatus.WARNING,
                         )
                         Text(
                             strings.text(
@@ -308,7 +311,7 @@ fun DeviceDetailsScreen(
                                 "mfa_status",
                                 strings.text(if (account.mfaEnabled) "enabled" else "disabled"),
                             ),
-                            active = account.mfaEnabled,
+                            if (account.mfaEnabled) SentinelStatus.VERIFIED else SentinelStatus.WARNING,
                         )
                         if (account.mfaEnabled) {
                             Text(
@@ -419,7 +422,7 @@ fun DeviceDetailsScreen(
             }
 
             if (recoveryCodes.isNotEmpty()) {
-                SentinelCard(scan = false) {
+                SentinelCard(kind = SentinelCardKind.CONTENT) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(strings.text("mfa_recovery_title"), style = MaterialTheme.typography.labelLarge)
                         Text(strings.text("mfa_recovery_warning"), style = MaterialTheme.typography.bodyMedium)
@@ -433,16 +436,16 @@ fun DeviceDetailsScreen(
                 error != null -> Text(strings.text("load_failed", error), color = MaterialTheme.colorScheme.error)
                 else -> {
                     val current = device!!
-                    SentinelCard(scan = true) {
+                    SentinelCard(kind = SentinelCardKind.DEVICE) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(strings.text("state_security"), style = MaterialTheme.typography.labelLarge)
                             StatusBadge(
                                 if (revoked) strings.text("status_revoked") else current.state,
-                                active = !revoked && current.state.equals("ACTIVE", true),
+                                if (revoked) SentinelStatus.REVOKED else statusFromRaw(current.state),
                             )
                             StatusBadge(
                                 if (revoked) strings.text("status_at_risk") else current.securityStatus,
-                                active = !revoked && current.securityStatus.equals("OK", true),
+                                if (revoked) SentinelStatus.FAILED else statusFromRaw(current.securityStatus),
                             )
                             Text(strings.text("platform", current.platform), style = MaterialTheme.typography.bodyMedium)
                             Text(strings.text("algorithm", current.algorithm), style = MaterialTheme.typography.bodyMedium)
@@ -574,7 +577,7 @@ fun MfaRecoveryCodesScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(strings.text("mfa_recovery_title"), style = MaterialTheme.typography.headlineMedium)
-            SentinelCard(scan = false) {
+            SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(strings.text("mfa_enabled_relogin"), style = MaterialTheme.typography.bodyMedium)
                     Text(strings.text("mfa_recovery_warning"), style = MaterialTheme.typography.bodyMedium)

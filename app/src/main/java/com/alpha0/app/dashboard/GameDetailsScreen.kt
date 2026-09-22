@@ -22,6 +22,7 @@ import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 import com.alpha0.app.ui.StatusBadge
+import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -51,7 +52,7 @@ fun GameDetailsScreen(accessToken: String, entitlementId: String, api: Dashboard
                     SentinelCard {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(current.gameName, style = MaterialTheme.typography.titleLarge)
-                            StatusBadge(current.status, active = current.status.equals("ACTIVE", ignoreCase = true))
+                            StatusBadge(current.status, statusFromRaw(current.status))
                             Text(strings.text("platform", current.platform), style = MaterialTheme.typography.bodyMedium)
                             Text(strings.text("family", current.family), style = MaterialTheme.typography.bodyMedium)
                             Text(strings.text("versioning", current.versioning), style = MaterialTheme.typography.bodyMedium)

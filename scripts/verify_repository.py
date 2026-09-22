@@ -72,6 +72,27 @@ def check_workflow_boundaries(checks: Checks) -> None:
     for name, text in workflow_text.items():
         checks.require("permissions:" in text, f"{name} declares least-privilege permissions")
 
+    exact_pr_checkout_ref = "ref: ${{ github.event.pull_request.head.sha || github.sha }}"
+    pull_request_workflows = (
+        "android-build.yml",
+        "build.yml",
+        "p1-evidence.yml",
+        "packaged-companion.yml",
+        "physical-test-apk.yml",
+        "release-evidence.yml",
+        "security.yml",
+        "supply-chain-evidence.yml",
+    )
+    for name in pull_request_workflows:
+        text = workflow_text[name]
+        checkout_count = text.count("uses: actions/checkout@")
+        exact_ref_count = text.count(exact_pr_checkout_ref)
+        checks.require(checkout_count > 0, f"{name} contains a source checkout")
+        checks.require(
+            exact_ref_count == checkout_count,
+            f"{name} binds every checkout to exact PR head / push SHA",
+        )
+
     routine = ("build.yml", "android-build.yml", "p1-evidence.yml", "security.yml")
     forbidden = ("secrets.ANDROID_KEY", "assembleRelease", "sentinel-release.jks")
     for name in routine:

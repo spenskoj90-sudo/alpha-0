@@ -11,7 +11,7 @@
 - Existing diagnostic operation names and bounded error codes remain unchanged.
 - `SessionManager` uses a coroutine `Mutex` so refresh rotation remains serialized. The mutex is held across the suspended network request, therefore concurrent refresh attempts observe the latest persisted refresh token rather than racing on a stale token.
 - Compose authentication uses a screen-scoped coroutine. Cancelling the screen coroutine cancels the caller's coroutine work; no token or password is placed in diagnostic fields.
-- Runtime authenticated Core calls pass through `SessionRefreshingHttpTransport`. It substitutes the latest stored access token, preserves caller correlation, performs at most one serialized `401 -> refresh -> retry` sequence, and never retries a request after refresh identity has been invalidated.
+- Runtime authenticated Core calls pass through `SessionRefreshingHttpTransport`. It substitutes the latest stored access token, establishes/preserves one correlation ID across the full logical request, and performs at most one serialized `INVALID_SESSION -> refresh -> retry` sequence. Other HTTP 401 outcomes such as `MFA_INVALID` are returned unchanged and never trigger token rotation or logout.
 - A refresh `401` or malformed successful refresh response clears the local session fail-closed and signals Compose to leave the authenticated navigation shell. Transient refresh I/O failures do not silently delete refresh state.
 - MFA enable is a server-side session-revocation boundary. Android clears its local session immediately and moves the one-time recovery codes into a transient unauthenticated screen; device/account navigation is unavailable until the user acknowledges the codes and signs in again.
 

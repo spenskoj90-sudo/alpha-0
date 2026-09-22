@@ -201,6 +201,43 @@ class HttpTransportTest {
     }
 
     @Test
+    fun refreshedSessionRejectedByCoreClearsLocalSession() {
+        var session: SessionCredentials? = SessionCredentials("access-old", "refresh-old")
+        var invalidations = 0
+        val delegate = RecordingTransport { _, index ->
+            when (index) {
+                0 -> HttpResponse(401, """{"code":"INVALID_SESSION"}""")
+                1 -> HttpResponse(200, """{"session_token":"access-new","refresh_token":"refresh-new"}""")
+                2 -> HttpResponse(401, """{"code":"INVALID_SESSION"}""")
+                else -> throw AssertionError("unexpected request $index")
+            }
+        }
+        val transport = SessionRefreshingHttpTransport(
+            baseUrl = "https://core.example",
+            delegate = delegate,
+            sessionProvider = { session },
+            onSessionRefreshed = { session = it },
+            onSessionInvalidated = {
+                session = null
+                invalidations += 1
+            },
+        )
+
+        val response = transport.execute(
+            HttpRequest(
+                HttpMethod.GET,
+                "https://core.example/v1/devices/device-1",
+                headers = mapOf("Authorization" to "Bearer access-old"),
+            )
+        )
+
+        assertEquals(401, response.status)
+        assertEquals(3, delegate.requests.size)
+        assertEquals(1, invalidations)
+        assertNull(session)
+    }
+
+    @Test
     fun latestStoredTokenReplacesStaleCallerBearerWithoutRefresh() {
         val session = SessionCredentials("access-current", "refresh-current")
         val delegate = RecordingTransport { request, _ ->

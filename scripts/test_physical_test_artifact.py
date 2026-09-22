@@ -11,6 +11,8 @@ from physical_test_artifact import build_manifest
 
 
 SHA = "a" * 40
+SIGNER = "b" * 64
+OTHER_SIGNER = "c" * 64
 ORIGIN = "https://sentinel-core-staging.onrender.com"
 
 
@@ -52,6 +54,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
             repository="spenskoj90-sudo/alpha-0",
             run_id="12345",
             run_attempt="2",
+            signer_sha256=SIGNER,
             generated_at="2026-09-16T20:00:00Z",
         )
 
@@ -62,6 +65,8 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
         self.assertEqual(manifest["runtimeEnvironment"], "staging")
         self.assertEqual(manifest["signingMode"], "ephemeral-debug")
+        self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
+        self.assertFalse(manifest["signerLineageVerified"])
         self.assertFalse(manifest["updateCompatible"])
         self.assertEqual(manifest["workflow"]["name"], "Physical Test APK")
         self.assertEqual(manifest["httpReadTimeoutMs"], 75_000)
@@ -81,11 +86,15 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 repository="spenskoj90-sudo/alpha-0",
                 run_id="12345",
                 run_attempt="2",
+                signer_sha256=SIGNER,
+                expected_signer_sha256=SIGNER,
                 signing_mode="stable-test",
                 workflow_name="Physical Test Update APK",
                 generated_at="2026-09-21T15:00:00Z",
             )
         self.assertTrue(manifest["updateCompatible"])
+        self.assertTrue(manifest["signerLineageVerified"])
+        self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
         self.assertEqual(manifest["signingMode"], "stable-test")
         self.assertEqual(manifest["workflow"]["name"], "Physical Test Update APK")
         self.assertEqual(manifest["artifactName"], f"sentinel-physical-test-update-apk-{SHA}")
@@ -103,7 +112,28 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                     repository="spenskoj90-sudo/alpha-0",
                     run_id="12345",
                     run_attempt="2",
+                    signer_sha256=SIGNER,
+                    expected_signer_sha256=SIGNER,
                     signing_mode="stable-test",
+                )
+
+    def test_stable_update_rejects_signer_lineage_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            with self.assertRaisesRegex(ValueError, "pinned update lineage"):
+                build_manifest(
+                    apk=apk,
+                    output_metadata=metadata,
+                    version_file=version,
+                    source_sha=SHA,
+                    api_base_url=ORIGIN,
+                    repository="spenskoj90-sudo/alpha-0",
+                    run_id="12345",
+                    run_attempt="2",
+                    signer_sha256=OTHER_SIGNER,
+                    expected_signer_sha256=SIGNER,
+                    signing_mode="stable-test",
+                    workflow_name="Physical Test Update APK",
                 )
 
     def test_loopback_bytes_in_compiled_dex_fail_closed(self) -> None:

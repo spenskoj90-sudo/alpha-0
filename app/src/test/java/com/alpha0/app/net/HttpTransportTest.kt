@@ -143,16 +143,14 @@ class HttpTransportTest {
             sessionProvider = { session },
             onSessionRefreshed = { session = it },
             onSessionInvalidated = { session = null },
+            requestIdFactory = { "request-123" },
         )
 
         val response = transport.execute(
             HttpRequest(
                 HttpMethod.GET,
                 "https://core.example/v1/devices/device-1",
-                headers = mapOf(
-                    "Authorization" to "Bearer stale-ui-token",
-                    "X-Request-ID" to "request-123",
-                ),
+                headers = mapOf("Authorization" to "Bearer stale-ui-token"),
             )
         )
 
@@ -162,6 +160,42 @@ class HttpTransportTest {
         assertEquals("Bearer access-new", delegate.requests[2].headers["Authorization"])
         assertEquals("request-123", delegate.requests[2].headers["X-Request-ID"])
         assertEquals(SessionCredentials("access-new", "refresh-new"), session)
+    }
+
+    @Test
+    fun nonSession401DoesNotRefreshOrInvalidate() {
+        var session: SessionCredentials? = SessionCredentials("access-current", "refresh-current")
+        var invalidations = 0
+        val delegate = RecordingTransport { _, index ->
+            if (index != 0) throw AssertionError("MFA failure must not trigger refresh")
+            HttpResponse(401, """{"code":"MFA_INVALID"}""")
+        }
+        val transport = SessionRefreshingHttpTransport(
+            baseUrl = "https://core.example",
+            delegate = delegate,
+            sessionProvider = { session },
+            onSessionRefreshed = { session = it },
+            onSessionInvalidated = {
+                session = null
+                invalidations += 1
+            },
+            requestIdFactory = { "mfa-request" },
+        )
+
+        val response = transport.execute(
+            HttpRequest(
+                HttpMethod.POST,
+                "https://core.example/v1/account/mfa/totp/disable",
+                headers = mapOf("Authorization" to "Bearer access-current"),
+                body = """{"code":"000000"}""".toByteArray(),
+            )
+        )
+
+        assertEquals(401, response.status)
+        assertEquals(1, delegate.requests.size)
+        assertEquals("mfa-request", delegate.requests.single().headers["X-Request-ID"])
+        assertEquals(0, invalidations)
+        assertEquals(SessionCredentials("access-current", "refresh-current"), session)
     }
 
     @Test

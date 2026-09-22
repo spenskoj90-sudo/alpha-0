@@ -66,7 +66,24 @@ jobs:
           SENTINEL_RUNTIME_ENVIRONMENT: staging
         run: ./gradlew --no-daemon assemblePhysicalTest
 
-      - name: Verify compiled APK identity, staging binding, and production separation
+      - name: Verify diagnostic signer and hash APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
+          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]')"
+          case "$signer_sha256" in
+            *[!0-9a-f]*|'') echo "invalid signer certificate SHA-256"; exit 1 ;;
+          esac
+          test "${#signer_sha256}" -eq 64
+          echo "SENTINEL_PHYSICAL_TEST_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
+          sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
+
+      - name: Verify compiled APK identity, staging binding, signer identity, and production separation
         shell: bash
         run: |
           set -euo pipefail
@@ -79,13 +96,14 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256" \
             --signing-mode "$SENTINEL_PHYSICAL_TEST_SIGNING_MODE" \
             --output physical-test-manifest.json
 
-      - name: Hash physical-test APK
+      - name: Verify physical-test APK hash binding
         run: |
-          sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
           test "$(cut -d ' ' -f 1 physical-test-apk.sha256)" = "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["apk"]["sha256"])')"
+          test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"
 
       - name: Upload exact-SHA physical-test APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -95,5 +113,6 @@ jobs:
             app/build/outputs/apk/physicalTest/app-physicalTest.apk
             physical-test-apk.sha256
             physical-test-manifest.json
+            physical-test-signer.txt
           if-no-files-found: error
           retention-days: 90

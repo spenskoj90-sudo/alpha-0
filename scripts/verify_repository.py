@@ -227,6 +227,24 @@ def check_versions(checks: Checks) -> None:
             and 'SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value' in workflow,
             f"{workflow_name} derives monotonic physical-test versionCode from GitHub run number",
         )
+        checks.require(
+            "--signer-sha256" in workflow
+            and "physical-test-signer.txt" in workflow
+            and "Signer #1 certificate SHA-256 digest:" in workflow,
+            f"{workflow_name} records the actual APK signer certificate identity",
+        )
+
+    stable_physical = read(".github/workflows/physical-test-update-apk.yml")
+    checks.require(
+        "vars.PHYSICAL_TEST_SIGNER_SHA256" in stable_physical,
+        "stable physical-test update workflow requires an Owner-pinned signer fingerprint variable",
+    )
+    checks.require(
+        'test "$signer_sha256" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"' in stable_physical
+        and "--expected-signer-sha256" in stable_physical
+        and '"signerLineageVerified"' in stable_physical,
+        "stable physical-test update workflow verifies signer lineage before claiming update compatibility",
+    )
 
     wrapper = read("gradle/wrapper/gradle-wrapper.properties")
     checksum = re.search(r"^distributionSha256Sum=([0-9a-f]{64})$", wrapper, re.MULTILINE)

@@ -10,7 +10,8 @@ from app.core.store import MemoryStore, PostgresStore
 
 def test_memory_store_refresh_rotation_revokes_previous_access_session():
     store = MemoryStore()
-    old_access, old_refresh, _, _ = store.issue_session("device-1", "user-1", 3600, 7200)
+    device_id = store.register_device("user-1", "android", "memory-refresh-key", "1" * 64, "challenge")
+    old_access, old_refresh, _, _ = store.issue_session(device_id, "user-1", 3600, 7200)
 
     rotated = store.rotate_refresh(old_refresh, 3600, 7200)
 
@@ -29,7 +30,8 @@ def test_memory_store_refresh_rotation_revokes_previous_access_session():
 
 def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():
     store = MemoryStore()
-    old_access, old_refresh, _, _ = store.issue_session("device-1", "user-1", 3600, 7200)
+    device_id = store.register_device("user-1", "android", "memory-race-key", "2" * 64, "challenge")
+    old_access, old_refresh, _, _ = store.issue_session(device_id, "user-1", 3600, 7200)
 
     def attempt(_):
         return store.rotate_refresh(old_refresh, 3600, 7200)

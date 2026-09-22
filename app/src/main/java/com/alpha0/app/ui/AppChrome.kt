@@ -1,5 +1,11 @@
 package com.alpha0.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
@@ -24,6 +30,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 data class AppDestination(val route: String, val labelKey: String)
 
@@ -89,6 +98,7 @@ fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
     ) {
         PrimaryDestinations.forEach { destination ->
             val icon = when (destination.route) {
@@ -97,15 +107,26 @@ fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
                 "security" -> Icons.Default.Security
                 else -> Icons.Default.Timeline
             }
+            val selected = selectedRoute == destination.route
             NavigationBarItem(
-                selected = selectedRoute == destination.route,
+                selected = selected,
                 onClick = { onNavigate(destination.route) },
-                icon = { Icon(icon, contentDescription = null) },
+                icon = {
+                    Column {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                        )
+                        Icon(icon, contentDescription = null, modifier = Modifier.padding(top = 5.dp))
+                    }
+                },
                 label = { Text(strings.text(destination.labelKey)) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.onSecondary,
-                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                    indicatorColor = MaterialTheme.colorScheme.secondary,
+                    selectedIconColor = MaterialTheme.colorScheme.primary,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = Color.Transparent,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),

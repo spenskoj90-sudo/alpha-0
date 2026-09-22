@@ -3,13 +3,15 @@ package com.alpha0.app.dashboard
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,14 +23,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.DataText
+import com.alpha0.app.ui.GhostButton
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
-import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.SentinelCardKind
+import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.buttonCardSemantics
 import com.alpha0.app.ui.progressStatusSemantics
+import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,9 +73,12 @@ fun DashboardScreen(
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         if (loading) {
-            Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 CircularProgressIndicator(
-                    modifier = Modifier.progressStatusSemantics("Loading SENTINEL status"),
+                    modifier = Modifier.progressStatusSemantics(strings.text("loading_status")),
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(strings.text("loading_status"), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -78,109 +86,157 @@ fun DashboardScreen(
             return@Surface
         }
 
+        val current = device
+        val deviceVerified = current != null &&
+            current.state.equals("ACTIVE", true) &&
+            current.securityStatus.equals("OK", true)
+        val attentionStatus = when {
+            error != null -> SentinelStatus.WARNING
+            current == null -> SentinelStatus.UNKNOWN
+            deviceVerified -> SentinelStatus.ACTIVE
+            else -> SentinelStatus.WARNING
+        }
+
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                Text(strings.text("dashboard"), style = MaterialTheme.typography.headlineMedium)
-                Text(strings.text("dashboard_subtitle"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.text("security_posture"), style = MaterialTheme.typography.headlineLarge)
+                Text(
+                    strings.text("security_posture_subtitle"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+
             if (error != null) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            strings.text("load_failed", error),
-                            modifier = Modifier.assertiveStatusSemantics(),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        PrimaryButton(
-                            text = strings.text("retry"),
-                            onClick = { reloadGeneration += 1 },
-                        )
-                    }
-                }
-            }
-            device?.let { current ->
-                item {
-                    SentinelCard(
-                        modifier = Modifier
-                            .buttonCardSemantics("Open device security details")
-                            .clickable { onDeviceClick() },
-                        scan = true,
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(strings.text("device"), style = MaterialTheme.typography.labelLarge)
-                            StatusBadge(current.state, active = current.state.equals("ACTIVE", ignoreCase = true))
-                            Text(current.securityStatus, style = MaterialTheme.typography.titleMedium)
-                            DataText(current.fingerprint)
-                            DataText(strings.text("bound", current.boundAt ?: strings.text("not_available")))
+                    SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StatusBadge(strings.text("attention_required"), SentinelStatus.WARNING)
+                            Text(
+                                strings.text("load_failed", error),
+                                modifier = Modifier.assertiveStatusSemantics(),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            PrimaryButton(strings.text("retry"), { reloadGeneration += 1 })
                         }
                     }
                 }
             }
+
             item {
-                SentinelCard(
-                    modifier = Modifier
-                        .buttonCardSemantics("Report a problem and optionally attach diagnostics")
-                        .clickable { onReportProblem() },
-                    scan = true,
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(strings.text("quality_feedback"), style = MaterialTheme.typography.labelLarge)
-                        Text(strings.text("report_problem"), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            strings.text("report_problem_description"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SentinelCard(kind = SentinelCardKind.SECURITY) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        SecurityPostureRow(
+                            label = strings.text("account"),
+                            value = strings.text("signed_in"),
+                            supporting = strings.text("verified_session"),
+                            status = SentinelStatus.VERIFIED,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.58f))
+                        SecurityPostureRow(
+                            label = strings.text("device"),
+                            value = if (deviceVerified) strings.text("trusted_device") else current?.state ?: strings.text("not_available"),
+                            supporting = current?.let { "${it.state} · ${it.securityStatus}" } ?: strings.text("state_unavailable"),
+                            status = if (current == null) SentinelStatus.UNKNOWN else if (deviceVerified) SentinelStatus.VERIFIED else statusFromRaw(current.state),
+                            modifier = Modifier
+                                .buttonCardSemantics(strings.text("open_device_identity"))
+                                .clickable { onDeviceClick() },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.58f))
+                        SecurityPostureRow(
+                            label = strings.text("attention"),
+                            value = if (attentionStatus == SentinelStatus.ACTIVE) strings.text("no_required_action") else strings.text("attention_required"),
+                            supporting = if (attentionStatus == SentinelStatus.ACTIVE) strings.text("loaded_states_current") else strings.text("review_security_state"),
+                            status = attentionStatus,
                         )
                     }
                 }
             }
-            item {
-                OutlinedButton(
-                    onClick = {
-                        signingOut = true
-                        error = null
-                    },
-                    enabled = !signingOut,
-                ) {
-                    Text(strings.text(if (signingOut) "signing_out" else "sign_out"))
-                }
-                if (signingOut) {
-                    LaunchedEffect(accessToken) {
-                        when (val result = withContext(Dispatchers.IO) { api.revokeSession(accessToken) }) {
-                            is DashboardApi.Result.Success -> {
-                                signingOut = false
-                                if (result.value) onSignedOut() else error = "SESSION_REVOKE_REJECTED"
-                            }
-                            is DashboardApi.Result.Failure -> {
-                                signingOut = false
-                                error = result.message
-                            }
-                        }
-                    }
-                }
-            }
-            item { Text(strings.text("game_access"), style = MaterialTheme.typography.titleLarge) }
+
+            item { Text(strings.text("game_access"), style = MaterialTheme.typography.headlineMedium) }
             if (entitlements.isEmpty()) {
-                item { Text(strings.text("no_entitlements"), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item {
+                    SentinelCard(kind = SentinelCardKind.CONTENT) {
+                        Text(strings.text("no_entitlements"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             } else {
                 items(entitlements, key = { it.id }) { entitlement ->
                     SentinelCard(
                         modifier = Modifier
                             .buttonCardSemantics("Open ${entitlement.gameName} access details")
-                            .clickable { onGameClick(entitlement.id) }
+                            .clickable { onGameClick(entitlement.id) },
+                        kind = SentinelCardKind.CONTENT,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(entitlement.gameName, style = MaterialTheme.typography.titleMedium)
-                            StatusBadge(entitlement.status, active = entitlement.status.equals("ACTIVE", ignoreCase = true))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(entitlement.gameName, style = MaterialTheme.typography.titleLarge)
+                                StatusBadge(entitlement.status, statusFromRaw(entitlement.status))
+                            }
                             Text(entitlement.platform, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             DataText(strings.text("valid_until", entitlement.validUntil))
                         }
                     }
                 }
             }
+
+            item {
+                Text(strings.text("recent_activity"), style = MaterialTheme.typography.headlineMedium)
+                SentinelCard(kind = SentinelCardKind.CONTENT) {
+                    Text(
+                        strings.text("recent_activity_limited"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(strings.text("support"), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    GhostButton(strings.text("report_problem"), onReportProblem)
+                    GhostButton(
+                        text = strings.text(if (signingOut) "signing_out" else "sign_out"),
+                        enabled = !signingOut,
+                        onClick = { signingOut = true; error = null },
+                    )
+                    if (signingOut) {
+                        LaunchedEffect(accessToken) {
+                            when (val result = withContext(Dispatchers.IO) { api.revokeSession(accessToken) }) {
+                                is DashboardApi.Result.Success -> {
+                                    signingOut = false
+                                    if (result.value) onSignedOut() else error = "SESSION_REVOKE_REJECTED"
+                                }
+                                is DashboardApi.Result.Failure -> {
+                                    signingOut = false
+                                    error = result.message
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun SecurityPostureRow(
+    label: String,
+    value: String,
+    supporting: String,
+    status: SentinelStatus,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(value, style = MaterialTheme.typography.titleLarge)
+            StatusBadge(status.name.lowercase().replaceFirstChar { it.uppercase() }, status)
+        }
+        Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

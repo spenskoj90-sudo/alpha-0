@@ -50,6 +50,7 @@ class SessionRefreshingHttpTransport(
     private val sessionProvider: () -> SessionCredentials?,
     private val onSessionRefreshed: (SessionCredentials) -> Unit,
     private val onSessionInvalidated: () -> Unit,
+    private val requestIdFactory: () -> String = { UUID.randomUUID().toString() },
 ) : HttpTransport {
     private val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
     private val refreshLock = Any()
@@ -65,22 +66,23 @@ class SessionRefreshingHttpTransport(
             return delegate.execute(request)
         }
 
-        val initial = sessionProvider() ?: return delegate.execute(request)
-        val first = delegate.execute(withBearer(request, initial.accessToken))
-        if (first.status != 401) return first
+        val correlatedRequest = withRequestId(request)
+        val initial = sessionProvider() ?: return delegate.execute(correlatedRequest)
+        val first = delegate.execute(withBearer(correlatedRequest, initial.accessToken))
+        if (!isSessionAuthenticationFailure(first)) return first
 
         return synchronized(refreshLock) {
             val latest = sessionProvider() ?: return@synchronized first
             val latestAttempt = if (latest.accessToken != initial.accessToken) {
-                delegate.execute(withBearer(request, latest.accessToken))
+                delegate.execute(withBearer(correlatedRequest, latest.accessToken))
             } else {
                 first
             }
-            if (latestAttempt.status != 401) return@synchronized latestAttempt
+            if (!isSessionAuthenticationFailure(latestAttempt)) return@synchronized latestAttempt
 
-            val refreshed = refreshSession(latest, request) ?: return@synchronized latestAttempt
-            val retry = delegate.execute(withBearer(request, refreshed.accessToken))
-            if (retry.status == 401) onSessionInvalidated()
+            val refreshed = refreshSession(latest, correlatedRequest) ?: return@synchronized latestAttempt
+            val retry = delegate.execute(withBearer(correlatedRequest, refreshed.accessToken))
+            if (isSessionAuthenticationFailure(retry)) onSessionInvalidated()
             retry
         }
     }
@@ -130,6 +132,21 @@ class SessionRefreshingHttpTransport(
 
     private fun isRefreshRequest(url: String): Boolean =
         url == "$normalizedBaseUrl/v1/sessions/refresh"
+
+    private fun isSessionAuthenticationFailure(response: HttpResponse): Boolean {
+        if (response.status != 401) return false
+        val json = runCatching { JSONObject(response.body) }.getOrNull() ?: return false
+        val code = json.optString("code").takeIf { it.isNotBlank() }
+            ?: json.optString("detail").takeIf { it.isNotBlank() }
+        return code == "INVALID_SESSION"
+    }
+
+    private fun withRequestId(request: HttpRequest): HttpRequest {
+        if (request.headers.keys.any { it.equals("X-Request-ID", ignoreCase = true) }) return request
+        return request.copy(headers = LinkedHashMap(request.headers).apply {
+            put("X-Request-ID", requestIdFactory())
+        })
+    }
 
     private fun bearerHeader(request: HttpRequest): String? =
         request.headers.entries

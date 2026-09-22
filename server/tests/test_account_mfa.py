@@ -32,8 +32,16 @@ def _current_code(secret: str) -> str:
 
 
 def _bound_session(user_id: str) -> str:
+    suffix = uuid.uuid4().hex
+    device_id = store.register_device(
+        user_id,
+        "android",
+        f"mfa-public-{suffix}",
+        (suffix * 2)[:64],
+        f"mfa-challenge-{suffix}",
+    )
     access, _, _, _ = store.issue_session(
-        f"mfa-device-{uuid.uuid4()}",
+        device_id,
         user_id,
         SESSION_TTL_SECONDS,
         REFRESH_TTL_SECONDS,

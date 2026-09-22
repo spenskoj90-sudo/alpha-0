@@ -271,5 +271,21 @@ def test_postgres_revoke_is_atomic_and_stale_device_sessions_fail_closed():
         )
     assert store.get_session(stale_access) is None
     assert store.rotate_refresh(stale_refresh, 3600, 7200) is None
+
+    suspended_device = store.register_device(
+        f"{user_id}-suspended",
+        "android",
+        "cHVibGljLXN1c3BlbmRlZC0" + suffix,
+        ("6" + suffix * 2)[:64],
+        "challenge-suspended",
+    )
+    with store.engine.begin() as conn:
+        conn.execute(
+            text("UPDATE device_bindings SET state='SUSPENDED' WHERE id=:id"),
+            {"id": suspended_device},
+        )
+    assert store.revoke_device(suspended_device) is True
+    assert store.get_device(suspended_device)["state"] == "REVOKED"
+    assert store.revoke_device(suspended_device) is False
     store.engine.dispose()
 

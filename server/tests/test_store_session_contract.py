@@ -173,3 +173,40 @@ def test_postgres_device_rotation_is_atomic_and_conflict_rolls_back():
         )
     store.engine.dispose()
 
+@pytest.mark.postgres
+def test_postgres_device_activity_metadata_is_truthful_and_throttled():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    suffix = uuid.uuid4().hex
+    user_id = f"pg-seen-{suffix}"
+    fingerprint = ("e" + suffix * 2)[:64]
+    public_key = "cHVibGljLXNlZW4t" + suffix
+    device_id = store.register_device(user_id, "android", public_key, fingerprint, "challenge-seen")
+
+    initial = store.get_device(device_id)
+    assert initial["created_at"] is not None
+    assert initial["last_seen_at"] is None
+
+    assert store.touch_device(device_id) is True
+    first_seen = store.get_device(device_id)["last_seen_at"]
+    assert first_seen is not None
+
+    # Ordinary request volume cannot write last_seen_at on every call.
+    assert store.touch_device(device_id) is False
+    assert store.get_device(device_id)["last_seen_at"] == first_seen
+
+    rotated_id, _, _, _, _ = store.rotate_device_identity(
+        device_id,
+        user_id,
+        "android",
+        "cHVibGljLXNlZW4tbmV3LQ" + suffix,
+        ("f" + suffix * 2)[:64],
+        "challenge-seen-new",
+        3600,
+        7200,
+    )
+    assert rotated_id != device_id
+    assert store.get_device(device_id)["state"] == "REVOKED"
+    assert store.touch_device(device_id) is False
+    assert store.get_device(device_id)["last_seen_at"] == first_seen
+    store.engine.dispose()
+

@@ -38,9 +38,9 @@ data class SessionCredentials(
 /**
  * Authenticated Core transport wrapper.
  *
- * A bearer request is always sent with the latest stored access token. A single
- * HTTP 401 triggers serialized one-time refresh-token rotation and one retry
- * with the same request/correlation metadata. Invalid refresh state is cleared
+ * A bearer request is always sent with the latest stored access token. Only an
+ * INVALID_SESSION response triggers serialized one-time refresh-token rotation
+ * and one retry with the same request/correlation metadata. Invalid refresh state is cleared
  * fail-closed; transient refresh transport failures are not converted into
  * credential deletion.
  */

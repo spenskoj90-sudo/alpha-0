@@ -47,11 +47,14 @@ import com.alpha0.app.dashboard.DashboardScreen
 import com.alpha0.app.dashboard.DeviceDetailsScreen
 import com.alpha0.app.dashboard.GameDetailsScreen
 import com.alpha0.app.dashboard.GamesScreen
+import com.alpha0.app.dashboard.MfaRecoveryCodesScreen
 import com.alpha0.app.device.DeviceApi
 import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
 import com.alpha0.app.help.HelpScreen
+import com.alpha0.app.net.SessionCredentials
+import com.alpha0.app.net.SessionRefreshingHttpTransport
 import com.alpha0.app.net.UrlConnectionHttpTransport
 import com.alpha0.app.quality.QualityReportApi
 import com.alpha0.app.quality.QualityReportScreen
@@ -68,6 +71,9 @@ import com.alpha0.app.ui.SentinelTheme
 import com.alpha0.app.ui.SentinelTopBar
 import com.alpha0.app.ui.rememberAppStrings
 import com.alpha0.app.update.UpdateScreen
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.collect
 
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
@@ -93,7 +99,24 @@ class MainActivity : ComponentActivity() {
 
         val initialSession = sessionStore.load(this)
         val preferences = AppPreferences(this)
-        val httpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
+        val sessionSignals = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
+        val rawHttpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
+        val httpTransport = SessionRefreshingHttpTransport(
+            baseUrl = BuildConfig.SENTINEL_API_BASE_URL,
+            delegate = rawHttpTransport,
+            sessionProvider = {
+                sessionStore.load(this)?.let { SessionCredentials(it.accessToken, it.refreshToken) }
+            },
+            onSessionRefreshed = { refreshed ->
+                val current = sessionStore.load(this)
+                sessionStore.save(this, refreshed.accessToken, refreshed.refreshToken, current?.deviceId)
+                sessionSignals.tryEmit(Unit)
+            },
+            onSessionInvalidated = {
+                sessionStore.clear(this)
+                sessionSignals.tryEmit(Unit)
+            },
+        )
         val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
         val federatedAuth = FederatedAuthCoordinator(
             context = this,
@@ -131,6 +154,7 @@ class MainActivity : ComponentActivity() {
                         federatedCallbackUri = federatedCallbackUri,
                         onFederatedCallbackConsumed = { federatedCallbackUri = null },
                         sessionManager = sessionManager,
+                        sessionSignals = sessionSignals,
                         deviceApi = deviceApi,
                         dashboardApi = dashboardApi,
                         qualityReportApi = qualityReportApi,
@@ -174,6 +198,7 @@ private fun SentinelApplicationUi(
     federatedCallbackUri: Uri?,
     onFederatedCallbackConsumed: () -> Unit,
     sessionManager: SessionManager,
+    sessionSignals: SharedFlow<Unit>,
     deviceApi: DeviceApi,
     dashboardApi: DashboardApi,
     qualityReportApi: QualityReportApi,
@@ -186,6 +211,7 @@ private fun SentinelApplicationUi(
     val navController = rememberNavController()
     var activeSession by remember { mutableStateOf(initialSession) }
     var refreshComplete by remember { mutableStateOf(initialSession == null) }
+    var pendingMfaRecoveryCodes by remember { mutableStateOf<List<String>?>(null) }
 
     LaunchedEffect(initialSession?.refreshToken) {
         if (initialSession == null) {
@@ -196,6 +222,18 @@ private fun SentinelApplicationUi(
             activeSession = sessionStore.load(activity)
             refreshComplete = true
             diagnostics.info("SESSION", "REFRESH_COMPLETE", if (activeSession != null) "SUCCESS" else "FAILURE")
+        }
+    }
+
+    LaunchedEffect(sessionSignals) {
+        sessionSignals.collect {
+            activeSession = sessionStore.load(activity)
+            if (activeSession == null && refreshComplete) {
+                pendingMfaRecoveryCodes = null
+                navController.navigate("login") {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                }
+            }
         }
     }
 
@@ -215,14 +253,18 @@ private fun SentinelApplicationUi(
     val rootRoute = route.substringBefore('/')
     val primaryRoutes = PrimaryDestinations.map { it.route }.toSet()
     val showBottomBar = !activeSession?.deviceId.isNullOrBlank() && rootRoute in primaryRoutes
-    val canGoBack = navController.previousBackStackEntry != null && rootRoute !in primaryRoutes && rootRoute != "login" && rootRoute != "device-setup"
+    val canGoBack = navController.previousBackStackEntry != null &&
+        rootRoute !in primaryRoutes &&
+        rootRoute != "login" &&
+        rootRoute != "device-setup" &&
+        rootRoute != "mfa-recovery-codes"
     val title = when (rootRoute) {
         "settings" -> strings.text("settings")
         "updates" -> strings.text("updates")
         "help" -> strings.text("help")
         "about" -> strings.text("about")
         "games" -> strings.text("games")
-        "security", "device-details" -> strings.text("security")
+        "security", "device-details", "mfa-recovery-codes" -> strings.text("security")
         "activity" -> strings.text("activity")
         else -> strings.text("app_name")
     }
@@ -254,7 +296,11 @@ private fun SentinelApplicationUi(
                     title = title,
                     canGoBack = canGoBack,
                     onBack = { navController.popBackStack() },
-                    onNavigate = { destination -> navController.navigate(destination) { launchSingleTop = true } },
+                    onNavigate = { destination ->
+                        if (rootRoute != "mfa-recovery-codes") {
+                            navController.navigate(destination) { launchSingleTop = true }
+                        }
+                    },
                 )
             },
             bottomBar = {
@@ -341,8 +387,33 @@ private fun SentinelApplicationUi(
                             store = sessionStore,
                             activity = activity,
                             navController = navController,
+                            onMfaEnabled = { codes ->
+                                sessionStore.clear(activity)
+                                activeSession = null
+                                pendingMfaRecoveryCodes = codes
+                                navController.navigate("mfa-recovery-codes") {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            },
                         ) {
                             activeSession = it
+                        }
+                    }
+                }
+                composable("mfa-recovery-codes") {
+                    val codes = pendingMfaRecoveryCodes
+                    if (codes.isNullOrEmpty()) {
+                        LaunchedEffect(Unit) {
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                        }
+                    } else {
+                        MfaRecoveryCodesScreen(codes = codes) {
+                            pendingMfaRecoveryCodes = null
+                            navController.navigate("login") {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
                         }
                     }
                 }
@@ -360,6 +431,14 @@ private fun SentinelApplicationUi(
                             store = sessionStore,
                             activity = activity,
                             navController = navController,
+                            onMfaEnabled = { codes ->
+                                sessionStore.clear(activity)
+                                activeSession = null
+                                pendingMfaRecoveryCodes = codes
+                                navController.navigate("mfa-recovery-codes") {
+                                    popUpTo(navController.graph.id) { inclusive = true }
+                                }
+                            },
                         ) {
                             activeSession = it
                         }
@@ -421,6 +500,7 @@ private fun DeviceDetailsContent(
     store: SecureSessionStore,
     activity: ComponentActivity,
     navController: androidx.navigation.NavHostController,
+    onMfaEnabled: (List<String>) -> Unit,
     onSessionChanged: (SecureSessionStore.Companion.Session?) -> Unit,
 ) {
     DeviceDetailsScreen(
@@ -432,6 +512,7 @@ private fun DeviceDetailsContent(
         federatedCallbackUri = federatedCallbackUri,
         onFederatedCallbackConsumed = onFederatedCallbackConsumed,
         deviceIdentity = identity,
+        onMfaEnabled = onMfaEnabled,
         onRevoked = {
             store.clear(activity)
             onSessionChanged(null)

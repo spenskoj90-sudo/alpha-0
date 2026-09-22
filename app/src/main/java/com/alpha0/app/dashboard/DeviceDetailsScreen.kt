@@ -47,6 +47,7 @@ fun DeviceDetailsScreen(
     federatedCallbackUri: Uri?,
     onFederatedCallbackConsumed: () -> Unit,
     deviceIdentity: DeviceIdentity,
+    onMfaEnabled: (List<String>) -> Unit = {},
     onRevoked: () -> Unit = {},
     onRotated: (DashboardApi.DeviceActionResult) -> Unit = {},
 ) {
@@ -63,7 +64,6 @@ fun DeviceDetailsScreen(
     var mfaEnrollment by remember { mutableStateOf<AuthApi.TotpEnrollment?>(null) }
     var mfaCode by remember { mutableStateOf("") }
     var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
-    var mfaSessionRevoked by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var revoked by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -203,15 +203,14 @@ fun DeviceDetailsScreen(
         scope.launch {
             when (val result = authApi.confirmTotp(accessToken, mfaCode)) {
                 is AuthApi.RecoveryCodesResult.Success -> {
-                    recoveryCodes = result.codes
                     mfaEnrollment = null
                     mfaCode = ""
-                    mfaSessionRevoked = true
                     accountSecurity = accountSecurity?.copy(
                         mfaEnabled = true,
                         mfaRecoveryCodesRemaining = result.codes.size,
                     )
                     actionMessage = strings.text("mfa_enabled_relogin")
+                    onMfaEnabled(result.codes)
                 }
                 is AuthApi.RecoveryCodesResult.Failure ->
                     accountError = if (result.message == "MFA_CODE_INVALID") {
@@ -325,8 +324,7 @@ fun DeviceDetailsScreen(
                             ),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        if (!mfaSessionRevoked) {
-                            val enrollment = mfaEnrollment
+                        val enrollment = mfaEnrollment
                             if (!account.mfaEnabled && enrollment == null) {
                                 PrimaryButton(
                                     text = strings.text("enable_mfa"),
@@ -380,7 +378,6 @@ fun DeviceDetailsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
-                        }
                         val available = providerStatuses.filter { it.provider !in linked }
                         if (available.isNotEmpty()) {
                             Text(strings.text("link_provider"), style = MaterialTheme.typography.bodyMedium)
@@ -427,14 +424,6 @@ fun DeviceDetailsScreen(
                         Text(strings.text("mfa_recovery_title"), style = MaterialTheme.typography.labelLarge)
                         Text(strings.text("mfa_recovery_warning"), style = MaterialTheme.typography.bodyMedium)
                         recoveryCodes.forEach { DataText(it) }
-                        if (mfaSessionRevoked) {
-                            PrimaryButton(
-                                text = strings.text("continue_sign_in"),
-                                enabled = !mfaActionInProgress,
-                                onClick = onRevoked,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
                     }
                 }
             }
@@ -559,3 +548,35 @@ fun DeviceDetailsScreen(
         }
     }
 }
+
+@Composable
+fun MfaRecoveryCodesScreen(
+    codes: List<String>,
+    onContinueToSignIn: () -> Unit,
+) {
+    val strings = LocalAppStrings.current
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(strings.text("mfa_recovery_title"), style = MaterialTheme.typography.headlineMedium)
+            SentinelCard(scan = false) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(strings.text("mfa_enabled_relogin"), style = MaterialTheme.typography.bodyMedium)
+                    Text(strings.text("mfa_recovery_warning"), style = MaterialTheme.typography.bodyMedium)
+                    codes.forEach { DataText(it) }
+                    PrimaryButton(
+                        text = strings.text("continue_sign_in"),
+                        onClick = onContinueToSignIn,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+

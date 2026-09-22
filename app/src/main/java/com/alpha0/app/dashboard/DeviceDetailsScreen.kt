@@ -466,9 +466,11 @@ fun DeviceDetailsScreen(
                                     var rotated: DashboardApi.DeviceActionResult? = null
                                     var failure: String? = null
                                     var candidate: DeviceIdentity.RotationCandidate? = null
+                                    var requestStarted = false
                                     try {
                                         val prepared = deviceIdentity.prepareRotation()
                                         candidate = prepared
+                                        requestStarted = true
                                         when (
                                             val result = api.rotateDevice(
                                                 accessToken,
@@ -485,21 +487,29 @@ fun DeviceDetailsScreen(
                                                     value.sessionToken.isNullOrBlank() ||
                                                     value.refreshToken.isNullOrBlank()
                                                 ) {
-                                                    deviceIdentity.abortRotation(prepared)
-                                                    failure = "UNEXPECTED_ERROR: Invalid rotate response: missing device/session data"
+                                                    failure = "KEY_ROTATION_RECOVERY_REQUIRED"
                                                 } else {
-                                                    deviceIdentity.commitRotation(prepared)
-                                                    rotated = value
+                                                    try {
+                                                        deviceIdentity.commitRotation(prepared)
+                                                        rotated = value
+                                                    } catch (_: Exception) {
+                                                        failure = "KEY_ROTATION_RECOVERY_REQUIRED"
+                                                    }
                                                 }
                                             }
                                             is DashboardApi.Result.Failure -> {
-                                                deviceIdentity.abortRotation(prepared)
-                                                failure = result.message
+                                                failure = "KEY_ROTATION_RECOVERY_REQUIRED:${result.message}"
                                             }
                                         }
                                     } catch (exception: Exception) {
-                                        candidate?.let(deviceIdentity::abortRotation)
-                                        failure = "KEY_ROTATION_${exception.javaClass.simpleName}"
+                                        if (!requestStarted) {
+                                            candidate?.let { runCatching { deviceIdentity.abortRotation(it) } }
+                                        }
+                                        failure = if (requestStarted) {
+                                            "KEY_ROTATION_RECOVERY_REQUIRED"
+                                        } else {
+                                            "KEY_ROTATION_${exception.javaClass.simpleName}"
+                                        }
                                     }
                                     withContext(Dispatchers.Main) {
                                         actionInProgress = false

@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
         val initialSession = sessionStore.load(this)
         val preferences = AppPreferences(this)
-        val sessionSignals = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+        val sessionSignals = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
         val rawHttpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
         val httpTransport = SessionRefreshingHttpTransport(
             baseUrl = BuildConfig.SENTINEL_API_BASE_URL,

@@ -91,7 +91,7 @@ export function RecommendationPanel() {
     >
       <div className="recommendation-heading">
         <div>
-          <div className="label">INTELLIGENCE / {recommendation?.kind.toUpperCase() ?? 'LIVE CORE'}</div>
+          <div className="label">Intelligence · {recommendation?.kind ?? 'live Core'}</div>
           <h2>Recommendation</h2>
         </div>
         <span className="confidence" aria-label={`Confidence ${confidence}`}>{confidence}</span>
@@ -101,9 +101,9 @@ export function RecommendationPanel() {
         <div role="status" aria-live="polite" aria-atomic="true">
           <p className="recommendation-text">{recommendation.text}</p>
           <div className="recommendation-meta">
-            <div><span className="label">PROVIDER</span><strong>{recommendation.provider_id ?? 'unreported'}</strong></div>
-            <div><span className="label">MODEL</span><strong>{recommendation.model_id ?? 'unreported'}</strong></div>
-            <div><span className="label">PROVENANCE</span><strong>{recommendation.provenance.join(' · ') || 'none'}</strong></div>
+            <div><span className="label">Provider</span><strong>{recommendation.provider_id ?? 'unreported'}</strong></div>
+            <div><span className="label">Model</span><strong>{recommendation.model_id ?? 'unreported'}</strong></div>
+            <div><span className="label">Provenance</span><strong>{recommendation.provenance.join(' · ') || 'none'}</strong></div>
           </div>
         </div>
       ) : (
@@ -119,7 +119,7 @@ export function RecommendationPanel() {
 
       <div className="button-row">
         <button className="ghost-btn" onClick={() => void loadRecommendation()} disabled={view === 'LOADING'}>
-          {view === 'LOADING' ? 'REQUESTING…' : view === 'READY' ? 'REFRESH LIVE' : 'LOAD LIVE'}
+          {view === 'LOADING' ? 'Requesting…' : view === 'READY' ? 'Refresh' : 'Load live'}
         </button>
         {view === 'SIGNED_OUT' && <span className="microcopy">Authentication is required.</span>}
         {view === 'ERROR' && <span className="microcopy">Failure is bounded; no fallback is treated as live evidence.</span>}

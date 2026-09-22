@@ -268,7 +268,7 @@ export function AccountControl() {
         }
         const checkoutUrl = verifiedCheckoutUrl(payload);
         if (!checkoutUrl) {
-          setMessage('INVALID_CHECKOUT_RESPONSE');
+          setMessage('INVALID_Checkout_RESPONSE');
           setMessageTone('error');
           return;
         }
@@ -296,20 +296,20 @@ export function AccountControl() {
   }
 
   if (view === 'CHECKING') {
-    return <article className="card account-panel" aria-busy="true"><div className="label">ACCOUNT CONTROL</div><p className="muted" role="status" aria-live="polite">Checking secure Web session…</p></article>;
+    return <article className="card account-panel" aria-busy="true"><div className="label">Account</div><p className="muted" role="status" aria-live="polite">Checking secure Web session…</p></article>;
   }
 
   if (view === 'SIGNED_OUT') {
     return (
       <article className="card account-panel" aria-label="SENTINEL account sign in" aria-busy={busy}>
         <div className="panel-heading">
-          <div><div className="label">ACCOUNT CONTROL</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
-          <span className="badge">HTTPONLY SESSION</span>
+          <div><div className="label">Account</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
+          <span className="badge">Secure Web session</span>
         </div>
         {mfaRequired ? (
           <form onSubmit={completeMfa}>
             <label className="field-label">
-              AUTHENTICATOR OR RECOVERY CODE
+              Authenticator or recovery code
               <input
                 type="text"
                 autoComplete="one-time-code"
@@ -319,14 +319,14 @@ export function AccountControl() {
               />
             </label>
             <div className="microcopy">A session is issued only after this second factor succeeds.</div>
-            <button className="btn" disabled={busy || mfaCode.trim().length < 6}>{busy ? 'WORKING…' : 'VERIFY MFA'}</button>
+            <button className="btn" disabled={busy || mfaCode.trim().length < 6}>{busy ? 'Working…' : 'Verify MFA'}</button>
           </form>
         ) : (
           <>
             <form onSubmit={authenticate}>
-              <label className="field-label">EMAIL<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
+              <label className="field-label">Email<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
               <label className="field-label">
-                PASSWORD
+                Password
                 <input
                   type="password"
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -338,7 +338,7 @@ export function AccountControl() {
                 />
               </label>
               <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
-              <button className="btn" disabled={busy}>{busy ? 'WORKING…' : mode === 'login' ? 'SIGN IN' : 'REGISTER'}</button>
+              <button className="btn" disabled={busy}>{busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
             </form>
             <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMfaRequired(false); setMfaCode(''); setMessage(''); setMessageTone('status'); }} disabled={busy}>
               {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
@@ -354,9 +354,9 @@ export function AccountControl() {
   if (view === 'ERROR') {
     return (
       <article className="card account-panel" aria-label="SENTINEL account control unavailable" aria-busy={busy}>
-        <div className="panel-heading"><div><div className="label">ACCOUNT CONTROL</div><h2>Control data unavailable</h2></div><span className="badge">FAIL-CLOSED</span></div>
+        <div className="panel-heading"><div><div className="label">Account</div><h2>Control data unavailable</h2></div><span className="badge">Fail-closed</span></div>
         <p className="status-message" role="alert" aria-live="assertive">{message || 'Core account data could not be verified.'}</p>
-        <div className="button-row"><button className="ghost-btn" onClick={() => void reloadAccount()} disabled={busy}>RETRY</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>CLEAR SESSION</button></div>
+        <div className="button-row"><button className="ghost-btn" onClick={() => void reloadAccount()} disabled={busy}>Retry</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>Clear session</button></div>
       </article>
     );
   }
@@ -365,20 +365,20 @@ export function AccountControl() {
     <div className="account-stack" aria-busy={busy}>
       <article className="card account-panel">
         <div className="panel-heading">
-          <div><div className="label">ACCOUNT CONTROL</div><h2>Subscription & entitlement state</h2></div>
-          <button className="ghost-btn" onClick={logout} disabled={busy}>SIGN OUT</button>
+          <div><div className="label">Account</div><h2>Access</h2></div>
+          <button className="ghost-btn" onClick={logout} disabled={busy}>Sign out</button>
         </div>
         {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
         <div className="account-metrics">
-          <div><span className="label">SESSION</span><strong className="ok">AUTHENTICATED</strong></div>
-          <div><span className="label">SUBSCRIPTIONS</span><strong>{subscriptions.length}</strong></div>
-          <div><span className="label">ENTITLEMENTS</span><strong>{entitlements.length}</strong></div>
+          <div><span className="label">Session</span><strong className="ok">AUTHENTICATED</strong></div>
+          <div><span className="label">Subscriptions</span><strong>{subscriptions.length}</strong></div>
+          <div><span className="label">Entitlements</span><strong>{entitlements.length}</strong></div>
         </div>
       </article>
 
-      <section className="section billing-section">
+      <section id="access" className="section billing-section">
         <article className="card">
-          <div className="label">PLANS</div>
+          <div className="label">Plans</div>
           {plans.length === 0 && <p className="muted">No plans returned by Core.</p>}
           {plans.map(plan => {
             const hasOpenIntent = activePlanCodes.has(plan.code);
@@ -390,14 +390,14 @@ export function AccountControl() {
                 : `Activate free plan ${plan.name}`;
             return <div className="item plan-row" key={plan.code}>
               <div><strong>{plan.name}</strong><div className="muted">{money(plan)} / {plan.interval_days} days · {plan.entitlement_codes.join(' + ')}</div></div>
-              <button className="ghost-btn" aria-label={actionLabel} disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'INTENT EXISTS' : paid ? 'CHECKOUT' : 'ACTIVATE FREE'}</button>
+              <button className="ghost-btn" aria-label={actionLabel} disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'Intent exists' : paid ? 'Checkout' : 'Activate free'}</button>
             </div>;
           })}
           <p className="boundary-copy">Paid checkout uses a server-created hosted provider session. The browser cannot select price IDs, provider mode, entitlement state, or payment confirmation. Paid features activate only after a verified provider lifecycle event.</p>
         </article>
 
         <article className="card">
-          <div className="label">SUBSCRIPTIONS</div>
+          <div className="label">Subscriptions</div>
           {subscriptions.length === 0 && <p className="muted">No subscription lifecycle records.</p>}
           {subscriptions.map(item => <div className="item" key={item.id}>
             <div className="row-between"><strong>{item.plan_code}</strong><span className={`state state-${item.status.toLowerCase()}`}>{item.status}</span></div>
@@ -408,7 +408,7 @@ export function AccountControl() {
       </section>
 
       <article className="card entitlement-card">
-        <div className="label">GAME ENTITLEMENTS</div>
+        <div className="label">GAME Entitlements</div>
         {entitlements.length === 0 && <p className="muted">No server-authoritative game entitlements.</p>}
         {entitlements.map(item => <div className="item" key={item.id}>
           <div className="row-between"><strong>{item.game_name}</strong><span className="state">{item.status}</span></div>

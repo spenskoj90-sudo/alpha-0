@@ -256,7 +256,7 @@ class MemoryStore(Store):
     def revoke_device(self, device_id):
         with self.lock:
             device = self.devices.get(device_id)
-            if not device or device.get("state") != "ACTIVE":
+            if not device or device.get("state") == "REVOKED":
                 return False
             device["state"] = "REVOKED"
             for session in self.sessions.values():
@@ -724,7 +724,7 @@ class PostgresStore(Store):
             revoked = conn.execute(
                 text(
                     "UPDATE device_bindings SET state='REVOKED',revoked_at=now() "
-                    "WHERE id=:id AND state='ACTIVE' RETURNING id"
+                    "WHERE id=:id AND state<>'REVOKED' RETURNING id"
                 ),
                 {"id": device_id},
             ).scalar_one_or_none()

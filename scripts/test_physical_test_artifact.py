@@ -12,6 +12,8 @@ from physical_test_artifact import build_manifest
 
 SHA = "a" * 40
 ORIGIN = "https://sentinel-core-staging.onrender.com"
+SIGNER = "1" * 64
+OTHER_SIGNER = "2" * 64
 
 
 class PhysicalTestArtifactTests(unittest.TestCase):
@@ -52,6 +54,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
             repository="spenskoj90-sudo/alpha-0",
             run_id="12345",
             run_attempt="2",
+            signer_sha256=SIGNER,
             generated_at="2026-09-16T20:00:00Z",
         )
 
@@ -83,12 +86,17 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 run_attempt="2",
                 signing_mode="stable-test",
                 workflow_name="Physical Test Update APK",
+                signer_sha256=SIGNER,
+                expected_signer_sha256=SIGNER,
                 generated_at="2026-09-21T15:00:00Z",
             )
         self.assertTrue(manifest["updateCompatible"])
         self.assertEqual(manifest["signingMode"], "stable-test")
         self.assertEqual(manifest["workflow"]["name"], "Physical Test Update APK")
         self.assertEqual(manifest["artifactName"], f"sentinel-physical-test-update-apk-{SHA}")
+        self.assertEqual(manifest["signingCertificateSha256"], SIGNER)
+        self.assertEqual(manifest["expectedSigningCertificateSha256"], SIGNER)
+        self.assertTrue(manifest["signerContinuityVerified"])
 
     def test_stable_signing_cannot_claim_routine_secret_free_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -104,6 +112,64 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                     run_id="12345",
                     run_attempt="2",
                     signing_mode="stable-test",
+                    signer_sha256=SIGNER,
+                )
+
+
+    def test_first_stable_signed_baseline_is_not_claimed_update_compatible_without_prior_signer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            manifest = build_manifest(
+                apk=apk,
+                output_metadata=metadata,
+                version_file=version,
+                source_sha=SHA,
+                api_base_url=ORIGIN,
+                repository="spenskoj90-sudo/alpha-0",
+                run_id="12345",
+                run_attempt="2",
+                signing_mode="stable-test",
+                workflow_name="Physical Test Update APK",
+                signer_sha256=SIGNER,
+            )
+        self.assertFalse(manifest["updateCompatible"])
+        self.assertFalse(manifest["signerContinuityVerified"])
+        self.assertIsNone(manifest["expectedSigningCertificateSha256"])
+
+    def test_stable_update_with_signer_mismatch_is_not_update_compatible(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            manifest = build_manifest(
+                apk=apk,
+                output_metadata=metadata,
+                version_file=version,
+                source_sha=SHA,
+                api_base_url=ORIGIN,
+                repository="spenskoj90-sudo/alpha-0",
+                run_id="12345",
+                run_attempt="2",
+                signing_mode="stable-test",
+                workflow_name="Physical Test Update APK",
+                signer_sha256=SIGNER,
+                expected_signer_sha256=OTHER_SIGNER,
+            )
+        self.assertFalse(manifest["updateCompatible"])
+        self.assertFalse(manifest["signerContinuityVerified"])
+
+    def test_invalid_signer_digest_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            with self.assertRaisesRegex(ValueError, "signer SHA-256"):
+                build_manifest(
+                    apk=apk,
+                    output_metadata=metadata,
+                    version_file=version,
+                    source_sha=SHA,
+                    api_base_url=ORIGIN,
+                    repository="spenskoj90-sudo/alpha-0",
+                    run_id="12345",
+                    run_attempt="2",
+                    signer_sha256="not-a-digest",
                 )
 
     def test_loopback_bytes_in_compiled_dex_fail_closed(self) -> None:

@@ -36,6 +36,8 @@ class Store(ABC):
     @abstractmethod
     def get_device(self, device_id: str) -> dict[str, Any] | None: ...
     @abstractmethod
+    def find_active_device_by_key(self, public_key_b64: str, fingerprint: str) -> dict[str, Any] | None: ...
+    @abstractmethod
     def create_challenge(self, device_id: str) -> str: ...
     @abstractmethod
     def consume_challenge(self, challenge: str, device_id: str) -> bool: ...
@@ -143,6 +145,17 @@ class MemoryStore(Store):
 
     def get_device(self, device_id):
         return self.devices.get(device_id)
+
+    def find_active_device_by_key(self, public_key_b64, fingerprint):
+        with self.lock:
+            for device_id, record in self.devices.items():
+                if (
+                    record.get("state") == "ACTIVE"
+                    and record.get("public_key") == public_key_b64
+                    and str(record.get("fingerprint", "")).lower() == fingerprint.lower()
+                ):
+                    return {"device_id": device_id, **record}
+        return None
 
     def create_challenge(self, device_id):
         challenge = secrets.token_urlsafe(32)
@@ -460,6 +473,19 @@ class PostgresStore(Store):
     def get_device(self, device_id):
         with self.engine.begin() as conn:
             row = conn.execute(text("SELECT d.id::text device_id,i.user_handle user_id,d.platform,d.state,d.public_key_der_b64 public_key,d.fingerprint_sha256 fingerprint,d.key_version,COALESCE((SELECT max(sequence) FROM game_events e WHERE e.device_id=d.id),-1) last_sequence FROM device_bindings d JOIN identities i ON i.id=d.identity_id WHERE d.id=:id"), {"id": device_id}).mappings().first()
+        return dict(row) if row else None
+
+    def find_active_device_by_key(self, public_key_b64, fingerprint):
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                text(
+                    "SELECT d.id::text device_id,i.user_handle user_id,d.platform,d.state,"
+                    "d.public_key_der_b64 public_key,d.fingerprint_sha256 fingerprint,d.key_version "
+                    "FROM device_bindings d JOIN identities i ON i.id=d.identity_id "
+                    "WHERE d.fingerprint_sha256=:fp AND d.public_key_der_b64=:key AND d.state='ACTIVE'"
+                ),
+                {"fp": fingerprint, "key": public_key_b64},
+            ).mappings().first()
         return dict(row) if row else None
 
     def create_challenge(self, device_id):

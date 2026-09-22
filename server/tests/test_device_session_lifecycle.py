@@ -1,14 +1,16 @@
 import base64
 import hashlib
 import os
+import time
 
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("SENTINEL_REQUIRE_ENROLLMENT", "false")
 
 from app.main import REFRESH_TTL_SECONDS, SESSION_TTL_SECONDS, app, store
+from app.core.security import canonical_json
 
 client = TestClient(app)
 
@@ -164,3 +166,80 @@ def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():
         json={"action": "character:read", "resource": "character:42"},
     )
     assert old_session.status_code == 401
+
+def test_rotation_recovery_finds_accepted_key_without_creating_another_binding():
+    reset_store()
+    old_key = ec.generate_private_key(ec.SECP256R1())
+    old_public, old_fingerprint = public_material(old_key)
+    old_device = store.register_device("u1", "android", old_public, old_fingerprint, "old-challenge")
+    old_access, _ = session_for()
+    store.sessions[hashlib.sha256(old_access.encode()).hexdigest()]["device_id"] = old_device
+
+    new_key = ec.generate_private_key(ec.SECP256R1())
+    new_public, new_fingerprint = public_material(new_key)
+    rotated = client.post(
+        f"/v1/devices/{old_device}/rotate",
+        headers={"Authorization": f"Bearer {old_access}"},
+        json={
+            "platform": "android",
+            "public_key_der_b64": new_public,
+            "fingerprint_sha256": new_fingerprint,
+        },
+    )
+    assert rotated.status_code == 200, rotated.text
+    new_device = rotated.json()["device_id"]
+    assert store.get_session(old_access) is None
+
+    before_count = len(store.devices) if hasattr(store, "devices") else None
+    recovered = client.post(
+        "/v1/devices/recover",
+        json={
+            "platform": "android",
+            "public_key_der_b64": new_public,
+            "fingerprint_sha256": new_fingerprint,
+        },
+    )
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["device_id"] == new_device
+    assert recovered.json()["state"] == "ACTIVE"
+    challenge = recovered.json()["challenge"]
+    if before_count is not None:
+        assert len(store.devices) == before_count
+
+    request_id = "rotation-recovery-proof"
+    timestamp = int(time.time())
+    payload = canonical_json({"challenge": challenge, "timestamp": timestamp, "request_id": request_id})
+    signature = base64.b64encode(new_key.sign(payload, ec.ECDSA(hashes.SHA256()))).decode()
+    proved = client.post(
+        f"/v1/devices/{new_device}/prove",
+        json={
+            "challenge": challenge,
+            "timestamp": timestamp,
+            "request_id": request_id,
+            "signature_b64": signature,
+        },
+    )
+    assert proved.status_code == 200, proved.text
+    assert proved.json()["session_token"]
+    assert store.get_session(proved.json()["session_token"])["device_id"] == new_device
+
+
+def test_rotation_recovery_unknown_key_is_non_creating():
+    reset_store()
+    key = ec.generate_private_key(ec.SECP256R1())
+    public_b64, fingerprint = public_material(key)
+    before_count = len(store.devices) if hasattr(store, "devices") else None
+    response = client.post(
+        "/v1/devices/recover",
+        json={
+            "platform": "android",
+            "public_key_der_b64": public_b64,
+            "fingerprint_sha256": fingerprint,
+        },
+    )
+    assert response.status_code == 404
+    assert response.json()["code"] == "DEVICE_ROTATION_NOT_FOUND"
+    if before_count is not None:
+        assert len(store.devices) == before_count
+
+

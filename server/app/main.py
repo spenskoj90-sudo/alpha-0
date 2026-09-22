@@ -970,12 +970,12 @@ def recover_device_rotation(
         raise HTTPException(status_code=404, detail="DEVICE_ROTATION_NOT_FOUND")
     challenge = store.create_challenge(device["device_id"])
     store.add_audit({
-        "actor_user_id": device["user_id"],
-        "actor_device_id": device["device_id"],
-        "action": "device:rotation-recover",
-        "resource": "device",
+        "actor_user_id": None,
+        "actor_device_id": None,
+        "action": "device:rotation-recover-challenge",
+        "resource": device["device_id"],
         "decision": "ALLOW",
-        "reason_code": "DEVICE_ROTATION_CANDIDATE_FOUND",
+        "reason_code": "DEVICE_ROTATION_CHALLENGE_ISSUED",
         "request_id": rid,
     })
     return DeviceRegisterResponse(device_id=device["device_id"], state="ACTIVE", challenge=challenge)

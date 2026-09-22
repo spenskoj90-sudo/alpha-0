@@ -12,7 +12,8 @@ The ZIP must contain exactly:
 
 - `app/build/outputs/apk/physicalTest/app-physicalTest.apk`;
 - `physical-test-apk.sha256`;
-- `physical-test-manifest.json`.
+- `physical-test-manifest.json`;
+- `physical-test-signer.txt`.
 
 The manifest must identify:
 
@@ -22,9 +23,10 @@ The manifest must identify:
 - build variant `physicalTest`;
 - API environment `staging`;
 - API origin `https://sentinel-core-staging.onrender.com`;
-- diagnostic mode `FORENSIC_TEST`.
+- diagnostic mode `FORENSIC_TEST`;
+- the actual `signerCertificateSha256` matching the digest in `physical-test-signer.txt`.
 
-Verify the APK SHA-256 against both `physical-test-apk.sha256` and `physical-test-manifest.json`. On the phone, the red top banner must show `PHYSICAL TEST · STAGING`, the expected version and the first 12 characters of the same source SHA.
+Verify the APK SHA-256 against both `physical-test-apk.sha256` and `physical-test-manifest.json`, and verify the manifest signer fingerprint against `physical-test-signer.txt`. On the phone, the red top banner must show `PHYSICAL TEST · STAGING`, the expected version and the first 12 characters of the same source SHA.
 
 ## 2. Before installation
 

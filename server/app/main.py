@@ -264,37 +264,6 @@ def bind_session_to_device(access_token: str, device_id: str) -> None:
             raise HTTPException(status_code=401, detail="INVALID_SESSION")
 
 
-def revoke_device_sessions(device_id: str) -> None:
-    if isinstance(store, MemoryStore):
-        with store.lock:
-            for record in store.sessions.values():
-                if record.get("device_id") == device_id:
-                    record["revoked"] = True
-        return
-    with store.engine.begin() as conn:
-        conn.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE sessions SET revoked_at=now() WHERE device_id=:device_id AND revoked_at IS NULL"
-            ),
-            {"device_id": device_id},
-        )
-
-
-def set_device_state(device_id: str, state: str) -> None:
-    if isinstance(store, MemoryStore):
-        device = store.devices.get(device_id)
-        if device:
-            device["state"] = state
-        return
-    with store.engine.begin() as conn:
-        conn.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE device_bindings SET state=:state, revoked_at=CASE WHEN :state='REVOKED' THEN now() ELSE revoked_at END WHERE id=:device_id"
-            ),
-            {"device_id": device_id, "state": state},
-        )
-
-
 def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str) -> bool:
     return principal.device_id == device_id or device.get("user_id") == principal.user_id
 
@@ -1015,8 +984,8 @@ def revoke_device(device_id: str, request: Request, authorization_header: str = 
         raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
     if device.get("state") == "REVOKED":
         raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
-    set_device_state(device_id, "REVOKED")
-    revoke_device_sessions(device_id)
+    if not store.revoke_device(device_id):
+        raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:revoke", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
     return {"revoked": True}
 

@@ -1046,10 +1046,23 @@ def rotate_device(
         raise HTTPException(status_code=409, detail="KEY_UNCHANGED")
 
     challenge = secrets.token_urlsafe(32)
-    new_device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
-    new_access, new_refresh, expires_at, scopes = store.issue_session(new_device_id, principal.user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    set_device_state(device_id, "REVOKED")
-    revoke_device_sessions(device_id)
+    try:
+        new_device_id, new_access, new_refresh, expires_at, scopes = store.rotate_device_identity(
+            device_id,
+            principal.user_id,
+            payload.platform,
+            payload.public_key_der_b64,
+            fingerprint,
+            challenge,
+            SESSION_TTL_SECONDS,
+            REFRESH_TTL_SECONDS,
+        )
+    except ValueError as exc:
+        if str(exc) == "DEVICE_KEY_CONFLICT":
+            raise HTTPException(status_code=409, detail="DEVICE_KEY_CONFLICT") from exc
+        if str(exc) == "DEVICE_NOT_ACTIVE":
+            raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE") from exc
+        raise
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:rotate", "resource": new_device_id, "decision": "ALLOW", "reason_code": "DEVICE_ROTATED", "request_id": rid})
     return {
         "device_id": new_device_id,

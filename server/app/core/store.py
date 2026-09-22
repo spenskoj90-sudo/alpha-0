@@ -38,6 +38,18 @@ class Store(ABC):
     @abstractmethod
     def find_active_device_by_key(self, public_key_b64: str, fingerprint: str) -> dict[str, Any] | None: ...
     @abstractmethod
+    def rotate_device_identity(
+        self,
+        old_device_id: str,
+        user_id: str,
+        platform: str,
+        public_key_b64: str,
+        fingerprint: str,
+        challenge: str,
+        access_ttl: int,
+        refresh_ttl: int,
+    ) -> tuple[str, str, str, datetime, list[str]]: ...
+    @abstractmethod
     def create_challenge(self, device_id: str) -> str: ...
     @abstractmethod
     def consume_challenge(self, challenge: str, device_id: str) -> bool: ...
@@ -156,6 +168,74 @@ class MemoryStore(Store):
                 ):
                     return {"device_id": device_id, **record}
         return None
+
+    def rotate_device_identity(
+        self,
+        old_device_id,
+        user_id,
+        platform,
+        public_key_b64,
+        fingerprint,
+        challenge,
+        access_ttl,
+        refresh_ttl,
+    ):
+        with self.lock:
+            old = self.devices.get(old_device_id)
+            if not old or old.get("user_id") != user_id or old.get("state") != "ACTIVE":
+                raise ValueError("DEVICE_NOT_ACTIVE")
+            existing = next(
+                (
+                    (device_id, record)
+                    for device_id, record in self.devices.items()
+                    if str(record.get("fingerprint", "")).lower() == fingerprint.lower()
+                ),
+                None,
+            )
+            if existing is not None:
+                new_device_id, record = existing
+                if (
+                    record.get("user_id") != user_id
+                    or record.get("state") != "ACTIVE"
+                    or record.get("public_key") != public_key_b64
+                ):
+                    raise ValueError("DEVICE_KEY_CONFLICT")
+            else:
+                new_device_id = str(uuid.uuid4())
+                self.devices[new_device_id] = {
+                    "user_id": user_id,
+                    "platform": platform,
+                    "public_key": public_key_b64,
+                    "fingerprint": fingerprint,
+                    "state": "ACTIVE",
+                    "key_version": int(old.get("key_version", 1)) + 1,
+                    "last_sequence": -1,
+                }
+            self.challenges[session_hash(challenge)] = {
+                "device_id": new_device_id,
+                "expires_at": time.time() + 120,
+                "consumed": False,
+            }
+            access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+            now = datetime.now(UTC)
+            exp = now + timedelta(seconds=access_ttl)
+            self.sessions[session_hash(access)] = {
+                "user_id": user_id,
+                "device_id": new_device_id,
+                "scopes": SCOPES,
+                "roles": ["user"],
+                "issued_at": now.timestamp(),
+                "expires_at": exp.timestamp(),
+                "refresh_hash": session_hash(refresh),
+                "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
+                "refresh_used": False,
+                "revoked": False,
+            }
+            old["state"] = "REVOKED"
+            for session in self.sessions.values():
+                if session.get("device_id") == old_device_id:
+                    session["revoked"] = True
+            return new_device_id, access, refresh, exp, SCOPES
 
     def create_challenge(self, device_id):
         challenge = secrets.token_urlsafe(32)
@@ -487,6 +567,99 @@ class PostgresStore(Store):
                 {"fp": fingerprint, "key": public_key_b64},
             ).mappings().first()
         return dict(row) if row else None
+
+    def rotate_device_identity(
+        self,
+        old_device_id,
+        user_id,
+        platform,
+        public_key_b64,
+        fingerprint,
+        challenge,
+        access_ttl,
+        refresh_ttl,
+    ):
+        access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=access_ttl)
+        refexp = now + timedelta(seconds=refresh_ttl)
+        candidate_id = str(uuid.uuid4())
+        with self.engine.begin() as conn:
+            old = conn.execute(
+                text(
+                    "SELECT d.id::text device_id,d.identity_id,d.state,d.key_version "
+                    "FROM device_bindings d JOIN identities i ON i.id=d.identity_id "
+                    "WHERE d.id=:id AND i.user_handle=:user FOR UPDATE"
+                ),
+                {"id": old_device_id, "user": user_id},
+            ).mappings().first()
+            if not old or old["state"] != "ACTIVE":
+                raise ValueError("DEVICE_NOT_ACTIVE")
+            new_device_id = conn.execute(
+                text(
+                    "INSERT INTO device_bindings("
+                    "id,identity_id,state,platform,public_key_der_b64,fingerprint_sha256,key_version"
+                    ") VALUES (:id,:uid,'ACTIVE',:platform,:key,:fp,:version) "
+                    "ON CONFLICT (fingerprint_sha256) DO NOTHING "
+                    "RETURNING id::text"
+                ),
+                {
+                    "id": candidate_id,
+                    "uid": old["identity_id"],
+                    "platform": platform,
+                    "key": public_key_b64,
+                    "fp": fingerprint,
+                    "version": int(old["key_version"] or 1) + 1,
+                },
+            ).scalar_one_or_none()
+            if new_device_id is None:
+                existing = conn.execute(
+                    text(
+                        "SELECT id::text device_id,identity_id,state,public_key_der_b64 "
+                        "FROM device_bindings WHERE fingerprint_sha256=:fp FOR UPDATE"
+                    ),
+                    {"fp": fingerprint},
+                ).mappings().one()
+                if (
+                    existing["identity_id"] != old["identity_id"]
+                    or existing["state"] != "ACTIVE"
+                    or existing["public_key_der_b64"] != public_key_b64
+                ):
+                    raise ValueError("DEVICE_KEY_CONFLICT")
+                new_device_id = str(existing["device_id"])
+            conn.execute(
+                text(
+                    "INSERT INTO device_challenges(device_id,nonce_hash,expires_at) "
+                    "VALUES (:id,:nonce,now()+interval '120 seconds')"
+                ),
+                {"id": new_device_id, "nonce": session_hash(challenge)},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO sessions("
+                    "identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
+                    "refresh_token_hash,refresh_expires_at"
+                    ") VALUES (:uid,:device,:sh,:scopes,now(),:exp,:rh,:rexp)"
+                ),
+                {
+                    "uid": old["identity_id"],
+                    "device": new_device_id,
+                    "sh": session_hash(access),
+                    "scopes": json.dumps(SCOPES),
+                    "exp": exp,
+                    "rh": session_hash(refresh),
+                    "rexp": refexp,
+                },
+            )
+            conn.execute(
+                text("UPDATE device_bindings SET state='REVOKED',revoked_at=now() WHERE id=:id"),
+                {"id": old_device_id},
+            )
+            conn.execute(
+                text("UPDATE sessions SET revoked_at=now() WHERE device_id=:id AND revoked_at IS NULL"),
+                {"id": old_device_id},
+            )
+        return new_device_id, access, refresh, exp, SCOPES
 
     def create_challenge(self, device_id):
         challenge = secrets.token_urlsafe(32)

@@ -109,8 +109,8 @@ jobs:
           test -n "$sdk_root"
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$apksigner"
-          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-signer.txt
-          digest="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk 2>&1 | tee physical-test-signer.txt
+          digest="$(sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: ([0-9A-Fa-f]{64})$/\1/p' physical-test-signer.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
           case "$digest" in
             *[!0-9a-f]*|'') echo "invalid stable physical-test signer SHA-256"; exit 1 ;;
           esac

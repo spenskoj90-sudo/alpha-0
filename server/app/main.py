@@ -951,6 +951,36 @@ def bind_device(
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 
+@app.post("/v1/devices/recover", response_model=DeviceRegisterResponse)
+def recover_device_rotation(
+    payload: DeviceBindRequest,
+    request: Request,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-rotation-recover")
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    device = store.find_active_device_by_key(payload.public_key_der_b64, fingerprint)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_ROTATION_NOT_FOUND")
+    challenge = store.create_challenge(device["device_id"])
+    store.add_audit({
+        "actor_user_id": device["user_id"],
+        "actor_device_id": device["device_id"],
+        "action": "device:rotation-recover",
+        "resource": "device",
+        "decision": "ALLOW",
+        "reason_code": "DEVICE_ROTATION_CANDIDATE_FOUND",
+        "request_id": rid,
+    })
+    return DeviceRegisterResponse(device_id=device["device_id"], state="ACTIVE", challenge=challenge)
+
+
 @app.get("/v1/devices/{device_id}")
 def get_device(device_id: str, authorization_header: str = Header(..., alias="Authorization")):
     principal = principal_from_token(require_bearer(authorization_header))

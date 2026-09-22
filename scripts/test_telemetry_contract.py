@@ -169,6 +169,8 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertIn("retention-days: 90", self.physical_workflow)
         self.assertNotIn("secrets.", self.physical_workflow)
         self.assertIn("--signing-mode \"$SENTINEL_PHYSICAL_TEST_SIGNING_MODE\"", self.physical_workflow)
+        self.assertIn("--signer-sha256 \"$PHYSICAL_TEST_SIGNER_SHA256\"", self.physical_workflow)
+        self.assertIn("physical-test-signer.txt", self.physical_workflow)
         self.assertIn("SENTINEL_PHYSICAL_TEST_SIGNING_MODE=ephemeral-debug", self.physical_workflow)
 
         update_workflow = read(".github/workflows/physical-test-update-apk.yml")
@@ -176,8 +178,12 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertNotIn("pull_request:", update_workflow)
         self.assertNotIn("push:", update_workflow)
         self.assertIn("PHYSICAL_TEST_KEYSTORE_BASE64", update_workflow)
+        self.assertIn("expected_signer_sha256:", update_workflow)
+        self.assertIn("--signer-sha256 \"$PHYSICAL_TEST_SIGNER_SHA256\"", update_workflow)
+        self.assertIn("--expected-signer-sha256 \"$EXPECTED_SIGNER_SHA256\"", update_workflow)
         self.assertIn("--signing-mode stable-test", update_workflow)
         self.assertIn('--workflow-name "Physical Test Update APK"', update_workflow)
+        self.assertIn('"updateCompatible"', update_workflow)
 
     def test_user_ticket_diagnostics_require_explicit_consent_and_remain_bounded(self) -> None:
         local = self.contract["localDiagnostics"]

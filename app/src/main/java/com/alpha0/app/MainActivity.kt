@@ -45,6 +45,11 @@ import com.alpha0.app.dashboard.ActivityScreen
 import com.alpha0.app.dashboard.DashboardApi
 import com.alpha0.app.dashboard.DashboardScreen
 import com.alpha0.app.dashboard.DeviceDetailsScreen
+import com.alpha0.app.dashboard.AccountSecurityDetailScreen
+import com.alpha0.app.dashboard.DeviceIdentityDetailScreen
+import com.alpha0.app.dashboard.SecurityDetailSection
+import com.alpha0.app.dashboard.SecurityHubScreen
+import com.alpha0.app.dashboard.SessionsDetailScreen
 import com.alpha0.app.dashboard.GameDetailsScreen
 import com.alpha0.app.dashboard.GamesScreen
 import com.alpha0.app.dashboard.MfaRecoveryCodesScreen
@@ -331,7 +336,7 @@ private fun SentinelApplicationUi(
     val startDestination = when {
         activeSession == null -> "login"
         activeSession?.deviceId.isNullOrBlank() -> "device-setup"
-        federatedCallbackUri != null -> "security"
+        federatedCallbackUri != null -> "security-providers"
         else -> "home"
     }
     val backStack by navController.currentBackStackEntryAsState()
@@ -350,7 +355,7 @@ private fun SentinelApplicationUi(
         "help" -> strings.text("help")
         "about" -> strings.text("about")
         "games" -> strings.text("games")
-        "security", "device-details", "mfa-recovery-codes" -> strings.text("security")
+        "security", "security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers", "device-details", "mfa-recovery-codes" -> strings.text("security")
         "activity" -> strings.text("activity")
         else -> strings.text("app_name")
     }
@@ -444,7 +449,7 @@ private fun SentinelApplicationUi(
                             current.accessToken,
                             current.deviceId!!,
                             dashboardApi,
-                            onDeviceClick = { navController.navigate("device-details") },
+                            onDeviceClick = { navController.navigate("security-device") },
                             onGameClick = { navController.navigate("game-details/$it") },
                             onReportProblem = { navController.navigate("quality-report") },
                             onSignedOut = {
@@ -462,28 +467,118 @@ private fun SentinelApplicationUi(
                 }
                 composable("security") {
                     AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
-                        DeviceDetailsContent(
-                            session = current,
+                        SecurityHubScreen(
+                            accessToken = current.accessToken,
+                            deviceId = current.deviceId!!,
                             api = dashboardApi,
                             authApi = authApi,
+                        ) { section ->
+                            val route = when (section) {
+                                SecurityDetailSection.ACCOUNT -> "security-account"
+                                SecurityDetailSection.MFA -> "security-mfa"
+                                SecurityDetailSection.RECOVERY -> "security-recovery"
+                                SecurityDetailSection.SESSIONS -> "security-sessions"
+                                SecurityDetailSection.DEVICE -> "security-device"
+                                SecurityDetailSection.PROVIDERS -> "security-providers"
+                            }
+                            navController.navigate(route)
+                        }
+                    }
+                }
+                composable("security-account") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        AccountSecurityDetailScreen(
+                            section = SecurityDetailSection.ACCOUNT,
+                            accessToken = current.accessToken,
+                            authApi = authApi,
                             federatedAuth = federatedAuth,
-                            federatedCallbackUri = federatedCallbackUri,
+                            federatedCallbackUri = null,
                             onFederatedCallbackConsumed = onFederatedCallbackConsumed,
-                            identity = deviceIdentity,
-                            store = sessionStore,
-                            activity = activity,
-                            navController = navController,
+                            onMfaEnabled = {},
+                            onSessionBoundary = {},
+                        )
+                    }
+                }
+                composable("security-mfa") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        AccountSecurityDetailScreen(
+                            section = SecurityDetailSection.MFA,
+                            accessToken = current.accessToken,
+                            authApi = authApi,
+                            federatedAuth = federatedAuth,
+                            federatedCallbackUri = null,
+                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
                             onMfaEnabled = { codes ->
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 pendingMfaRecoveryCodes = codes
-                                navController.navigate("mfa-recovery-codes") {
-                                    popUpTo(navController.graph.id) { inclusive = true }
+                                navController.navigate("mfa-recovery-codes") { popUpTo(navController.graph.id) { inclusive = true } }
+                            },
+                            onSessionBoundary = {
+                                sessionStore.clear(activity)
+                                activeSession = null
+                                navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }
+                            },
+                        )
+                    }
+                }
+                composable("security-recovery") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        AccountSecurityDetailScreen(
+                            section = SecurityDetailSection.RECOVERY,
+                            accessToken = current.accessToken,
+                            authApi = authApi,
+                            federatedAuth = federatedAuth,
+                            federatedCallbackUri = null,
+                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
+                            onMfaEnabled = { codes ->
+                                sessionStore.clear(activity)
+                                activeSession = null
+                                pendingMfaRecoveryCodes = codes
+                                navController.navigate("mfa-recovery-codes") { popUpTo(navController.graph.id) { inclusive = true } }
+                            },
+                            onSessionBoundary = {},
+                        )
+                    }
+                }
+                composable("security-sessions") { SessionsDetailScreen() }
+                composable("security-providers") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        AccountSecurityDetailScreen(
+                            section = SecurityDetailSection.PROVIDERS,
+                            accessToken = current.accessToken,
+                            authApi = authApi,
+                            federatedAuth = federatedAuth,
+                            federatedCallbackUri = federatedCallbackUri,
+                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
+                            onMfaEnabled = {},
+                            onSessionBoundary = {},
+                        )
+                    }
+                }
+                composable("security-device") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        DeviceIdentityDetailScreen(
+                            accessToken = current.accessToken,
+                            deviceId = current.deviceId!!,
+                            api = dashboardApi,
+                            deviceIdentity = deviceIdentity,
+                            onRevoked = {
+                                sessionStore.clear(activity)
+                                activeSession = null
+                                navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }
+                            },
+                            onRotated = { rotated ->
+                                val replacementId = rotated.deviceId
+                                val access = rotated.sessionToken
+                                val refresh = rotated.refreshToken
+                                if (!replacementId.isNullOrBlank() && !access.isNullOrBlank() && !refresh.isNullOrBlank()) {
+                                    sessionStore.save(activity, access, refresh, replacementId)
+                                    activeSession = sessionStore.load(activity)
+                                    navController.navigate("home") { popUpTo("home") { inclusive = true } }
                                 }
                             },
-                        ) {
-                            activeSession = it
-                        }
+                        )
                     }
                 }
                 composable("mfa-recovery-codes") {

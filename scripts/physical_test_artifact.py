@@ -20,6 +20,7 @@ EXPECTED_VARIANT = "physicalTest"
 EXPECTED_STAGING_ORIGIN = "https://sentinel-core-staging.onrender.com"
 EXPECTED_HTTP_READ_TIMEOUT_MS = 75_000
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DEX_ENTRY = re.compile(r"^classes(?:\d+)?\.dex$")
 
 
@@ -81,6 +82,8 @@ def build_manifest(
     run_attempt: str,
     signing_mode: str = "ephemeral-debug",
     workflow_name: str = "Physical Test APK",
+    signer_sha256: str,
+    expected_signer_sha256: str = "",
     generated_at: str | None = None,
 ) -> dict[str, object]:
     require(SHA40.fullmatch(source_sha) is not None, "source SHA must be 40-character lowercase hex")
@@ -93,6 +96,13 @@ def build_manifest(
         (signing_mode == "stable-test") == (workflow_name == "Physical Test Update APK"),
         "stable-test signing must use the dedicated update workflow",
     )
+    signer_sha256 = signer_sha256.strip().lower()
+    expected_signer_sha256 = expected_signer_sha256.strip().lower()
+    require(SHA256.fullmatch(signer_sha256) is not None, "physical-test signer SHA-256 must be 64-character lowercase hex")
+    if expected_signer_sha256:
+        require(signing_mode == "stable-test", "expected signer continuity is valid only for stable-test signing")
+        require(SHA256.fullmatch(expected_signer_sha256) is not None, "expected signer SHA-256 must be 64-character lowercase hex")
+    signer_continuity_verified = bool(expected_signer_sha256) and signer_sha256 == expected_signer_sha256
     origin = validate_staging_origin(api_base_url)
     canonical_version = version_file.read_text(encoding="utf-8").strip()
     require(bool(canonical_version), "canonical VERSION is empty")
@@ -129,7 +139,10 @@ def build_manifest(
         "apiBaseUrl": origin,
         "runtimeEnvironment": "staging",
         "signingMode": signing_mode,
-        "updateCompatible": signing_mode == "stable-test",
+        "signingCertificateSha256": signer_sha256,
+        "expectedSigningCertificateSha256": expected_signer_sha256 or None,
+        "signerContinuityVerified": signer_continuity_verified,
+        "updateCompatible": signing_mode == "stable-test" and signer_continuity_verified,
         "httpReadTimeoutMs": EXPECTED_HTTP_READ_TIMEOUT_MS,
         "coldStartAware": True,
         "diagnosticsMode": "FORENSIC_TEST",
@@ -149,6 +162,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-attempt", required=True)
     parser.add_argument("--signing-mode", default="ephemeral-debug")
     parser.add_argument("--workflow-name", default="Physical Test APK")
+    parser.add_argument("--signer-sha256", required=True)
+    parser.add_argument("--expected-signer-sha256", default="")
     parser.add_argument("--generated-at")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -168,6 +183,8 @@ def main() -> int:
             run_attempt=args.run_attempt,
             signing_mode=args.signing_mode,
             workflow_name=args.workflow_name,
+            signer_sha256=args.signer_sha256,
+            expected_signer_sha256=args.expected_signer_sha256,
             generated_at=args.generated_at,
         )
     except (OSError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:

@@ -32,7 +32,7 @@ The running FastAPI service publishes the live API specification at `/openapi.js
 - `POST /v1/devices/register` — register a device with a public-key fingerprint; supports authenticated user-bound enrollment and the legacy enrollment-token bootstrap path.
 - `POST /v1/devices/bind` — bind a new device key to the authenticated user session and return the first one-time proof challenge.
 - `POST /v1/devices/recover` — crash-recovery discovery for a previously accepted exact public-key/fingerprint pair; returns only the active device id and a fresh proof challenge, never a session. The caller must still prove possession of the Android Keystore private key through `/v1/devices/{device_id}/prove`.
-- `GET /v1/devices/{device_id}` — read the caller-owned device state.
+- `GET /v1/devices/{device_id}` — read the caller-owned device state, including durable `bound_at` from the binding creation time and nullable `last_seen_at` from throttled authenticated device activity. Unbound sessions do not advance device activity.
 - `POST /v1/devices/{device_id}/challenge` — issue a fresh one-time proof challenge for a caller-owned active device; used for proof retry without creating another device binding.
 - `POST /v1/devices/{device_id}/prove` — consume the device challenge and verify a P-256 signed proof to issue a device-bound session.
 - `POST /v1/devices/{device_id}/rotate` — rotate a caller-owned active device key and issue a new device-bound session.

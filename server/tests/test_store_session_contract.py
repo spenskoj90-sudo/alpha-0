@@ -3,13 +3,15 @@ import os
 import uuid
 
 import pytest
+from sqlalchemy import text
 
 from app.core.store import MemoryStore, PostgresStore
 
 
 def test_memory_store_refresh_rotation_revokes_previous_access_session():
     store = MemoryStore()
-    old_access, old_refresh, _, _ = store.issue_session("device-1", "user-1", 3600, 7200)
+    device_id = store.register_device("user-1", "android", "memory-refresh-key", "1" * 64, "challenge")
+    old_access, old_refresh, _, _ = store.issue_session(device_id, "user-1", 3600, 7200)
 
     rotated = store.rotate_refresh(old_refresh, 3600, 7200)
 
@@ -28,7 +30,8 @@ def test_memory_store_refresh_rotation_revokes_previous_access_session():
 
 def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():
     store = MemoryStore()
-    old_access, old_refresh, _, _ = store.issue_session("device-1", "user-1", 3600, 7200)
+    device_id = store.register_device("user-1", "android", "memory-race-key", "2" * 64, "challenge")
+    old_access, old_refresh, _, _ = store.issue_session(device_id, "user-1", 3600, 7200)
 
     def attempt(_):
         return store.rotate_refresh(old_refresh, 3600, 7200)
@@ -171,5 +174,120 @@ def test_postgres_device_rotation_is_atomic_and_conflict_rolls_back():
             3600,
             7200,
         )
+    store.engine.dispose()
+
+@pytest.mark.postgres
+def test_postgres_device_activity_metadata_is_truthful_and_throttled():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    suffix = uuid.uuid4().hex
+    user_id = f"pg-seen-{suffix}"
+    fingerprint = ("e" + suffix * 2)[:64]
+    public_key = "cHVibGljLXNlZW4t" + suffix
+    device_id = store.register_device(user_id, "android", public_key, fingerprint, "challenge-seen")
+
+    initial = store.get_device(device_id)
+    assert initial["created_at"] is not None
+    assert initial["last_seen_at"] is None
+
+    assert store.touch_device(device_id) is True
+    first_seen = store.get_device(device_id)["last_seen_at"]
+    assert first_seen is not None
+
+    # Ordinary request volume cannot write last_seen_at on every call.
+    assert store.touch_device(device_id) is False
+    assert store.get_device(device_id)["last_seen_at"] == first_seen
+
+    rotated_id, _, _, _, _ = store.rotate_device_identity(
+        device_id,
+        user_id,
+        "android",
+        "cHVibGljLXNlZW4tbmV3LQ" + suffix,
+        ("f" + suffix * 2)[:64],
+        "challenge-seen-new",
+        3600,
+        7200,
+    )
+    assert rotated_id != device_id
+    assert store.get_device(device_id)["state"] == "REVOKED"
+    assert store.touch_device(device_id) is False
+    assert store.get_device(device_id)["last_seen_at"] == first_seen
+    store.engine.dispose()
+
+def test_memory_store_revoked_device_sessions_fail_closed_even_if_session_row_is_stale():
+    store = MemoryStore()
+    device_id = store.register_device("memory-revoke", "android", "memory-key", "9" * 64, "challenge")
+    access, refresh, _, _ = store.issue_session(device_id, "memory-revoke", 3600, 7200)
+    user_access, user_refresh, _, _ = store.issue_session(None, "memory-revoke", 3600, 7200)
+
+    # Simulate historical/process-crash inconsistency: device state changed but
+    # the session row itself was not marked revoked.
+    store.devices[device_id]["state"] = "REVOKED"
+
+    assert store.get_session(access) is None
+    assert store.rotate_refresh(refresh, 3600, 7200) is None
+    assert store.get_session(user_access) is not None
+    assert store.rotate_refresh(user_refresh, 3600, 7200) is not None
+
+
+@pytest.mark.postgres
+def test_postgres_revoke_is_atomic_and_stale_device_sessions_fail_closed():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    suffix = uuid.uuid4().hex
+    user_id = f"pg-revoke-{suffix}"
+    device_id = store.register_device(
+        user_id,
+        "android",
+        "cHVibGljLXJldm9rZS0" + suffix,
+        ("7" + suffix * 2)[:64],
+        "challenge-revoke",
+    )
+    first_access, first_refresh, _, _ = store.issue_session(device_id, user_id, 3600, 7200)
+    second_access, _, _, _ = store.issue_session(device_id, user_id, 3600, 7200)
+    user_access, user_refresh, _, _ = store.issue_session(None, user_id, 3600, 7200)
+
+    assert store.revoke_device(device_id) is True
+    assert store.get_device(device_id)["state"] == "REVOKED"
+    assert store.get_session(first_access) is None
+    assert store.get_session(second_access) is None
+    assert store.rotate_refresh(first_refresh, 3600, 7200) is None
+    assert store.revoke_device(device_id) is False
+
+    # Revoking a device must not revoke independent least-privilege user sessions.
+    assert store.get_session(user_access) is not None
+    assert store.rotate_refresh(user_refresh, 3600, 7200) is not None
+
+    # Defense-in-depth proof: even a deliberately stale/unrevoked session row
+    # cannot authorize or rotate refresh once its device is REVOKED.
+    stale_device = store.register_device(
+        f"{user_id}-stale",
+        "android",
+        "cHVibGljLXN0YWxlLQ" + suffix,
+        ("8" + suffix * 2)[:64],
+        "challenge-stale",
+    )
+    stale_access, stale_refresh, _, _ = store.issue_session(stale_device, f"{user_id}-stale", 3600, 7200)
+    with store.engine.begin() as conn:
+        conn.execute(
+            text("UPDATE device_bindings SET state='REVOKED',revoked_at=now() WHERE id=:id"),
+            {"id": stale_device},
+        )
+    assert store.get_session(stale_access) is None
+    assert store.rotate_refresh(stale_refresh, 3600, 7200) is None
+
+    suspended_device = store.register_device(
+        f"{user_id}-suspended",
+        "android",
+        "cHVibGljLXN1c3BlbmRlZC0" + suffix,
+        ("6" + suffix * 2)[:64],
+        "challenge-suspended",
+    )
+    with store.engine.begin() as conn:
+        conn.execute(
+            text("UPDATE device_bindings SET state='SUSPENDED' WHERE id=:id"),
+            {"id": suspended_device},
+        )
+    assert store.revoke_device(suspended_device) is True
+    assert store.get_device(suspended_device)["state"] == "REVOKED"
+    assert store.revoke_device(suspended_device) is False
     store.engine.dispose()
 

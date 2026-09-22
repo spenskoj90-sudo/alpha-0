@@ -353,8 +353,16 @@ def test_google_provider_link_requires_authenticated_account_and_fresh_nonce(mon
     assert pre_device.status_code == 403
     assert pre_device.json()["code"] == "DEVICE_BOUND_SESSION_REQUIRED"
 
+    suffix = uuid.uuid4().hex
+    device_id = main_module.store.register_device(
+        email,
+        "android",
+        f"federated-link-public-{suffix}",
+        (suffix * 2)[:64],
+        f"federated-link-challenge-{suffix}",
+    )
     session_record = main_module.store.sessions[session_hash(access)]
-    session_record["device_id"] = "unit-test-device"
+    session_record["device_id"] = device_id
 
     linked = client.post(
         "/v1/account/providers/google/link",

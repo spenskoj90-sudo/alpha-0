@@ -224,7 +224,10 @@ def principal_from_token(token: str) -> Principal:
     record = store.get_session(token)
     if not record:
         raise HTTPException(status_code=401, detail="INVALID_SESSION")
-    return Principal(record["user_id"], record.get("device_id"), frozenset(record.get("roles", [])), frozenset(record.get("scopes", [])))
+    device_id = record.get("device_id")
+    if device_id:
+        store.touch_device(device_id)
+    return Principal(record["user_id"], device_id, frozenset(record.get("roles", [])), frozenset(record.get("scopes", [])))
 
 
 def require_bearer(authorization_header: str) -> str:
@@ -259,37 +262,6 @@ def bind_session_to_device(access_token: str, device_id: str) -> None:
         )
         if result.rowcount != 1:
             raise HTTPException(status_code=401, detail="INVALID_SESSION")
-
-
-def revoke_device_sessions(device_id: str) -> None:
-    if isinstance(store, MemoryStore):
-        with store.lock:
-            for record in store.sessions.values():
-                if record.get("device_id") == device_id:
-                    record["revoked"] = True
-        return
-    with store.engine.begin() as conn:
-        conn.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE sessions SET revoked_at=now() WHERE device_id=:device_id AND revoked_at IS NULL"
-            ),
-            {"device_id": device_id},
-        )
-
-
-def set_device_state(device_id: str, state: str) -> None:
-    if isinstance(store, MemoryStore):
-        device = store.devices.get(device_id)
-        if device:
-            device["state"] = state
-        return
-    with store.engine.begin() as conn:
-        conn.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE device_bindings SET state=:state, revoked_at=CASE WHEN :state='REVOKED' THEN now() ELSE revoked_at END WHERE id=:device_id"
-            ),
-            {"device_id": device_id, "state": state},
-        )
 
 
 def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str) -> bool:
@@ -995,8 +967,8 @@ def get_device(device_id: str, authorization_header: str = Header(..., alias="Au
         "platform": device.get("platform"),
         "fingerprint_sha256": device.get("fingerprint"),
         "algorithm": "EC / secp256r1 / SHA256withECDSA",
-        "bound_at": None,
-        "last_seen_at": None,
+        "bound_at": device.get("created_at"),
+        "last_seen_at": device.get("last_seen_at"),
         "security_status": "SECURE" if device.get("state") == "ACTIVE" else "AT_RISK",
     }
 
@@ -1012,8 +984,8 @@ def revoke_device(device_id: str, request: Request, authorization_header: str = 
         raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
     if device.get("state") == "REVOKED":
         raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
-    set_device_state(device_id, "REVOKED")
-    revoke_device_sessions(device_id)
+    if not store.revoke_device(device_id):
+        raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:revoke", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
     return {"revoked": True}
 

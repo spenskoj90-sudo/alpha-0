@@ -135,12 +135,6 @@ def _device_payload(user_id: str, device_id: str, store) -> dict[str, Any]:
         "bound_at": device.get("created_at"),
         "security_status": "SECURE" if device["state"] == "ACTIVE" else "AT_RISK",
     }
-    if not hasattr(store, "devices"):
-        with store.engine.begin() as conn:
-            row = conn.execute(__import__("sqlalchemy").text("SELECT created_at,last_seen_at FROM device_bindings WHERE id=:d AND identity_id=(SELECT id FROM identities WHERE user_handle=:u)"), {"d": device_id, "u": user_id}).mappings().first()
-        if row:
-            result["bound_at"] = row["created_at"].isoformat() if row["created_at"] else None
-            result["last_seen_at"] = row["last_seen_at"].isoformat() if row["last_seen_at"] else None
     return result
 
 

@@ -44,14 +44,36 @@ def bind_user():
     return registered.json(), public_b64, fingerprint
 
 
-def test_device_detail_is_scoped_to_authenticated_user():
+def test_device_detail_returns_truthful_binding_and_authenticated_activity_timestamps():
     reset_store()
     device_id = store.register_device("u1", "android", "A" * 32, "1" * 64, "challenge")
-    token, _, _, _ = store.issue_session(None, "u1", 3600, 3600)
+    before = store.get_device(device_id)
+    assert before["created_at"] is not None
+    assert before["last_seen_at"] is None
+
+    token, _, _, _ = store.issue_session(device_id, "u1", 3600, 3600)
     response = client.get(f"/v1/devices/{device_id}", headers={"Authorization": f"Bearer {token}"})
+
     assert response.status_code == 200
-    assert response.json()["device_id"] == device_id
-    assert response.json()["state"] == "ACTIVE"
+    payload = response.json()
+    assert payload["device_id"] == device_id
+    assert payload["state"] == "ACTIVE"
+    assert payload["bound_at"]
+    assert payload["last_seen_at"]
+    assert store.get_device(device_id)["last_seen_at"] is not None
+
+
+def test_unbound_user_session_does_not_advance_device_last_seen():
+    reset_store()
+    device_id = store.register_device("u1", "android", "B" * 32, "2" * 64, "challenge")
+    token, _, _, _ = store.issue_session(None, "u1", 3600, 3600)
+
+    response = client.get(f"/v1/devices/{device_id}", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["bound_at"]
+    assert response.json()["last_seen_at"] is None
+    assert store.get_device(device_id)["last_seen_at"] is None
 
 
 def test_entitlements_are_user_scoped_and_enriched_with_game_data():

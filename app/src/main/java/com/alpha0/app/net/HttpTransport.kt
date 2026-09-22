@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import org.json.JSONObject
 
 enum class HttpMethod {
     GET,
@@ -28,6 +29,118 @@ interface HttpTransport {
     @Throws(IOException::class)
     fun execute(request: HttpRequest): HttpResponse
 }
+
+data class SessionCredentials(
+    val accessToken: String,
+    val refreshToken: String,
+)
+
+/**
+ * Authenticated Core transport wrapper.
+ *
+ * A bearer request is always sent with the latest stored access token. A single
+ * HTTP 401 triggers serialized one-time refresh-token rotation and one retry
+ * with the same request/correlation metadata. Invalid refresh state is cleared
+ * fail-closed; transient refresh transport failures are not converted into
+ * credential deletion.
+ */
+class SessionRefreshingHttpTransport(
+    baseUrl: String,
+    private val delegate: HttpTransport,
+    private val sessionProvider: () -> SessionCredentials?,
+    private val onSessionRefreshed: (SessionCredentials) -> Unit,
+    private val onSessionInvalidated: () -> Unit,
+) : HttpTransport {
+    private val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
+    private val refreshLock = Any()
+
+    init {
+        require(normalizedBaseUrl.startsWith("https://") || normalizedBaseUrl.startsWith("http://")) {
+            "Core base URL must use HTTP(S)"
+        }
+    }
+
+    override fun execute(request: HttpRequest): HttpResponse {
+        if (!isCoreRequest(request.url) || bearerHeader(request) == null || isRefreshRequest(request.url)) {
+            return delegate.execute(request)
+        }
+
+        val initial = sessionProvider() ?: return delegate.execute(request)
+        val first = delegate.execute(withBearer(request, initial.accessToken))
+        if (first.status != 401) return first
+
+        return synchronized(refreshLock) {
+            val latest = sessionProvider() ?: return@synchronized first
+            if (latest.accessToken != initial.accessToken) {
+                return@synchronized delegate.execute(withBearer(request, latest.accessToken))
+            }
+
+            val refreshed = refreshSession(latest, request) ?: return@synchronized first
+            delegate.execute(withBearer(request, refreshed.accessToken))
+        }
+    }
+
+    private fun refreshSession(
+        current: SessionCredentials,
+        originalRequest: HttpRequest,
+    ): SessionCredentials? {
+        val headers = linkedMapOf(
+            "Accept" to "application/json",
+            "Content-Type" to "application/json",
+        )
+        originalRequest.headers.entries
+            .firstOrNull { it.key.equals("X-Request-ID", ignoreCase = true) }
+            ?.value
+            ?.let { headers["X-Request-ID"] = it }
+
+        val response = delegate.execute(
+            HttpRequest(
+                method = HttpMethod.POST,
+                url = "$normalizedBaseUrl/v1/sessions/refresh",
+                headers = headers,
+                body = JSONObject().apply {
+                    put("refresh_token", current.refreshToken)
+                }.toString().toByteArray(Charsets.UTF_8),
+            )
+        )
+
+        if (response.status !in 200..299) {
+            if (response.status == 401) onSessionInvalidated()
+            return null
+        }
+
+        val json = runCatching { JSONObject(response.body) }.getOrNull()
+        val access = json?.optString("session_token").orEmpty()
+        val refresh = json?.optString("refresh_token").orEmpty()
+        if (access.isBlank() || refresh.isBlank()) {
+            onSessionInvalidated()
+            return null
+        }
+
+        return SessionCredentials(access, refresh).also(onSessionRefreshed)
+    }
+
+    private fun isCoreRequest(url: String): Boolean =
+        url == normalizedBaseUrl || url.startsWith("$normalizedBaseUrl/")
+
+    private fun isRefreshRequest(url: String): Boolean =
+        url == "$normalizedBaseUrl/v1/sessions/refresh"
+
+    private fun bearerHeader(request: HttpRequest): String? =
+        request.headers.entries
+            .firstOrNull { it.key.equals("Authorization", ignoreCase = true) }
+            ?.value
+            ?.takeIf { it.startsWith("Bearer ") && it.length > "Bearer ".length }
+
+    private fun withBearer(request: HttpRequest, accessToken: String): HttpRequest {
+        val headers = LinkedHashMap(request.headers)
+        val existing = headers.keys.firstOrNull { it.equals("Authorization", ignoreCase = true) }
+        if (existing != null) headers.remove(existing)
+        headers["Authorization"] = "Bearer $accessToken"
+        return request.copy(headers = headers)
+    }
+}
+
 
 /**
  * Shared Android/JVM HTTP boundary.

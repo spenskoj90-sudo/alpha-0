@@ -36,6 +36,8 @@ class Store(ABC):
     @abstractmethod
     def get_device(self, device_id: str) -> dict[str, Any] | None: ...
     @abstractmethod
+    def touch_device(self, device_id: str) -> bool: ...
+    @abstractmethod
     def find_active_device_by_key(self, public_key_b64: str, fingerprint: str) -> dict[str, Any] | None: ...
     @abstractmethod
     def rotate_device_identity(
@@ -147,6 +149,8 @@ class MemoryStore(Store):
                     "state": "ACTIVE",
                     "key_version": 1,
                     "last_sequence": -1,
+                    "created_at": datetime.now(UTC),
+                    "last_seen_at": None,
                 }
             self.challenges[session_hash(challenge)] = {
                 "device_id": device_id,
@@ -157,6 +161,14 @@ class MemoryStore(Store):
 
     def get_device(self, device_id):
         return self.devices.get(device_id)
+
+    def touch_device(self, device_id):
+        with self.lock:
+            device = self.devices.get(device_id)
+            if not device or device.get("state") != "ACTIVE":
+                return False
+            device["last_seen_at"] = datetime.now(UTC)
+            return True
 
     def find_active_device_by_key(self, public_key_b64, fingerprint):
         with self.lock:
@@ -210,6 +222,8 @@ class MemoryStore(Store):
                     "state": "ACTIVE",
                     "key_version": int(old.get("key_version", 1)) + 1,
                     "last_sequence": -1,
+                    "created_at": datetime.now(UTC),
+                    "last_seen_at": None,
                 }
             self.challenges[session_hash(challenge)] = {
                 "device_id": new_device_id,
@@ -552,8 +566,29 @@ class PostgresStore(Store):
 
     def get_device(self, device_id):
         with self.engine.begin() as conn:
-            row = conn.execute(text("SELECT d.id::text device_id,i.user_handle user_id,d.platform,d.state,d.public_key_der_b64 public_key,d.fingerprint_sha256 fingerprint,d.key_version,COALESCE((SELECT max(sequence) FROM game_events e WHERE e.device_id=d.id),-1) last_sequence FROM device_bindings d JOIN identities i ON i.id=d.identity_id WHERE d.id=:id"), {"id": device_id}).mappings().first()
+            row = conn.execute(
+                text(
+                    "SELECT d.id::text device_id,i.user_handle user_id,d.platform,d.state,"
+                    "d.public_key_der_b64 public_key,d.fingerprint_sha256 fingerprint,d.key_version,"
+                    "d.created_at,d.last_seen_at,"
+                    "COALESCE((SELECT max(sequence) FROM game_events e WHERE e.device_id=d.id),-1) last_sequence "
+                    "FROM device_bindings d JOIN identities i ON i.id=d.identity_id WHERE d.id=:id"
+                ),
+                {"id": device_id},
+            ).mappings().first()
         return dict(row) if row else None
+
+    def touch_device(self, device_id):
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    "UPDATE device_bindings SET last_seen_at=now() "
+                    "WHERE id=:id AND state='ACTIVE' "
+                    "AND (last_seen_at IS NULL OR last_seen_at < now()-interval '5 minutes')"
+                ),
+                {"id": device_id},
+            )
+            return result.rowcount == 1
 
     def find_active_device_by_key(self, public_key_b64, fingerprint):
         with self.engine.begin() as conn:

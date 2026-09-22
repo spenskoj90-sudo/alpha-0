@@ -71,12 +71,17 @@ class SessionRefreshingHttpTransport(
 
         return synchronized(refreshLock) {
             val latest = sessionProvider() ?: return@synchronized first
-            if (latest.accessToken != initial.accessToken) {
-                return@synchronized delegate.execute(withBearer(request, latest.accessToken))
+            val latestAttempt = if (latest.accessToken != initial.accessToken) {
+                delegate.execute(withBearer(request, latest.accessToken))
+            } else {
+                first
             }
+            if (latestAttempt.status != 401) return@synchronized latestAttempt
 
-            val refreshed = refreshSession(latest, request) ?: return@synchronized first
-            delegate.execute(withBearer(request, refreshed.accessToken))
+            val refreshed = refreshSession(latest, request) ?: return@synchronized latestAttempt
+            val retry = delegate.execute(withBearer(request, refreshed.accessToken))
+            if (retry.status == 401) onSessionInvalidated()
+            retry
         }
     }
 

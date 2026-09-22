@@ -66,6 +66,22 @@ jobs:
           SENTINEL_RUNTIME_ENVIRONMENT: staging
         run: ./gradlew --no-daemon assemblePhysicalTest
 
+      - name: Capture physical-test signer identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-signer.txt
+          digest="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          case "$digest" in
+            *[!0-9a-f]*|'') echo "invalid physical-test signer SHA-256"; exit 1 ;;
+          esac
+          test "${#digest}" -eq 64
+          echo "PHYSICAL_TEST_SIGNER_SHA256=$digest" >> "$GITHUB_ENV"
+
       - name: Verify compiled APK identity, staging binding, and production separation
         shell: bash
         run: |
@@ -79,6 +95,7 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signer-sha256 "$PHYSICAL_TEST_SIGNER_SHA256" \
             --signing-mode "$SENTINEL_PHYSICAL_TEST_SIGNING_MODE" \
             --output physical-test-manifest.json
 
@@ -95,5 +112,6 @@ jobs:
             app/build/outputs/apk/physicalTest/app-physicalTest.apk
             physical-test-apk.sha256
             physical-test-manifest.json
+            physical-test-signer.txt
           if-no-files-found: error
           retention-days: 90

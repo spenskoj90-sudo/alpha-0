@@ -7,6 +7,11 @@ on:
         description: "Exact protected-main commit SHA to build"
         required: true
         type: string
+      expected_signer_sha256:
+        description: "Prior stable physical-test signer SHA-256. Leave empty only for the one-time stable-signer baseline reinstall."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -96,7 +101,25 @@ jobs:
           test -n "$SENTINEL_PHYSICAL_TEST_KEY_PASSWORD"
           ./gradlew --no-daemon test assemblePhysicalTest
 
+      - name: Capture stable physical-test signer identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "$sdk_root"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-signer.txt
+          digest="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          case "$digest" in
+            *[!0-9a-f]*|'') echo "invalid stable physical-test signer SHA-256"; exit 1 ;;
+          esac
+          test "${#digest}" -eq 64
+          echo "PHYSICAL_TEST_SIGNER_SHA256=$digest" >> "$GITHUB_ENV"
+
       - name: Verify update artifact identity
+        env:
+          EXPECTED_SIGNER_SHA256: ${{ inputs.expected_signer_sha256 }}
         run: |
           set -euo pipefail
           python scripts/physical_test_artifact.py \
@@ -108,20 +131,20 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signer-sha256 "$PHYSICAL_TEST_SIGNER_SHA256" \
+            --expected-signer-sha256 "$EXPECTED_SIGNER_SHA256" \
             --signing-mode stable-test \
             --workflow-name "Physical Test Update APK" \
             --output physical-test-manifest.json
-          test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
+          if test -n "$EXPECTED_SIGNER_SHA256"; then
+            test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
+          else
+            test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "false"
+          fi
 
-      - name: Verify signer and hash APK
+      - name: Hash APK
         run: |
           set -euo pipefail
-          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          test -n "$sdk_root"
-          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          test -x "$apksigner"
-          "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
-          grep -q "Signer #1 certificate SHA-256 digest:" physical-test-signer.txt
           sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
 
       - name: Upload update-compatible exact-SHA APK

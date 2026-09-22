@@ -224,7 +224,10 @@ def principal_from_token(token: str) -> Principal:
     record = store.get_session(token)
     if not record:
         raise HTTPException(status_code=401, detail="INVALID_SESSION")
-    return Principal(record["user_id"], record.get("device_id"), frozenset(record.get("roles", [])), frozenset(record.get("scopes", [])))
+    device_id = record.get("device_id")
+    if device_id:
+        store.touch_device(device_id)
+    return Principal(record["user_id"], device_id, frozenset(record.get("roles", [])), frozenset(record.get("scopes", [])))
 
 
 def require_bearer(authorization_header: str) -> str:
@@ -995,8 +998,8 @@ def get_device(device_id: str, authorization_header: str = Header(..., alias="Au
         "platform": device.get("platform"),
         "fingerprint_sha256": device.get("fingerprint"),
         "algorithm": "EC / secp256r1 / SHA256withECDSA",
-        "bound_at": None,
-        "last_seen_at": None,
+        "bound_at": device.get("created_at"),
+        "last_seen_at": device.get("last_seen_at"),
         "security_status": "SECURE" if device.get("state") == "ACTIVE" else "AT_RISK",
     }
 

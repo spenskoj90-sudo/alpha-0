@@ -228,6 +228,20 @@ def check_versions(checks: Checks) -> None:
             f"{workflow_name} derives monotonic physical-test versionCode from GitHub run number",
         )
 
+    physical_routine = read(".github/workflows/physical-test-apk.yml")
+    physical_update = read(".github/workflows/physical-test-update-apk.yml")
+    checks.require(
+        '--signer-sha256 "$PHYSICAL_TEST_SIGNER_SHA256"' in physical_routine
+        and "physical-test-signer.txt" in physical_routine,
+        "routine physical-test artifact retains signer identity evidence",
+    )
+    checks.require(
+        "expected_signer_sha256:" in physical_update
+        and '--expected-signer-sha256 "$EXPECTED_SIGNER_SHA256"' in physical_update
+        and '--signer-sha256 "$PHYSICAL_TEST_SIGNER_SHA256"' in physical_update,
+        "stable physical-test update requires explicit signer continuity evidence",
+    )
+
     wrapper = read("gradle/wrapper/gradle-wrapper.properties")
     checksum = re.search(r"^distributionSha256Sum=([0-9a-f]{64})$", wrapper, re.MULTILINE)
     checks.require(bool(checksum), "Gradle distribution has an explicit SHA-256 checksum")

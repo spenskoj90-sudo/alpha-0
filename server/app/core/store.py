@@ -52,6 +52,8 @@ class Store(ABC):
         refresh_ttl: int,
     ) -> tuple[str, str, str, datetime, list[str]]: ...
     @abstractmethod
+    def revoke_device(self, device_id: str) -> bool: ...
+    @abstractmethod
     def create_challenge(self, device_id: str) -> str: ...
     @abstractmethod
     def consume_challenge(self, challenge: str, device_id: str) -> bool: ...
@@ -251,6 +253,17 @@ class MemoryStore(Store):
                     session["revoked"] = True
             return new_device_id, access, refresh, exp, SCOPES
 
+    def revoke_device(self, device_id):
+        with self.lock:
+            device = self.devices.get(device_id)
+            if not device or device.get("state") != "ACTIVE":
+                return False
+            device["state"] = "REVOKED"
+            for session in self.sessions.values():
+                if session.get("device_id") == device_id:
+                    session["revoked"] = True
+            return True
+
     def create_challenge(self, device_id):
         challenge = secrets.token_urlsafe(32)
         with self.lock:
@@ -286,6 +299,11 @@ class MemoryStore(Store):
         record = self.sessions.get(session_hash(access_token))
         if not record or record["expires_at"] <= time.time() or record.get("revoked"):
             return None
+        device_id = record.get("device_id")
+        if device_id:
+            device = self.devices.get(device_id)
+            if not device or device.get("state") != "ACTIVE":
+                return None
         return record
 
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
@@ -293,6 +311,11 @@ class MemoryStore(Store):
             record = next((r for r in self.sessions.values() if r.get("refresh_hash") == session_hash(refresh_token)), None)
             if not record or record.get("revoked") or record["refresh_expires_at"] <= time.time() or record.get("refresh_used"):
                 return None
+            device_id = record.get("device_id")
+            if device_id:
+                device = self.devices.get(device_id)
+                if not device or device.get("state") != "ACTIVE":
+                    return None
             record["refresh_used"] = True
             record["revoked"] = True
             old = record.copy()
@@ -696,6 +719,23 @@ class PostgresStore(Store):
             )
         return new_device_id, access, refresh, exp, SCOPES
 
+    def revoke_device(self, device_id):
+        with self.engine.begin() as conn:
+            revoked = conn.execute(
+                text(
+                    "UPDATE device_bindings SET state='REVOKED',revoked_at=now() "
+                    "WHERE id=:id AND state='ACTIVE' RETURNING id"
+                ),
+                {"id": device_id},
+            ).scalar_one_or_none()
+            if revoked is None:
+                return False
+            conn.execute(
+                text("UPDATE sessions SET revoked_at=now() WHERE device_id=:id AND revoked_at IS NULL"),
+                {"id": device_id},
+            )
+            return True
+
     def create_challenge(self, device_id):
         challenge = secrets.token_urlsafe(32)
         with self.engine.begin() as conn:
@@ -723,7 +763,16 @@ class PostgresStore(Store):
 
     def get_session(self, access_token):
         with self.engine.begin() as conn:
-            row = conn.execute(text("SELECT s.identity_id::text identity_id,s.device_id::text device_id,s.scopes_json,s.expires_at,i.user_handle FROM sessions s JOIN identities i ON i.id=s.identity_id WHERE s.session_hash=:sh AND s.expires_at>now() AND s.revoked_at IS NULL"), {"sh": session_hash(access_token)}).mappings().first()
+            row = conn.execute(
+                text(
+                    "SELECT s.identity_id::text identity_id,s.device_id::text device_id,s.scopes_json,s.expires_at,i.user_handle "
+                    "FROM sessions s JOIN identities i ON i.id=s.identity_id "
+                    "LEFT JOIN device_bindings d ON d.id=s.device_id "
+                    "WHERE s.session_hash=:sh AND s.expires_at>now() AND s.revoked_at IS NULL "
+                    "AND (s.device_id IS NULL OR d.state='ACTIVE')"
+                ),
+                {"sh": session_hash(access_token)},
+            ).mappings().first()
         if not row:
             return None
         scopes = row["scopes_json"] if isinstance(row["scopes_json"], list) else json.loads(row["scopes_json"])
@@ -739,13 +788,21 @@ class PostgresStore(Store):
             row = conn.execute(
                 text(
                     "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"
-                    "s.refresh_expires_at,s.refresh_used_at,s.revoked_at,i.id identity_id "
+                    "s.refresh_expires_at,s.refresh_used_at,s.revoked_at,i.id identity_id,d.state device_state "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
+                    "LEFT JOIN device_bindings d ON d.id=s.device_id "
                     "WHERE s.refresh_token_hash=:rh FOR UPDATE"
                 ),
                 {"rh": session_hash(refresh_token)},
             ).mappings().first()
-            if not row or row["revoked_at"] or row["refresh_used_at"] or not row["refresh_expires_at"] or row["refresh_expires_at"] <= datetime.now(UTC):
+            if (
+                not row
+                or row["revoked_at"]
+                or row["refresh_used_at"]
+                or not row["refresh_expires_at"]
+                or row["refresh_expires_at"] <= datetime.now(UTC)
+                or (row["device_id"] is not None and row["device_state"] != "ACTIVE")
+            ):
                 return None
             conn.execute(
                 text("UPDATE sessions SET refresh_used_at=now(),revoked_at=now() WHERE id=:id"),

@@ -951,6 +951,36 @@ def bind_device(
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 
+@app.post("/v1/devices/recover", response_model=DeviceRegisterResponse)
+def recover_device_rotation(
+    payload: DeviceBindRequest,
+    request: Request,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
+    rid = request_id(request, x_request_id)
+    rate_limit(request, "device-rotation-recover")
+    try:
+        fingerprint = fingerprint_public_key(payload.public_key_der_b64)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=400, detail="INVALID_PUBLIC_KEY") from exc
+    if fingerprint.lower() != payload.fingerprint_sha256.lower():
+        raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
+    device = store.find_active_device_by_key(payload.public_key_der_b64, fingerprint)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_ROTATION_NOT_FOUND")
+    challenge = store.create_challenge(device["device_id"])
+    store.add_audit({
+        "actor_user_id": None,
+        "actor_device_id": None,
+        "action": "device:rotation-recover-challenge",
+        "resource": device["device_id"],
+        "decision": "ALLOW",
+        "reason_code": "DEVICE_ROTATION_CHALLENGE_ISSUED",
+        "request_id": rid,
+    })
+    return DeviceRegisterResponse(device_id=device["device_id"], state="ACTIVE", challenge=challenge)
+
+
 @app.get("/v1/devices/{device_id}")
 def get_device(device_id: str, authorization_header: str = Header(..., alias="Authorization")):
     principal = principal_from_token(require_bearer(authorization_header))
@@ -1016,10 +1046,23 @@ def rotate_device(
         raise HTTPException(status_code=409, detail="KEY_UNCHANGED")
 
     challenge = secrets.token_urlsafe(32)
-    new_device_id = store.register_device(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
-    new_access, new_refresh, expires_at, scopes = store.issue_session(new_device_id, principal.user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    set_device_state(device_id, "REVOKED")
-    revoke_device_sessions(device_id)
+    try:
+        new_device_id, new_access, new_refresh, expires_at, scopes = store.rotate_device_identity(
+            device_id,
+            principal.user_id,
+            payload.platform,
+            payload.public_key_der_b64,
+            fingerprint,
+            challenge,
+            SESSION_TTL_SECONDS,
+            REFRESH_TTL_SECONDS,
+        )
+    except ValueError as exc:
+        if str(exc) == "DEVICE_KEY_CONFLICT":
+            raise HTTPException(status_code=409, detail="DEVICE_KEY_CONFLICT") from exc
+        if str(exc) == "DEVICE_NOT_ACTIVE":
+            raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE") from exc
+        raise
     store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:rotate", "resource": new_device_id, "decision": "ALLOW", "reason_code": "DEVICE_ROTATED", "request_id": rid})
     return {
         "device_id": new_device_id,

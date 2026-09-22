@@ -71,9 +71,11 @@ import com.alpha0.app.ui.SentinelTheme
 import com.alpha0.app.ui.SentinelTopBar
 import com.alpha0.app.ui.rememberAppStrings
 import com.alpha0.app.update.UpdateScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
@@ -214,7 +216,91 @@ private fun SentinelApplicationUi(
     var pendingMfaRecoveryCodes by remember { mutableStateOf<List<String>?>(null) }
 
     LaunchedEffect(initialSession?.refreshToken) {
-        if (initialSession == null) {
+        var rotationBoundaryResolved = false
+        val pendingRotation = runCatching { deviceIdentity.pendingRotation() }.getOrNull()
+        if (pendingRotation != null) {
+            diagnostics.info(
+                "KEYSTORE",
+                "KEY_ROTATION_RECOVERY_START",
+                details = mapOf("fingerprint_prefix" to pendingRotation.fingerprint.take(12)),
+            )
+            when (
+                val recovery = withContext(Dispatchers.IO) {
+                    deviceApi.recoverRotation(
+                        pendingRotation.publicKeyDerBase64,
+                        pendingRotation.fingerprint,
+                    )
+                }
+            ) {
+                is DeviceApi.Result.Success -> {
+                    rotationBoundaryResolved = true
+                    sessionStore.clear(activity)
+                    try {
+                        deviceIdentity.commitRotation(pendingRotation)
+                        when (
+                            val proof = withContext(Dispatchers.IO) {
+                                deviceApi.prove(
+                                    recovery.value.deviceId,
+                                    recovery.value.challenge,
+                                    deviceIdentity,
+                                )
+                            }
+                        ) {
+                            is DeviceApi.ProofResult.Success -> {
+                                sessionStore.save(
+                                    activity,
+                                    proof.value.accessToken,
+                                    proof.value.refreshToken,
+                                    proof.value.deviceId,
+                                )
+                                diagnostics.info("KEYSTORE", "KEY_ROTATION_RECOVERY_COMPLETE", "SUCCESS")
+                            }
+                            is DeviceApi.ProofResult.Failure -> diagnostics.warn(
+                                "KEYSTORE",
+                                "KEY_ROTATION_RECOVERY_PROOF",
+                                "FAILURE",
+                                errorCode = proof.message,
+                            )
+                        }
+                    } catch (exception: Exception) {
+                        diagnostics.error(
+                            "KEYSTORE",
+                            "KEY_ROTATION_RECOVERY_COMMIT",
+                            "FAILURE",
+                            errorCode = exception.javaClass.simpleName,
+                            throwable = exception,
+                        )
+                    }
+                    activeSession = sessionStore.load(activity)
+                }
+                is DeviceApi.Result.Failure -> {
+                    if (recovery.message == "DEVICE_ROTATION_NOT_FOUND") {
+                        runCatching { deviceIdentity.abortRotation(pendingRotation) }
+                            .onFailure {
+                                diagnostics.error(
+                                    "KEYSTORE",
+                                    "KEY_ROTATION_RECOVERY_ABORT",
+                                    "FAILURE",
+                                    errorCode = it.javaClass.simpleName,
+                                    throwable = it,
+                                )
+                            }
+                        diagnostics.info("KEYSTORE", "KEY_ROTATION_RECOVERY_NOT_COMMITTED", "SUCCESS")
+                    } else {
+                        diagnostics.warn(
+                            "KEYSTORE",
+                            "KEY_ROTATION_RECOVERY_DEFERRED",
+                            "DEGRADED",
+                            errorCode = recovery.message,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (rotationBoundaryResolved) {
+            refreshComplete = true
+        } else if (initialSession == null) {
             refreshComplete = true
         } else {
             diagnostics.info("SESSION", "REFRESH_START")

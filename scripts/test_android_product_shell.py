@@ -75,6 +75,22 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('strings.text("open_authenticator")', security)
 
 
+    def test_device_rotation_is_crash_recoverable(self) -> None:
+        identity = read("app/src/main/java/com/alpha0/app/security/DeviceIdentity.kt")
+        device_api = read("app/src/main/java/com/alpha0/app/device/DeviceApi.kt")
+        device_screen = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        core = read("server/app/main.py")
+        store = read("server/app/core/store.py")
+        self.assertIn("fun pendingRotation()", identity)
+        self.assertIn("PENDING_ALIAS", identity)
+        self.assertIn("PENDING_FINGERPRINT", identity)
+        self.assertIn('"/v1/devices/recover"', device_api)
+        self.assertIn("KEY_ROTATION_RECOVERY_START", self.main)
+        self.assertIn("KEY_ROTATION_RECOVERY_REQUIRED", device_screen)
+        self.assertIn('def recover_device_rotation(', core)
+        self.assertIn("store.rotate_device_identity(", core)
+        self.assertIn("def rotate_device_identity(", store)
+
     def test_runtime_session_refresh_and_mfa_revocation_fail_closed(self) -> None:
         transport = read("app/src/main/java/com/alpha0/app/net/HttpTransport.kt")
         security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")

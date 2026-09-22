@@ -29,11 +29,17 @@ class DeviceIdentityInstrumentedTest {
 
         val aborted = identity.prepareRotation()
         assertNotEquals(original, aborted.fingerprint)
+        assertEquals(aborted.fingerprint, DeviceIdentity().also {
+            it.attachDiagnostics(InstrumentationRegistry.getInstrumentation().targetContext)
+        }.pendingRotation()?.fingerprint)
         identity.abortRotation(aborted)
         assertEquals(original, identity.getIdentityInfo().fingerprint)
+        assertEquals(null, identity.pendingRotation())
 
         val committed = identity.prepareRotation()
+        assertEquals(committed.fingerprint, identity.pendingRotation()?.fingerprint)
         identity.commitRotation(committed)
+        assertEquals(null, identity.pendingRotation())
         assertEquals(committed.fingerprint, identity.getIdentityInfo().fingerprint)
         assertNotEquals(original, committed.fingerprint)
         val challenge = "rotated-sentinel-challenge".toByteArray()

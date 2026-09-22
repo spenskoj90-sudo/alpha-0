@@ -25,6 +25,8 @@ class DeviceIdentity {
         private const val ROTATION_ALIAS_B = "alpha0.device.identity.rotation.b.v1"
         private const val PREFS = "sentinel_device_identity"
         private const val ACTIVE_ALIAS = "active_alias"
+        private const val PENDING_ALIAS = "pending_alias"
+        private const val PENDING_FINGERPRINT = "pending_fingerprint"
 
         private const val CURVE = "secp256r1"
         private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
@@ -220,6 +222,42 @@ class DeviceIdentity {
         return Base64.encodeToString(getPublicKey().encoded, Base64.NO_WRAP)
     }
 
+
+    @Synchronized
+    fun pendingRotation(): RotationCandidate? {
+        val context = checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val alias = prefs.getString(PENDING_ALIAS, null)
+            ?.takeIf { it == ROTATION_ALIAS_A || it == ROTATION_ALIAS_B }
+            ?: return null
+        val expectedFingerprint = prefs.getString(PENDING_FINGERPRINT, null)
+            ?.takeIf { it.length == 64 }
+            ?: return null
+        if (alias == activeAlias()) {
+            check(
+                prefs.edit().remove(PENDING_ALIAS).remove(PENDING_FINGERPRINT).commit()
+            ) { "Unable to clear committed rotation journal" }
+            return null
+        }
+        val keyStore = loadKeyStore()
+        if (!keyStore.containsAlias(alias)) {
+            check(
+                prefs.edit().remove(PENDING_ALIAS).remove(PENDING_FINGERPRINT).commit()
+            ) { "Unable to clear stale rotation journal" }
+            return null
+        }
+        val publicKey = getPublicKey(alias)
+        val fingerprint = MessageDigest.getInstance(HASH_ALGORITHM).digest(publicKey.encoded).toHex()
+        if (fingerprint != expectedFingerprint) {
+            throw IllegalStateException("Rotation journal fingerprint mismatch")
+        }
+        return RotationCandidate(
+            alias = alias,
+            fingerprint = fingerprint,
+            publicKeyDerBase64 = Base64.encodeToString(publicKey.encoded, Base64.NO_WRAP),
+        )
+    }
+
     /**
      * Generates a staged hardware-backed identity without replacing the active key.
      * The caller must commit it only after Core accepts the rotation, or abort it on
@@ -227,7 +265,8 @@ class DeviceIdentity {
      */
     @Synchronized
     fun prepareRotation(): RotationCandidate {
-        checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        val context = checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        pendingRotation()?.let { return it }
         val current = activeAlias()
         val candidateAlias = if (current == ROTATION_ALIAS_A) ROTATION_ALIAS_B else ROTATION_ALIAS_A
         val keyStore = loadKeyStore()
@@ -238,6 +277,15 @@ class DeviceIdentity {
             .getInstance(HASH_ALGORITHM)
             .digest(publicKey.encoded)
             .toHex()
+        val persisted = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(PENDING_ALIAS, candidateAlias)
+            .putString(PENDING_FINGERPRINT, fingerprint)
+            .commit()
+        if (!persisted) {
+            if (keyStore.containsAlias(candidateAlias)) keyStore.deleteEntry(candidateAlias)
+            throw IllegalStateException("Unable to persist rotation journal")
+        }
         log(
             "INFO",
             "KEY_ROTATION_PREPARED",
@@ -259,14 +307,20 @@ class DeviceIdentity {
         check(candidate.alias != previous && keyStore.containsAlias(candidate.alias)) {
             "Rotation candidate is not available"
         }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        check(prefs.getString(PENDING_ALIAS, null) == candidate.alias) {
+            "Rotation candidate is not journaled"
+        }
         check(
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
+            prefs.edit()
                 .putString(ACTIVE_ALIAS, candidate.alias)
+                .remove(PENDING_ALIAS)
+                .remove(PENDING_FINGERPRINT)
                 .commit()
         ) { "Unable to persist rotated identity" }
         if (previous != candidate.alias && keyStore.containsAlias(previous)) {
-            keyStore.deleteEntry(previous)
+            runCatching { keyStore.deleteEntry(previous) }
+                .onFailure { log("WARN", "KEY_ROTATION_OLD_KEY_RETAINED", "DEGRADED", t = it) }
         }
         log(
             "INFO",
@@ -279,6 +333,13 @@ class DeviceIdentity {
     @Synchronized
     fun abortRotation(candidate: RotationCandidate) {
         if (candidate.alias == activeAlias()) return
+        val context = checkNotNull(appContext) { "attachDiagnostics must be called before key rotation" }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString(PENDING_ALIAS, null) == candidate.alias) {
+            check(
+                prefs.edit().remove(PENDING_ALIAS).remove(PENDING_FINGERPRINT).commit()
+            ) { "Unable to clear rotation journal" }
+        }
         val keyStore = loadKeyStore()
         if (keyStore.containsAlias(candidate.alias)) keyStore.deleteEntry(candidate.alias)
         log("INFO", "KEY_ROTATION_ABORTED", "SKIPPED")

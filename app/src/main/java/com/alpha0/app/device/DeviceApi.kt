@@ -97,6 +97,51 @@ class DeviceApi(
         }
     }
 
+
+    fun recoverRotation(publicKeyDerB64: String, fingerprintSha256: String): Result {
+        val t0 = System.currentTimeMillis()
+        return try {
+            val payload = JSONObject().apply {
+                put("platform", "android")
+                put("public_key_der_b64", publicKeyDerB64)
+                put("fingerprint_sha256", fingerprintSha256)
+            }.toString()
+            val response = executeJson("/v1/devices/recover", payload)
+            val duration = System.currentTimeMillis() - t0
+            if (response.status in 200..299 && response.json != null) {
+                val deviceId = response.json.optString("device_id")
+                val state = response.json.optString("state")
+                val challenge = response.json.optString("challenge")
+                if (deviceId.isBlank() || state != "ACTIVE" || challenge.isBlank()) {
+                    diag?.warn("DEVICE", "ROTATION_RECOVER", "FAILURE", errorCode = "DEVICE_RECOVERY_RESPONSE_INVALID", durationMs = duration)
+                    Result.Failure("DEVICE_RECOVERY_RESPONSE_INVALID")
+                } else {
+                    diag?.info(
+                        "DEVICE", "ROTATION_RECOVER", "SUCCESS",
+                        durationMs = duration,
+                        details = mapOf(
+                            "device_id_prefix" to deviceId.take(12),
+                            "fingerprint_prefix" to fingerprintSha256.take(12),
+                        ),
+                    )
+                    Result.Success(BindResult(deviceId, state, challenge))
+                }
+            } else {
+                val code = response.errorCode()
+                diag?.warn("DEVICE", "ROTATION_RECOVER", "FAILURE", errorCode = code, durationMs = duration)
+                Result.Failure(code)
+            }
+        } catch (e: IOException) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.error("DEVICE", "ROTATION_RECOVER", "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration, throwable = e)
+            Result.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.error("DEVICE", "ROTATION_RECOVER", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
+            Result.Failure("UNEXPECTED_ERROR")
+        }
+    }
+
     fun challenge(accessToken: String, deviceId: String): ChallengeResult {
         require(accessToken.isNotBlank()) { "accessToken must not be blank" }
         require(deviceId.isNotBlank()) { "deviceId must not be blank" }

@@ -19,7 +19,7 @@
 - **Emulator runner fix (PR #103):** pinned `ReactiveCircus/android-emulator-runner` to `v2.37.0`.
 - **Repository hygiene cleanup:** reconciled current-state documentation and removed obsolete/historical ambiguity from active task tracking.
 
-## Unreleased — 2026-08-27 (Grok / sentinel/release-hardening-2026-08-27)
+## Unreleased — 2026-08-27 (legacy release-hardening branch)
 
 - Admin brute-force lockout and rate limiting on admin endpoints.
 - RLS negative tests proving access without `app.service_role=true` cannot SELECT/INSERT protected rows.

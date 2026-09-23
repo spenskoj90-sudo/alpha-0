@@ -82,8 +82,7 @@ export function RecommendationPanel() {
   }
 
   const confidence = recommendation ? `${Math.round(recommendation.confidence * 100)}%` : '—';
-  const kind = recommendation?.kind.toUpperCase() ?? 'UNAVAILABLE';
-  const heading = kind === 'FACT' ? 'Observed fact' : kind === 'INFERENCE' ? 'Inference' : 'Recommendation';
+  const kind = recommendation?.kind.toUpperCase() ?? 'LIVE CORE';
 
   return (
     <article
@@ -94,7 +93,7 @@ export function RecommendationPanel() {
       <div className="recommendation-heading">
         <div>
           <span className="intelligence-kind" data-kind={kind}>{kind}</span>
-          <h2>{heading}</h2>
+          <h2>{recommendation ? (kind === 'FACT' ? 'Observed fact' : kind === 'INFERENCE' ? 'Inference' : 'Recommendation') : 'Trusted intelligence'}</h2>
         </div>
         <span className="confidence" aria-label={`Confidence ${confidence}`}>{confidence}</span>
       </div>
@@ -102,12 +101,31 @@ export function RecommendationPanel() {
       {view === 'READY' && recommendation ? (
         <div role="status" aria-live="polite" aria-atomic="true">
           <p className="recommendation-text">{recommendation.text}</p>
-          <div className="recommendation-meta">
-            <div><span className="label">Provider</span><strong>{recommendation.provider_id ?? 'unreported'}</strong></div>
-            <div><span className="label">Model</span><strong>{recommendation.model_id ?? 'unreported'}</strong></div>
-            <div><span className="label">Source / provenance</span><strong>{recommendation.provenance.join(' · ') || 'not reported'}</strong></div>
-            <div><span className="label">Freshness</span><strong className="data-unavailable">not reported by Core</strong></div>
-          </div>
+          {recommendation.kind === 'fact' && (
+            <div className="recommendation-meta">
+              <div><span className="label">Source</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'}</strong></div>
+              <div><span className="label">Freshness</span><strong>UNREPORTED</strong></div>
+              <div><span className="label">Evidence type</span><strong>DIRECTLY OBSERVED</strong></div>
+            </div>
+          )}
+          {recommendation.kind === 'inference' && (
+            <div className="recommendation-meta">
+              <div><span className="label">Confidence</span><strong>{confidence}</strong></div>
+              <div><span className="label">Contributing signals</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'}</strong></div>
+              <div><span className="label">Freshness</span><strong>UNREPORTED</strong></div>
+            </div>
+          )}
+          {recommendation.kind === 'recommendation' && (
+            <div className="recommendation-meta">
+              <div><span className="label">Action</span><strong>{recommendation.text}</strong></div>
+              <div><span className="label">Priority</span><strong>UNREPORTED</strong></div>
+              <div><span className="label">Reason</span><strong>UNREPORTED</strong></div>
+              <div><span className="label">Confidence</span><strong>{confidence}</strong></div>
+              <div><span className="label">Source / time</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'} · time UNREPORTED</strong></div>
+              <div><span className="label">Acknowledgement</span><strong>NOT RECORDED</strong></div>
+            </div>
+          )}
+          <div className="microcopy">Provider {recommendation.provider_id ?? 'unreported'} · model {recommendation.model_id ?? 'unreported'}</div>
         </div>
       ) : (
         <p

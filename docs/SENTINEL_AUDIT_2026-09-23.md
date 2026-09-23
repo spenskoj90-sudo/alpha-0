@@ -32,7 +32,7 @@ Product-side AI/provider abstractions are not engineering participants and remai
 
 The repository is the canonical design source of truth. Figma is optional for authoring, inspection and review and must not be a dependency for shipping or validating SENTINEL.
 
-The active repository design contract is `design/sentinel-design-system.v2.1.json` plus `docs/DESIGN_SYSTEM_V2_1.md`, with implementation/drift/accessibility checks remaining in CI. This keeps design execution available even when a Figma account is limited by seat/tier or rate limits.
+The active repository design contract is `design/sentinel-design-system.v3.json` plus `docs/DESIGN_SYSTEM_V3.md`, with implementation/drift/accessibility checks remaining in CI. v2.1 is retained as historical lineage. This keeps design execution available even when Figma is limited by seat/tier or rate limits.
 
 ## Branch hygiene finding
 
@@ -52,7 +52,7 @@ These are not repository implementation defects and must not be replaced by simu
 
 ## Android-only execution posture
 
-Until the Windows host is available, useful owner-side work is limited to installing and exercising the exact Physical Test APK, validating the Android UI after Design System v2.1, TalkBack/accessibility behavior, authentication/MFA/device onboarding, background/restart/network-loss recovery, update/help/about/settings flows and diagnostic export. Windows/voice/WoW/package-host gates remain deferred to the real host.
+Until the Windows host is available, useful owner-side work is limited to installing and exercising the exact Physical Test APK, validating the Android UI after Design System v3.0, TalkBack/accessibility behavior, authentication/MFA/device onboarding, background/restart/network-loss recovery, update/help/about/settings flows and diagnostic export. Windows/voice/WoW/package-host gates remain deferred to the real host.
 
 ## Evidence rule
 

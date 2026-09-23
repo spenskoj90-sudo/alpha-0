@@ -115,7 +115,7 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
         self.assertNotIn("Canvas(", self.tokens)
-        self.assertIn("RoundedCornerShape(18.dp)", self.tokens)
+        self.assertNotIn("RoundedCornerShape(18.dp)", self.tokens)\n        self.assertIn("RoundedCornerShape(8.dp)", self.tokens)
         self.assertIn("Surface(", self.tokens)
 
     def test_update_center_uses_play_update_api_and_monotonic_version(self) -> None:
@@ -184,11 +184,12 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_launcher_identity_is_explicit_and_branded(self) -> None:
         self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)
         self.assertIn('android:roundIcon="@mipmap/ic_launcher"', self.manifest)
-        self.assertIn("#FF061018", self.launcher)
-        self.assertIn("#FF061018", self.launcher)
-        self.assertIn("#FF7DDCFF", self.launcher)
-        self.assertIn("#FF9BE7FF", self.launcher)
-        self.assertIn("#FF00E0C2", self.launcher)
+        self.assertIn('android:drawable="@color/sentinel_launcher_background"', self.launcher)
+        self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_foreground"', self.launcher)
+        launcher_fg = read("app/src/main/res/drawable/ic_sentinel_launcher_foreground.xml")
+        self.assertIn("M32,3 L57,15", launcher_fg)
+        self.assertIn("#FF2DD4FF", launcher_fg)
+        self.assertIn("#FF00E0C2", launcher_fg)
         adaptive = read("app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")
         monochrome = read("app/src/main/res/drawable/ic_sentinel_launcher_monochrome.xml")
         self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_monochrome"', adaptive)

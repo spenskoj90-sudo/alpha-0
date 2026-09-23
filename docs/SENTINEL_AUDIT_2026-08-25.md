@@ -11,7 +11,7 @@
 
 ## Authority rule
 
-The repository at the exact baseline SHA is the source of truth. AI audit statements are hypotheses until verified against that SHA and, where applicable, exact CI evidence.
+The repository at the exact baseline SHA is the source of truth. Legacy external audit statements are hypotheses until verified against that SHA and, where applicable, exact CI evidence.
 
 ## Verified architecture
 
@@ -22,7 +22,7 @@ The repository at the exact baseline SHA is the source of truth. AI audit statem
 - CI/CD: GitHub Actions.
 - Firebase Test Lab is implemented only in `.github/workflows/build.yml`.
 
-## Grok findings — accepted / rejected
+## Legacy external audit A — accepted / rejected
 
 ### Accepted
 
@@ -45,7 +45,7 @@ The repository at the exact baseline SHA is the source of truth. AI audit statem
 6. The backend is FastAPI/Python, not Ktor/Kotlin.
 7. The current session implementation is opaque random session/refresh tokens hashed in storage, not the hardcoded-JWT-secret architecture described by the conflicting audit.
 
-## DeepSeek findings — accepted / rejected
+## Legacy external audit B — accepted / rejected
 
 ### Confirmed from repository/context
 
@@ -56,7 +56,7 @@ The repository at the exact baseline SHA is the source of truth. AI audit statem
 
 ### Not accepted as facts
 
-The following DeepSeek claims are contradicted by the exact baseline repository and are therefore **not implementation tasks** without new evidence:
+The following legacy external-audit claims are contradicted by the exact baseline repository and are therefore **not implementation tasks** without new evidence:
 
 - hardcoded JWT secret in `server/src/main/resources/application.conf`;
 - Ktor backend paths under `server/src/main/kotlin`;
@@ -114,7 +114,7 @@ FTL currently blocks the Build & Test umbrella job. The repository strategy shou
 - No release certificate rotation.
 - No deletion of `android-build.yml`.
 - No blind changes to APK artifact paths.
-- No product-code changes based only on the conflicting DeepSeek report.
+- No product-code changes based only on a conflicting legacy external report.
 - No FTL rerun before IAM remediation.
 - No destructive branch/PR cleanup.
 

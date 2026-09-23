@@ -24,7 +24,7 @@ The manifest must identify:
 - API origin `https://sentinel-core-staging.onrender.com`;
 - diagnostic mode `FORENSIC_TEST`.
 
-Verify the APK SHA-256 against both `physical-test-apk.sha256` and `physical-test-manifest.json`. On the phone, the red top banner must show `PHYSICAL TEST · STAGING`, the expected version and the first 12 characters of the same source SHA.
+Verify the APK SHA-256 against both `physical-test-apk.sha256` and `physical-test-manifest.json`. On the phone, the compact PHYSICAL TEST identity strip must show `PHYSICAL TEST`, staging environment, the expected version and the first 12 characters of the same source SHA. It must be obvious without presenting itself as an emergency/error banner.
 
 ## 2. Before installation
 
@@ -51,9 +51,9 @@ Never put the password, tokens, private keys or exported diagnostics in a public
 1. If an older `SENTINEL PHYSICAL TEST` is installed, export any evidence that must be preserved, then uninstall it for the fresh-install pass.
 2. Open `app-physicalTest.apk` and allow installation from the selected source when Android asks.
 3. Launch **SENTINEL PHYSICAL TEST**.
-4. Confirm the permanent red banner says `PHYSICAL TEST · STAGING` and shows the expected version/SHA prefix.
+4. Confirm the permanent compact PHYSICAL TEST identity strip clearly identifies `PHYSICAL TEST`, `STAGING`, the expected version and SHA prefix while leaving normal screen content usable.
 5. Confirm the normal release package, if installed, remains separate. The physical-test package is `com.alpha0.app.physicaltest`.
-6. Close and reopen the app once before signing in. A crash loop, blank screen or lost red identity banner is a defect.
+6. Close and reopen the app once before signing in. A crash loop, blank screen or lost PHYSICAL TEST identity strip is a defect.
 
 For a sideloaded physical-test APK, Google Play Protect may recommend scanning the
 application because Google Play has not previously distributed that exact
@@ -100,7 +100,7 @@ and try **Sign in** before attempting to create the account again.
 5. On **Activity**, confirm the application labels local session/device/diagnostic state honestly and does not invent server history.
 6. Open every entitlement card that is present, then return with Android Back.
 7. Open **Report a problem**, use Back/Cancel, and confirm navigation returns to Home.
-8. Test long system font/display scaling and both supported orientations. Text may wrap/scroll; controls must remain reachable and must not overlap the red build banner or bottom navigation.
+8. Test long system font/display scaling and both supported orientations. Text may wrap/scroll; controls must remain reachable and must not overlap the PHYSICAL TEST identity strip or bottom navigation.
 
 ## 7. Network loss and recovery
 
@@ -137,7 +137,7 @@ The current Android UI has no user-facing gameplay event capture action. Offline
 ## 10. Diagnostics and quality report
 
 1. Reproduce one safe success flow and one offline/network failure.
-2. Tap **Export logs** in the red banner. Expect the Android share sheet with a compressed `.jsonl.gz` forensic trace.
+2. Tap **Export logs** in the PHYSICAL TEST identity strip. Expect the Android share sheet with a compressed `.jsonl.gz` forensic trace. Save it to **Google Drive → Sentinel → Логи** when practical; that folder is the standard post-test evidence source.
 3. Save/send it only through the Owner's private evidence channel. Confirm the export action itself does not reveal a password, bearer token, refresh token, private key or raw request body.
 4. Open **Report a problem**. Confirm the diagnostic snapshot count/size/mode are shown before entering report text.
 5. Submit one staging report without attaching diagnostics.

@@ -32,6 +32,17 @@
 - [ ] **ENVIRONMENT-UNVERIFIED:** physical Windows packaged Companion, real microphone/driver/acoustic behavior and exact WoW 3.3.5a/private-server L3 acceptance.
 - [ ] **OWNER GATE:** branch deletion candidates may be removed only after one explicit bulk approval and immediate pre-delete tip revalidation.
 
+## SENTINEL Design System v3.0 consolidation
+
+- [x] **IMPLEMENTED:** v3 machine contract and active design authority; v2.1 retained as historical lineage.
+- [x] **IMPLEMENTED:** approved studio raster/glyph production assets, Android v3 chrome/navigation/environment identity, Web control-plane IA/intelligence grammar, Companion shell/kill-switch/voice boundary, Overlay density/single-message contract.
+- [x] **IMPLEMENTED:** dependency automation restored without auto-merge; PostgreSQL 18.6 image exact-patch/digest pin; Core warning cleanup and additional event-runtime/request-limit failure-path tests.
+- [x] **DOCUMENTED:** physical StrictMode finding classified as framework/platform-observed from the available stack evidence; warning remains visible.
+- [x] **DOCUMENTED:** branch inventory classified with remote deletion still Owner-only.
+- [ ] **ENVIRONMENT-UNVERIFIED:** physical Android v3 visual/accessibility/latency acceptance on the new exact-SHA APK.
+- [ ] **ENVIRONMENT-UNVERIFIED:** physical Windows packaged Companion, production-selected microphone/provider path and exact WoW WotLK 3.3.5a/private-server L3 run.
+- [ ] **OWNER/EXTERNAL GATE:** production database/provider activation, release signing/publication and live deployment.
+
 ## Active internal completion program
 
 The 2026-09-13 code-first rebaseline distinguished implemented foundations from product/runtime completion. Do not restore broad completion claims without code, automated evidence and exact-environment evidence appropriate to the claim.

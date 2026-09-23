@@ -3,6 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const REQUIRED_APP_FILES = Object.freeze([
+  'assets/sentinel-glyph.svg',
+  'assets/sentinel-glyph-mono.svg',
+  'assets/sentinel-icon-64.png',
+  'assets/sentinel-master-512.png',
   'bootstrap.js',
   'build-provenance.json',
   'companion-process.js',

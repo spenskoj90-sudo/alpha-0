@@ -16,5 +16,5 @@ test('capture error marks audio discarded before MediaRecorder stop', () => {
 test('logout and Companion kill switch cancel rather than submit active capture', () => {
   assert.match(renderer, /function cancelVoiceCapture\(\)[\s\S]*?voiceCaptureDiscarded\s*=\s*true;[\s\S]*?voiceChunks\s*=\s*\[\];/);
   assert.match(renderer, /logoutButton\.onclick\s*=\s*async \(\)\s*=>\s*\{\s*cancelVoiceCapture\(\);/);
-  assert.match(renderer, /stopButton\.onclick\s*=\s*async \(\)\s*=>\s*\{\s*cancelVoiceCapture\(\);/);
+  assert.match(renderer, /stopButton\.onclick\s*=\s*async \(\)\s*=>\s*\{[\s\S]*?window\.confirm\([\s\S]*?if \(!confirmed\) return;[\s\S]*?cancelVoiceCapture\(\);/);
 });

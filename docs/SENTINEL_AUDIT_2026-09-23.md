@@ -57,3 +57,11 @@ Until the Windows host is available, useful owner-side work is limited to instal
 ## Evidence rule
 
 All final acceptance claims remain bound to one exact source SHA and matching artifacts. No security gate, branch protection, signing boundary, provider credential boundary or production deployment boundary may be weakened to obtain a pass.
+
+
+## Consolidation result
+
+PR #335 merged to protected `main` as `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`. Post-merge exact-SHA validation completed successfully for Build & Test (Run 35904040005), Security (35904039953), P1 Evidence (35904040081), Physical Test APK (35904040167), Packaged Companion Host (35904040046), Supply Chain Evidence (35904039956) and Release Evidence Preflight (35904039955).
+
+The protected-main Physical Test APK artifact is `sentinel-physical-test-apk-457f2a7d5cb638a1925ee87f4770f5e91a687ad9` (artifact ID `10770476391`, GitHub artifact digest `sha256:cc4bba68142c4bda23f1a2e9aa5930577757fb5ddbf311497f162883b7532f43`). The embedded APK SHA-256 is `a05c8d53d4548ccc8777e3733aaa9a63dbde60bab56cb1d4529d4825a0dbe36e`. The matching Packaged Companion artifact is ID `10769544985`, artifact digest `sha256:43cff6949d127774d2825b1342f102f15648af4846e3351ad48126c2c46623cc`, with inner Windows package SHA-256 `686d65330b3fa26eaa7d6a0c4657cf840c33a7957d7ee0530eec82718de99647`.
+

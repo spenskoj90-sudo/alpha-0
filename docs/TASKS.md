@@ -22,9 +22,11 @@
 
 ## Design System v3 consolidated product pass
 
-- [x] **IMPLEMENTED / PR-VALIDATING:** canonical v3 machine contract and documentation; v2.1 retained only as historical reference.
-- [x] **IMPLEMENTED / PR-VALIDATING:** Android custom four-domain navigation, compact Physical Test identity, v3 shared geometry/state semantics, reduced shield/S/signal launcher/themed/notification glyph path.
-- [x] **IMPLEMENTED / PR-VALIDATING:** Web/Companion/Overlay v3 shell calibration, intelligence grammar, explicit kill-switch confirmation and one-message overlay presentation.
+PR #335 merged to protected `main` as `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`. All seven post-merge push workflows completed successfully on that exact SHA; subsequent maintenance must preserve the same exact-SHA gate.
+
+- [x] **IMPLEMENTED / MAIN-VERIFIED:** canonical v3 machine contract and documentation; v2.1 retained only as historical reference.
+- [x] **IMPLEMENTED / MAIN-VERIFIED:** Android custom four-domain navigation, compact Physical Test identity, v3 shared geometry/state semantics, reduced shield/S/signal launcher/themed/notification glyph path.
+- [x] **IMPLEMENTED / MAIN-VERIFIED:** Web/Companion/Overlay v3 shell calibration, intelligence grammar, explicit kill-switch confirmation and one-message overlay presentation.
 - [x] **IMPLEMENTED:** dependency automation restored without auto-merge; PostgreSQL 18.6 exact image/digest pin and dependency audit recorded.
 - [x] **OBSERVED / DOCUMENTED:** rc2 StrictMode SurfaceControl/InsetsSourceControl finalizer findings classified as framework/platform-observed without suppression.
 - [x] **IMPLEMENTED / ENVIRONMENT-UNVERIFIED:** correlated Android client-total request timing expanded; exact staging cold-start server/network decomposition awaits runtime-log correlation.

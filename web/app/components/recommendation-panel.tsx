@@ -82,6 +82,8 @@ export function RecommendationPanel() {
   }
 
   const confidence = recommendation ? `${Math.round(recommendation.confidence * 100)}%` : '—';
+  const kind = recommendation?.kind.toUpperCase() ?? 'UNAVAILABLE';
+  const heading = kind === 'FACT' ? 'Observed fact' : kind === 'INFERENCE' ? 'Inference' : 'Recommendation';
 
   return (
     <article
@@ -91,8 +93,8 @@ export function RecommendationPanel() {
     >
       <div className="recommendation-heading">
         <div>
-          <div className="label">Intelligence · {recommendation?.kind ?? 'live Core'}</div>
-          <h2>Recommendation</h2>
+          <span className="intelligence-kind" data-kind={kind}>{kind}</span>
+          <h2>{heading}</h2>
         </div>
         <span className="confidence" aria-label={`Confidence ${confidence}`}>{confidence}</span>
       </div>
@@ -103,7 +105,8 @@ export function RecommendationPanel() {
           <div className="recommendation-meta">
             <div><span className="label">Provider</span><strong>{recommendation.provider_id ?? 'unreported'}</strong></div>
             <div><span className="label">Model</span><strong>{recommendation.model_id ?? 'unreported'}</strong></div>
-            <div><span className="label">Provenance</span><strong>{recommendation.provenance.join(' · ') || 'none'}</strong></div>
+            <div><span className="label">Source / provenance</span><strong>{recommendation.provenance.join(' · ') || 'not reported'}</strong></div>
+            <div><span className="label">Freshness</span><strong className="data-unavailable">not reported by Core</strong></div>
           </div>
         </div>
       ) : (

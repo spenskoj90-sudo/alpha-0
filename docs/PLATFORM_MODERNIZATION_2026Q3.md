@@ -11,7 +11,7 @@ The supported modernization target is:
 | --- | --- |
 | Kotlin / KGP | 2.4.20 |
 | Compose compiler plugin | 2.4.20 |
-| Android Gradle Plugin | 9.3.1 |
+| Android Gradle Plugin | 9.4.0 |
 | Gradle | 9.7.1 |
 | Gradle/CI JDK | 25 LTS |
 | Android Java/Kotlin bytecode target | JVM 17 |
@@ -27,11 +27,11 @@ The supported modernization target is:
 | Play Integrity | 1.6.0 |
 | kotlinx.coroutines Android | 1.11.0 |
 
-AGP 9 built-in Kotlin is used. The legacy `org.jetbrains.kotlin.android` plugin is intentionally absent. KGP 2.4.20 is supplied on the build classpath so the built-in Kotlin compiler is inside Kotlin's documented AGP 9.3.1 compatibility range. Compose compiler stays version-aligned with Kotlin.
+AGP 9 built-in Kotlin is used. The legacy `org.jetbrains.kotlin.android` plugin is intentionally absent. KGP 2.4.20 is supplied on the build classpath to keep the built-in Kotlin compiler explicitly pinned and Compose compiler version-aligned with Kotlin. Compose compiler stays version-aligned with Kotlin.
 
 The build JDK and application bytecode level are deliberately separate. Gradle executes on JDK 25 LTS while Android output remains JVM 17 until an independently justified runtime-bytecode migration is accepted.
 
-AGP 9.4 is newer but is not the baseline merely because of its version number. It is evaluated only after the fully supported AGP 9.3.1/Kotlin 2.4.20 baseline is green and only if the resulting toolchain has no unsupported compatibility state.
+AGP 9.4 is newer but is not the baseline merely because of its version number. It is evaluated only after the fully supported AGP 9.4.0/Kotlin 2.4.20 baseline is green and only if the resulting toolchain has no unsupported compatibility state.
 
 ## Android API policy
 
@@ -50,9 +50,9 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Surface | Accepted baseline |
 | --- | --- |
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
-| Web | Next.js 16.3.5, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.1 |
-| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.5; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
-| Companion | Electron 44.4.2 on Node 24 LTS |
+| Web | Next.js 16.3.6, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.1 |
+| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.6; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
+| Companion | Electron 44.4.3 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
 | Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.0 |
@@ -61,7 +61,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 
 Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is regenerated under Node 24.21.0 and is required to remain consistent with `package.json`.
 
-The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.2 Win32 x64 archive and verifies SHA-256 `6aae435b6cd5c0eedf9fd38824bae4045ffdaecd029f0b8c8328bac3f5b71f03` before staging the application payload.
+The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.3 Win32 x64 archive and verifies SHA-256 `790a355b684d5c7cc8dc3cdd8c4cca7c4b2d054685427c7554a956879a82e70b` before staging the application payload.
 
 The connected Neon pre-release source was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The source contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies.
 

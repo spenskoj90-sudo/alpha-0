@@ -5,7 +5,7 @@
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Authority:** Human Owner
 
-This is the canonical engineering-governance contract for SENTINEL. It supersedes all previous multi-AI engineering models and any historical rule that GPT may not merge a PR.
+This is the canonical engineering-governance contract for SENTINEL. It supersedes all previous engineering-governance models and any historical rule that GPT may not merge a PR.
 
 ## 1. Human Owner
 
@@ -37,9 +37,9 @@ No other AI may participate in or receive delegated SENTINEL engineering work.
 
 ## 3. No AI-to-AI delegation
 
-Grok, Claude, Gemini, DeepSeek, or any other external AI/LLM is not an engineering participant. GPT must not delegate analysis, coding, testing, review, security auditing, research, architecture, CI diagnosis, DevOps, release engineering or integration to another AI.
+No external AI/LLM is an engineering participant. GPT must not delegate analysis, coding, testing, review, security auditing, research, architecture, CI diagnosis, DevOps, release engineering or integration to another AI.
 
-Historical references to other AI systems are non-authoritative historical context only.
+Historical references to former external-review tooling are non-authoritative context only.
 
 ## 4. Autonomous engineering loop
 

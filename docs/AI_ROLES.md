@@ -15,11 +15,11 @@ GPT may autonomously inspect repository state, analyze issues, design and implem
 
 ## 3. No secondary AI engineering role
 
-No other AI system is an engineering participant in SENTINEL. Grok, Claude, Gemini, DeepSeek and all other external AI/LLM systems must not be used as delegated developers, reviewers, testers, security auditors, architects, researchers, CI agents or implementation agents.
+No external AI/LLM is an engineering participant in SENTINEL and none may be used as a delegated developer, reviewer, tester, security auditor, architect, researcher, CI agent or implementation agent.
 
 GPT must not delegate repository analysis, coding, testing, review, security work, architecture, research, CI diagnosis, DevOps or integration to another AI.
 
-Historical commits, documents or chat records mentioning other AI systems are historical context only and do not create current authority.
+Historical references to former external-review tooling are context only and do not create current authority.
 
 ## 4. AI features inside SENTINEL
 

@@ -31,3 +31,8 @@ Companion is a desktop system tool with Overview, Account, Runtime, Host configu
 
 ## Figma
 Canonical file: vRIHsesWZNMEEEjNJu8TjB. Live inventory remains limited to 00 Foundations / frame 1:4; authoring the v2.1 pages is pending Figma connector quota restoration. Repository implementation does not claim nonexistent Figma node IDs.
+
+
+## Repository-first authoring
+
+The repository contract is authoritative. Figma may be used for visual exploration, inspection and collaborative review when account capabilities permit, but SENTINEL does not depend on a paid Figma seat or Figma availability to define, validate or ship the design system. Tokens, state semantics, assets, implementation and automated drift/accessibility checks remain repository-owned.

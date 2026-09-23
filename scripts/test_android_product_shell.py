@@ -115,7 +115,8 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
         self.assertNotIn("Canvas(", self.tokens)
-        self.assertNotIn("RoundedCornerShape(18.dp)", self.tokens)\n        self.assertIn("RoundedCornerShape(8.dp)", self.tokens)
+        self.assertNotIn("RoundedCornerShape(18.dp)", self.tokens)
+        self.assertIn("RoundedCornerShape(8.dp)", self.tokens)
         self.assertIn("Surface(", self.tokens)
 
     def test_update_center_uses_play_update_api_and_monotonic_version(self) -> None:

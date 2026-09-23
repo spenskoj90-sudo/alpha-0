@@ -23,6 +23,16 @@ Existence of a source tree does not by itself establish that the surface is pack
 - Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. On 2026-09-21 the connected Neon pre-release runtime was intentionally reset onto the prepared same-region PostgreSQL 18.6 project and Render Core was cut over to its `sentinel` database. All 15 repository migrations through `014_account_mfa` remain present with the previously verified checksum parity and all 39 application RLS tables retain FORCE RLS. The new pre-release baseline intentionally starts without the historical PG17 identities/users/devices/sessions; the former PostgreSQL 17.11 project is retained separately as `sentinel-pre-release-pg17-rollback` rather than treated as the active runtime.
 - Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
 
+
+### Design System v3 consolidation (PR #335)
+
+- **IMPLEMENTED / PR-VALIDATING:** SENTINEL Design System v3.0 (CALM PRECISION / TRUSTED INTELLIGENCE) is the active design authority on the integration branch. v2.1 is historical reference only. The machine contract is `design/sentinel-design-system.v3.json` and drift verification covers Android, Web, Companion and Overlay.
+- **IMPLEMENTED / PR-VALIDATING:** Android primary navigation no longer uses stock Material NavigationBar/NavigationBarItem presentation; the four canonical destinations are Home, Games, Security and Activity with SENTINEL domain glyphs. The physical-test warning banner is replaced by a compact environment identity strip without weakening forensic identity.
+- **IMPLEMENTED / PR-VALIDATING:** approved shield/S/signal artwork is repository-managed for Web/Companion/high-value brand surfaces; adaptive/monochrome/notification glyph paths preserve the reduced brand DNA. Final launcher optical acceptance remains physical evidence.
+- **IMPLEMENTED / PR-VALIDATING:** Web, Companion and Overlay use v3 geometry/state grammar. Overlay remains presentation-only and displays one meaningful message at a time. Companion kill switch requires explicit confirmation; voice remains explicit-consent push-to-talk.
+- **OBSERVED / FRAMEWORK-PLATFORM:** the two physical StrictMode LeakedClosableViolation records from the rc2 bundle contain Android framework SurfaceControl/InsetsSourceControl finalization frames and no SENTINEL frame. They remain visible and are not suppressed; reclassification is required if later evidence reaches app-owned code.
+- **IMPLEMENTED / ENVIRONMENT-UNVERIFIED:** Android request timing now keeps correlation IDs on start/complete events and duration on failure paths. The previous physical bundle shows cold 7–35 s samples versus warm ~0.1–1.0 s samples; exact staging server/network decomposition awaits correlated runtime logs.
+
 ## 2. Security and persistence baseline
 
 - Android device identity is Keystore-backed P-256 with SHA-256 fingerprinting.

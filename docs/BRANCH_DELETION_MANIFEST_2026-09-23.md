@@ -17,7 +17,7 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 
 ## Totals
 
-- total remote branches: 170
+- total remote branches at latest enumeration: 170
 - non-main branches: 169
 - MERGED: 124
 - PURE_BEHIND: 10
@@ -198,7 +198,7 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 | `release/final-acceptance-binding` | `97735b76ae8e` | MERGED | PR #285 merged 2026-09-15; current branch tip equals exact merged PR head |
 | `security/admin-totp-mfa` | `afb297935c01` | MERGED | PR #303 merged 2026-09-18; current branch tip equals exact merged PR head |
 | `security/attested-release-provenance` | `d9d3407b2352` | MERGED | PR #282 merged 2026-09-14; current branch tip equals exact merged PR head |
-| `sentinel-v3-consolidation` | `f6fc94c63ad3` | ACTIVE_RECENT | active integration branch for PR #335 |
+| `sentinel-v3-consolidation` | `c97f624408f9` | ACTIVE_RECENT | active integration branch for PR #335; tip is expected to move during the CI-fix loop |
 | `tmp/performance-baseline-10-sync` | `a60e10854576` | PURE_BEHIND | live compare against main: ahead=0; no branch-only files |
 
 ## Explicitly preserved requested branches

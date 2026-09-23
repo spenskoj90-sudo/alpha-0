@@ -133,7 +133,7 @@ class AndroidProductShellTests(unittest.TestCase):
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")
         bootstrap = read("gradlew")
-        self.assertIn('id("com.android.application") version "9.4.0"', root_gradle)
+        self.assertIn('id("com.android.application") version "9.4.1"', root_gradle)
         self.assertNotIn('org.jetbrains.kotlin.android', root_gradle)
         self.assertIn('kotlin-gradle-plugin:2.4.20', root_gradle)
         self.assertIn('org.jetbrains.kotlin.plugin.compose") version "2.4.20"', root_gradle)

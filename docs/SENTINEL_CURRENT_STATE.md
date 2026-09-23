@@ -29,7 +29,7 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 - Native repository runtimes are pinned to Node.js 24.21.0 LTS and Python 3.14.7.
 - Web uses Next.js 16.3.6 / React 19.3.0; the Companion packaging baseline is Electron 44.4.3.
-- Android builds use AGP 9.4.0, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
+- Android builds use AGP 9.4.1, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
 - Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. On 2026-09-21 the connected Neon pre-release runtime was intentionally reset onto the prepared same-region PostgreSQL 18.6 project and Render Core was cut over to its `sentinel` database. All 15 repository migrations through `014_account_mfa` remain present with the previously verified checksum parity and all 39 application RLS tables retain FORCE RLS. The new pre-release baseline intentionally starts without the historical PG17 identities/users/devices/sessions; the former PostgreSQL 17.11 project is retained separately as `sentinel-pre-release-pg17-rollback` rather than treated as the active runtime.
 - Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
 

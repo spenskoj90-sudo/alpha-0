@@ -12,7 +12,7 @@ The repository implementation backlog is effectively closed. The remaining open 
 
 ## Platform modernization in this pass
 
-- Android Gradle Plugin: `9.3.1 -> 9.4.0`.
+- Android Gradle Plugin: `9.3.1 -> 9.4.0 -> 9.4.1`.
 - Kotlin/Compose compiler remains `2.4.20`.
 - Gradle remains `9.7.1`.
 - Web security patch: Next.js `16.3.5 -> 16.3.6`; deterministic npm lockfile refreshed and validated with `npm ci`.

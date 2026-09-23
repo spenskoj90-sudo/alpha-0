@@ -4,6 +4,16 @@
 >
 > When a repository fact matters, inspect the current `main` tree and code. When an acceptance claim matters, require the exact SHA plus the relevant test/CI/runtime evidence. Unknown facts remain **UNVERIFIED**.
 
+## Current v3 product state
+
+SENTINEL Design System v3.0 is the active design authority across Android, Web, Companion and Overlay. The canonical direction is **CALM PRECISION / TRUSTED INTELLIGENCE**. v2.1 and earlier design contracts are historical lineage rather than active visual authority.
+
+The production asset family is bound to the approved design-reference shield/S/signal artwork. Byte-exact 512/192/64 raster derivatives and favicon are stored in production, while compact/system contexts use the exact studio reduced glyph geometry. Android no longer uses stock Material bottom-navigation presentation or the rejected large red physical-test banner. Web and Companion preserve their existing architectures while applying v3 information hierarchy, low-radius geometry, accessibility modes and explicit authority boundaries. Overlay remains presentation-only and shows one meaningful message at a time.
+
+Intelligence presentation uses FACT / INFERENCE / RECOMMENDATION semantics. Missing source, freshness, confidence, priority or other authoritative fields remain explicitly unreported rather than being rendered as healthy/zero or invented by the client.
+
+The prior physical Android diagnostic bundle remains historical evidence for its bound SHA. It shows no crash/ANR; its two StrictMode `LeakedClosableViolation` stacks are framework-only `InsetsSourceControl/SurfaceControl.finalize` observations and remain unsuppressed. v3 physical visual/accessibility/cold-path acceptance is still ENVIRONMENT-UNVERIFIED until exercised on the new exact-SHA physical-test APK.
+
 ## 1. Product surfaces
 
 - Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, server-driven Google/Telegram/VK federated sign-in, explicit provider linking from Security, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.

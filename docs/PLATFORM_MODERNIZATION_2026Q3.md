@@ -11,7 +11,7 @@ The supported modernization target is:
 | --- | --- |
 | Kotlin / KGP | 2.4.20 |
 | Compose compiler plugin | 2.4.20 |
-| Android Gradle Plugin | 9.3.1 |
+| Android Gradle Plugin | 9.4.0 |
 | Gradle | 9.7.1 |
 | Gradle/CI JDK | 25 LTS |
 | Android Java/Kotlin bytecode target | JVM 17 |
@@ -27,7 +27,7 @@ The supported modernization target is:
 | Play Integrity | 1.6.0 |
 | kotlinx.coroutines Android | 1.11.0 |
 
-AGP 9 built-in Kotlin is used. The legacy `org.jetbrains.kotlin.android` plugin is intentionally absent. KGP 2.4.20 is supplied on the build classpath so the built-in Kotlin compiler is inside Kotlin's documented AGP 9.4.0 compatibility range. Compose compiler stays version-aligned with Kotlin.
+AGP 9 built-in Kotlin is used. The legacy `org.jetbrains.kotlin.android` plugin is intentionally absent. KGP 2.4.20 is supplied on the build classpath to keep the built-in Kotlin compiler explicitly pinned and Compose compiler version-aligned with Kotlin. Compose compiler stays version-aligned with Kotlin.
 
 The build JDK and application bytecode level are deliberately separate. Gradle executes on JDK 25 LTS while Android output remains JVM 17 until an independently justified runtime-bytecode migration is accepted.
 

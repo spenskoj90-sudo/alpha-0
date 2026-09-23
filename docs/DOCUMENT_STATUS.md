@@ -10,7 +10,7 @@
 - `SENTINEL_CURRENT_STATE.md` — semantic orientation only; it deliberately contains no mutable HEAD mirror.
 - `TASKS.md` — active work queue, never implementation evidence.
 - `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md` and `FINAL_RELEASE_ACCEPTANCE_V1.md` — active evidence, provenance, exact-candidate physical/environment acceptance and release-acceptance contracts.
-- `DESIGN_SYSTEM_V1.md` plus `../design/sentinel-design-system.v1.json` — active semantic cross-surface design contract and machine-readable design/code mapping; Figma is its visual design anchor, while repository tests provide implementation-drift evidence.
+- `DESIGN_SYSTEM_V3.md` plus `../design/sentinel-design-system.v3.json` — active cross-surface visual/interaction contract and machine-readable drift authority. The design-reference repository is an input laboratory; production repository assets/code/tests remain canonical.
 - `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
 - `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
 - `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.
@@ -28,6 +28,8 @@ The following are active within their stated scope but are not proof that a curr
 When an active architecture document contains a future target, its target language is normative only after the applicable decision/acceptance process; it is not a claim of implementation.
 
 ## Historical
+
+- `DESIGN_SYSTEM_V1.md`, `DESIGN_SYSTEM_V2_1.md` and their v1/v2.1 machine manifests — retained design lineage; v3.0 is the active authority.
 
 - root `HANDOVER_DOCUMENT.md`;
 - `AUDIT_CLOSURE_2026-08-13.md`;

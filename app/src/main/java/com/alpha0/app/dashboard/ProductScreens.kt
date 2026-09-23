@@ -22,7 +22,10 @@ import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelCardKind
+import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
+import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -47,22 +50,36 @@ fun GamesScreen(accessToken: String, api: DashboardApi, onGameClick: (String) ->
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text(strings.text("games_title"), style = MaterialTheme.typography.headlineMedium)
+            Text(strings.text("games_title"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("games_description"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (loading) item { CircularProgressIndicator() }
         error?.let { message ->
             item {
-                Text(strings.text("load_failed", message), color = MaterialTheme.colorScheme.error)
-                PrimaryButton(strings.text("retry"), { generation += 1 })
+                SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatusBadge(strings.text("attention_required"), SentinelStatus.WARNING)
+                        Text(strings.text("load_failed", message), color = MaterialTheme.colorScheme.error)
+                        PrimaryButton(strings.text("retry"), { generation += 1 })
+                    }
+                }
             }
         }
-        if (!loading && error == null && games.isEmpty()) item { Text(strings.text("no_entitlements")) }
+        if (!loading && error == null && games.isEmpty()) {
+            item {
+                SentinelCard(kind = SentinelCardKind.CONTENT) {
+                    Text(strings.text("no_entitlements"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         items(games, key = { it.id }) { game ->
-            SentinelCard(modifier = Modifier.clickable { onGameClick(game.id) }) {
+            SentinelCard(
+                modifier = Modifier.clickable { onGameClick(game.id) },
+                kind = SentinelCardKind.CONTENT,
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(game.gameName, style = MaterialTheme.typography.titleMedium)
-                    StatusBadge(game.status, game.status.equals("ACTIVE", true))
+                    Text(game.gameName, style = MaterialTheme.typography.titleLarge)
+                    StatusBadge(game.status, statusFromRaw(game.status))
                     Text(game.platform, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     DataText(strings.text("valid_until", game.validUntil))
                 }
@@ -79,20 +96,23 @@ fun ActivityScreen(deviceId: String?) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text(strings.text("activity_title"), style = MaterialTheme.typography.headlineMedium)
+            Text(strings.text("activity_title"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("activity_description"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        listOf(
-            strings.text("activity_session") to true,
-            strings.text("activity_device") to !deviceId.isNullOrBlank(),
-            strings.text("activity_logs") to true,
-        ).forEach { (message, active) ->
-            item {
-                SentinelCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        StatusBadge(if (active) "OK" else strings.text("not_available"), active)
-                        Text(message)
-                    }
+        item {
+            SentinelCard(kind = SentinelCardKind.CONTENT) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatusBadge(
+                        if (deviceId.isNullOrBlank()) strings.text("state_unavailable") else strings.text("limited_view"),
+                        if (deviceId.isNullOrBlank()) SentinelStatus.UNAVAILABLE else SentinelStatus.UNKNOWN,
+                    )
+                    Text(strings.text("activity_limited_title"), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        strings.text("activity_limited_body"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    deviceId?.let { DataText(it) }
                 }
             }
         }

@@ -6,23 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SENTINEL Overlay</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 12px; background: transparent; color: #eef3f7; overflow: hidden; pointer-events: none; }
-    .panel { min-height: 84px; border: 1px solid rgba(112, 219, 255, .24); border-radius: 14px; background: rgba(7, 18, 31, .88); box-shadow: 0 12px 36px rgba(0,0,0,.42); padding: 12px 14px; backdrop-filter: blur(10px); }
-    .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-    .brand { font-size: 12px; letter-spacing: .16em; font-weight: 750; }
-    .state { font-size: 11px; opacity: .76; }
-    .list { display: grid; gap: 7px; }
-    .item { border-left: 2px solid rgba(91, 227, 208, .72); padding-left: 9px; }
-    .kind { font-size: 10px; letter-spacing: .1em; opacity: .62; }
-    .text { margin-top: 2px; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
-    .empty { font-size: 12px; opacity: .68; }
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--primary:#2dd4ff;--signal:#00e0c2;--warning:#f59e0b;--text:#e6f1f7;--muted:#a6b7c5}
+    *{box-sizing:border-box}body{margin:0;padding:12px;background:transparent;color:var(--text);overflow:hidden;pointer-events:none}.panel{min-height:84px;border:1px solid rgba(45,212,255,.28);border-radius:16px;background:rgba(6,16,24,.92);box-shadow:0 10px 28px rgba(0,0,0,.32);padding:12px 14px;backdrop-filter:blur(10px)}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid rgba(41,72,95,.8)}.brand-wrap{display:flex;align-items:center;gap:8px}.mini-mark{width:24px;height:24px}.brand{font-size:12px;letter-spacing:.12em;font-weight:750}.boundary{font-size:11px;color:var(--warning);font-weight:700;margin-left:8px}.state{font-size:11px;color:var(--muted)}.list{display:grid;gap:7px}.item{border-left:3px solid rgba(0,224,194,.8);padding:7px 0 7px 10px;background:rgba(13,27,41,.72);border-radius:0 10px 10px 0}.kind{font-size:10px;color:var(--muted);font-weight:650}.text{margin-top:2px;font-size:13px;line-height:1.35;overflow-wrap:anywhere}.empty{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
   <section class="panel" aria-live="polite">
-    <div class="top"><div class="brand">SENTINEL</div><div id="state" class="state">STOPPED</div></div>
+    <div class="top">
+      <div class="brand-wrap">
+        <svg class="mini-mark" viewBox="0 0 108 108" aria-hidden="true"><path d="M54 11C68 20 79 24 89 29L86 57C83 77 71 91 54 99C37 91 25 77 22 57L19 29C29 24 40 20 54 11Z" fill="#2dd4ff"/><path d="M54 20C66 27 75 30 81 33L78 55C76 69 67 80 54 88C41 80 32 69 30 55L27 33C34 30 43 27 54 20Z" fill="#061018"/><path d="M31 37C42 26 62 25 76 32C84 36 86 43 81 49C75 55 65 56 54 56C43 56 35 58 31 64C27 70 31 77 39 81C50 87 68 84 78 74" fill="none" stroke="#00e0c2" stroke-width="9" stroke-linecap="round"/></svg>
+        <div class="brand">SENTINEL <span class="boundary">Presentation only</span></div>
+      </div>
+      <div id="state" class="state">STOPPED</div>
+    </div>
     <div id="presentations" class="list"><div class="empty">Waiting for Companion presentation.</div></div>
   </section>
   <script src="overlay-renderer.js"></script>

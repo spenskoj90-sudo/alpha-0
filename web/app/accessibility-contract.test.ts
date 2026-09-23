@@ -12,12 +12,14 @@ describe('Web accessibility contract', () => {
     expect(page).toContain('href="#main-content"');
     expect(page).toContain('<main id="main-content"');
     expect(page).toContain('tabIndex={-1}');
-    expect(page).toContain('<h1 className="brand">SENTINEL</h1>');
+    expect(page).toContain('className="side-nav"');
+    expect(page).toContain('<BrandMark');
   });
 
   it('keeps keyboard focus visible including forced-colors mode', () => {
     expect(css).toContain(':focus-visible');
     expect(css).toContain('outline: 3px solid var(--accent-2)');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(css).toContain('@media (forced-colors: active)');
     expect(css).toContain('.skip-link:focus-visible');
   });

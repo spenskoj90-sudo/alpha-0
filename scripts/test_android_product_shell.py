@@ -34,6 +34,8 @@ class AndroidProductShellTests(unittest.TestCase):
         for route in ("home", "games", "security", "activity"):
             self.assertIn(f'composable("{route}")', self.main)
             self.assertIn(f'AppDestination("{route}"', self.chrome)
+        for route in ("security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers"):
+            self.assertIn(f'composable("{route}")', self.main)
 
     def test_language_and_theme_preferences_are_complete_and_persistent(self) -> None:
         self.assertIn("enum class AppLanguage { SYSTEM, RUSSIAN, ENGLISH }", self.preferences)
@@ -43,6 +45,8 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("putString(KEY_THEME", self.preferences)
         self.assertIn("SentinelLightColorScheme", self.theme)
         self.assertIn("SentinelDarkColorScheme", self.theme)
+        self.assertIn('GoogleFont("Onest")', self.tokens)
+        self.assertNotIn('GoogleFont("Outfit")', self.tokens)
         self.assertIn("isSystemInDarkTheme()", self.theme)
 
     def test_bilingual_contract_covers_critical_navigation(self) -> None:
@@ -111,7 +115,7 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
         self.assertNotIn("Canvas(", self.tokens)
-        self.assertIn("RoundedCornerShape(20.dp)", self.tokens)
+        self.assertIn("RoundedCornerShape(18.dp)", self.tokens)
         self.assertIn("Surface(", self.tokens)
 
     def test_update_center_uses_play_update_api_and_monotonic_version(self) -> None:
@@ -180,11 +184,11 @@ class AndroidProductShellTests(unittest.TestCase):
     def test_launcher_identity_is_explicit_and_branded(self) -> None:
         self.assertIn('android:icon="@mipmap/ic_launcher"', self.manifest)
         self.assertIn('android:roundIcon="@mipmap/ic_launcher"', self.manifest)
-        self.assertIn("#07121F", self.launcher)
-        self.assertIn("#10283D", self.launcher)
-        self.assertIn("#78E7FF", self.launcher)
-        self.assertIn("#6FD6FF", self.launcher)
-        self.assertIn("#5BE3D0", self.launcher)
+        self.assertIn("#FF061018", self.launcher)
+        self.assertIn("#FF061018", self.launcher)
+        self.assertIn("#FF7DDCFF", self.launcher)
+        self.assertIn("#FF9BE7FF", self.launcher)
+        self.assertIn("#FF00E0C2", self.launcher)
         adaptive = read("app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")
         monochrome = read("app/src/main/res/drawable/ic_sentinel_launcher_monochrome.xml")
         self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_monochrome"', adaptive)

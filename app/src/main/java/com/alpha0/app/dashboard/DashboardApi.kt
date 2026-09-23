@@ -151,7 +151,12 @@ class DashboardApi(
     private fun <T> request(accessToken: String, path: String, operation: String, method: String, body: JSONObject? = null, parser: (JSONObject) -> T): Result<T> {
         val requestId = diag?.newCorrelationId()
         val started = System.nanoTime()
-        diag?.debug("API", "REQUEST_START", details = mapOf("operation" to operation, "method" to method))
+        diag?.debug(
+            "API",
+            "REQUEST_START",
+            requestId = requestId,
+            details = mapOf("operation" to operation, "method" to method, "phase" to "client_total"),
+        )
         return try {
             val normalizedBase = baseUrl.trim().trimEnd('/')
             val headers = linkedMapOf(
@@ -181,7 +186,7 @@ class DashboardApi(
                     "REQUEST_COMPLETE",
                     requestId = requestId,
                     durationMs = durationMs,
-                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status),
+                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status, "phase" to "client_total"),
                 )
                 Result.Success(parser(json))
             } else {
@@ -192,15 +197,32 @@ class DashboardApi(
                     requestId = requestId,
                     errorCode = code,
                     durationMs = durationMs,
-                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status),
+                    details = mapOf("operation" to operation, "method" to method, "http_status" to response.status, "phase" to "client_total"),
                 )
                 Result.Failure(code)
             }
         } catch (_: IOException) {
-            diag?.warn("API", "REQUEST_COMPLETE", requestId = requestId, errorCode = "NETWORK_ERROR", details = mapOf("operation" to operation, "method" to method))
+            val durationMs = (System.nanoTime() - started) / 1_000_000
+            diag?.warn(
+                "API",
+                "REQUEST_COMPLETE",
+                requestId = requestId,
+                errorCode = "NETWORK_ERROR",
+                durationMs = durationMs,
+                details = mapOf("operation" to operation, "method" to method, "phase" to "client_total"),
+            )
             Result.Failure("NETWORK_ERROR")
         } catch (error: Exception) {
-            diag?.error("API", "REQUEST_COMPLETE", requestId = requestId, errorCode = "UNEXPECTED_ERROR", details = mapOf("operation" to operation, "method" to method), throwable = error)
+            val durationMs = (System.nanoTime() - started) / 1_000_000
+            diag?.error(
+                "API",
+                "REQUEST_COMPLETE",
+                requestId = requestId,
+                errorCode = "UNEXPECTED_ERROR",
+                durationMs = durationMs,
+                details = mapOf("operation" to operation, "method" to method, "phase" to "client_total"),
+                throwable = error,
+            )
             Result.Failure("UNEXPECTED_ERROR")
         }
     }

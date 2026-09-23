@@ -31,7 +31,7 @@ AGP 9 built-in Kotlin is used. The legacy `org.jetbrains.kotlin.android` plugin 
 
 The build JDK and application bytecode level are deliberately separate. Gradle executes on JDK 25 LTS while Android output remains JVM 17 until an independently justified runtime-bytecode migration is accepted.
 
-AGP 9.4 is newer but is not the baseline merely because of its version number. It is evaluated only after the fully supported AGP 9.4.1/Kotlin 2.4.20 baseline is green and only if the resulting toolchain has no unsupported compatibility state.
+AGP 9.4.1 is accepted as the baseline because the supported AGP 9.4/Kotlin 2.4.20/Gradle 9.7.1 combination is validated by exact-SHA CI, not merely because 9.4.1 is numerically newer. Preview AGP lines remain excluded until separately justified and validated.
 
 ## Android API policy
 

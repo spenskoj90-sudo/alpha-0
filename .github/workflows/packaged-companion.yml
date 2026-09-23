@@ -102,7 +102,7 @@ jobs:
           if ($smoke.sourceSha -ne $env:SENTINEL_SOURCE_SHA) {
             throw "runtime smoke evidence is not bound to exact source SHA $env:SENTINEL_SOURCE_SHA"
           }
-          if ($smoke.electronVersion -ne "44.4.2") {
+          if ($smoke.electronVersion -ne "44.4.3") {
             throw "unexpected packaged Electron version $($smoke.electronVersion)"
           }
           if ($smoke.main -ne "bootstrap.js") {

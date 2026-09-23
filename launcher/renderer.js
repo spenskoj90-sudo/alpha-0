@@ -344,6 +344,8 @@ startButton.onclick = async () => {
   } catch (error) { showError(companionStatus, error); refreshButtons(); }
 };
 stopButton.onclick = async () => {
+  const confirmed = window.confirm('Stop SENTINEL Companion runtime? Active local runtime and presentation state will stop.');
+  if (!confirmed) return;
   cancelVoiceCapture();
   setWowCheckpoint({ state: 'STOPPED' });
   setCompanion(await window.sentinel.stopCompanion());

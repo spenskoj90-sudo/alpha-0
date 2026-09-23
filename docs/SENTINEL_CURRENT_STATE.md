@@ -36,7 +36,7 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 ### Design System v3 consolidation (PR #335 — merged)
 
-PR #335 merged as protected-main SHA `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`. Its post-merge Build & Test, Security, P1 Evidence, Physical Test APK, Packaged Companion Host, Supply Chain Evidence and Release Evidence Preflight workflows all completed successfully on that exact SHA. Core recorded 451 passed / 23 deselected with 80.87% coverage; Web recorded 28/28 tests passed; PostgreSQL integration recorded 23 passed with 451 deselected.
+PR #335 is merged. Its protected-main post-merge Build & Test, Security, P1 Evidence, Physical Test APK, Packaged Companion Host, Supply Chain Evidence and Release Evidence Preflight workflows completed successfully. Core recorded 451 passed / 23 deselected with 80.87% coverage; Web recorded 28/28 tests passed; PostgreSQL integration recorded 23 passed with 451 deselected. Exact historical SHA/run/artifact identifiers are kept in the dated audit record rather than this mutable current-state guide.
 
 - **IMPLEMENTED / MAIN-VERIFIED:** SENTINEL Design System v3.0 (CALM PRECISION / TRUSTED INTELLIGENCE) is the active design authority on protected `main`. v2.1 is historical reference only. The machine contract is `design/sentinel-design-system.v3.json` and drift verification covers Android, Web, Companion and Overlay.
 - **IMPLEMENTED / MAIN-VERIFIED:** Android primary navigation no longer uses stock Material NavigationBar/NavigationBarItem presentation; the four canonical destinations are Home, Games, Security and Activity with SENTINEL domain glyphs. The physical-test warning banner is replaced by a compact environment identity strip without weakening forensic identity.

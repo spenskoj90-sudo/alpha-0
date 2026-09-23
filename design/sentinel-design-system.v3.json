@@ -1,25 +1,289 @@
 {
-  "schema":"sentinel.design-system.v3",
-  "revision":"3.0.0",
-  "status":"ACTIVE",
-  "direction":"CALM PRECISION / TRUSTED INTELLIGENCE",
-  "designReference":{"repository":"spenskoj90-sudo/sentinel-aware-companion","sha":"60629603299fd8af035c6f05991482cde0363c33"},
-  "predecessor":{"schema":"sentinel.design-system.v2.1","status":"HISTORICAL_REFERENCE"},
-  "colors":{"dark":{"background":"#061018","surface":"#0D1B29","raised":"#13263A","primary":"#2DD4FF","signal":"#00E0C2","success":"#22C55E","warning":"#F59E0B","danger":"#F43F5E","text":"#E6F1F7","muted":"#A6B7C5"},"light":{"background":"#F4F8FB","surface":"#FFFFFF","raised":"#EAF1F6","primary":"#006C88","signal":"#0B6F67","success":"#147251","warning":"#8A5A00","danger":"#B4233A","text":"#10202B","muted":"#506875"}},
-  "semanticRoles":{"primary":"intelligence/action","signal":"live/verified operational","missing":"UNKNOWN/UNAVAILABLE"},
-  "typography":{"brand":"Onest","ui":"Inter","technical":"JetBrains Mono","fallback":"explicit platform fallback; Cyrillic required"},
-  "spacing":{"unit":4,"steps":[4,8,12,16,24,32,48]},
-  "radii":{"small":4,"module":6,"cardMax":8},
-  "borders":{"hairline":1,"signalEdge":2,"focus":2},
-  "elevation":{"flat":0,"raised":1,"dialog":3},
-  "opacity":{"disabled":0.46,"overlay":0.92},
-  "motion":{"interactiveMs":180,"enterMs":320,"reducedMotion":true},
-  "breakpoints":{"mobileMax":639,"tabletMax":1023,"desktopMin":1024,"contentMax":1240},
-  "iconSizing":{"compact":[16,20,24],"navigation":22,"brand":[48,64],"master":[192,512],"opticalReview":[16,20,24,32,48,64,192,512]},
-  "touchTargets":{"androidDp":48,"webPx":44,"companionPx":44},
-  "zOrder":{"base":0,"sticky":20,"overlay":40,"dialog":60,"toast":80},
-  "dataVisualization":{"series":["primary","signal","warning","info","success"],"missingExplicit":true},
-  "stateGrammar":{"status":["VERIFIED","ACTIVE","PENDING","WARNING","DENIED","REVOKED","FAILED","UNKNOWN","UNAVAILABLE","STOPPED"],"capability":["AVAILABLE","LIMITED","UNAVAILABLE","UNVERIFIED"],"runtime":["CONNECTING","ACTIVE","DEGRADED","LOCAL-ONLY","OFFLINE","STOPPED"],"policy":["ALLOW","CONFIRM","DENY"]},
-  "intelligenceGrammar":{"FACT":"observed + source + freshness","INFERENCE":"derived + confidence + signals","RECOMMENDATION":"action > priority > reason > confidence > source/time > acknowledgement","missingOrStale":"never healthy/zero"},
-  "platform":{"android":{"navigation":["Home","Games","Security","Activity"],"stockMaterialNavigation":false},"web":{"forcedColors":true,"reducedMotion":true},"companion":{"killSwitchConfirmation":true},"overlay":{"density":["Minimal","Standard","Expanded"],"oneMeaningfulMessage":true,"presentationOnly":true}}
+  "schema": "sentinel.design-system.v3",
+  "revision": "3.0.0",
+  "status": "ACTIVE",
+  "direction": "CALM PRECISION / TRUSTED INTELLIGENCE",
+  "designReference": {
+    "repository": "spenskoj90-sudo/sentinel-aware-companion",
+    "sha": "60629603299fd8af035c6f05991482cde0363c33",
+    "masterArtwork": {
+      "path": "src/assets/sentinel-master-icon.png",
+      "blobSha": "bc0fe93d932023798291c45602100f025341d884",
+      "pixelSize": 1024,
+      "role": "approved full-color master source"
+    }
+  },
+  "predecessor": {
+    "schema": "sentinel.design-system.v2.1",
+    "status": "HISTORICAL_REFERENCE"
+  },
+  "colors": {
+    "dark": {
+      "background": "#061018",
+      "surface": "#0D1B29",
+      "raised": "#13263A",
+      "primary": "#2DD4FF",
+      "signal": "#00E0C2",
+      "success": "#22C55E",
+      "warning": "#F59E0B",
+      "danger": "#F43F5E",
+      "text": "#E6F1F7",
+      "muted": "#A6B7C5"
+    },
+    "light": {
+      "background": "#F4F8FB",
+      "surface": "#FFFFFF",
+      "raised": "#EAF1F6",
+      "primary": "#006C88",
+      "signal": "#0B6F67",
+      "success": "#147251",
+      "warning": "#8A5A00",
+      "danger": "#B4233A",
+      "text": "#10202B",
+      "muted": "#506875"
+    }
+  },
+  "semanticRoles": {
+    "primary": "intelligence/action",
+    "signal": "live/verified operational",
+    "missing": "UNKNOWN/UNAVAILABLE"
+  },
+  "typography": {
+    "brand": "Onest",
+    "ui": "Inter",
+    "technical": "JetBrains Mono",
+    "fallback": "explicit platform fallback; Cyrillic required"
+  },
+  "spacing": {
+    "unit": 4,
+    "steps": [
+      4,
+      8,
+      12,
+      16,
+      24,
+      32,
+      48
+    ]
+  },
+  "radii": {
+    "small": 4,
+    "module": 6,
+    "cardMax": 8
+  },
+  "borders": {
+    "hairline": 1,
+    "signalEdge": 2,
+    "focus": 2
+  },
+  "elevation": {
+    "flat": 0,
+    "raised": 1,
+    "dialog": 3
+  },
+  "opacity": {
+    "disabled": 0.46,
+    "overlay": 0.92
+  },
+  "motion": {
+    "interactiveMs": 180,
+    "enterMs": 320,
+    "reducedMotion": true
+  },
+  "breakpoints": {
+    "mobileMax": 639,
+    "tabletMax": 1023,
+    "desktopMin": 1024,
+    "contentMax": 1240
+  },
+  "iconSizing": {
+    "compact": [
+      16,
+      20,
+      24
+    ],
+    "navigation": 22,
+    "brand": [
+      48,
+      64
+    ],
+    "master": [
+      192,
+      512
+    ],
+    "opticalReview": [
+      16,
+      20,
+      24,
+      32,
+      48,
+      64,
+      192,
+      512
+    ]
+  },
+  "touchTargets": {
+    "androidDp": 48,
+    "webPx": 44,
+    "companionPx": 44
+  },
+  "zOrder": {
+    "base": 0,
+    "sticky": 20,
+    "overlay": 40,
+    "dialog": 60,
+    "toast": 80
+  },
+  "dataVisualization": {
+    "series": [
+      "primary",
+      "signal",
+      "warning",
+      "info",
+      "success"
+    ],
+    "missingExplicit": true
+  },
+  "stateGrammar": {
+    "status": [
+      "VERIFIED",
+      "ACTIVE",
+      "PENDING",
+      "WARNING",
+      "DENIED",
+      "REVOKED",
+      "FAILED",
+      "UNKNOWN",
+      "UNAVAILABLE",
+      "STOPPED"
+    ],
+    "capability": [
+      "AVAILABLE",
+      "LIMITED",
+      "UNAVAILABLE",
+      "UNVERIFIED"
+    ],
+    "runtime": [
+      "CONNECTING",
+      "ACTIVE",
+      "DEGRADED",
+      "LOCAL-ONLY",
+      "OFFLINE",
+      "STOPPED"
+    ],
+    "policy": [
+      "ALLOW",
+      "CONFIRM",
+      "DENY"
+    ],
+    "voice": [
+      "UNAVAILABLE",
+      "CONSENT_REQUIRED",
+      "READY",
+      "LISTENING",
+      "PROCESSING",
+      "RECOGNIZED",
+      "RESPONSE",
+      "NO_SPEECH",
+      "TIMEOUT",
+      "PROVIDER_FAILURE",
+      "NETWORK_FAILURE",
+      "DISABLED"
+    ],
+    "overlayDensity": [
+      "MINIMAL",
+      "STANDARD",
+      "EXPANDED"
+    ],
+    "overlayScenario": [
+      "RECOMMENDATION",
+      "WARNING",
+      "DEGRADED"
+    ]
+  },
+  "intelligenceGrammar": {
+    "FACT": "observed + source + freshness",
+    "INFERENCE": "derived + confidence + signals",
+    "RECOMMENDATION": "action > priority > reason > confidence > source/time > acknowledgement",
+    "missingOrStale": "never healthy/zero"
+  },
+  "platform": {
+    "android": {
+      "navigation": [
+        "Home",
+        "Games",
+        "Security",
+        "Activity"
+      ],
+      "stockMaterialNavigation": false
+    },
+    "web": {
+      "forcedColors": true,
+      "reducedMotion": true
+    },
+    "companion": {
+      "killSwitchConfirmation": true
+    },
+    "overlay": {
+      "density": [
+        "Minimal",
+        "Standard",
+        "Expanded"
+      ],
+      "oneMeaningfulMessage": true,
+      "presentationOnly": true,
+      "scenario": [
+        "Recommendation",
+        "Warning",
+        "Degraded"
+      ]
+    }
+  },
+  "productionAuthority": "spenskoj90-sudo/alpha-0",
+  "brand": {
+    "dna": [
+      "shield",
+      "S",
+      "signal"
+    ],
+    "master512": {
+      "path": "design/brand/sentinel-master-512.png",
+      "gitBlobSha": "e4e4dad49fd9522605e1c1018d175f8ea0973fee",
+      "source": "sentinel-aware-companion/public/brand/icon-512.png",
+      "transfer": "byte-exact Git object"
+    },
+    "master1024": {
+      "canonicalSource": "sentinel-aware-companion/src/assets/sentinel-master-icon.png",
+      "gitBlobSha": "bc0fe93d932023798291c45602100f025341d884",
+      "repositoryCopy": "not duplicated; immutable source provenance retained"
+    },
+    "reducedGlyph": {
+      "path": "design/brand/sentinel-glyph.svg",
+      "source": "sentinel-aware-companion/public/brand/glyph.svg",
+      "geometry": "shield + S + signal"
+    },
+    "monochrome": "design/brand/sentinel-glyph-mono.svg",
+    "domainIcons": [
+      "Home",
+      "Games",
+      "Security",
+      "Activity",
+      "Intelligence",
+      "Companion",
+      "Overlay",
+      "Signal"
+    ],
+    "rule": "full-color master is never reconstructed as a primitive VectorDrawable"
+  },
+  "accessibility": {
+    "talkBack": true,
+    "keyboard": true,
+    "visibleFocus": true,
+    "forcedColors": true,
+    "reducedMotion": true,
+    "fontScaling": true,
+    "nonColorStatus": true,
+    "androidMinTouchDp": 48,
+    "desktopMinTargetPx": 44
+  }
 }

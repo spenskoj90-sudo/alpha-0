@@ -27,7 +27,7 @@
 ## D-005 — No destructive branch cleanup yet
 
 **Date:** 2026-08-17  
-**Decision:** Do not delete/close historical branches or PRs until current AI handoffs are incorporated and each branch is classified.  
+**Decision:** Do not delete/close historical branches or PRs until current engineering handoffs are incorporated and each branch is classified.  
 **Status:** Superseded by **D-016** and **D-017**. No non-main branches remain as of 2026-09-01 (feature leftovers after #115 cleaned by Owner).
 
 ## D-006 — Signing/keystore handling
@@ -51,7 +51,7 @@
 **Date:** 2026-08-17  
 **Decision (superseded by later main):** Gap remediated; negative regression present.
 
-## D-010 — Challenge lifecycle finding from DeepSeek rejected against main
+## D-010 — Legacy external challenge-lifecycle finding rejected against main
 
 **Date:** 2026-08-17  
 **Decision:** Main already implements consume/expiry; do not re-implement as new feature.

@@ -166,8 +166,23 @@ class DiagnosticLogger private constructor(private val context: Context) {
         }
     }
 
-    fun debug(component: String, event: String, result: String = "SUCCESS", details: Map<String, Any?>? = null) {
-        if (isForensicTest()) event("DEBUG", component, event, result, details = details)
+    fun debug(
+        component: String,
+        event: String,
+        result: String = "SUCCESS",
+        requestId: String? = null,
+        durationMs: Long? = null,
+        details: Map<String, Any?>? = null,
+    ) {
+        if (isForensicTest()) event(
+            "DEBUG",
+            component,
+            event,
+            result,
+            requestId = requestId,
+            durationMs = durationMs,
+            details = details,
+        )
     }
 
     fun info(component: String, event: String, result: String = "SUCCESS", requestId: String? = null, durationMs: Long? = null, details: Map<String, Any?>? = null) =

@@ -49,6 +49,8 @@ class DisabledEmailTransport:
 class TestEmailTransport:
     """Deterministic no-network transport used by tests and local integration."""
 
+    __test__ = False  # Provider fixture, not a pytest test class.
+
     def __init__(self, *, max_messages: int = 32) -> None:
         if max_messages <= 0 or max_messages > 256:
             raise ValueError("EMAIL_TEST_BUFFER_INVALID")

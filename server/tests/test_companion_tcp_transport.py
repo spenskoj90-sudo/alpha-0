@@ -68,7 +68,10 @@ def test_transport_requires_explicit_tls_or_insecure_opt_in() -> None:
 
 def test_real_tls_context_requires_tls_1_2_and_peer_verification() -> None:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.minimum_version = ssl.TLSVersion.TLSv1_1
+    # Python correctly deprecates configuring TLS 1.1; this test deliberately
+    # creates that invalid context to prove SENTINEL rejects it fail-closed.
+    with pytest.warns(DeprecationWarning):
+        context.minimum_version = ssl.TLSVersion.TLSv1_1
     with pytest.raises(ValueError, match="TLS 1.2"):
         CompanionTcpTransport("example.test", 443, ssl_context=context)
 

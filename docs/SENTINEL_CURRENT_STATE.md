@@ -4,6 +4,16 @@
 >
 > When a repository fact matters, inspect the current `main` tree and code. When an acceptance claim matters, require the exact SHA plus the relevant test/CI/runtime evidence. Unknown facts remain **UNVERIFIED**.
 
+## Current v3 product state
+
+SENTINEL Design System v3.0 is the active design authority across Android, Web, Companion and Overlay. The canonical direction is **CALM PRECISION / TRUSTED INTELLIGENCE**. v2.1 and earlier design contracts are historical lineage rather than active visual authority.
+
+The production asset family is bound to the approved design-reference shield/S/signal artwork. Byte-exact 512/192/64 raster derivatives and favicon are stored in production, while compact/system contexts use the exact studio reduced glyph geometry. Android no longer uses stock Material bottom-navigation presentation or the rejected large red physical-test banner. Web and Companion preserve their existing architectures while applying v3 information hierarchy, low-radius geometry, accessibility modes and explicit authority boundaries. Overlay remains presentation-only and shows one meaningful message at a time.
+
+Intelligence presentation uses FACT / INFERENCE / RECOMMENDATION semantics. Missing source, freshness, confidence, priority or other authoritative fields remain explicitly unreported rather than being rendered as healthy/zero or invented by the client.
+
+The prior physical Android diagnostic bundle remains historical evidence for its bound SHA. It shows no crash/ANR; its two StrictMode `LeakedClosableViolation` stacks are framework-only `InsetsSourceControl/SurfaceControl.finalize` observations and remain unsuppressed. v3 physical visual/accessibility/cold-path acceptance is still ENVIRONMENT-UNVERIFIED until exercised on the new exact-SHA physical-test APK.
+
 ## 1. Product surfaces
 
 - Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, server-driven Google/Telegram/VK federated sign-in, explicit provider linking from Security, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
@@ -22,6 +32,16 @@ Existence of a source tree does not by itself establish that the surface is pack
 - Android builds use AGP 9.4.0, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
 - Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. On 2026-09-21 the connected Neon pre-release runtime was intentionally reset onto the prepared same-region PostgreSQL 18.6 project and Render Core was cut over to its `sentinel` database. All 15 repository migrations through `014_account_mfa` remain present with the previously verified checksum parity and all 39 application RLS tables retain FORCE RLS. The new pre-release baseline intentionally starts without the historical PG17 identities/users/devices/sessions; the former PostgreSQL 17.11 project is retained separately as `sentinel-pre-release-pg17-rollback` rather than treated as the active runtime.
 - Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
+
+
+### Design System v3 consolidation (PR #335)
+
+- **IMPLEMENTED / PR-VALIDATING:** SENTINEL Design System v3.0 (CALM PRECISION / TRUSTED INTELLIGENCE) is the active design authority on the integration branch. v2.1 is historical reference only. The machine contract is `design/sentinel-design-system.v3.json` and drift verification covers Android, Web, Companion and Overlay.
+- **IMPLEMENTED / PR-VALIDATING:** Android primary navigation no longer uses stock Material NavigationBar/NavigationBarItem presentation; the four canonical destinations are Home, Games, Security and Activity with SENTINEL domain glyphs. The physical-test warning banner is replaced by a compact environment identity strip without weakening forensic identity.
+- **IMPLEMENTED / PR-VALIDATING:** approved shield/S/signal artwork is repository-managed for Web/Companion/high-value brand surfaces; adaptive/monochrome/notification glyph paths preserve the reduced brand DNA. Final launcher optical acceptance remains physical evidence.
+- **IMPLEMENTED / PR-VALIDATING:** Web, Companion and Overlay use v3 geometry/state grammar. Overlay remains presentation-only and displays one meaningful message at a time. Companion kill switch requires explicit confirmation; voice remains explicit-consent push-to-talk.
+- **OBSERVED / FRAMEWORK-PLATFORM:** the two physical StrictMode LeakedClosableViolation records from the rc2 bundle contain Android framework SurfaceControl/InsetsSourceControl finalization frames and no SENTINEL frame. They remain visible and are not suppressed; reclassification is required if later evidence reaches app-owned code.
+- **IMPLEMENTED / ENVIRONMENT-UNVERIFIED:** Android request timing now keeps correlation IDs on start/complete events and duration on failure paths. The previous physical bundle shows cold 7–35 s samples versus warm ~0.1–1.0 s samples; exact staging server/network decomposition awaits correlated runtime logs.
 
 ## 2. Security and persistence baseline
 

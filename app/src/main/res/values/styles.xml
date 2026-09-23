@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Sentinel" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:navigationBarColor">@color/sentinel_launcher_background</item>
+        <item name="android:statusBarColor">@color/sentinel_launcher_background</item>
+    </style>
+</resources>

@@ -1,28 +1,33 @@
 package com.alpha0.app.ui
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.SportsEsports
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -30,17 +35,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.R
 
-data class AppDestination(val route: String, val labelKey: String)
+data class AppDestination(
+    val route: String,
+    val labelKey: String,
+    @DrawableRes val iconRes: Int,
+)
 
 val PrimaryDestinations = listOf(
-    AppDestination("home", "home"),
-    AppDestination("games", "games"),
-    AppDestination("security", "security"),
-    AppDestination("activity", "activity"),
+    AppDestination("home", "home", R.drawable.ic_domain_home),
+    AppDestination("games", "games", R.drawable.ic_domain_games),
+    AppDestination("security", "security", R.drawable.ic_domain_security),
+    AppDestination("activity", "activity", R.drawable.ic_domain_activity),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,42 +109,119 @@ fun SentinelTopBar(
 @Composable
 fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
     val strings = LocalAppStrings.current
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f)),
     ) {
-        PrimaryDestinations.forEach { destination ->
-            val icon = when (destination.route) {
-                "home" -> Icons.Default.Home
-                "games" -> Icons.Default.SportsEsports
-                "security" -> Icons.Default.Security
-                else -> Icons.Default.Timeline
-            }
-            val selected = selectedRoute == destination.route
-            NavigationBarItem(
-                selected = selected,
-                onClick = { onNavigate(destination.route) },
-                icon = {
-                    Column {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .heightIn(min = 68.dp)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PrimaryDestinations.forEach { destination ->
+                val selected = selectedRoute == destination.route
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 60.dp)
+                        .selectable(
+                            selected = selected,
+                            role = Role.Tab,
+                            onClick = { onNavigate(destination.route) },
                         )
-                        Icon(icon, contentDescription = null, modifier = Modifier.padding(top = 5.dp))
-                    }
-                },
-                label = { Text(strings.text(destination.labelKey)) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = Color.Transparent,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ),
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .width(if (selected) 24.dp else 12.dp)
+                            .height(2.dp)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent,
+                            ),
+                    )
+                    Icon(
+                        painter = painterResource(destination.iconRes),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .size(22.dp),
+                        tint = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = strings.text(destination.labelKey),
+                        modifier = Modifier.padding(top = 3.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (selected) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PhysicalTestIdentityStrip(
+    version: String,
+    sourceSha: String,
+    environment: String,
+    exportLabel: String,
+    onExport: () -> Unit,
+) {
+    val metadata = listOf(
+        version,
+        sourceSha.take(12).ifBlank { "sha-unavailable" },
+        environment.ifBlank { "staging" }.uppercase(),
+    ).joinToString(" · ")
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.42f)),
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .background(MaterialTheme.colorScheme.secondary),
             )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PHYSICAL TEST",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    metadata,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            TextButton(
+                onClick = onExport,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(exportLabel, style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
 }

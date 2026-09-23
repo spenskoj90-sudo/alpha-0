@@ -71,6 +71,7 @@ import com.alpha0.app.ui.AppPreferences
 import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryDestinations
+import com.alpha0.app.ui.PhysicalTestIdentityStrip
 import com.alpha0.app.ui.SentinelBottomBar
 import com.alpha0.app.ui.SentinelTheme
 import com.alpha0.app.ui.SentinelTopBar
@@ -362,21 +363,16 @@ private fun SentinelApplicationUi(
 
     Column {
         if (diagnostics.isForensicTest()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF7A1F1F)).padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    strings.text("physical_banner", BuildConfig.VERSION_NAME, BuildConfig.SENTINEL_SOURCE_SHA.take(12)),
-                    color = Color.White,
-                    modifier = Modifier.weight(1f),
-                )
-                Button(onClick = {
-                    diagnostics.info("QUALITY", "FORENSIC_EXPORT_REQUESTED", details = mapOf("surface" to "global-banner"))
+            PhysicalTestIdentityStrip(
+                version = BuildConfig.VERSION_NAME,
+                sourceSha = BuildConfig.SENTINEL_SOURCE_SHA,
+                environment = BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT,
+                exportLabel = strings.text("export_logs"),
+                onExport = {
+                    diagnostics.info("QUALITY", "FORENSIC_EXPORT_REQUESTED", details = mapOf("surface" to "environment-strip"))
                     diagnostics.exportShare(activity)
-                }) { Text(strings.text("export_logs")) }
-            }
+                },
+            )
         }
 
         Scaffold(

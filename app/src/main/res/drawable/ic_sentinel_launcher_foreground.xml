@@ -1,27 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path android:pathData="M54,11 C68,20 79,24 89,29 L86,57 C83,77 71,91 54,99 C37,91 25,77 22,57 L19,29 C29,24 40,20 54,11 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:startX="20" android:startY="18" android:endX="87" android:endY="92" android:type="linear"
-                android:startColor="#FF7DDCFF" android:centerColor="#FF2DD4FF" android:endColor="#FF0067D8"/>
-        </aapt:attr>
-    </path>
-    <path android:fillColor="#FF061018" android:pathData="M54,20 C66,27 75,30 81,33 L78,55 C76,69 67,80 54,88 C41,80 32,69 30,55 L27,33 C34,30 43,27 54,20 Z"/>
-    <path android:pathData="M31,37 C42,26 62,25 76,32 C84,36 86,43 81,49 C75,55 65,56 54,56 C43,56 35,58 31,64 C27,70 31,77 39,81 C50,87 68,84 78,74"
-        android:fillColor="#00000000" android:strokeWidth="9" android:strokeLineCap="round" android:strokeLineJoin="round">
-        <aapt:attr name="android:strokeColor">
-            <gradient android:startX="31" android:startY="31" android:endX="80" android:endY="82" android:type="linear"
-                android:startColor="#FFAEDFFF" android:centerColor="#FF2DD4FF" android:endColor="#FF00E0C2"/>
-        </aapt:attr>
-    </path>
-    <path android:fillColor="#00000000" android:strokeColor="#AA00E0C2" android:strokeWidth="3.2" android:strokeLineCap="round"
-        android:pathData="M58,31 C70,32 80,40 83,52"/>
-    <path android:fillColor="#00000000" android:strokeColor="#7700E0C2" android:strokeWidth="2.5" android:strokeLineCap="round"
-        android:pathData="M60,39 C68,40 74,45 76,52"/>
-    <path android:fillColor="#FFFFFFFF" android:pathData="M70,49 A3.4,3.4 0,1 0,70,55 A3.4,3.4 0,1 0,70,49"/>
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="64" android:viewportHeight="64">
+    <group android:pivotX="32" android:pivotY="32" android:scaleX="0.72" android:scaleY="0.72">
+        <path android:fillColor="#00000000" android:strokeColor="#FF2DD4FF" android:strokeWidth="4"
+            android:strokeLineJoin="round" android:pathData="M32,3 L57,15 V33 C57,47 47.6,56.4 32,62 C16.4,56.4 7,47 7,33 V15 Z"/>
+        <path android:fillColor="#00000000" android:strokeColor="#FF2DD4FF" android:strokeWidth="6"
+            android:strokeLineCap="round" android:pathData="M46,18 C39,14.3 31,14.7 23,19.4 C16.6,23.2 14.6,26.7 15.6,29.8 C16.7,33.2 21,35.3 29.3,37.4 L36.3,39.3 C43.8,41.4 46.5,44.1 44.5,47.5 C43.1,49.9 38.7,52.7 32,55"/>
+        <path android:fillColor="#00000000" android:strokeColor="#FF00E0C2" android:strokeWidth="2"
+            android:strokeLineCap="round" android:pathData="M35,28 C40,28 43,31 44,37 M35,22 C44,22 50,28 50,37"/>
+        <path android:fillColor="#FF00E0C2" android:pathData="M33,34 A3,3 0,1 0,33,40 A3,3 0,1 0,33,34"/>
+    </group>
 </vector>

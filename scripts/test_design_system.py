@@ -28,6 +28,8 @@ class DesignSystemContractTests(unittest.TestCase):
         cls.launcher_renderer = read("launcher/renderer.js")
         cls.overlay = read("launcher/overlay.html")
         cls.overlay_renderer = read("launcher/overlay-renderer.js")
+        cls.web_manifest = read("web/app/manifest.ts")
+        cls.packaged_runtime = read("launcher/packaged-runtime.js")
 
     def test_manifest_identity_and_reference_truth(self) -> None:
         self.assertEqual(self.manifest["schema"], "sentinel.design-system.v3")
@@ -75,6 +77,8 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("PhysicalTestIdentityStrip(", self.main_activity)
         self.assertNotIn("Color(0xFF7A1F1F)", self.main_activity)
         self.assertIn("M32,3 L57,15", self.launcher_fg)
+        self.assertEqual(self.manifest["brand"]["master512"]["gitBlobSha"], "e4e4dad49fd9522605e1c1018d175f8ea0973fee")
+        self.assertIn("sentinel_master_icon", read("app/src/main/res/values-v31/styles.xml"))
 
     def test_web_v3_structure_modes_and_intelligence(self) -> None:
         self.assertIn("SENTINEL Design System v3.0", self.web)
@@ -88,8 +92,12 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn('viewBox="0 0 64 64"', self.web_brand)
         self.assertIn("intelligence-kind", self.web_intelligence)
         self.assertIn("Freshness", self.web_intelligence)
-        self.assertIn("not reported by Core", self.web_intelligence)
+        self.assertIn("UNREPORTED", self.web_intelligence)
+        self.assertIn("Source / time", self.web_intelligence)
+        self.assertIn("Acknowledgement", self.web_intelligence)
         self.assertNotIn("background-image:", self.web)
+        self.assertIn("/brand/icon-192.png", self.web_manifest)
+        self.assertIn("/brand/icon-512.png", self.web_manifest)
 
     def test_companion_v3_and_kill_switch(self) -> None:
         for section in ("Overview","Account","Runtime","Host configuration","Games","Adapters","Voice","Overlay","Diagnostics","Updates"):
@@ -99,6 +107,8 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("microphone is not continuously listening", self.launcher.lower())
         self.assertIn("@media(forced-colors:active)", self.launcher)
         self.assertIn("@media(prefers-reduced-motion:reduce)", self.launcher)
+        for asset in ("assets/sentinel-glyph.svg", "assets/sentinel-glyph-mono.svg", "assets/sentinel-icon-64.png", "assets/sentinel-master-512.png"):
+            self.assertIn(asset, self.packaged_runtime)
 
     def test_overlay_is_presentation_only_and_single_message(self) -> None:
         self.assertIn("pointer-events:none", self.overlay)

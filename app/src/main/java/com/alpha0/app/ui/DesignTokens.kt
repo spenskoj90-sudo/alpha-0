@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.alpha0.app.R
 
 /**
- * SENTINEL Design System v2.1.
+ * SENTINEL Design System v3.0 — Calm Precision / Trusted Intelligence.
  *
  * Semantics come from Design System v2. The visual identity is the Owner-approved
  * shield/S/signal direction: deep naval surfaces, restrained cyan/teal signal,
@@ -93,6 +93,12 @@ enum class SentinelCardKind {
     RECOMMENDATION,
 }
 
+enum class SentinelIntelligenceKind {
+    FACT,
+    INFERENCE,
+    RECOMMENDATION,
+}
+
 fun statusFromRaw(value: String?): SentinelStatus {
     return when (value?.trim()?.uppercase()) {
         "VERIFIED", "OK", "HEALTHY" -> SentinelStatus.VERIFIED
@@ -110,7 +116,7 @@ fun statusFromRaw(value: String?): SentinelStatus {
 
 private fun SentinelStatus.color(): Color = when (this) {
     SentinelStatus.VERIFIED -> SentinelColors.Success
-    SentinelStatus.ACTIVE -> SentinelColors.Primary
+    SentinelStatus.ACTIVE -> SentinelColors.Signal
     SentinelStatus.PENDING, SentinelStatus.WARNING -> SentinelColors.Warning
     SentinelStatus.DENIED, SentinelStatus.REVOKED, SentinelStatus.FAILED -> SentinelColors.Danger
     SentinelStatus.UNKNOWN, SentinelStatus.UNAVAILABLE, SentinelStatus.STOPPED -> SentinelColors.TextTertiary
@@ -149,7 +155,7 @@ fun StatusBadge(
     Surface(
         modifier = modifier,
         color = color.copy(alpha = 0.09f),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(4.dp),
         border = BorderStroke(1.dp, color.copy(alpha = 0.48f)),
     ) {
         Row(modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) {
@@ -179,7 +185,7 @@ fun SentinelCard(
     }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(8.dp),
         color = background,
         tonalElevation = 0.dp,
         shadowElevation = 1.dp,
@@ -201,7 +207,7 @@ fun PrimaryButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(6.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -222,7 +228,7 @@ fun SecondaryButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(6.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -243,7 +249,7 @@ fun GhostButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 48.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(6.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
     }
@@ -260,7 +266,7 @@ fun DangerButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(6.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.82f)),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
     ) {

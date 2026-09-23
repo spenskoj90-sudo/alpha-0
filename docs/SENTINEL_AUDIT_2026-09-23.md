@@ -12,7 +12,7 @@ The repository implementation backlog is effectively closed. The remaining open 
 
 ## Platform modernization in this pass
 
-- Android Gradle Plugin: `9.3.1 -> 9.4.0`.
+- Android Gradle Plugin: `9.3.1 -> 9.4.0 -> 9.4.1`.
 - Kotlin/Compose compiler remains `2.4.20`.
 - Gradle remains `9.7.1`.
 - Web security patch: Next.js `16.3.5 -> 16.3.6`; deterministic npm lockfile refreshed and validated with `npm ci`.
@@ -32,7 +32,7 @@ Product-side AI/provider abstractions are not engineering participants and remai
 
 The repository is the canonical design source of truth. Figma is optional for authoring, inspection and review and must not be a dependency for shipping or validating SENTINEL.
 
-The active repository design contract is `design/sentinel-design-system.v2.1.json` plus `docs/DESIGN_SYSTEM_V2_1.md`, with implementation/drift/accessibility checks remaining in CI. This keeps design execution available even when a Figma account is limited by seat/tier or rate limits.
+The active repository design contract is `design/sentinel-design-system.v3.json` plus `docs/DESIGN_SYSTEM_V3.md`, with implementation/drift/accessibility checks remaining in CI. v2.1 is retained as historical lineage. This keeps design execution available even when Figma is limited by seat/tier or rate limits.
 
 ## Branch hygiene finding
 
@@ -52,8 +52,16 @@ These are not repository implementation defects and must not be replaced by simu
 
 ## Android-only execution posture
 
-Until the Windows host is available, useful owner-side work is limited to installing and exercising the exact Physical Test APK, validating the Android UI after Design System v2.1, TalkBack/accessibility behavior, authentication/MFA/device onboarding, background/restart/network-loss recovery, update/help/about/settings flows and diagnostic export. Windows/voice/WoW/package-host gates remain deferred to the real host.
+Until the Windows host is available, useful owner-side work is limited to installing and exercising the exact Physical Test APK, validating the Android UI after Design System v3.0, TalkBack/accessibility behavior, authentication/MFA/device onboarding, background/restart/network-loss recovery, update/help/about/settings flows and diagnostic export. Windows/voice/WoW/package-host gates remain deferred to the real host.
 
 ## Evidence rule
 
 All final acceptance claims remain bound to one exact source SHA and matching artifacts. No security gate, branch protection, signing boundary, provider credential boundary or production deployment boundary may be weakened to obtain a pass.
+
+
+## Consolidation result
+
+PR #335 merged to protected `main` as `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`. Post-merge exact-SHA validation completed successfully for Build & Test (Run 35904040005), Security (35904039953), P1 Evidence (35904040081), Physical Test APK (35904040167), Packaged Companion Host (35904040046), Supply Chain Evidence (35904039956) and Release Evidence Preflight (35904039955).
+
+The protected-main Physical Test APK artifact is `sentinel-physical-test-apk-457f2a7d5cb638a1925ee87f4770f5e91a687ad9` (artifact ID `10770476391`, GitHub artifact digest `sha256:cc4bba68142c4bda23f1a2e9aa5930577757fb5ddbf311497f162883b7532f43`). The embedded APK SHA-256 is `a05c8d53d4548ccc8777e3733aaa9a63dbde60bab56cb1d4529d4825a0dbe36e`. The matching Packaged Companion artifact is ID `10769544985`, artifact digest `sha256:43cff6949d127774d2825b1342f102f15648af4846e3351ad48126c2c46623cc`, with inner Windows package SHA-256 `686d65330b3fa26eaa7d6a0c4657cf840c33a7957d7ee0530eec82718de99647`.
+

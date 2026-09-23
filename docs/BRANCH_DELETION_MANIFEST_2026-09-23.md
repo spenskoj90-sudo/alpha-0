@@ -11,21 +11,21 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 - Enumerated every current remote branch through the GitHub API.
 - `MERGED` requires a closed merged PR whose stored exact PR head SHA is identical to the branch's current tip. This avoids treating squash ancestry as proof and also proves no post-merge branch mutation.
 - `PURE_BEHIND` was established by live compare against `main` with `ahead=0`.
-- Generated `ci/state-sync-auto-*` branches are `CONTENT_SUPERSEDED` because their only branch-only path is the generated current-state document; current state is intentionally repository/live-evidence driven.
+- Generated `ci/state-sync-auto-*` branches are `CONTENT_SUPERSEDED` because their only branch-only path is the generated current-state document; current state is intentionally repository/live-evidence driven. Reviewed Dependabot branches are also `CONTENT_SUPERSEDED` when their change was either absorbed into PR #344 or explicitly rejected by the dated dependency audit.
 - All other non-merged diverged branches are preserved. The three specifically requested physical/device branches are therefore **not deletion candidates** merely because newer code exists; their current file blobs differ from main and require explicit content reconciliation before deletion.
-- `ACTIVE_RECENT` covers the current integration branch and the parallel GPT-only same-day consolidation branch while useful work is reconciled.
+- `ACTIVE_RECENT` covers only the current post-merge hardening branch and the parallel GPT-only same-day consolidation branch while final reconciliation completes.
 
 ## Totals
 
-- total remote branches at latest enumeration: 170
+- total remote branches at latest enumeration: 179
 - non-main branches: 169
-- MERGED: 124
+- MERGED: 125
 - PURE_BEHIND: 10
-- CONTENT_SUPERSEDED: 8
+- CONTENT_SUPERSEDED: 16
 - UNIQUE_MUST_PRESERVE: 25
 - ACTIVE_RECENT: 2
 - UNKNOWN: 0
-- potential deletion candidates after one explicit Owner bulk approval: 142
+- potential deletion candidates after one explicit Owner bulk approval: 151
 
 ## Branch-by-branch classification
 
@@ -65,6 +65,14 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 | `core/companion-transport-health-v1` | `f2cf08334fb8` | MERGED | PR #192 merged 2026-09-07; current branch tip equals exact merged PR head |
 | `core/ugs-runtime-replay-foundation` | `05f75ba704a5` | MERGED | PR #187 merged 2026-09-07; current branch tip equals exact merged PR head |
 | `core/wow-conservative-adapter` | `911e83802b10` | MERGED | PR #188 merged 2026-09-07; current branch tip equals exact merged PR head |
+| `dependabot/github_actions/github/codeql-action/analyze-4.38.1` | `b7fa11a32c46` | CONTENT_SUPERSEDED | PR #343 closed after the v4.38.1 analyze update was absorbed into consolidated PR #344 |
+| `dependabot/github_actions/github/codeql-action/init-4.38.1` | `1a8378fe2ca4` | CONTENT_SUPERSEDED | PR #342 closed after the v4.38.1 init update was absorbed into consolidated PR #344 |
+| `dependabot/gradle/com.android.application-9.4.1` | `27bfce17e0f4` | CONTENT_SUPERSEDED | PR #336 closed after AGP 9.4.1 plus the matching repository invariant/docs were absorbed into PR #344 |
+| `dependabot/gradle/org.json-json-20260814` | `3095549413ed` | CONTENT_SUPERSEDED | PR #337 closed after upstream release verification selected documented 20260719 instead of the unexplained bot coordinate |
+| `dependabot/npm_and_yarn/web/eslint-10.11.0` | `64bea00bb8cb` | CONTENT_SUPERSEDED | PR #340 closed: ESLint 10 is a major transition; validated Next-compatible ESLint 9.39.5 is intentionally retained |
+| `dependabot/npm_and_yarn/web/types/node-26.6.2` | `682598ecd8da` | CONTENT_SUPERSEDED | PR #341 closed: Node 26 type definitions would not match the validated Node 24 runtime baseline |
+| `dependabot/npm_and_yarn/web/typescript-7.0.2` | `7c975f7394b5` | CONTENT_SUPERSEDED | PR #339 closed: TypeScript 7 is a major transition and is intentionally outside this release-readiness pass |
+| `dependabot/pip/server/setuptools-84.0.0` | `f1a937a7b125` | CONTENT_SUPERSEDED | PR #338 closed after review of intervening setuptools compatibility removals; exact 80.9.0 pin is retained for this pass |
 | `docs/coverage-policy-final` | `b35bda0183ef` | PURE_BEHIND | live compare against main: ahead=0; no branch-only files |
 | `docs/gpt-only-autonomous-engineering-167` | `92e0eef11455` | MERGED | PR #168 merged 2026-09-06; current branch tip equals exact merged PR head |
 | `docs/issue-146-current-state-snapshot` | `806adb445d1a` | MERGED | PR #148 merged 2026-09-05; current branch tip equals exact merged PR head |
@@ -84,6 +92,7 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 | `docs/staging-mfa-accepted-2026-09-21` | `e5b77b762fb5` | MERGED | PR #320 merged 2026-09-21; current branch tip equals exact merged PR head |
 | `docs/staging-mfa-runtime-reconcile-2026-09-19` | `cb26c1c5a580` | MERGED | PR #310 merged 2026-09-19; current branch tip equals exact merged PR head |
 | `docs/telemetry-contract-v1` | `75162b599971` | MERGED | PR #174 merged 2026-09-06; current branch tip equals exact merged PR head |
+| `docs/v3-post-merge-evidence-2026-09-23` | `3fc95890719c` | ACTIVE_RECENT | current post-merge hardening branch for PR #344; exact-SHA CI is still running |
 | `feat/accessibility-hardening` | `2286f990d89d` | MERGED | PR #278 merged 2026-09-14; current branch tip equals exact merged PR head |
 | `feat/account-mfa-totp-2026-09-19` | `88a79cf1c28f` | MERGED | PR #309 merged 2026-09-19; current branch tip equals exact merged PR head |
 | `feat/account-security-lifecycle` | `b32ea4bef7bc` | MERGED | PR #304 merged 2026-09-18; current branch tip equals exact merged PR head |
@@ -161,7 +170,7 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 | `fix/post-merge-current-state-sync-2026-09-06` | `67baca0f74df` | MERGED | PR #169 merged 2026-09-06; current branch tip equals exact merged PR head |
 | `fix/quality-cluster-root-hardening` | `6e46b59988f6` | MERGED | PR #290 merged 2026-09-16; current branch tip equals exact merged PR head |
 | `fix/sync-pat-current-state-2026-09-06` | `f8c34312495a` | MERGED | PR #171 merged 2026-09-06; current branch tip equals exact merged PR head |
-| `gpt/master-product-consolidation-v3-2026-09-23` | `b844d68b987d` | ACTIVE_RECENT | same-day GPT-only consolidation branch; useful content still being reconciled into PR #335 |
+| `gpt/master-product-consolidation-v3-2026-09-23` | `b844d68b987d` | ACTIVE_RECENT | parallel same-day GPT-only branch remains diverged; preserve until its branch-only commits are explicitly proven redundant against protected main |
 | `hardening/android-physical-test-readiness` | `22d52fe831a6` | MERGED | PR #299 merged 2026-09-17; current branch tip equals exact merged PR head |
 | `hardening/design-system-reality-sync` | `7aa7dac9a132` | MERGED | PR #297 merged 2026-09-16; current branch tip equals exact merged PR head |
 | `hardening/diagnostic-schema-alias` | `1c786d585a11` | UNIQUE_MUST_PRESERVE | non-merged diverged tip; deletion prohibited until branch-only content is explicitly reconciled or proven superseded |
@@ -198,7 +207,7 @@ Remote branch deletion is an **Owner-only irreversible gate**. This manifest doe
 | `release/final-acceptance-binding` | `97735b76ae8e` | MERGED | PR #285 merged 2026-09-15; current branch tip equals exact merged PR head |
 | `security/admin-totp-mfa` | `afb297935c01` | MERGED | PR #303 merged 2026-09-18; current branch tip equals exact merged PR head |
 | `security/attested-release-provenance` | `d9d3407b2352` | MERGED | PR #282 merged 2026-09-14; current branch tip equals exact merged PR head |
-| `sentinel-v3-consolidation` | `c97f624408f9` | ACTIVE_RECENT | active integration branch for PR #335; tip is expected to move during the CI-fix loop |
+| `sentinel-v3-consolidation` | `9dca3dcd6194` | MERGED | PR #335 merged 2026-09-23; current branch tip equals the exact merged PR head |
 | `tmp/performance-baseline-10-sync` | `a60e10854576` | PURE_BEHIND | live compare against main: ahead=0; no branch-only files |
 
 ## Explicitly preserved requested branches

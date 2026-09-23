@@ -9,7 +9,7 @@ This audit prefers stable releases and security/reproducibility over version chu
 
 | Component | Repository pin | Upstream status on 2026-09-23 | Decision |
 | --- | --- | --- | --- |
-| Android Gradle Plugin | 9.4.0 | current stable 9.4; supports API 37 and requires Gradle >=9.6 | KEEP |
+| Android Gradle Plugin | 9.4.1 | current stable 9.4 patch; supports API 37 and requires Gradle >=9.6 | UPDATE 9.4.0 → 9.4.1 |
 | Gradle wrapper | 9.7.1 + distribution SHA-256 | current 9.7 patch; upstream recommends 9.7.1 over 9.7.0 | KEEP |
 | Kotlin / Compose plugin | 2.4.20 | latest supported 2.4 release | KEEP |
 | Compose BOM | 2026.09.00 | official Android guidance names 2026.09.00 as latest stable BOM | KEEP |
@@ -20,10 +20,11 @@ This audit prefers stable releases and security/reproducibility over version chu
 | Play Integrity | 1.6.0 | current documented stable | KEEP |
 | kotlinx.coroutines | 1.11.0 | current stable release | KEEP |
 
-AGP 9.4.0 documents JDK 17 compatibility. SENTINEL keeps Java/Kotlin JVM target 17 rather than changing toolchain solely for novelty.
+AGP 9.4.1 is the current stable 9.4 patch and remains compatible with the existing Gradle 9.7.1/JDK 17 baseline. SENTINEL keeps Java/Kotlin JVM target 17 rather than changing toolchain solely for novelty.
 
 Official references:
-- https://developer.android.com/build/releases/agp-9-4-0-release-notes
+- https://developer.android.com/reference/tools/gradle-api
+- https://developer.android.com/studio/releases/fixed-bugs/studio/2026.1.4
 - https://docs.gradle.org/9.7.1/release-notes.html
 - https://kotlinlang.org/docs/whatsnew2420.html
 - https://developer.android.com/develop/ui/compose/bom
@@ -66,7 +67,7 @@ The Web lockfile remains authoritative for the transitive graph. CI installs wit
 | cryptography | 50.0.1 | current stable, PyPI provenance available | KEEP |
 | pytest | 9.1.1 | current stable | KEEP |
 | pytest-cov | 7.1.0 | current stable | KEEP |
-| setuptools | 80.9.0 | build-system exact pin retained for reproducibility | KEEP |
+| setuptools | 80.9.0 | 84.0.0 is stable but crosses pkg_resources/distutils removals in intervening majors | KEEP — deliberate compatibility hold |
 
 Official/package-index references:
 - https://www.python.org/downloads/release/python-3147/
@@ -105,7 +106,28 @@ References:
 
 ## CI / supply chain
 
-GitHub Actions remain pinned to immutable commit SHAs. Security workflow includes CodeQL, pip-audit, npm audit, OSV and Trivy. Supply-chain workflows preserve SBOM/provenance/digest/reproducibility evidence. Dependency automation is restored through `.github/dependabot.yml` for GitHub Actions, Web npm, Companion npm, Gradle and server pip, with **no automatic merge**.
+GitHub Actions remain pinned to immutable commit SHAs. CodeQL Action is updated from 4.38.0 to 4.38.1 (`1c5b675653bb5c22dbe9b12b556ec555138e09fd`) after the official 2026-09-18 patch release. Security workflow includes CodeQL, pip-audit, npm audit, OSV and Trivy. Supply-chain workflows preserve SBOM/provenance/digest/reproducibility evidence. Dependency automation is restored through `.github/dependabot.yml` for GitHub Actions, Web npm, Companion npm, Gradle and server pip, with **no automatic merge**.
+
+## Dependency-automation findings after restoration
+
+The first Dependabot scan surfaced additional candidates after the consolidated v3 merge. This pass adopts only stable, directly justified changes:
+
+- AGP 9.4.1: adopted as the current official stable patch.
+- CodeQL Action 4.38.1: adopted for both init/analyze using the exact immutable release commit.
+- `org.json:json` test dependency: moved from 20250517 to the official 20260719 release, which includes the upstream CVE-2026-59171 fixes. It remains test-only.
+
+The following are intentionally not adopted in this pass:
+
+- TypeScript 7.x and ESLint 10.x: major toolchain transitions, not patch maintenance.
+- `@types/node` 26.x: does not match SENTINEL's Node 24 runtime baseline.
+- setuptools 84.x: stable, but intervening major versions remove/deprecate legacy behaviors; no current build/security failure justifies that compatibility churn.
+- Dependabot's `org.json:json:20260814` candidate: upstream release documentation identifies 20260719 as the latest published release; SENTINEL therefore pins the documented release rather than a newer unexplained coordinate.
+
+Official references:
+- https://github.com/github/codeql-action/blob/main/CHANGELOG.md
+- https://github.com/stleary/JSON-java/releases
+- https://github.com/stleary/JSON-java/blob/master/docs/RELEASES.md
+- https://setuptools.pypa.io/en/latest/history.html
 
 ## Warning cleanup
 
@@ -118,4 +140,4 @@ The earlier AnyIO BlockingPortal warning is not present in the latest inspected 
 
 ## Conclusion
 
-No broad dependency upgrade is justified beyond the already-applied PostgreSQL exact patch/digest pin and the current Next.js security patch already present on baseline. Current direct pins are stable and compatible with the repository's target architecture. Final transitive-vulnerability acceptance is bound to the exact PR HEAD by the Security workflow; this document does not substitute for that green exact-SHA result.
+No broad dependency upgrade is justified beyond the PostgreSQL exact patch/digest pin, current Next.js security patch, AGP 9.4.1, CodeQL Action 4.38.1 and the official org.json test-only security update. Current direct pins are stable and compatible with the repository's target architecture. Final transitive-vulnerability acceptance is bound to the exact PR HEAD by the Security workflow; this document does not substitute for that green exact-SHA result.

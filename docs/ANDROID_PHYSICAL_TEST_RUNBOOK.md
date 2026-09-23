@@ -91,6 +91,21 @@ and try **Sign in** before attempting to create the account again.
 8. Rapid repeated taps must not create parallel requests; the control is disabled while busy.
 9. Background/foreground the app and then force-stop/relaunch it. Expect encrypted session recovery and refresh without another password prompt.
 
+## 5A. MFA lifecycle on the physical phone
+
+Use only a staging test account and a normal TOTP authenticator. Never place the enrollment secret or recovery codes in screenshots, diagnostics, issues or chat.
+
+1. From **Security → Multi-factor authentication**, start **Enable authenticator MFA**.
+2. Open the TOTP setup link in an authenticator app when available, or enter the displayed secret manually. Confirm with the current 6-digit code.
+3. Confirm SENTINEL displays the one-time recovery-code set and states that existing sessions were revoked. Store the codes offline, then continue to sign-in.
+4. Sign in with email/password. After the first factor succeeds, confirm the dedicated second-factor screen appears and no authenticated SENTINEL session is available until MFA succeeds.
+5. Enter an incorrect current code once. Expect a bounded error and no authenticated navigation.
+6. Enter the valid current authenticator code. Expect successful sign-in, then complete/recover device proof as required and verify Home is usable.
+7. Sign out and sign in again. Use exactly one unused recovery code instead of TOTP. Expect successful sign-in.
+8. Sign out and attempt to reuse the same recovery code. Expect rejection; a consumed recovery code must never authenticate twice.
+9. In **Security → Recovery**, replace recovery codes using a valid authenticator/recovery factor. Confirm the old unused set becomes invalid and the replacement set is shown only once.
+10. If the campaign includes disable/re-enable coverage, disable MFA with a valid factor, confirm existing sessions are revoked, verify password-only sign-in, then re-enable MFA and preserve only the new recovery set. Do not leave the shared staging test account in an unintended policy state.
+
 ## 6. Authenticated navigation
 
 1. Confirm the bottom navigation exposes **Home**, **Games**, **Security** and **Activity**.
@@ -134,7 +149,19 @@ The current Android UI has no user-facing gameplay event capture action. Offline
 4. For a Play-installed build, expect the user-confirmed Play update flow without uninstalling the application or losing its local preferences/session. Record the old/new version codes and Play track.
 5. Failure to find an unpublished update is not an application PASS or FAIL. The exact Play track, package, signing lineage and version-code ordering are required evidence.
 
-## 10. Diagnostics and quality report
+## 10. Mobile Web control-plane check
+
+Use the same Android phone and the current authorized staging Web origin for the exact acceptance campaign. Do not infer a Web PASS from Android-native behavior.
+
+1. Open the staging Web control plane in the phone browser in portrait mode, then landscape.
+2. Verify sign-in and, for an MFA-enabled staging account, complete the same server-authoritative second factor without exposing the challenge or session tokens to page JavaScript.
+3. Confirm the primary control-plane domains, account/security state, billing/entitlement surfaces and live intelligence/recommendation surface remain readable without horizontal clipping or overlapping fixed chrome.
+4. Test browser text scaling/zoom, light/dark or forced/system appearance where supported, visible keyboard focus with an attached/virtual keyboard, and the skip/main navigation landmarks when the browser exposes them.
+5. Background the browser, return, reload once, then repeat with network disabled and restored. Expect bounded error/recovery behavior rather than a permanent spinner or fabricated live data.
+6. Confirm recommendation/intelligence UI distinguishes authoritative facts, inference/recommendation and unavailable/stale source state; it must not present missing staging data as fresh evidence.
+7. Record the Web origin, browser/version and approximate event time with any defect. Do not copy session cookies or authentication tokens.
+
+## 11. Diagnostics and quality report
 
 1. Reproduce one safe success flow and one offline/network failure.
 2. Tap **Export logs** in the PHYSICAL TEST identity strip. Expect the Android share sheet with a compressed `.jsonl.gz` forensic trace. Save it to **Google Drive → Sentinel → Логи** when practical; that folder is the standard post-test evidence source.
@@ -144,7 +171,7 @@ The current Android UI has no user-facing gameplay event capture action. Offline
 6. Submit a second clearly labeled staging report with **Attach this diagnostic snapshot** enabled and quality-improvement opt-in left off. Expect a report reference/status.
 7. Test the quality-program checkbox separately; it must never become selected automatically when diagnostics are attached.
 
-## 11. Lifecycle, accessibility and stress
+## 12. Lifecycle, accessibility and stress
 
 - Lock/unlock the screen on login, settings, device setup, every primary destination and the report form.
 - Background/foreground at least ten times, including during an in-flight request.
@@ -154,7 +181,7 @@ The current Android UI has no user-facing gameplay event capture action. Offline
 - Perform rapid Back/navigation/retry actions and a sustained 20–30 minute normal session.
 - Record any thermal, memory, battery, responsiveness, blank-state or focus regression.
 
-## 12. Evidence to return
+## 13. Evidence to return
 
 For every defect send:
 

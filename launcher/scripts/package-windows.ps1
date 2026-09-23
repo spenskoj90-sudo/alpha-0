@@ -76,6 +76,10 @@ $AppDir = Join-Path $OutputDir "resources/app"
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 $ApplicationSources = @(
   "accessibility-runtime.js",
+  "assets/sentinel-glyph.svg",
+  "assets/sentinel-glyph-mono.svg",
+  "assets/sentinel-icon-64.png",
+  "assets/sentinel-master-512.png",
   "bootstrap.js",
   "companion-process.js",
   "companion-worker.js",
@@ -101,7 +105,10 @@ foreach ($RelativePath in $ApplicationSources) {
   if (-not (Test-Path $SourcePath -PathType Leaf)) {
     throw "Required launcher source is missing: $RelativePath"
   }
-  Copy-Item -LiteralPath $SourcePath -Destination (Join-Path $AppDir $RelativePath)
+  $DestinationPath = Join-Path $AppDir $RelativePath
+  $DestinationParent = Split-Path -Parent $DestinationPath
+  New-Item -ItemType Directory -Force -Path $DestinationParent | Out-Null
+  Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath
 }
 
 $SourceSha = if (-not [string]::IsNullOrWhiteSpace($env:SENTINEL_SOURCE_SHA)) {

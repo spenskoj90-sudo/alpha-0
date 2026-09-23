@@ -161,11 +161,11 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
   --radius-control: 6px;
   --radius-module: 6px;
   --radius-card: 8px;
-  --font-brand: Onest, Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-data: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --font-brand: var(--font-onest), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-ui: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
 }
-html, body { font-family: var(--font-ui); }
+html, body { font-family: var(--font-ui); font-synthesis: none; }
 .brand, .page-header h1, .section-title, .recommendation-heading h2, .panel-heading h2 { font-family: var(--font-brand); }
 .microcopy, code, pre, .technical, .confidence { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .product-shell { grid-template-columns: 232px minmax(0, 1fr); }

@@ -61,7 +61,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 
 Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is regenerated under Node 24.21.0 and is required to remain consistent with `package.json`.
 
-The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.3 Win32 x64 archive and verifies SHA-256 `6aae435b6cd5c0eedf9fd38824bae4045ffdaecd029f0b8c8328bac3f5b71f03` before staging the application payload.
+The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.3 Win32 x64 archive and verifies SHA-256 `790a355b684d5c7cc8dc3cdd8c4cca7c4b2d054685427c7554a956879a82e70b` before staging the application payload.
 
 The connected Neon pre-release source was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The source contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies.
 

@@ -9,12 +9,7 @@
 
 ## 1. Audit sources
 
-Two independent clean-room reports were compared:
-
-- Grok — repository clone / implementation-level inspection.
-- DeepSeek — independent repository/security/QA architecture review.
-
-Neither report is authoritative by itself. Direct Git state and implementation evidence take precedence.
+Two legacy external clean-room reports were compared. Neither report is authoritative by itself; direct Git state and implementation evidence take precedence.
 
 ## 2. Reconciled findings
 

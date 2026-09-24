@@ -210,3 +210,22 @@ class AndroidProductShellTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_owner_approved_master_brand_is_shared_by_launcher_and_auth() -> None:
+    login = _read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+    launcher = _read("app/src/main/res/drawable/ic_sentinel_launcher_foreground.xml")
+    manifest = _read("app/src/main/AndroidManifest.xml")
+
+    assert "R.drawable.sentinel_master_icon" in login
+    assert "R.drawable.ic_sentinel_brand_mark" not in login
+    assert '@drawable/sentinel_master_icon' in launcher
+    assert '@mipmap/ic_launcher' in manifest
+
+
+def test_auth_controls_follow_v3_low_radius_contract() -> None:
+    login = _read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+
+    assert "RoundedCornerShape(12.dp)" not in login
+    assert "RoundedCornerShape(14.dp)" not in login
+    assert "RoundedCornerShape(6.dp)" in login

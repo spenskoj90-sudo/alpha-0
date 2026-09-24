@@ -144,7 +144,7 @@ android {
             initWith(getByName("debug"))
             applicationIdSuffix = ".physicaltest"
             versionNameSuffix = "-physical-test"
-            manifestPlaceholders["appLabel"] = "SENTINEL PHYSICAL TEST"
+            manifestPlaceholders["appLabel"] = "SENTINEL"
             manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.physicaltest.auth"
             buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.physicaltest.auth\"")
             matchingFallbacks += listOf("debug")

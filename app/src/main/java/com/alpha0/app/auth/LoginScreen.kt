@@ -2,6 +2,7 @@ package com.alpha0.app.auth
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -331,11 +333,11 @@ fun LoginScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_sentinel_brand_mark),
+            Image(
+                painter = painterResource(R.drawable.sentinel_master_icon),
                 contentDescription = null,
-                modifier = Modifier.size(88.dp),
-                tint = androidx.compose.ui.graphics.Color.Unspecified,
+                modifier = Modifier.size(104.dp),
+                contentScale = ContentScale.Fit,
             )
             Text(strings.text("app_name"), style = MaterialTheme.typography.headlineMedium)
             Text(
@@ -372,7 +374,7 @@ fun LoginScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(6.dp),
                 )
             }
 
@@ -385,7 +387,7 @@ fun LoginScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(6.dp),
                 )
             }
 
@@ -407,7 +409,7 @@ fun LoginScreen(
                         }
                     },
                     enabled = !busy,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(6.dp),
                 )
             }
 
@@ -434,7 +436,7 @@ fun LoginScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !busy,
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(6.dp),
             ) {
                 if (busy) {
                     CircularProgressIndicator(

@@ -188,13 +188,25 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('android:drawable="@color/sentinel_launcher_background"', self.launcher)
         self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_foreground"', self.launcher)
         launcher_fg = read("app/src/main/res/drawable/ic_sentinel_launcher_foreground.xml")
-        self.assertIn("M32,3 L57,15", launcher_fg)
-        self.assertIn("#FF2DD4FF", launcher_fg)
-        self.assertIn("#FF00E0C2", launcher_fg)
+        self.assertIn('@drawable/sentinel_master_icon', launcher_fg)
+        self.assertNotIn("M32,3 L57,15", launcher_fg)
         adaptive = read("app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml")
         monochrome = read("app/src/main/res/drawable/ic_sentinel_launcher_monochrome.xml")
         self.assertIn('android:drawable="@drawable/ic_sentinel_launcher_monochrome"', adaptive)
         self.assertIn("#FFFFFFFF", monochrome)
+
+    def test_owner_approved_master_brand_is_shared_by_launcher_and_auth(self) -> None:
+        login = read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+        launcher_fg = read("app/src/main/res/drawable/ic_sentinel_launcher_foreground.xml")
+        self.assertIn("R.drawable.sentinel_master_icon", login)
+        self.assertNotIn("R.drawable.ic_sentinel_brand_mark", login)
+        self.assertIn('@drawable/sentinel_master_icon', launcher_fg)
+
+    def test_auth_controls_follow_v3_low_radius_contract(self) -> None:
+        login = read("app/src/main/java/com/alpha0/app/auth/LoginScreen.kt")
+        self.assertNotIn("RoundedCornerShape(12.dp)", login)
+        self.assertNotIn("RoundedCornerShape(14.dp)", login)
+        self.assertIn("RoundedCornerShape(6.dp)", login)
 
     def test_distribution_channels_keep_play_and_diagnostics_separate(self) -> None:
         self.assertIn('applicationIdSuffix = ".physicaltest"', self.gradle)

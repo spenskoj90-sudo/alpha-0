@@ -33,6 +33,16 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 
 internal val ENGLISH = mapOf(
     "app_name" to "SENTINEL",
+    "status_verified" to "Verified",
+    "status_active" to "Active",
+    "status_pending" to "Pending",
+    "status_warning" to "Warning",
+    "status_denied" to "Denied",
+    "status_revoked_label" to "Revoked",
+    "status_failed" to "Failed",
+    "status_unknown" to "Unknown",
+    "status_unavailable" to "Unavailable",
+    "status_stopped" to "Stopped",
     "security_posture" to "Security posture",
     "security_posture_subtitle" to "Account authority and trusted device state, separated by scope.",
     "account" to "Account",
@@ -312,6 +322,16 @@ internal val ENGLISH = mapOf(
 
 internal val RUSSIAN = mapOf(
     "app_name" to "SENTINEL",
+    "status_verified" to "Подтверждено",
+    "status_active" to "Активно",
+    "status_pending" to "Ожидание",
+    "status_warning" to "Внимание",
+    "status_denied" to "Запрещено",
+    "status_revoked_label" to "Отозвано",
+    "status_failed" to "Ошибка",
+    "status_unknown" to "Неизвестно",
+    "status_unavailable" to "Недоступно",
+    "status_stopped" to "Остановлено",
     "security_posture" to "Состояние безопасности",
     "security_posture_subtitle" to "Состояния аккаунта и доверенного устройства разделены по области ответственности.",
     "account" to "Аккаунт",

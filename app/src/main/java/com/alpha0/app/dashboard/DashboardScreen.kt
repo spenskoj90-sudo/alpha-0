@@ -87,9 +87,7 @@ fun DashboardScreen(
         }
 
         val current = device
-        val deviceVerified = current != null &&
-            current.state.equals("ACTIVE", true) &&
-            current.securityStatus.equals("OK", true)
+        val deviceVerified = current != null && isTrustedDeviceState(current.state, current.securityStatus)
         val attentionStatus = when {
             error != null -> SentinelStatus.WARNING
             current == null -> SentinelStatus.UNKNOWN
@@ -235,8 +233,27 @@ private fun SecurityPostureRow(
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(value, style = MaterialTheme.typography.titleLarge)
-            StatusBadge(status.name.lowercase().replaceFirstChar { it.uppercase() }, status)
+            val strings = LocalAppStrings.current
+            StatusBadge(strings.text(status.labelKey()), status)
         }
         Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+
+internal fun isTrustedDeviceState(state: String?, securityStatus: String?): Boolean =
+    state.equals("ACTIVE", ignoreCase = true) &&
+        (securityStatus.equals("OK", ignoreCase = true) || securityStatus.equals("SECURE", ignoreCase = true))
+
+private fun SentinelStatus.labelKey(): String = when (this) {
+    SentinelStatus.VERIFIED -> "status_verified"
+    SentinelStatus.ACTIVE -> "status_active"
+    SentinelStatus.PENDING -> "status_pending"
+    SentinelStatus.WARNING -> "status_warning"
+    SentinelStatus.DENIED -> "status_denied"
+    SentinelStatus.REVOKED -> "status_revoked_label"
+    SentinelStatus.FAILED -> "status_failed"
+    SentinelStatus.UNKNOWN -> "status_unknown"
+    SentinelStatus.UNAVAILABLE -> "status_unavailable"
+    SentinelStatus.STOPPED -> "status_stopped"
 }

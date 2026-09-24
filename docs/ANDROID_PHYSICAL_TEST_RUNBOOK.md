@@ -48,9 +48,9 @@ Never put the password, tokens, private keys or exported diagnostics in a public
 
 ## 3. Install and establish build identity
 
-1. If an older `SENTINEL PHYSICAL TEST` is installed, export any evidence that must be preserved, then uninstall it for the fresh-install pass.
+1. If an older `SENTINEL` is installed, export any evidence that must be preserved, then uninstall it for the fresh-install pass.
 2. Open `app-physicalTest.apk` and allow installation from the selected source when Android asks.
-3. Launch **SENTINEL PHYSICAL TEST**.
+3. Launch **SENTINEL**.
 4. Confirm the permanent compact PHYSICAL TEST identity strip clearly identifies `PHYSICAL TEST`, `STAGING`, the expected version and SHA prefix while leaving normal screen content usable.
 5. Confirm the normal release package, if installed, remains separate. The physical-test package is `com.alpha0.app.physicaltest`.
 6. Close and reopen the app once before signing in. A crash loop, blank screen or lost PHYSICAL TEST identity strip is a defect.

@@ -76,7 +76,8 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("PhysicalTestIdentityStrip", self.chrome)
         self.assertIn("PhysicalTestIdentityStrip(", self.main_activity)
         self.assertNotIn("Color(0xFF7A1F1F)", self.main_activity)
-        self.assertIn("M32,3 L57,15", self.launcher_fg)
+        self.assertIn('@drawable/sentinel_master_icon', self.launcher_fg)
+        self.assertNotIn("M32,3 L57,15", self.launcher_fg)
         self.assertEqual(self.manifest["brand"]["master512"]["gitBlobSha"], "e4e4dad49fd9522605e1c1018d175f8ea0973fee")
         self.assertIn("sentinel_master_icon", read("app/src/main/res/values-v31/styles.xml"))
 

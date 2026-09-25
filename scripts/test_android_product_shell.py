@@ -21,6 +21,7 @@ class AndroidProductShellTests(unittest.TestCase):
         cls.theme = read("app/src/main/java/com/alpha0/app/ui/SentinelTheme.kt")
         cls.chrome = read("app/src/main/java/com/alpha0/app/ui/AppChrome.kt")
         cls.setup = read("app/src/main/java/com/alpha0/app/device/DeviceSetupScreen.kt")
+        cls.battery = read("app/src/main/java/com/alpha0/app/device/BatteryOptimization.kt")
         cls.tokens = read("app/src/main/java/com/alpha0/app/ui/DesignTokens.kt")
         cls.update = read("app/src/main/java/com/alpha0/app/update/UpdateScreen.kt")
         cls.gradle = read("app/build.gradle.kts")
@@ -118,6 +119,13 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertNotIn("RoundedCornerShape(18.dp)", self.tokens)
         self.assertIn("RoundedCornerShape(8.dp)", self.tokens)
         self.assertIn("Surface(", self.tokens)
+
+    def test_battery_guidance_uses_system_settings_without_direct_exemption_permission(self) -> None:
+        self.assertIn("Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS", self.battery)
+        self.assertNotIn("Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS", self.battery)
+        self.assertNotIn("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS", self.manifest)
+        self.assertIn("BatteryOptimization.openSettings(context)", self.setup)
+        self.assertIn("Settings.ACTION_APPLICATION_DETAILS_SETTINGS", self.setup)
 
     def test_update_center_uses_play_update_api_and_monotonic_version(self) -> None:
         self.assertIn("AppUpdateManagerFactory.create", self.update)

@@ -52,6 +52,7 @@ check 'Telemetry manifest' test -f observability/telemetry-contract.v1.json
 check 'Telemetry contract tests' test -f scripts/test_telemetry_contract.py
 check 'Provider runtime state tests' test -f scripts/test_provider_runtime_state.py
 check 'Repository policy verifier' test -f scripts/verify_repository.py
+check 'Branch hygiene safety tests' test -f scripts/test_branch_hygiene.py
 check 'Release evidence verifier' test -f scripts/release_evidence.py
 check 'Release evidence policy entrypoint' test -f scripts/release_evidence_entrypoint.py
 check 'Release evidence tests' test -f scripts/test_release_evidence.py
@@ -88,11 +89,12 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_release_evidence.py scripts/test_release_evidence_supply_chain.py \
     scripts/release_lineage.py scripts/test_release_lineage.py \
     scripts/test_artifact_attestations.py scripts/test_design_system.py \
-    scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py \
+    scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py scripts/test_branch_hygiene.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
     scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py
   check 'Android product shell invariants' python scripts/test_android_product_shell.py
   check 'Repository policy invariants' python scripts/verify_repository.py
+  check 'Branch hygiene safety invariants' python scripts/test_branch_hygiene.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py

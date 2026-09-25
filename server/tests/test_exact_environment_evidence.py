@@ -303,3 +303,183 @@ def test_registered_identity_must_match_bundle_exactly() -> None:
 
     with pytest.raises(ValueError, match="registered adapter identity"):
         apply_exact_environment_evidence(registry, valid_bundle())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_sha", "A" * 40),
+        ("source_sha", "a" * 39),
+        ("provenance_file_sha256", "G" * 64),
+        ("provenance_file_sha256", "e" * 63),
+    ],
+)
+def test_packaged_host_rejects_invalid_source_and_digest_shapes(field: str, value: str) -> None:
+    payload = valid_bundle().packaged_host.model_dump(by_alias=True)
+    payload[field] = value
+    with pytest.raises(ValueError):
+        PackagedHostProvenance.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("checkpoint_sha256", "z" * 64),
+        ("path_fingerprint_sha256", "f" * 63),
+    ],
+)
+def test_checkpoint_schema_rejects_invalid_digests(field: str, value: str) -> None:
+    payload = checkpoint(10, 30, "b").model_dump()
+    payload[field] = value
+    with pytest.raises(ValueError):
+        LiveWowCheckpointEvidence.model_validate(payload)
+
+
+def test_bundle_schema_rejects_invalid_ids_source_and_claim_lists() -> None:
+    base = valid_bundle().model_dump()
+    for field, value in (
+        ("evidence_id", "bad evidence id"),
+        ("source_sha", "A" * 40),
+        ("capability_claims", ["wow.identity", "wow.identity"]),
+        ("capability_claims", [""]),
+        ("capability_claims", ["x" * 129]),
+    ):
+        payload = dict(base)
+        payload[field] = value
+        with pytest.raises(ValueError):
+            ExactEnvironmentEvidenceBundle.model_validate(payload)
+
+
+def test_bundle_timeline_is_bounded_and_timezone_aware() -> None:
+    base = valid_bundle()
+    for started, completed, message in (
+        (NOW.replace(tzinfo=None), NOW + timedelta(minutes=1), "timezone-aware"),
+        (NOW, NOW, "after started_at"),
+        (NOW, NOW + timedelta(hours=8, seconds=1), "eight-hour"),
+    ):
+        payload = base.model_dump()
+        payload["started_at"] = started
+        payload["completed_at"] = completed
+        with pytest.raises(ValueError, match=message):
+            ExactEnvironmentEvidenceBundle.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("adapter_id", "other-adapter", "adapter_id"),
+        ("adapter_version", "999", "adapter_version"),
+        ("game_id", "other-game", "game_id"),
+        ("capability_profile_version", "999", "capability profile"),
+        ("environment_id", None, "environment_id"),
+        ("client_version", None, "client_version"),
+        ("server_profile", None, "server_profile"),
+        ("client_version", "unsupported-patch", "unsupported"),
+        ("server_profile", "unsupported-server", "unsupported"),
+        ("client_family", "retail", "client_family"),
+    ],
+)
+def test_identity_must_match_exact_conservative_wow_contract(field: str, value, message: str) -> None:
+    bundle = valid_bundle()
+    identity = bundle.adapter_identity.model_copy(update={field: value})
+    with pytest.raises(ValueError, match=message):
+        validate_exact_environment_evidence(bundle.model_copy(update={"adapter_identity": identity}))
+
+
+def test_packaged_host_requires_nonempty_package_version_after_boundary_copy() -> None:
+    bundle = valid_bundle()
+    host = bundle.packaged_host.model_copy(update={"package_version": ""})
+    with pytest.raises(ValueError, match="version is required"):
+        validate_exact_environment_evidence(bundle.model_copy(update={"packaged_host": host}))
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"accepted": False}, "accepted ACTIVE"),
+        ({"mode": "DEGRADED"}, "accepted ACTIVE"),
+        ({"accepted_at": NOW.replace(tzinfo=None)}, "timezone-aware"),
+        ({"accepted_at": NOW - timedelta(seconds=1)}, "outside the evidence run"),
+        ({"protocol_version": "2.0"}, "handshake mismatch"),
+    ],
+)
+def test_handshake_must_be_accepted_exact_and_inside_run(updates: dict, message: str) -> None:
+    bundle = valid_bundle()
+    handshake = bundle.handshake.model_copy(update=updates)
+    with pytest.raises(ValueError, match=message):
+        validate_exact_environment_evidence(bundle.model_copy(update={"handshake": handshake}))
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"captured_at": NOW.replace(tzinfo=None)}, "timezone-aware"),
+        ({"captured_at": NOW - timedelta(seconds=1)}, "outside the evidence run"),
+        ({"mode": "DEGRADED"}, "remain ACTIVE"),
+        ({"kill_switch_active": True}, "kill switch active"),
+    ],
+)
+def test_runtime_health_samples_must_be_live_active_and_inside_run(updates: dict, message: str) -> None:
+    bundle = valid_bundle()
+    sample = bundle.health_samples[0].model_copy(update=updates)
+    with pytest.raises(ValueError, match=message):
+        validate_exact_environment_evidence(bundle.model_copy(update={"health_samples": [sample]}))
+
+
+def _mutate_first_checkpoint(bundle: ExactEnvironmentEvidenceBundle, *, checkpoint_updates=None, observation_updates=None, ack_updates=None):
+    first = bundle.checkpoints[0]
+    observation = first.observation.model_copy(update=observation_updates or {})
+    ack = first.core_ack.model_copy(update=ack_updates or {})
+    first = first.model_copy(update={"observation": observation, "core_ack": ack, **(checkpoint_updates or {})})
+    return bundle.model_copy(update={"checkpoints": [first, bundle.checkpoints[1]]})
+
+
+@pytest.mark.parametrize(
+    ("checkpoint_updates", "observation_updates", "ack_updates", "message"),
+    [
+        ({"captured_at": NOW.replace(tzinfo=None)}, None, None, "timezone-aware"),
+        (None, {"observed_at": NOW.replace(tzinfo=None)}, None, "timezone-aware"),
+        (None, None, {"acknowledged_at": NOW.replace(tzinfo=None)}, "timezone-aware"),
+        ({"captured_at": NOW - timedelta(minutes=2)}, None, None, "capture is outside"),
+        (None, {"observed_at": NOW - timedelta(minutes=2)}, None, "observation time is outside"),
+        ({"captured_at": NOW + timedelta(seconds=20)}, {"observed_at": NOW + timedelta(seconds=30)}, None, "predates"),
+        ({"captured_at": NOW + timedelta(seconds=30)}, None, {"acknowledged_at": NOW + timedelta(seconds=20)}, "acknowledgement time"),
+        (None, {"patch_profile": WowPatchProfile.RETAIL_12_0_5}, None, "environment does not match"),
+        (None, {"data_quality": DataQuality.UNKNOWN}, None, "UNKNOWN data quality"),
+        (None, {"addon_connected": False}, None, "addon_connected=true"),
+        (None, {"launcher_associated": False}, None, "failed launcher/account"),
+        (None, {"account_entitled": False}, None, "failed launcher/account"),
+        (None, None, {"reason": "OTHER"}, "matching accepted Core acknowledgement"),
+        (None, None, {"event_id": "different-event"}, "matching accepted Core acknowledgement"),
+    ],
+)
+def test_checkpoint_temporal_environment_and_authority_boundaries(
+    checkpoint_updates, observation_updates, ack_updates, message: str
+) -> None:
+    bundle = _mutate_first_checkpoint(
+        valid_bundle(),
+        checkpoint_updates=checkpoint_updates,
+        observation_updates=observation_updates,
+        ack_updates=ack_updates,
+    )
+    with pytest.raises(ValueError, match=message):
+        validate_exact_environment_evidence(bundle)
+
+
+def test_realm_capability_claim_requires_identity_in_every_checkpoint() -> None:
+    bundle = valid_bundle()
+    first = bundle.checkpoints[0]
+    observation = first.observation.model_copy(update={"realm_id": None})
+    first = first.model_copy(update={"observation": observation})
+    bundle = bundle.model_copy(update={"checkpoints": [first, bundle.checkpoints[1]]})
+    with pytest.raises(ValueError, match="wow.realm_profile"):
+        validate_exact_environment_evidence(bundle)
+
+
+def test_reapplying_same_exact_evidence_is_idempotent_for_capability_state() -> None:
+    registry = AdapterRegistry()
+    summary, first_changes = apply_exact_environment_evidence(registry, valid_bundle())
+    second_summary, second_changes = apply_exact_environment_evidence(registry, valid_bundle())
+    assert second_summary.evidence_digest_sha256 == summary.evidence_digest_sha256
+    assert len(first_changes) == len(second_changes)
+    assert all(change is None for change in second_changes)

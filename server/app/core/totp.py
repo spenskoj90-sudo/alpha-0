@@ -46,6 +46,8 @@ def matching_totp_counter(
     current_counter = int((time.time() if now is None else now) // TOTP_STEP_SECONDS)
     for offset in range(-window, window + 1):
         counter = current_counter + offset
+        if counter < 0:
+            continue
         if last_counter is not None and counter <= last_counter:
             continue
         if hmac.compare_digest(provided, totp_at(key, counter)):

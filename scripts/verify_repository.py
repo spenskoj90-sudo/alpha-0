@@ -144,6 +144,21 @@ def check_workflow_boundaries(checks: Checks) -> None:
     checks.require("release_lineage.py" not in release_publish and "actions/checkout@" not in release_publish, "publication-authority job executes no repository code")
     checks.require("actions/download-artifact@" in release_publish, "publication-authority job consumes only preverified workflow artifact input")
 
+    build = workflow_text["build.yml"]
+    checks.require(
+        "--cov-fail-under=85" in build,
+        "non-PostgreSQL Core line coverage gate is at least 85%",
+    )
+    checks.require(
+        "--cov-branch" in build and "line_min = 90.0" in build and "branch_min = 85.0" in build,
+        "combined Core coverage measures branches and enforces 90% lines / 85% branches",
+    )
+    checks.require(
+        "if line_pct < line_min or branch_pct < branch_min:" in build
+        and "COMBINED_COVERAGE_GATE_FAILED" in build,
+        "combined Core coverage gate fails closed below either threshold",
+    )
+
     security = workflow_text["security.yml"]
     checks.require("ignore-unfixed: false" in security, "Trivy includes unfixed HIGH/CRITICAL findings")
     checks.require("severity: HIGH,CRITICAL" in security and "exit-code: 1" in security, "Trivy HIGH/CRITICAL gate fails closed")
@@ -191,8 +206,8 @@ def check_versions(checks: Checks) -> None:
     checks.require("python:3.14.7-slim@sha256:" in read("server/Dockerfile"), "Core image pins Python 3.14.7 by digest")
     launcher = json.loads(read("launcher/package.json"))
     checks.require(launcher.get("engines", {}).get("node") == "24.x", "Launcher declares Node 24 LTS")
-    checks.require(launcher.get("dependencies", {}).get("electron") == "44.4.3", "Launcher pins Electron 44.4.3")
-    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.4.3", "Launcher packaging pins Electron 44.4.3")
+    checks.require(launcher.get("dependencies", {}).get("electron") == "44.4.5", "Launcher pins Electron 44.4.5")
+    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.4.5", "Launcher packaging pins Electron 44.4.5")
     checks.require('implementation("io.sentry:sentry-android:8.57.0")' in android, "Android pins Sentry 8.57.0")
     checks.require('androidTestImplementation("androidx.test.ext:junit:1.3.0")' in android, "Android test JUnit is current stable")
     checks.require('androidTestImplementation("androidx.test:runner:1.7.0")' in android, "Android test runner is current stable")

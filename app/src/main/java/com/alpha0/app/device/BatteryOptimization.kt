@@ -2,7 +2,6 @@ package com.alpha0.app.device
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -14,13 +13,11 @@ object BatteryOptimization {
         return powerManager.isIgnoringBatteryOptimizations(context.packageName)
     }
 
-    fun request(context: Context): Boolean {
+    fun openSettings(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || isIgnored(context)) return true
         return runCatching {
             context.startActivity(
-                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                }
+                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
             )
             true
         }.getOrDefault(false)

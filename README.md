@@ -73,9 +73,9 @@ The Android device identity remains Keystore-backed: P-256 / `secp256r1` with SH
 ## Current-state limitations / open work
 
 - Live production PostgreSQL, ingress/TLS, distributed rate limiting and operational backup/restore remain environment-level acceptance gates; CI evidence does not prove a live deployment.
-- Remote branch deletion is intentionally not performed by autonomous engineering because it is destructive; the current classification is recorded in `docs/REMOTE_BRANCH_CLEANUP_2026-09-12.md`.
-- Exact target WoW/private-server execution and a complete packaged Companion application remain evidence-limited work.
-- A soft battery-optimization onboarding prompt remains planned to reduce first-run network failures on aggressive Android/MIUI-like firmware.
+- Remote branch hygiene is evidence-gated: historical branches may be removed only after their live tip and branch-only content are proven merged, behind, or superseded; dated cleanup manifests are evidence records rather than authority over live Git state.
+- Exact target WoW/private-server execution and physical/signed Windows Companion acceptance remain external evidence gates; the repository already produces a source-bound unsigned Win32 x64 Companion package in CI.
+- Android onboarding provides battery-optimization guidance through platform settings without requesting the direct Doze exemption permission; final behavior on aggressive OEM firmware remains part of physical-device acceptance.
 
 ## Repository
 
@@ -147,7 +147,7 @@ The authoritative rule is:
 
 `FAIL → root cause → FIX → regression → MAIN PASS → ACCEPTED`
 
-The release-candidate workflow scope includes Core coverage (minimum 80%), Android build/tests, web tests/lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed. Routine PR CI never loads Android release-signing secrets.
+The release-candidate workflow scope includes Core coverage (at least 85% lines for the non-PostgreSQL suite and at least 90% lines / 85% branches for combined Core + PostgreSQL execution), Android build/tests, web tests/lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed. Routine PR CI never loads Android release-signing secrets.
 
 See `docs/RELEASE_GATES.md` for the RC acceptance matrix.
 

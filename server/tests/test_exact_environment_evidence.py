@@ -444,7 +444,7 @@ def _mutate_first_checkpoint(bundle: ExactEnvironmentEvidenceBundle, *, checkpoi
         (None, {"observed_at": NOW - timedelta(minutes=2)}, None, "observation time is outside"),
         ({"captured_at": NOW + timedelta(seconds=20)}, {"observed_at": NOW + timedelta(seconds=30)}, None, "predates"),
         ({"captured_at": NOW + timedelta(seconds=30)}, None, {"acknowledged_at": NOW + timedelta(seconds=20)}, "acknowledgement time"),
-        (None, {"patch_profile": WowPatchProfile.RETAIL_CURRENT}, None, "environment does not match"),
+        (None, {"patch_profile": WowPatchProfile.RETAIL_12_0_5}, None, "environment does not match"),
         (None, {"data_quality": DataQuality.UNKNOWN}, None, "UNKNOWN data quality"),
         (None, {"addon_connected": False}, None, "addon_connected=true"),
         (None, {"launcher_associated": False}, None, "failed launcher/account"),

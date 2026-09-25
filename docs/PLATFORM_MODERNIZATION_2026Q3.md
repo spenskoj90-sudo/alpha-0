@@ -53,7 +53,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
 | Web | Next.js 16.3.6, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.1 |
 | Web lint | ESLint 9.39.5 with eslint-config-next 16.3.6; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
-| Companion | Electron 44.4.3 on Node 24 LTS |
+| Companion | Electron 44.4.5 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
 | Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.0 |
@@ -62,7 +62,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 
 Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is regenerated under Node 24.21.0 and is required to remain consistent with `package.json`.
 
-The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.3 Win32 x64 archive and verifies SHA-256 `790a355b684d5c7cc8dc3cdd8c4cca7c4b2d054685427c7554a956879a82e70b` before staging the application payload.
+The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.4.5 Win32 x64 archive and verifies SHA-256 `11c395820a5aaa8ebcc0686b476d0ac98a730274ebfbdc8cf5538a7c2815cb5d` before staging the application payload.
 
 The connected Neon pre-release source was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The source contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies.
 

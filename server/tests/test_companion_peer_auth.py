@@ -63,3 +63,14 @@ def test_peer_auth_rejects_empty_allowlist_and_invalid_evidence() -> None:
 
     with pytest.raises(ValueError, match="mechanism"):
         PeerAuthEvidence(mechanism="", peer_id="peer", authenticated=True)
+
+
+def test_peer_auth_rejects_invalid_peer_identity_boundaries() -> None:
+    with pytest.raises(ValueError, match="peer_id"):
+        PeerAuthEvidence(mechanism="test-evidence", peer_id="", authenticated=True)
+    with pytest.raises(ValueError, match="peer_id"):
+        PeerAuthEvidence(mechanism="test-evidence", peer_id="x" * 129, authenticated=True)
+    with pytest.raises(ValueError, match="peer IDs"):
+        AllowlistPeerAuthenticator({"valid-peer", ""})
+    with pytest.raises(ValueError, match="peer IDs"):
+        AllowlistPeerAuthenticator({"x" * 129})

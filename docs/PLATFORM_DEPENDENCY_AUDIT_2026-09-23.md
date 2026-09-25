@@ -1,7 +1,9 @@
 # Platform and dependency audit — 2026-09-23
 
-**Status:** ACTIVE AUDIT RECORD  
+**Status:** HISTORICAL EVIDENCE RECORD  
 **Evidence model:** repository pins + official upstream release sources + exact-SHA CI vulnerability scans.
+
+This dated record is not the current version authority. It preserves the 2026-09-23 decision evidence; current pins and final 2026-09-25 upstream recheck are maintained in `docs/PLATFORM_MODERNIZATION_2026Q3.md`.
 
 This audit prefers stable releases and security/reproducibility over version churn. Alpha/beta/RC releases are not adopted merely because their version number is newer.
 

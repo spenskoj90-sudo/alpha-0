@@ -1,10 +1,10 @@
 # BRANCH_DELETION_MANIFEST — 2026-09-23
 
-**Status:** ACTIVE AUDIT RECORD  
+**Status:** HISTORICAL EVIDENCE RECORD  
 **Repository:** `spenskoj90-sudo/alpha-0`  
 **Baseline main:** `b218cab8130afbe3e413a9e7f2beb53e034a8daa`
 
-Remote branch deletion is an **Owner-only irreversible gate**. This manifest does not delete anything and is deliberately conservative: a diverged branch that is not proven redundant is `UNIQUE_MUST_PRESERVE`.
+This dated manifest records the conservative branch state observed on 2026-09-23. Its former deletion-authorization wording is superseded by the current Human Owner instruction and `docs/BRANCH_INVENTORY.md`. The historical classifications below are retained as evidence and are not a live deletion source.
 
 ## Method
 
@@ -220,6 +220,6 @@ The following are `UNIQUE_MUST_PRESERVE` in this audit:
 
 Their live compares show branch-only commits and their affected file blobs are not byte-identical to current main. They must not be deleted until their branch-only semantics are reconciled against the newer implementation and evidence.
 
-## Deletion gate
+## Historical deletion gate
 
-No remote branch is deleted by this pass. If the Human Owner later gives one explicit bulk approval, deletion may include only rows classified `MERGED`, `PURE_BEHIND` or `CONTENT_SUPERSEDED` at that time, after re-checking tips for mutation immediately before deletion. `UNIQUE_MUST_PRESERVE`, `ACTIVE_RECENT` and `UNKNOWN` remain excluded.
+At the time of this 2026-09-23 record, deletion required a later Owner approval. That historical gate has since been superseded. Current deletion authority and live classifications are defined only by the current Human Owner instruction and `docs/BRANCH_INVENTORY.md`; exact-tip revalidation remains mandatory.

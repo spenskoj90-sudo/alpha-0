@@ -8,8 +8,8 @@
 
 Routine PR validation must not load release-signing material or receive attestation-signing OIDC authority. The protected-branch contexts are:
 
-1. `Core tests and coverage` — compile plus unit/API/security tests; coverage at least 80%.
-2. `PostgreSQL integration and recovery` — migrations from an empty database, persistence/RLS/session/event regressions, backup and restore smoke.
+1. `Core tests and coverage` — compile plus non-PostgreSQL unit/API/security tests with a hard line-coverage floor of 85%.
+2. `PostgreSQL integration and recovery` — migrations from an empty database, persistence/RLS/session/event regressions and backup/restore smoke; it appends PostgreSQL execution to branch-aware Core coverage and hard-fails below 90% combined lines or 85% combined branches.
 3. `Android build and tests` — debug APK, JVM tests and instrumentation APK, without signing secrets.
 4. `Android instrumentation (GitHub Emulator)` — emulator assertions for the current debug/test APKs.
 5. `Build Android APK` — independent debug APK build and JVM test path.

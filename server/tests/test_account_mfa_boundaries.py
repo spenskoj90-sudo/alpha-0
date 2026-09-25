@@ -18,11 +18,11 @@ def _code(secret: str, *, offset: int = 0) -> str:
 def test_totp_validation_rejects_malformed_secret_code_and_replay() -> None:
     assert matching_totp_counter("", "123456") is None
     assert matching_totp_counter("INVALID!", "123456") is None
-    assert matching_totp_counter("JBSWY3DPEHPK3PXP", None) is None
-    assert matching_totp_counter("JBSWY3DPEHPK3PXP", "abcdef") is None
-    assert verify_totp("JBSWY3DPEHPK3PXP", "000000", now=0) is False
+    assert matching_totp_counter("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", None) is None
+    assert matching_totp_counter("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", "abcdef") is None
+    assert verify_totp("JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP", "000000", now=0) is False
 
-    secret = "JBSWY3DPEHPK3PXP"
+    secret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
     now = 1_800_000_000.0
     counter = int(now // 30)
     code = totp_at(decode_totp_secret(secret), counter)

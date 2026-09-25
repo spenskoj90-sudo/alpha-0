@@ -36,8 +36,8 @@ class GameAdapterCoordinatorTest {
         assertEquals(1, result.accepted)
         assertEquals(0, queue.size())
         assertNotNull(received)
-        assertEquals("demo.character.snapshot", received!!.single().type)
-        assertEquals(0L, received!!.single().sequence)
+        assertEquals("demo.character.snapshot", received.single().type)
+        assertEquals(0L, received.single().sequence)
     }
 
     @Test

@@ -161,8 +161,10 @@ def test_provider_snapshot_reconciliation_id_is_stable_and_state_sensitive() -> 
 def test_snapshot_reader_validates_provider_identity_and_freshness(subscription_id, snapshot, error) -> None:
     reader = None if snapshot is None else (lambda _id: snapshot)
     adapter = HmacBillingProviderAdapter("signed-test", SECRET, snapshot_reader=reader)
-    expected = RuntimeError if snapshot is None and subscription_id else ValueError
-    with pytest.raises(expected, match=error if expected is ValueError else "PROVIDER_RECONCILIATION_UNAVAILABLE"):
+    invalid_id = not subscription_id or len(subscription_id) > 256
+    expected = ValueError if invalid_id or snapshot is not None else RuntimeError
+    match = error if expected is ValueError else "PROVIDER_RECONCILIATION_UNAVAILABLE"
+    with pytest.raises(expected, match=match):
         adapter.read_subscription(subscription_id)
 
 

@@ -109,6 +109,7 @@ object DiagnosticRuntime {
                 )
             }
 
+            @Deprecated("Android framework callback retained for compatibility on supported API levels.")
             override fun onLowMemory() {
                 logger.warn("RUNTIME", "LOW_MEMORY", errorCode = "LOW_MEMORY")
             }

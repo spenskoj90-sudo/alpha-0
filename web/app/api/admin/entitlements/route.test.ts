@@ -68,4 +68,30 @@ describe('/api/admin/entitlements', () => {
     expect(new Headers(init?.headers).get('x-sentinel-admin-token')).toBe('test-token');
     expect(new Headers(init?.headers).get('x-sentinel-admin-totp')).toBe('123456');
   });
+  it('fails closed on malformed Core URL and transport failure', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'not a url');
+    const invalid = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
+      headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
+    }));
+    expect(invalid.status).toBe(503);
+
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example/');
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
+    const unavailable = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
+      headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
+    }));
+    expect(unavailable.status).toBe(502);
+    await expect(unavailable.json()).resolves.toEqual({ error: 'SENTINEL_CORE_UNAVAILABLE' });
+  });
+
+  it('uses a safe content-type fallback for upstream responses', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
+    const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
+      headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/json');
+  });
+
 });

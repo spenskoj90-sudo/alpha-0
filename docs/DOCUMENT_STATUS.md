@@ -20,7 +20,7 @@
 The following are active within their stated scope but are not proof that a current build passed:
 
 - `README.md`, `ARCHITECTURE.md`, `ARCHITECTURE_V4.md`, `SENTINEL_MASTER_ARCHITECTURE_v0.3.md` and `SENTINEL_PRODUCT_VISION_CONTEXT.md`;
-- `API.md`, `SECURITY.md`, `SECURITY_WHITEPAPER.md`, `DEPLOYMENT.md`, `DEVELOPER_GUIDE.md`, `CONTRIBUTING.md`, `OBSERVABILITY.md`, `FTL_POLICY.md`, `QUALITY_COVERAGE_POLICY.md`, `BRANCH_INVENTORY.md` and `SENTINEL_PERFORMANCE_BASELINE.md`;
+- `API.md`, `SECURITY.md`, `SECURITY_WHITEPAPER.md`, `DEPLOYMENT.md`, `DEVELOPER_GUIDE.md`, `CONTRIBUTING.md`, `OBSERVABILITY.md`, `FTL_POLICY.md`, `QUALITY_COVERAGE_POLICY.md`, `BRANCH_INVENTORY.md`, `PROVIDER_STATUS_MATRIX.md`, `PLATFORM_MODERNIZATION_2026Q3.md` and `SENTINEL_PERFORMANCE_BASELINE.md`;
 - versioned component/contract documents (`*_V1.md`, `*_V2.md`, `UNIFIED_GAME_STATE_V1.md`, `GAME_ADAPTER_CONTRACT_V1.md`, and the Companion/recommendation/intelligence documents);
 - `PASS_1_UGS_COMPLETION_V1.md` through `PASS_6_ANDROID_CORE_LOOP.md`, which are implementation-boundary records for their respective merged passes;
 - `SENTINEL_GAME_CAPABILITY_MATRIX_v1.md` and `SENTINEL_REFERENCE_FAILURE_AUDIT_v1.md` remain active non-binding drafts where their own header says `DRAFT FOR OWNER REVIEW`.
@@ -29,6 +29,7 @@ When an active architecture document contains a future target, its target langua
 
 ## Historical
 
+- `PLATFORM_DEPENDENCY_AUDIT_2026-09-23.md` — **HISTORICAL EVIDENCE RECORD**; current version authority is `PLATFORM_MODERNIZATION_2026Q3.md` plus live upstream verification.
 - `BRANCH_DELETION_MANIFEST_2026-09-23.md` — **EVIDENCE RECORD / HISTORICAL**; superseded for live branch decisions by `BRANCH_INVENTORY.md`.
 - `DESIGN_SYSTEM_V1.md`, `DESIGN_SYSTEM_V2_1.md` and their v1/v2.1 machine manifests — retained design lineage; v3.0 is the active authority.
 

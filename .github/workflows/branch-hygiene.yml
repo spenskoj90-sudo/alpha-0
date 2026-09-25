@@ -1,0 +1,115 @@
+name: Branch Hygiene
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/branch-hygiene.yml"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: sentinel-branch-hygiene
+  cancel-in-progress: false
+
+jobs:
+  delete-proven-legacy-branches:
+    name: Delete proven legacy branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$GITHUB_REF" = "refs/heads/main"
+
+      - name: Delete only live-revalidated MERGED or PURE_BEHIND branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="docs/BRANCH_DELETION_MANIFEST_2026-09-23.md"
+          test -f "$manifest"
+
+          python - <<'PY' > "$RUNNER_TEMP/branch-hygiene.tsv"
+          import re
+          from pathlib import Path
+
+          row = re.compile(
+              r"^\| `(?P<branch>[^`]+)` \| `(?P<tip>[0-9a-f]{12})` \| "
+              r"(?P<class>[A-Z_]+) \| (?P<reason>.*) \|$"
+          )
+          pr_number = re.compile(r"PR #(\d+) merged")
+          for line in Path("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md").read_text().splitlines():
+              match = row.match(line)
+              if not match:
+                  continue
+              classification = match.group("class")
+              if classification not in {"MERGED", "PURE_BEHIND"}:
+                  continue
+              branch = match.group("branch")
+              if branch == "main" or any(ch.isspace() for ch in branch):
+                  raise SystemExit(f"unsafe branch name in manifest: {branch!r}")
+              pr = ""
+              if classification == "MERGED":
+                  pr_match = pr_number.search(match.group("reason"))
+                  if not pr_match or "exact merged PR head" not in match.group("reason"):
+                      raise SystemExit(f"MERGED row lacks exact-PR evidence: {branch}")
+                  pr = pr_match.group(1)
+              print("\t".join((branch, match.group("tip"), classification, pr)))
+          PY
+
+          deleted=0
+          skipped_absent=0
+          while IFS=$'\t' read -r branch expected_prefix classification pr_number; do
+            git check-ref-format --branch "$branch" >/dev/null
+            remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
+            if [ -z "$remote_sha" ]; then
+              echo "already absent: $branch"
+              skipped_absent=$((skipped_absent + 1))
+              continue
+            fi
+            case "$remote_sha" in
+              "$expected_prefix"*) ;;
+              *)
+                echo "ref mutation detected for $branch: expected prefix $expected_prefix, live $remote_sha" >&2
+                exit 1
+                ;;
+            esac
+
+            if [ "$classification" = "MERGED" ]; then
+              live_head="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.head.sha')"
+              merged_at="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.merged_at // ""')"
+              test -n "$merged_at"
+              if [ "$live_head" != "$remote_sha" ]; then
+                echo "exact PR-head mismatch for $branch: PR #$pr_number=$live_head branch=$remote_sha" >&2
+                exit 1
+              fi
+            elif [ "$classification" = "PURE_BEHIND" ]; then
+              git cat-file -e "$remote_sha^{commit}"
+              if ! git merge-base --is-ancestor "$remote_sha" "$GITHUB_SHA"; then
+                echo "PURE_BEHIND ancestry failed for $branch at $remote_sha" >&2
+                exit 1
+              fi
+            else
+              echo "unexpected cleanup classification: $classification" >&2
+              exit 1
+            fi
+
+            git push origin --delete "$branch"
+            deleted=$((deleted + 1))
+          done < "$RUNNER_TEMP/branch-hygiene.tsv"
+
+          echo "BRANCH_HYGIENE deleted=$deleted already_absent=$skipped_absent"

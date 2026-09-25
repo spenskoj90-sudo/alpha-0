@@ -176,8 +176,10 @@ def check_workflow_boundaries(checks: Checks) -> None:
     checks.require(
         'if [ "$remote_sha" != "$expected_sha" ]' in branch_hygiene
         and "ref mutation detected" in branch_hygiene
+        and 'git fetch --no-tags origin "refs/heads/$branch"' in branch_hygiene
+        and 'if [ "$fetched_sha" != "$expected_sha" ]' in branch_hygiene
         and 'protected="$(gh api' in branch_hygiene,
-        "branch hygiene revalidates exact live tip and refuses protected refs",
+        "branch hygiene revalidates exact live and fetched tips and refuses protected refs",
     )
     checks.require(
         "exact PR-head mismatch" in branch_hygiene

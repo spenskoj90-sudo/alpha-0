@@ -16,7 +16,7 @@ class AppStrings internal constructor(
         return if (args.isEmpty()) pattern else String.format(locale(), pattern, *args)
     }
 
-    private fun locale(): Locale = if (language == AppLanguage.RUSSIAN) Locale("ru") else Locale.ENGLISH
+    private fun locale(): Locale = if (language == AppLanguage.RUSSIAN) Locale.forLanguageTag("ru") else Locale.ENGLISH
 }
 
 val LocalAppStrings = staticCompositionLocalOf { AppStrings(AppLanguage.ENGLISH, ENGLISH) }

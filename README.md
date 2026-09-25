@@ -147,7 +147,7 @@ The authoritative rule is:
 
 `FAIL → root cause → FIX → regression → MAIN PASS → ACCEPTED`
 
-The release-candidate workflow scope includes Core coverage (minimum 80%), Android build/tests, web tests/lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed. Routine PR CI never loads Android release-signing secrets.
+The release-candidate workflow scope includes Core coverage (at least 85% lines for the non-PostgreSQL suite and at least 90% lines / 85% branches for combined Core + PostgreSQL execution), Android build/tests, web tests/lint/build, container build, CodeQL, dependency audit and filesystem secret scanning. Actual acceptance requires those checks to pass on the exact SHA being claimed. Routine PR CI never loads Android release-signing secrets.
 
 See `docs/RELEASE_GATES.md` for the RC acceptance matrix.
 

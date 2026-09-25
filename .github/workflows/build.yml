@@ -102,12 +102,16 @@ jobs:
           from pathlib import Path
           data = json.loads(Path("coverage-combined.json").read_text())
           totals = data["totals"]
+          line_total = totals["num_statements"]
+          branch_total = totals.get("num_branches", 0)
+          line_pct = 100.0 * totals["covered_lines"] / line_total if line_total else 100.0
+          branch_pct = 100.0 * totals.get("covered_branches", 0) / branch_total if branch_total else 100.0
           print(
               "COMBINED_COVERAGE "
-              f"lines={totals['percent_covered_display']}% "
+              f"lines={line_pct:.2f}% "
               f"covered_lines={totals['covered_lines']} "
               f"missing_lines={totals['missing_lines']} "
-              f"branches={totals.get('percent_covered_display', 'n/a')}% "
+              f"branches={branch_pct:.2f}% "
               f"covered_branches={totals.get('covered_branches', 0)} "
               f"missing_branches={totals.get('missing_branches', 0)}"
           )

@@ -70,7 +70,7 @@ def test_checkout_rejects_unknown_and_free_plans_before_provider_use(monkeypatch
         json={"plan_code": plan_code},
     )
     assert response.status_code == status
-    assert response.json()["detail"] == detail
+    assert response.json()["code"] == detail
 
 
 @pytest.mark.parametrize("mode", ["none", "runtime", "value", "missing-price"])
@@ -107,7 +107,7 @@ def test_checkout_fails_closed_for_incomplete_stripe_configuration(monkeypatch, 
         json={"plan_code": "core-plus"},
     )
     assert response.status_code == 503
-    assert response.json()["detail"] == expected
+    assert response.json()["code"] == expected
     assert "internal" not in response.text
 
 
@@ -140,7 +140,7 @@ def test_checkout_reuses_pending_row_and_maps_provider_failure_without_entitleme
         json={"plan_code": "core-plus"},
     )
     assert failed.status_code == 502
-    assert failed.json()["detail"] == "STRIPE_API_UNAVAILABLE"
+    assert failed.json()["code"] == "STRIPE_API_UNAVAILABLE"
 
     features = client.get("/v1/billing/features", headers=headers)
     assert features.status_code == 200
@@ -189,11 +189,11 @@ def test_verified_webhook_validates_provider_configuration_signature_and_size(mo
         monkeypatch.setattr(provider_api, "configured_provider_registry", lambda error=error: _Registry(error=error))
         response = _post_webhook("signed-test")
         assert response.status_code == 503
-        assert response.json()["detail"] == "BILLING_PROVIDER_NOT_CONFIGURED"
+        assert response.json()["code"] == "BILLING_PROVIDER_NOT_CONFIGURED"
 
     monkeypatch.setattr(provider_api, "configured_provider_registry", lambda: _Registry(_WebhookAdapter(SimpleNamespace())))
-    assert _post_webhook("signed-test", signature=False).json()["detail"] == "PROVIDER_WEBHOOK_SIGNATURE_REQUIRED"
-    assert _post_webhook("stripe", signature=False).json()["detail"] == "PROVIDER_WEBHOOK_SIGNATURE_REQUIRED"
+    assert _post_webhook("signed-test", signature=False).json()["code"] == "PROVIDER_WEBHOOK_SIGNATURE_REQUIRED"
+    assert _post_webhook("stripe", signature=False).json()["code"] == "PROVIDER_WEBHOOK_SIGNATURE_REQUIRED"
 
     oversized = _post_webhook("signed-test", body=b"x" * 262_145)
     assert oversized.status_code == 413
@@ -222,7 +222,7 @@ def test_verified_webhook_maps_adapter_failures_to_bounded_public_codes(monkeypa
     if status == 200:
         assert response.json() == {"accepted": False, "ignored": True, "reason": detail}
     else:
-        assert response.json()["detail"] == detail
+        assert response.json()["code"] == detail
     assert "private" not in response.text
 
 
@@ -252,5 +252,5 @@ def test_verified_webhook_maps_billing_conflicts_without_internal_text(monkeypat
     monkeypatch.setattr(main_module, "billing_service", _Billing())
     response = _post_webhook("signed-test")
     assert response.status_code == status
-    assert response.json()["detail"] == detail
+    assert response.json()["code"] == detail
     assert "database" not in response.text

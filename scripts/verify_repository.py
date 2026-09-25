@@ -234,6 +234,9 @@ def check_versions(checks: Checks) -> None:
     checks.require(launcher.get("dependencies", {}).get("electron") == "44.4.5", "Launcher pins Electron 44.4.5")
     checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.4.5", "Launcher packaging pins Electron 44.4.5")
     checks.require('implementation("io.sentry:sentry-android:8.57.0")' in android, "Android pins Sentry 8.57.0")
+    checks.require('implementation("androidx.navigation:navigation-compose:2.10.2")' in android, "Android pins Navigation Compose 2.10.2")
+    checks.require('"httpx2==2.13.1"' in pyproject, "Core test tooling pins httpx2 2.13.1")
+    checks.require('"sqlalchemy==2.0.54"' in pyproject, "Core retains validated SQLAlchemy 2.0.54 RC line")
     checks.require('androidTestImplementation("androidx.test.ext:junit:1.3.0")' in android, "Android test JUnit is current stable")
     checks.require('androidTestImplementation("androidx.test:runner:1.7.0")' in android, "Android test runner is current stable")
     checks.require('androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")' in android, "Android Espresso is current stable")
@@ -335,9 +338,10 @@ def check_governance(checks: Checks) -> None:
         "active branch inventory leaves no unresolved or unknown historical branch state",
     )
     checks.require(
-        "RECONCILED:" in branch_inventory
-        and "ref mutation aborts deletion" in branch_inventory,
-        "content-superseded deletion remains tied to explicit reconciliation and exact-tip revalidation",
+        "BRANCH_HYGIENE deleted=40 already_absent=0" in branch_inventory
+        and "| `main` | ACTIVE |" in branch_inventory
+        and "only protected `main`" in branch_inventory,
+        "active branch inventory records completed exact-tip cleanup and compact durable state",
     )
     historical_branch_manifest = read("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md")
     checks.require(
@@ -356,6 +360,34 @@ def check_governance(checks: Checks) -> None:
     )
     checks.require("sole AI engineering participant" in workflow, "workflow contract remains GPT-only")
     checks.require("DOCUMENT_STATUS.md" in read("README.md") or (ROOT / "docs/DOCUMENT_STATUS.md").exists(), "document authority map exists")
+    provider_matrix = read("docs/PROVIDER_STATUS_MATRIX.md")
+    checks.require(
+        "**Status:** ACTIVE" in provider_matrix
+        and "Stripe Billing" in provider_matrix
+        and "Resend email" in provider_matrix
+        and "Sentry Android" in provider_matrix
+        and "PostHog operational telemetry" in provider_matrix
+        and "Google federated auth" in provider_matrix
+        and "Telegram federated auth" in provider_matrix
+        and "VK federated auth" in provider_matrix
+        and "STT provider boundary" in provider_matrix
+        and "TTS provider boundary" in provider_matrix,
+        "provider status matrix covers every required external provider boundary",
+    )
+    checks.require(
+        "| PostHog operational telemetry | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |" in provider_matrix
+        and "Production delivery is `MISSING` **by design**" in provider_matrix,
+        "provider matrix does not misstate production PostHog as an activated or merely credential-gated path",
+    )
+    platform = read("docs/PLATFORM_MODERNIZATION_2026Q3.md")
+    checks.require(
+        "| Navigation Compose | 2.10.2 |" in platform
+        and "httpx2 2.13.1" in platform
+        and "**TypeScript 7.0.2:**" in platform
+        and "**SQLAlchemy 2.1.0:**" in platform
+        and "**Next.js 16.3.7:**" in platform,
+        "platform baseline records final upstream recheck and explicit RC compatibility holds",
+    )
     checks.require((ROOT / "docs/REMOTE_BRANCH_CLEANUP_2026-09-12.md").exists(), "remote branch cleanup classification exists")
 
 

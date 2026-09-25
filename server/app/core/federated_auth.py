@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import time
 from dataclasses import dataclass
@@ -143,7 +144,7 @@ def provider_status(provider: str) -> ProviderStatus:
 
 
 def _b64url_decode(value: str, *, max_bytes: int = _MAX_JWT_BYTES) -> bytes:
-    if len(value) > max_bytes * 2:
+    if len(value) > max_bytes * 2 or not value or re.fullmatch(r"[A-Za-z0-9_-]+", value) is None:
         raise FederatedAuthError("FEDERATED_TOKEN_INVALID")
     try:
         padded = value + "=" * (-len(value) % 4)

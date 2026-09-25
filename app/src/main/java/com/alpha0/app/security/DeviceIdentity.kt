@@ -38,7 +38,7 @@ class DeviceIdentity {
         val algorithm: String
     )
 
-    data class RotationCandidate internal constructor(
+    class RotationCandidate internal constructor(
         internal val alias: String,
         val fingerprint: String,
         val publicKeyDerBase64: String,

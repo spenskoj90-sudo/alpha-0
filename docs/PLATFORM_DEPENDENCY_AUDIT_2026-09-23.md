@@ -13,7 +13,8 @@ This audit prefers stable releases and security/reproducibility over version chu
 | Gradle wrapper | 9.7.1 + distribution SHA-256 | current 9.7 patch; upstream recommends 9.7.1 over 9.7.0 | KEEP |
 | Kotlin / Compose plugin | 2.4.20 | latest supported 2.4 release | KEEP |
 | Compose BOM | 2026.09.00 | official Android guidance names 2026.09.00 as latest stable BOM | KEEP |
-| AndroidX Core | 1.19.0 | current stable | KEEP |
+| AndroidX Core | 1.19.1 | current stable patch on 2026-09-23 | UPDATE 1.19.0 → 1.19.1 |
+| Lifecycle Runtime Compose | 2.11.0 | current stable line; 2.12 is alpha | ADD explicit stable dependency for LocalLifecycleOwner |
 | Activity Compose | 1.13.0 | current stable; 1.14 is alpha | KEEP |
 | Navigation | 2.10.1 | current stable | KEEP |
 | Credentials | 1.6.0 | current stable; 1.7 is alpha | KEEP |
@@ -130,6 +131,17 @@ Official references:
 - https://setuptools.pypa.io/en/latest/history.html
 
 ## Warning cleanup
+
+The Android compile/test pass also surfaced six maintenance warnings after the Design System v3 physical-device correction. They are addressed without changing product authority or runtime policy:
+
+1. `LocalLifecycleOwner` moved to `androidx.lifecycle.compose`; SENTINEL now uses the stable Lifecycle Runtime Compose 2.11.0 API explicitly.
+2. The legacy Android `onLowMemory` callback override is retained for supported platform compatibility and explicitly marked deprecated.
+3. `RotationCandidate` is no longer a data class, preventing Kotlin from exposing a public generated `copy()` for an internal constructor.
+4. Russian locale construction uses `Locale.forLanguageTag("ru")`.
+5. The game coordinator unit test removes redundant non-null assertions.
+6. Compose UI instrumentation uses the v2 `createComposeRule` API.
+
+AndroidX Core is also advanced from 1.19.0 to the stable 1.19.1 patch. Exact-SHA CI remains the acceptance gate for both changes.
 
 The previous Core run reported only two warnings:
 

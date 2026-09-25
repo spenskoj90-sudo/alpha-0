@@ -86,7 +86,7 @@ describe('/api/admin/entitlements', () => {
 
   it('uses a safe content-type fallback for upstream responses', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('ok', { status: 200 }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([111, 107]), { status: 200 }));
     const response = await GET(new NextRequest('http://localhost/api/admin/entitlements', {
       headers: { 'x-sentinel-admin-token': 'test-token', 'x-sentinel-admin-totp': '123456' },
     }));

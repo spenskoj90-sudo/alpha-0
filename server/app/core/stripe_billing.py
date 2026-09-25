@@ -231,7 +231,8 @@ class StripeBillingProviderAdapter:
         subscription = data["object"]
         subscription_id = subscription.get("id")
         status = subscription.get("status")
-        metadata = subscription.get("metadata") or {}
+        metadata_value = subscription.get("metadata")
+        metadata = {} if metadata_value is None else metadata_value
         if not isinstance(subscription_id, str) or not subscription_id.startswith("sub_") or len(subscription_id) > 256:
             raise ProviderVerificationError("PROVIDER_WEBHOOK_BODY_INVALID")
         if not isinstance(status, str) or len(status) > 64 or not isinstance(metadata, dict):

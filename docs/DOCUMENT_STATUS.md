@@ -29,6 +29,7 @@ When an active architecture document contains a future target, its target langua
 
 ## Historical
 
+- `BRANCH_DELETION_MANIFEST_2026-09-23.md` — **EVIDENCE RECORD / HISTORICAL**; superseded for live branch decisions by `BRANCH_INVENTORY.md`.
 - `DESIGN_SYSTEM_V1.md`, `DESIGN_SYSTEM_V2_1.md` and their v1/v2.1 machine manifests — retained design lineage; v3.0 is the active authority.
 
 - root `HANDOVER_DOCUMENT.md`;
@@ -49,4 +50,3 @@ Historical documents are retained for traceability. Their actors, SHA snapshots,
 
 New documents must declare `ACTIVE`, `HISTORICAL`, `SUPERSEDED`, or an explicit non-binding draft status near the title. A superseded document must name its replacement. Never edit historical conclusions to make them look current; add a banner or a new current decision instead.
 
-- `BRANCH_DELETION_MANIFEST_2026-09-23.md` — **EVIDENCE RECORD / HISTORICAL**; superseded for live branch decisions by `BRANCH_INVENTORY.md`.

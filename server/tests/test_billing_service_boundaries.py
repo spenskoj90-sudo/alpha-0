@@ -165,7 +165,7 @@ def test_feature_entitlements_ignore_nonactive_and_unknown_plans() -> None:
         ),
         (
             BillingWebhookEvent("evt", "", "sub", BillingState.ACTIVE, datetime.now(UTC)),
-            "INVALID_WEBHOOK",
+            "UNVERIFIED_PROVIDER_EVENT",
         ),
         (
             BillingWebhookEvent("evt", "test", "", BillingState.ACTIVE, datetime.now(UTC)),

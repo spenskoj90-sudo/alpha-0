@@ -107,7 +107,13 @@ jobs:
               echo "refusing to delete protected branch: $branch" >&2
               exit 1
             fi
-            git cat-file -e "$remote_sha^{commit}"
+            git fetch --no-tags origin "refs/heads/$branch"
+            fetched_sha="$(git rev-parse FETCH_HEAD)"
+            if [ "$fetched_sha" != "$expected_sha" ]; then
+              echo "fetched ref mutation detected for $branch: expected $expected_sha, fetched $fetched_sha" >&2
+              exit 1
+            fi
+            git cat-file -e "$fetched_sha^{commit}"
             git push origin --delete "$branch"
             return 0
           }

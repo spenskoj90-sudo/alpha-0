@@ -113,7 +113,7 @@ class DiagnosticEvent(BaseModel):
 
 
 class DiagnosticSnapshot(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True, serialize_by_alias=True)
+    model_config = ConfigDict(extra="forbid", validate_by_alias=True, validate_by_name=False, serialize_by_alias=True)
 
     schema_name: Literal["sentinel.diagnostic-snapshot.v1"] = Field(validation_alias="schema", serialization_alias="schema")
     mode: Literal["PRODUCTION", "FORENSIC_TEST"]

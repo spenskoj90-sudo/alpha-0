@@ -163,6 +163,29 @@ def check_workflow_boundaries(checks: Checks) -> None:
     checks.require("ignore-unfixed: false" in security, "Trivy includes unfixed HIGH/CRITICAL findings")
     checks.require("severity: HIGH,CRITICAL" in security and "exit-code: 1" in security, "Trivy HIGH/CRITICAL gate fails closed")
 
+    branch_hygiene = workflow_text["branch-hygiene.yml"]
+    checks.require(
+        "contents: write" in branch_hygiene and "pull-requests: read" in branch_hygiene,
+        "branch hygiene has only the authority needed for exact-ref deletion and PR verification",
+    )
+    checks.require(
+        '"docs/BRANCH_INVENTORY.md"' in branch_hygiene
+        and '{"MERGED_EXACT", "PURE_BEHIND", "CONTENT_SUPERSEDED"}' in branch_hygiene,
+        "branch hygiene consumes only the active reconciled inventory classifications",
+    )
+    checks.require(
+        'if [ "$remote_sha" != "$expected_sha" ]' in branch_hygiene
+        and "ref mutation detected" in branch_hygiene
+        and 'protected="$(gh api' in branch_hygiene,
+        "branch hygiene revalidates exact live tip and refuses protected refs",
+    )
+    checks.require(
+        "exact PR-head mismatch" in branch_hygiene
+        and 'merge_sha" = "$GITHUB_SHA' in branch_hygiene
+        and 'head_repo" = "$GITHUB_REPOSITORY' in branch_hygiene,
+        "branch hygiene binds merged and self-cleanup deletion to exact same-repository PR lineage",
+    )
+
 
 def check_web(checks: Checks) -> None:
     package = json.loads(read("web/package.json"))
@@ -276,6 +299,7 @@ def check_governance(checks: Checks) -> None:
         "docs/SENTINEL_AUDIT_2026-08-25.md": "Status: HISTORICAL",
         "docs/SENTINEL_FINAL_AUDIT_2026-08-26.md": "Status: HISTORICAL",
         "docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md": "Status: HISTORICAL",
+        "docs/BRANCH_DELETION_MANIFEST_2026-09-23.md": "Status:** HISTORICAL EVIDENCE RECORD",
     }
     for path, marker in required_status.items():
         checks.require(marker in read(path).splitlines()[0:8].__str__(), f"{path} has explicit {marker} banner")
@@ -294,6 +318,30 @@ def check_governance(checks: Checks) -> None:
         and "remote deletion still Owner-only" not in tasks
         and "OWNER GATE:** branch deletion" not in tasks,
         "task board matches evidence-gated autonomous branch hygiene authorization",
+    )
+
+    branch_inventory = read("docs/BRANCH_INVENTORY.md")
+    checks.require(
+        "**Status:** ACTIVE" in branch_inventory
+        and "CONTENT_SUPERSEDED" in branch_inventory
+        and "MERGED_EXACT" in branch_inventory,
+        "active branch inventory records evidence-gated cleanup classifications",
+    )
+    checks.require(
+        "| UNIQUE_RECONCILE |" not in branch_inventory
+        and "| UNKNOWN |" not in branch_inventory,
+        "active branch inventory leaves no unresolved or unknown historical branch state",
+    )
+    checks.require(
+        "RECONCILED:" in branch_inventory
+        and "ref mutation aborts deletion" in branch_inventory,
+        "content-superseded deletion remains tied to explicit reconciliation and exact-tip revalidation",
+    )
+    historical_branch_manifest = read("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md")
+    checks.require(
+        "HISTORICAL EVIDENCE RECORD" in historical_branch_manifest
+        and "Owner-only irreversible gate" not in historical_branch_manifest,
+        "dated branch manifest is historical evidence, not live deletion authority",
     )
 
     canonical = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")

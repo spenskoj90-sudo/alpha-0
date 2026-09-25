@@ -211,7 +211,7 @@ def canonical_evidence_digest(bundle: ExactEnvironmentEvidenceBundle) -> str:
 
 
 def _require_aware(value: datetime, field_name: str) -> datetime:
-    if value.tzinfo is None:
+    if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")
     return value
 
@@ -287,6 +287,11 @@ def _validate_checkpoints(
     patch_profile: WowPatchProfile,
     server_profile: WowServerProfile,
 ) -> list[LiveWowCheckpointEvidence]:
+    # Validate timestamp awareness before sorting. Python cannot order a
+    # malformed offset-naive timestamp against an aware timestamp, and raw
+    # TypeError must never escape this evidence-validation boundary.
+    for checkpoint in bundle.checkpoints:
+        _require_aware(checkpoint.captured_at, "checkpoint.captured_at")
     ordered = sorted(bundle.checkpoints, key=lambda item: item.captured_at)
     event_ids: set[str] = set()
     checkpoint_digests: set[str] = set()

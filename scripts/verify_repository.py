@@ -214,7 +214,7 @@ def check_web(checks: Checks) -> None:
         package.get("scripts", {}).get("test:coverage") == "vitest run --coverage",
         "Web exposes the deterministic coverage entrypoint",
     )
-    vitest = read("web/vitest.config.ts")
+    vitest = read("web/vitest.config.mts")
     checks.require(
         "include: ['app/api/**/*.ts']" in vitest
         and "statements: 85" in vitest

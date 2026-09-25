@@ -6,7 +6,7 @@
 - Core: Python 3.14.7, FastAPI 0.141.1 / Uvicorn 0.53.0; native runtimes are pinned by `.python-version`.
 - Database: PostgreSQL 18 in the reference Compose/integration/recovery stack.
 - Web: Node.js 24.21.0 LTS with Next.js 16.3.6 / React 19.3.0; native Node resolution is pinned by `.node-version`.
-- Companion packaging: Node.js 24.21.0 LTS with Electron 44.4.3 and an immutable official Win32 x64 runtime digest.
+- Companion packaging: Node.js 24.21.0 LTS with Electron 44.4.5 and an immutable official Win32 x64 runtime digest.
 
 ## Reference deployment
 

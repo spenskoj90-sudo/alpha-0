@@ -1,4 +1,4 @@
-name: Generate Web Coverage Lockfile
+name: Measure Web Coverage
 
 on:
   push:
@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  generate:
-    name: Generate Web coverage lockfile
+  measure:
+    name: Measure Web production coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,15 +24,27 @@ jobs:
           node-version: "24.21.0"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Generate deterministic package metadata
+      - name: Install exact repository graph
         working-directory: web
-        run: npm install --package-lock-only --ignore-scripts --save-dev @vitest/coverage-v8@5.0.1
-      - name: Upload generated package metadata
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: web-coverage-lock-${{ github.sha }}
-          path: |
-            web/package.json
-            web/package-lock.json
-          if-no-files-found: error
-          retention-days: 1
+        run: npm ci
+      - name: Install measurement-only coverage provider
+        working-directory: web
+        run: npm install --ignore-scripts --no-save --package-lock=false @vitest/coverage-v8@5.0.1
+      - name: Measure all first-party TypeScript/TSX production modules
+        working-directory: web
+        run: |
+          cat > vitest.coverage-temp.config.ts <<'EOF'
+          import { defineConfig } from "vitest/config";
+
+          export default defineConfig({
+            test: {
+              coverage: {
+                provider: "v8",
+                reporter: ["text", "json-summary"],
+                include: ["app/**/*.{ts,tsx}"],
+                exclude: ["app/**/*.test.ts", "app/**/*.test.tsx"],
+              },
+            },
+          });
+          EOF
+          npx vitest run --config vitest.coverage-temp.config.ts --coverage

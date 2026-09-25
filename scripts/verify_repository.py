@@ -203,7 +203,34 @@ def check_web(checks: Checks) -> None:
     security = read(".github/workflows/security.yml")
     checks.require("npm install" not in build + p1 + security, "validation workflows do not resolve web dependencies with npm install")
     checks.require("npm ci" in build and "npm test" in build, "Web build gates deterministic install and Vitest")
+    checks.require("npm run test:coverage" in build, "Web build enforces measured API/server coverage")
     checks.require("npm ci" in p1 and "npm ci" in security, "security/evidence workflows use npm ci")
+
+    checks.require(
+        package.get("devDependencies", {}).get("@vitest/coverage-v8") == "5.0.1",
+        "Web pins the Vitest V8 coverage provider to the Vitest release line",
+    )
+    checks.require(
+        package.get("scripts", {}).get("test:coverage") == "vitest run --coverage",
+        "Web exposes the deterministic coverage entrypoint",
+    )
+    vitest = read("web/vitest.config.ts")
+    checks.require(
+        "include: ['app/api/**/*.ts']" in vitest
+        and "statements: 85" in vitest
+        and "lines: 85" in vitest
+        and "functions: 85" in vitest
+        and "branches: 80" in vitest,
+        "Web API/server coverage hard-gates 85% statements/lines/functions and 80% branches",
+    )
+    checks.require(
+        "'app/api/_lib/core-session.ts'" in vitest
+        and "'app/api/session/**/*.ts'" in vitest
+        and "'app/api/billing/**/*.ts'" in vitest
+        and "branches: 85" in vitest
+        and "lines: 90" in vitest,
+        "Web critical auth/session/billing coverage has a 90% line/function and 85% branch floor",
+    )
 
 
 def check_versions(checks: Checks) -> None:

@@ -98,7 +98,7 @@ fun DeviceSetupScreen(
                         PrimaryButton(
                             text = strings.text("allow_background"),
                             onClick = {
-                                val opened = BatteryOptimization.request(context)
+                                val opened = BatteryOptimization.openSettings(context)
                                 if (!opened) {
                                     runCatching {
                                         context.startActivity(

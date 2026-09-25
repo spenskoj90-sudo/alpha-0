@@ -22,7 +22,7 @@ The supported modernization target is:
 | AndroidX Core | 1.19.1 |
 | Lifecycle Runtime Compose | 2.11.0 |
 | Activity Compose | 1.13.0 |
-| Navigation Compose | 2.10.1 |
+| Navigation Compose | 2.10.2 |
 | Credentials | 1.6.0 |
 | Google ID | 1.2.1 |
 | Play Integrity | 1.6.0 |
@@ -56,7 +56,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Companion | Electron 44.4.5 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
-| Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.0 |
+| Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.1 |
 | PostgreSQL repository baseline | 18 |
 | Android observability/test refresh | Sentry Android 8.57.0, AndroidX Test ext.junit 1.3.0, runner 1.7.0, Espresso 3.7.0 |
 
@@ -97,3 +97,33 @@ A dependency update is incomplete until its lockfile, checksum, image digest or 
 7. Merge only when all required checks pass on the exact PR HEAD SHA.
 8. Verify staging runtime from the resulting protected-main merge.
 9. Physical-device, production credentials, signing, publication and live deployment remain their existing Owner/environment gates.
+
+
+## Final upstream recheck — 2026-09-25
+
+A second upstream check was performed immediately before the final RC consolidation pass. The rule remains: newer is accepted only when it improves the release candidate without introducing an unproven compatibility migration.
+
+### Confirmed current/stable baselines
+
+- Node 24.21.0 remains the selected LTS runtime line.
+- Python 3.14.7 remains the current Python 3.14 maintenance release used by the repository.
+- Kotlin 2.4.20 remains the latest supported 2.4 release.
+- Gradle 9.7.1 remains the recommended stable 9.7 patch; 9.8 is still milestone/pre-release.
+- Android Gradle Plugin 9.4.1 remains the current stable AGP release.
+- AndroidX Core 1.19.1, Lifecycle 2.11.0 and Activity 1.13.0 remain the current stable lines used by SENTINEL.
+- AndroidX Navigation 2.10.2 supersedes 2.10.1 and is accepted in this pass as a patch-level stable update.
+- PostgreSQL 18.6 remains the current PG18 maintenance baseline; PostgreSQL 19 is still beta and is not an RC target.
+- FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, psycopg 3.3.6, cryptography 50.0.1 and websockets 17.1 remain current for their selected release lines.
+- httpx2 2.13.1 supersedes 2.13.0 and is accepted as a test-only patch update.
+- React 19.3.0 and Vitest 5.0.1 remain current.
+- Next.js 16.3.6 remains the current Active LTS security release as of this check.
+
+### Deliberate compatibility holds
+
+- **Next.js 16.3.7:** upstream has announced a security release for 2026-09-30, but it is not released as of 2026-09-25. Recheck immediately before publication if publication occurs on or after that date; do not fabricate or pre-pin an unreleased version.
+- **TypeScript 7.0.2:** latest major exists, but SENTINEL stays on validated TypeScript 6.0.3 for this RC. A TypeScript 7 move requires a dedicated compatibility migration proving Next, eslint-config-next, ESLint, Vitest, declarations, build and CI together; a major compiler transition is not folded into the final RC without that evidence.
+- **SQLAlchemy 2.1.0:** released 2026-09-24, one day before this recheck. SENTINEL retains 2.0.54 for the RC because the new minor ORM line requires deliberate migration validation across FORCE-RLS transaction handling, migrations, worker leasing and PostgreSQL recovery behavior. This is a compatibility hold, not a claim that 2.0.54 is numerically latest.
+- **ESLint 10:** remains outside the validated Next toolchain for this RC; ESLint 9.39.5 is retained.
+- **setuptools:** 80.9.0 remains intentionally pinned after prior compatibility review; do not jump release-build tooling solely for version freshness.
+
+Any one of these holds may be reopened after the exact RC physical/environment gates without weakening existing security or provenance checks.

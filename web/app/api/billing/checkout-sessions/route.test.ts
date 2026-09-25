@@ -76,4 +76,24 @@ describe('/api/billing/checkout-sessions', () => {
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it('rejects invalid JSON and non-string plan identifiers before Core', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const malformed = await POST(new NextRequest('http://localhost/api/billing/checkout-sessions', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: 'sentinel_access=access-secret' },
+      body: '{',
+    }));
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({ error: 'INVALID_JSON' });
+
+    const nonString = await POST(new NextRequest('http://localhost/api/billing/checkout-sessions', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: 'sentinel_access=access-secret' },
+      body: JSON.stringify({ plan_code: 42 }),
+    }));
+    expect(nonString.status).toBe(400);
+    await expect(nonString.json()).resolves.toEqual({ error: 'INVALID_PLAN_CODE' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
 });

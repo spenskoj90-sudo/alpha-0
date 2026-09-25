@@ -1,7 +1,7 @@
 # SENTINEL Performance Baseline
 
 **Issue:** #10  
-**Status:** Proposed measurement contract; no numeric performance result is claimed by this document.  
+**Status:** ACTIVE measurement contract with exact-SHA CI baseline; physical-device/runtime metrics remain separately UNVERIFIED where not measured.  
 **Scope:** Alpha-stage build and runtime performance for the Android client, Core API, and web control plane where an existing CI/device execution path already exists.
 
 ## 1. Evidence rules
@@ -25,7 +25,28 @@
 | Network | Core API payload size for representative event batch | Measure serialized request/response bytes for a fixed fixture at the application boundary | CI/integration test with deterministic fixture | **No unexplained increase > 20%** versus the established baseline | Compare the same fixture and encoding; investigate schema/payload changes |
 | Web | Production build wall-clock time | Run the existing production build command from the web workspace and capture elapsed wall-clock time | GitHub Actions web build job on the repository's configured runner | **≤ 5 min** for the build command; establish actual baseline before tightening | Compare exact-SHA runs and distinguish dependency-install time from build execution time where logs permit |
 
-## 3. Establishing the first measured baseline
+## 3. Measured CI baseline — protected main 2026-09-25
+
+The following measurements are real CI observations from protected `main` source `6f85186404b7b71e41a94ad75f8c97f38ce297d9`, Build & Test workflow run `36153171506`. They are not production SLOs and do not substitute for physical-device measurements.
+
+| Metric | Measured result | Evidence context |
+| --- | --- | --- |
+| Core non-PostgreSQL suite | 925 passed / 24 deselected in 10.16 s | GitHub-hosted Linux runner, Python 3.14 toolchain |
+| PostgreSQL-tagged Core suite | 24 passed / 925 deselected in 8.61 s | GitHub-hosted Linux runner with PostgreSQL 18 service |
+| Combined Core coverage | 92.77% lines / 85.19% branches | 7,084 covered lines; 1,818 covered branches; hard gate 90% / 85% |
+| Web tests | 28/28 passed | deterministic `npm ci` + Vitest |
+| Web production compile | 3.4 s | Next.js production build on GitHub-hosted runner; full build includes setup/static generation beyond compile |
+| Android debug build | 1 min 5 s | Gradle build command in routine Android CI with restored dependency cache |
+| Android JVM unit-test command | 17 s | routine Android CI |
+| Android instrumentation APK assembly command | 20 s | routine Android CI; emulator execution is a separate job |
+
+These values establish a reproducible repository baseline only for the named CI context. Runner scheduling, dependency download time and hosted-runner hardware variance are not interpreted as application regressions without repeated evidence.
+
+### Runtime measurements currently available
+
+Render staging resource telemetry has been sampled during this release-readiness pass, but the provider returned CPU/memory series without HTTP request-count or latency series for the sampled low-traffic interval. Therefore no HTTP p95 claim is made. Physical Android startup, peak memory, real mobile-network request volume, Windows Companion latency and exact-game-environment latency remain `ENVIRONMENT-UNVERIFIED` until measured on their target environments.
+
+## 4. Establishing additional measured baselines
 
 The first measurement pass must establish the actual value for each metric that has an executable CI/device path. The result record should contain:
 
@@ -39,7 +60,7 @@ The first measurement pass must establish the actual value for each metric that 
 
 Until this evidence exists, the metric remains **UNVERIFIED**. The proposed thresholds above must not be copied into release notes or state documentation as achieved performance.
 
-## 4. Reproducibility requirements
+## 5. Reproducibility requirements
 
 ### CI
 
@@ -57,7 +78,7 @@ The current repository CI includes dedicated Android build/tests, Core tests/cov
 - Repeat measurements; do not accept a single noisy sample as a regression.
 - Device evidence is complementary to CI evidence and must not be represented as CI status.
 
-## 5. Regression policy
+## 6. Regression policy
 
 A threshold breach is a signal for investigation, not an automatic release blocker until the measurement path is validated and the gate is adopted by the Owner.
 
@@ -71,13 +92,13 @@ For a suspected regression:
 
 No threshold should be silently relaxed to make a failing measurement pass.
 
-## 6. Relationship to release gates
+## 7. Relationship to release gates
 
 The release gate policy already requires core tests and coverage, Android build/tests, web lint/build, container build, security/dependency checks, PostgreSQL migration/integration checks, and other release evidence. Performance measurements in this document supplement those gates; they do not replace them.
 
 Performance claims must continue to follow the repository evidence rule: exact commit SHA plus workflow Run ID for CI/test claims. Where that evidence is unavailable, use **UNVERIFIED**.
 
-## 7. Explicit non-goals for Issue #10
+## 8. Explicit non-goals for Issue #10
 
 - No application/runtime behavior changes.
 - No new CI workflow or dependency.

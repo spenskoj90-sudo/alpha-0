@@ -29,10 +29,10 @@ Existence of a source tree does not by itself establish that the surface is pack
 
 - Native repository runtimes are pinned to Node.js 24.21.0 LTS and Python 3.14.7.
 - Web uses Next.js 16.3.6 / React 19.3.0; the Companion packaging baseline is Electron 44.4.5.
-- Android builds use AGP 9.4.1, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17.
+- Android builds use AGP 9.4.1, Kotlin/Compose compiler 2.4.20, Gradle 9.7.1 on JDK 25 LTS, compile SDK 37 and target SDK 36 while application bytecode remains JVM 17. Stable Navigation Compose is 2.10.2.
 - Repository PostgreSQL integration, recovery and reference-deployment evidence uses PostgreSQL 18. On 2026-09-21 the connected Neon pre-release runtime was intentionally reset onto the prepared same-region PostgreSQL 18.6 project and Render Core was cut over to its `sentinel` database. All 15 repository migrations through `014_account_mfa` remain present with the previously verified checksum parity and all 39 application RLS tables retain FORCE RLS. The new pre-release baseline intentionally starts without the historical PG17 identities/users/devices/sessions; the former PostgreSQL 17.11 project is retained separately as `sentinel-pre-release-pg17-rollback` rather than treated as the active runtime.
 - Current GitHub workflow dependencies are pinned to immutable action commit SHAs; stable action-line upgrades are accepted only with exact-SHA CI evidence.
-- Core quality policy now hard-gates the non-PostgreSQL suite at 85% line coverage and the combined Core + PostgreSQL branch-aware data set at 90% lines / 85% branches. Thresholds are enforced in CI and locked by repository verification rather than documented as aspirational targets.
+- Quality policy hard-gates the non-PostgreSQL Core suite at 85% line coverage and the combined Core + PostgreSQL branch-aware data set at 90% lines / 85% branches. Web first-party API/server TypeScript is independently gated by Vitest/V8 at 85% statements/lines/functions and 80% branches, with stronger 90%/85% critical auth/session/billing thresholds (and a 95%/90% admin-auth threshold). React/Next UI remains governed by behavioral/accessibility/build/browser evidence rather than being misrepresented by headless line percentages. Thresholds are enforced in CI and locked by repository verification rather than documented as aspirational targets.
 
 
 ### Design System v3 consolidation (PR #335 — merged)
@@ -101,13 +101,15 @@ These statements are orientation-level invariants. They do not replace inspectio
 
 ## 5. Telemetry and provider staging boundaries
 
+Exact provider acceptance state is tracked in `docs/PROVIDER_STATUS_MATRIX.md`; repository integration code is never promoted to staging/physical/production acceptance without evidence for that specific column and exact candidate.
+
 - The canonical operational telemetry plane remains bounded local/PostgreSQL state. Companion emits privacy-safe runtime/transport events, exposes health and latency snapshots, supports fanout, and has opt-in PostgreSQL persistence/retention seams.
 - An optional PostHog HTTPS sink is implemented for staging only and is disabled by default. Activation requires `SENTINEL_ENV=staging`, an externally injected project key and exact release/source identity. Egress is pinned in code to the official US/EU PostHog ingestion endpoints rather than accepting an arbitrary host; the outbound envelope uses a constant non-person distinct ID, disables person-profile processing and copies only a fixed low-cardinality operational allowlist.
 - Core has a bounded operational observability plane: global `X-Request-ID` normalization, server-authored trace IDs, low-cardinality route-template/method/status-class HTTP counters and latency windows, a bounded recent-trace ring, overflow/drop evidence and admin-protected JSON/OpenMetrics-compatible readback. Request and trace identifiers are not metric labels.
 - Operational correlation is propagated through the authenticated Web proxy, launcher refresh/retry path and shared Android HTTP transport while preserving explicit caller correlation where valid. Companion and voice runtime outcomes are instrumented without using audio, transcript, token, user, IP, realm or payload values as metric labels.
 - Deterministic Block D failure injection covers unsafe correlation, series-cardinality saturation, bounded trace overflow and identifier-label isolation. CI-local performance evidence measures normalization, registry-recording and snapshot overhead against explicit budgets and publishes exact-SHA evidence in routine Build & Test.
 - Email delivery has a separate provider-neutral bounded transport: disabled-by-default fail-closed behavior, a deterministic network-free test transport and a staging-only Resend adapter using externally injected configuration. Account registration/verification and password recovery are explicit product events that may use the transport; requests remain non-enumerating and raw one-time credentials are never persisted.
-- Production PostHog activation, provider-account retention/alert configuration, real Resend delivery, production Resend credentials, deployed production observability backends and production SLO/on-call policy remain external environment concerns rather than repository acceptance claims.
+- PostHog remains staging-only and production activation is prohibited by the current code/telemetry contract; enabling it in production would require an explicit future product/security decision and code change. Provider-account retention/alert configuration, real Resend delivery, production Resend credentials, deployed production observability backends and production SLO/on-call policy remain external environment concerns rather than repository acceptance claims.
 - Performance budgets are operation-scoped contracts; measured results are acceptance evidence only when tied to the relevant exact SHA/Run ID and current main state. Real-load, physical-device and packaged-host performance remain environment-specific evidence.
 - Deterministic privacy scrubbing and a canonical recovery matrix with fail-closed health outcomes are implemented and covered by unit tests.
 - Launcher session/process/reconnect security, passive SavedVariables parser/queue/protocol behavior, overlay presentation isolation, voice consent/capture/provider/result boundaries and exact-environment evidence capture contracts have deterministic routine CI coverage. Exact WoW addon lifecycle/host behavior, physical microphone/acoustic behavior and real packaged-overlay/voice latency remain environment-unverified until exercised on the target runtime.
@@ -138,7 +140,7 @@ Known external or protected items remain:
 - selected production STT/TTS provider credentials/network acceptance and physical microphone/driver/acoustic-quality evidence;
 - physical target-PC acceptance for the packaged Companion where required by the release candidate;
 - production ingress/database credentials;
-- production Stripe credentials and live account/price/webhook/network/payment acceptance, plus production PostHog/Resend account configuration if those integrations are activated;
+- production Stripe credentials and live account/price/webhook/network/payment acceptance, plus production Resend account configuration if activated; PostHog is staging-only under the current contract and is not a production-credential gate;
 - signing-key/certificate custody;
 - signed release-candidate Owner execution;
 - release tag/publication and live production deployment.

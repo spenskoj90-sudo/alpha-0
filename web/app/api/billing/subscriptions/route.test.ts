@@ -77,4 +77,26 @@ describe('/api/billing/subscriptions', () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init?.body).toBe(JSON.stringify({ plan_code: 'core-plus', provider: 'manual' }));
   });
+  it('rejects malformed or out-of-bounds subscription plan input before Core', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+    const malformed = await POST(new NextRequest('http://localhost/api/billing/subscriptions', {
+      method: 'POST',
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: 'sentinel_access=access-secret' },
+      body: '{',
+    }));
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({ error: 'INVALID_JSON' });
+
+    for (const planCode of [42, '', 'x'.repeat(65)]) {
+      const response = await POST(new NextRequest('http://localhost/api/billing/subscriptions', {
+        method: 'POST',
+        headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: 'sentinel_access=access-secret' },
+        body: JSON.stringify({ plan_code: planCode }),
+      }));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'INVALID_PLAN_CODE' });
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
 });

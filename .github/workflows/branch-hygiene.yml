@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/branch-hygiene.yml"
+      - "docs/BRANCH_INVENTORY.md"
 
 permissions:
   contents: write
@@ -34,82 +35,168 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test "$GITHUB_REF" = "refs/heads/main"
 
-      - name: Delete only live-revalidated MERGED or PURE_BEHIND branches
+      - name: Delete only live-revalidated reconciled branches
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          manifest="docs/BRANCH_DELETION_MANIFEST_2026-09-23.md"
-          test -f "$manifest"
+          inventory="docs/BRANCH_INVENTORY.md"
+          test -f "$inventory"
 
           python - <<'PY' > "$RUNNER_TEMP/branch-hygiene.tsv"
           import re
           from pathlib import Path
 
           row = re.compile(
-              r"^\| `(?P<branch>[^`]+)` \| `(?P<tip>[0-9a-f]{12})` \| "
+              r"^\| `(?P<branch>[^`]+)` \| `(?P<tip>[0-9a-f]{40})` \| "
               r"(?P<class>[A-Z_]+) \| (?P<reason>.*) \|$"
           )
           pr_number = re.compile(r"PR #(\d+) merged")
-          for line in Path("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md").read_text().splitlines():
+          allowed = {"MERGED_EXACT", "PURE_BEHIND", "CONTENT_SUPERSEDED"}
+          for line in Path("docs/BRANCH_INVENTORY.md").read_text(encoding="utf-8").splitlines():
               match = row.match(line)
               if not match:
                   continue
               classification = match.group("class")
-              if classification not in {"MERGED", "PURE_BEHIND"}:
+              if classification == "ACTIVE":
                   continue
+              if classification not in allowed:
+                  raise SystemExit(
+                      f"inventory contains non-deletable classification {classification}: "
+                      f"{match.group('branch')}"
+                  )
               branch = match.group("branch")
+              reason = match.group("reason")
               if branch == "main" or any(ch.isspace() for ch in branch):
-                  raise SystemExit(f"unsafe branch name in manifest: {branch!r}")
+                  raise SystemExit(f"unsafe branch name in inventory: {branch!r}")
               pr = ""
-              if classification == "MERGED":
-                  pr_match = pr_number.search(match.group("reason"))
-                  if not pr_match or "exact merged PR head" not in match.group("reason"):
-                      raise SystemExit(f"MERGED row lacks exact-PR evidence: {branch}")
+              if classification == "MERGED_EXACT":
+                  pr_match = pr_number.search(reason)
+                  if not pr_match or "live tip equals exact PR head" not in reason:
+                      raise SystemExit(f"MERGED_EXACT row lacks exact-PR evidence: {branch}")
                   pr = pr_match.group(1)
+              elif classification == "CONTENT_SUPERSEDED":
+                  if not reason.startswith("RECONCILED:"):
+                      raise SystemExit(f"CONTENT_SUPERSEDED row lacks reconciliation evidence: {branch}")
               print("\t".join((branch, match.group("tip"), classification, pr)))
           PY
 
+          delete_exact_ref() {
+            local branch="$1"
+            local expected_sha="$2"
+            local encoded protected remote_sha
+            git check-ref-format --branch "$branch" >/dev/null
+            remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
+            if [ -z "$remote_sha" ]; then
+              echo "already absent: $branch"
+              return 2
+            fi
+            if [ "$remote_sha" != "$expected_sha" ]; then
+              echo "ref mutation detected for $branch: expected $expected_sha, live $remote_sha" >&2
+              exit 1
+            fi
+            encoded="$(python - "$branch" <<'PY'
+          import sys
+          from urllib.parse import quote
+          print(quote(sys.argv[1], safe=""))
+          PY
+          )"
+            protected="$(gh api "repos/$GITHUB_REPOSITORY/branches/$encoded" --jq '.protected')"
+            if [ "$protected" != "false" ]; then
+              echo "refusing to delete protected branch: $branch" >&2
+              exit 1
+            fi
+            git cat-file -e "$remote_sha^{commit}"
+            git push origin --delete "$branch"
+            return 0
+          }
+
           deleted=0
           skipped_absent=0
-          while IFS=$'\t' read -r branch expected_prefix classification pr_number; do
-            git check-ref-format --branch "$branch" >/dev/null
+          while IFS=$'\t' read -r branch expected_sha classification pr_number; do
             remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
             if [ -z "$remote_sha" ]; then
               echo "already absent: $branch"
               skipped_absent=$((skipped_absent + 1))
               continue
             fi
-            case "$remote_sha" in
-              "$expected_prefix"*) ;;
+            if [ "$remote_sha" != "$expected_sha" ]; then
+              echo "ref mutation detected for $branch: expected $expected_sha, live $remote_sha" >&2
+              exit 1
+            fi
+
+            case "$classification" in
+              MERGED_EXACT)
+                pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number")"
+                live_head="$(jq -r '.head.sha' <<<"$pr_json")"
+                merged_at="$(jq -r '.merged_at // ""' <<<"$pr_json")"
+                base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+                head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+                test -n "$merged_at"
+                test "$base_ref" = "main"
+                test "$head_repo" = "$GITHUB_REPOSITORY"
+                if [ "$live_head" != "$remote_sha" ]; then
+                  echo "exact PR-head mismatch for $branch: PR #$pr_number=$live_head branch=$remote_sha" >&2
+                  exit 1
+                fi
+                ;;
+              PURE_BEHIND)
+                if ! git merge-base --is-ancestor "$remote_sha" "$GITHUB_SHA"; then
+                  echo "PURE_BEHIND ancestry failed for $branch at $remote_sha" >&2
+                  exit 1
+                fi
+                ;;
+              CONTENT_SUPERSEDED)
+                # Semantic reconciliation is recorded and reviewed in the exact-main
+                # inventory. At execution time the destructive boundary re-proves
+                # that the reviewed ref itself has not mutated.
+                ;;
               *)
-                echo "ref mutation detected for $branch: expected prefix $expected_prefix, live $remote_sha" >&2
+                echo "unexpected cleanup classification: $classification" >&2
                 exit 1
                 ;;
             esac
 
-            if [ "$classification" = "MERGED" ]; then
-              live_head="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.head.sha')"
-              merged_at="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.merged_at // ""')"
-              test -n "$merged_at"
-              if [ "$live_head" != "$remote_sha" ]; then
-                echo "exact PR-head mismatch for $branch: PR #$pr_number=$live_head branch=$remote_sha" >&2
-                exit 1
+            if delete_exact_ref "$branch" "$expected_sha"; then
+              deleted=$((deleted + 1))
+            else
+              rc=$?
+              if [ "$rc" -eq 2 ]; then
+                skipped_absent=$((skipped_absent + 1))
+              else
+                exit "$rc"
               fi
-            elif [ "$classification" = "PURE_BEHIND" ]; then
-              git cat-file -e "$remote_sha^{commit}"
-              if ! git merge-base --is-ancestor "$remote_sha" "$GITHUB_SHA"; then
-                echo "PURE_BEHIND ancestry failed for $branch at $remote_sha" >&2
-                exit 1
+            fi
+          done < "$RUNNER_TEMP/branch-hygiene.tsv"
+
+          # Delete the branch that produced this merge commit as well, but only
+          # after GitHub independently proves exact same-repository PR lineage.
+          merge_pr="$(git show -s --format=%s "$GITHUB_SHA" | sed -nE 's/^Merge PR #([0-9]+):.*$/\1/p')"
+          if [ -n "$merge_pr" ]; then
+            pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$merge_pr")"
+            merged_at="$(jq -r '.merged_at // ""' <<<"$pr_json")"
+            merge_sha="$(jq -r '.merge_commit_sha // ""' <<<"$pr_json")"
+            base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+            head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
+            head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+            head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
+            if [ -n "$merged_at" ] && [ "$merge_sha" = "$GITHUB_SHA" ] &&
+               [ "$base_ref" = "main" ] && [ "$head_repo" = "$GITHUB_REPOSITORY" ] &&
+               [ "$head_ref" != "main" ]; then
+              if delete_exact_ref "$head_ref" "$head_sha"; then
+                deleted=$((deleted + 1))
+              else
+                rc=$?
+                if [ "$rc" -eq 2 ]; then
+                  skipped_absent=$((skipped_absent + 1))
+                else
+                  exit "$rc"
+                fi
               fi
             else
-              echo "unexpected cleanup classification: $classification" >&2
-              exit 1
+              echo "current merge PR lineage did not satisfy self-cleanup gate; preserving head branch"
             fi
-
-            git push origin --delete "$branch"
-            deleted=$((deleted + 1))
-          done < "$RUNNER_TEMP/branch-hygiene.tsv"
+          fi
 
           echo "BRANCH_HYGIENE deleted=$deleted already_absent=$skipped_absent"

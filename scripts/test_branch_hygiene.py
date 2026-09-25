@@ -35,6 +35,9 @@ class BranchHygieneWorkflowTests(unittest.TestCase):
         self.assertIn("exact PR-head mismatch", WORKFLOW)
         self.assertIn('if [ "$protected" != "false" ]', WORKFLOW)
         self.assertIn("refusing to delete protected branch", WORKFLOW)
+        self.assertIn('git fetch --no-tags origin "refs/heads/$branch"', WORKFLOW)
+        self.assertIn('if [ "$fetched_sha" != "$expected_sha" ]', WORKFLOW)
+        self.assertIn("fetched ref mutation detected", WORKFLOW)
         self.assertIn('git push origin --delete "$branch"', WORKFLOW)
         self.assertNotIn("--force", WORKFLOW)
 

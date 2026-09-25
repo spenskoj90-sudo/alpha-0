@@ -65,12 +65,6 @@ jobs:
     defaults:
       run:
         working-directory: server
-    env:
-      DATABASE_URL: postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel_test
-      PGOPTIONS: -c app.service_role=true
-      SENTINEL_ENV: production
-      SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
-      SENTINEL_REQUIRE_ENROLLMENT: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,8 +75,43 @@ jobs:
           python-version: "3.14.7"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[test]'
-      - run: python migrate.py
-      - run: pytest -m postgres
+      - name: Measure branch-aware non-PostgreSQL coverage
+        run: |
+          coverage erase
+          pytest -m 'not postgres' --cov=app --cov-branch --cov-report=term-missing --cov-report=json:coverage-combined.json
+      - name: Apply PostgreSQL schema
+        env:
+          DATABASE_URL: postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel_test
+          PGOPTIONS: -c app.service_role=true
+          SENTINEL_ENV: production
+          SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
+          SENTINEL_REQUIRE_ENROLLMENT: "true"
+        run: python migrate.py
+      - name: Add PostgreSQL integration coverage
+        env:
+          DATABASE_URL: postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel_test
+          PGOPTIONS: -c app.service_role=true
+          SENTINEL_ENV: production
+          SENTINEL_ENROLLMENT_TOKEN: pg-smoke:secret
+          SENTINEL_REQUIRE_ENROLLMENT: "true"
+        run: pytest -m postgres --cov=app --cov-branch --cov-append --cov-report=term-missing --cov-report=json:coverage-combined.json
+      - name: Publish combined coverage summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("coverage-combined.json").read_text())
+          totals = data["totals"]
+          print(
+              "COMBINED_COVERAGE "
+              f"lines={totals['percent_covered_display']}% "
+              f"covered_lines={totals['covered_lines']} "
+              f"missing_lines={totals['missing_lines']} "
+              f"branches={totals.get('percent_covered_display', 'n/a')}% "
+              f"covered_branches={totals.get('covered_branches', 0)} "
+              f"missing_branches={totals.get('missing_branches', 0)}"
+          )
+          PY
       - name: Backup and restore smoke test
         run: |
           docker run --rm --network host -e PGPASSWORD=testpass postgres:18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 pg_dump -h 127.0.0.1 -p 5432 -U sentinel -d sentinel_test --no-owner --no-privileges > /tmp/sentinel-backup.sql

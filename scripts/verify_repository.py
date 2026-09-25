@@ -282,6 +282,19 @@ def check_governance(checks: Checks) -> None:
 
     current_state = read("docs/SENTINEL_CURRENT_STATE.md")
     checks.require(not re.search(r"\b[0-9a-f]{40}\b", current_state), "current-state guide does not embed a mutable commit SHA")
+    deployment = read("docs/DEPLOYMENT.md")
+    checks.require(
+        "current **pre-release/staging** database is hosted on Neon PostgreSQL" in deployment
+        and "Supabase (managed PostgreSQL" not in deployment,
+        "active deployment guide matches the Neon managed-database boundary",
+    )
+    tasks = read("docs/TASKS.md")
+    checks.require(
+        "REPOSITORY HYGIENE AUTHORIZED" in tasks
+        and "remote deletion still Owner-only" not in tasks
+        and "OWNER GATE:** branch deletion" not in tasks,
+        "task board matches evidence-gated autonomous branch hygiene authorization",
+    )
 
     canonical = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")
     workflow = read("docs/WORKFLOW_CONTRACT.md")

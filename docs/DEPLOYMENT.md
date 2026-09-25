@@ -18,24 +18,26 @@ Required environment is documented in `.env.example`.
 
 Put Core and Web behind a TLS-terminating WAF/load balancer. Keep PostgreSQL private. Store secrets in a secret manager or deployment secret store. Do not commit `.env` files, private keys, database passwords or enrollment secrets.
 
-## Production database hosting
+## Managed database hosting
 
-Supabase (managed PostgreSQL, free tier) is used **exclusively** as Postgres hosting via the standard `DATABASE_URL` connection string.
+The current **pre-release/staging** database is hosted on Neon PostgreSQL and is consumed through the standard `DATABASE_URL` boundary. The active pre-release baseline is PostgreSQL 18; the previously retained PostgreSQL 17 environment remains rollback/evidence state and must not be deleted automatically.
 
-The following Supabase-managed features are **not used** and must not be enabled or relied upon:
-
-- Supabase Auth
-- Supabase RLS policies-as-a-service
-- any other managed Supabase product surface (Realtime, Storage, Edge Functions, etc.)
+Neon is infrastructure, not an identity or authorization authority. SENTINEL does **not** delegate authentication, authorization, RLS policy ownership or device/session authority to a managed-database vendor.
 
 All authentication and authorization remain on the existing SENTINEL system:
 
-- opaque session tokens with hashed persistence and one-time refresh rotation
-- Android Keystore / EC P-256 device identity
-- server-authoritative default-deny authorization
-- `service_role` (and FORCE RLS) defined and enforced by SENTINEL migrations (see `004_p1_rls_force.sql` and related)
+- opaque session tokens with hashed persistence and one-time refresh rotation;
+- Android Keystore / EC P-256 device identity;
+- server-authoritative default-deny authorization;
+- repository-owned migrations, RLS + FORCE RLS and transaction-local `service_role` activation.
 
-Production Core connects to the hosted Postgres instance solely through `DATABASE_URL`. No Supabase client SDKs or platform-specific auth flows are part of the SENTINEL runtime boundary.
+Core connects to managed PostgreSQL solely through `DATABASE_URL`. Provider-specific client SDKs are not part of the Core security boundary.
+
+For production, the current topology candidate is:
+
+`Cloudflare edge/WAF → Render Web/Core → Neon PostgreSQL`
+
+Production account creation, custom domain/DNS, WAF policy, production database credentials, backup/restore acceptance and live traffic remain Owner/external gates. A different managed PostgreSQL vendor may be selected only through an explicit evidence-backed infrastructure decision; active documentation must not claim an unused provider as current state.
 
 ## Required production configuration
 

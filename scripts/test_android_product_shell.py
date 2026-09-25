@@ -156,7 +156,7 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('androidx.core:core-ktx:1.19.1', self.gradle)
         self.assertIn('androidx.lifecycle:lifecycle-runtime-compose:2.11.0', self.gradle)
         self.assertIn('androidx.activity:activity-compose:1.13.0', self.gradle)
-        self.assertIn('androidx.navigation:navigation-compose:2.10.1', self.gradle)
+        self.assertIn('androidx.navigation:navigation-compose:2.10.2', self.gradle)
         self.assertIn('com.google.android.play:integrity:1.6.0', self.gradle)
 
     def test_federated_auth_uses_credential_manager_pkce_and_isolated_callbacks(self) -> None:

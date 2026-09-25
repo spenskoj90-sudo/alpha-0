@@ -19,7 +19,8 @@ The supported modernization target is:
 | targetSdk | 36 |
 | minSdk | 29 |
 | Compose BOM | 2026.09.00 |
-| AndroidX Core | 1.19.0 |
+| AndroidX Core | 1.19.1 |
+| Lifecycle Runtime Compose | 2.11.0 |
 | Activity Compose | 1.13.0 |
 | Navigation Compose | 2.10.1 |
 | Credentials | 1.6.0 |

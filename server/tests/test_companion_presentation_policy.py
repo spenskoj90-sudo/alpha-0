@@ -33,3 +33,67 @@ def test_recommendation_metadata_rejects_invalid_confidence():
         validate_recommendation_metadata(
             provider_id="provider", model_id="model", provenance=(), confidence=1.1
         )
+
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "model_id"),
+    [
+        ("", "model"),
+        ("   ", "model"),
+        ("x" * 129, "model"),
+        ("provider", ""),
+        ("provider", "x" * 129),
+    ],
+)
+def test_recommendation_metadata_rejects_invalid_provider_and_model_ids(provider_id, model_id):
+    with pytest.raises(ValueError):
+        validate_recommendation_metadata(
+            provider_id=provider_id,
+            model_id=model_id,
+            provenance=(),
+            confidence=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "provenance",
+    [
+        tuple(str(index) for index in range(21)),
+        ("",),
+        ("x" * 257,),
+    ],
+)
+def test_recommendation_metadata_rejects_unbounded_provenance(provenance):
+    with pytest.raises(ValueError):
+        validate_recommendation_metadata(
+            provider_id=None,
+            model_id=None,
+            provenance=provenance,
+            confidence=None,
+        )
+
+
+def test_recommendation_metadata_accepts_optional_identity_and_confidence_boundaries():
+    low = validate_recommendation_metadata(
+        provider_id=None,
+        model_id=None,
+        provenance=(),
+        confidence=0.0,
+    )
+    high = validate_recommendation_metadata(
+        provider_id="provider",
+        model_id="model",
+        provenance=("source",),
+        confidence=1.0,
+    )
+    assert low.confidence == 0.0
+    assert high.confidence == 1.0
+
+    with pytest.raises(ValueError):
+        validate_recommendation_metadata(
+            provider_id=None,
+            model_id=None,
+            provenance=(),
+            confidence=-0.01,
+        )

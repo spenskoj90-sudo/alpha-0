@@ -183,7 +183,7 @@ def test_verified_webhook_validates_provider_configuration_signature_and_size(mo
 
     bad_provider = _post_webhook("bad!")
     assert bad_provider.status_code == 400
-    assert bad_provider.json()["detail"] == "INVALID_PROVIDER"
+    assert bad_provider.json()["code"] == "INVALID_PROVIDER"
 
     for error in (KeyError("missing"), RuntimeError("missing"), ValueError("missing")):
         monkeypatch.setattr(provider_api, "configured_provider_registry", lambda error=error: _Registry(error=error))
@@ -197,7 +197,7 @@ def test_verified_webhook_validates_provider_configuration_signature_and_size(mo
 
     oversized = _post_webhook("signed-test", body=b"x" * 262_145)
     assert oversized.status_code == 413
-    assert oversized.json()["detail"] == "PROVIDER_WEBHOOK_BODY_TOO_LARGE"
+    assert oversized.json()["code"] == "PROVIDER_WEBHOOK_BODY_TOO_LARGE"
 
 
 @pytest.mark.parametrize(

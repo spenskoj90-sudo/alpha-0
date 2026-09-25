@@ -1,4 +1,4 @@
-name: Measure Web Coverage
+name: Generate Web Coverage Lockfile
 
 on:
   push:
@@ -8,43 +8,40 @@ on:
       - ".github/workflows/web-coverage-lock-temp.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  measure:
-    name: Measure Web production coverage
+  generate:
+    name: Generate exact Web coverage lockfile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
-          persist-credentials: false
+          fetch-depth: 0
+          persist-credentials: true
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24.21.0"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Install exact repository graph
-        working-directory: web
-        run: npm ci
-      - name: Install measurement-only coverage provider
-        working-directory: web
-        run: npm install --ignore-scripts --no-save --package-lock=false @vitest/coverage-v8@5.0.1
-      - name: Measure all first-party TypeScript/TSX production modules
+      - name: Generate exact package metadata
         working-directory: web
         run: |
-          cat > vitest.coverage-temp.config.ts <<'EOF'
-          import { defineConfig } from "vitest/config";
-
-          export default defineConfig({
-            test: {
-              coverage: {
-                provider: "v8",
-                reporter: ["text", "json-summary"],
-                include: ["app/**/*.{ts,tsx}"],
-                exclude: ["app/**/*.test.ts", "app/**/*.test.tsx"],
-              },
-            },
-          });
-          EOF
-          npx vitest run --config vitest.coverage-temp.config.ts --coverage
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts --save-exact --save-dev @vitest/coverage-v8@5.0.1
+          npm pkg set 'scripts.test:coverage=vitest run --coverage'
+      - name: Commit generated lockfile only to unchanged source branch
+        env:
+          SOURCE_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "refs/heads/$SOURCE_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git diff --check
+          git add web/package.json web/package-lock.json
+          test -n "$(git diff --cached --name-only)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "test(web): add deterministic Vitest coverage provider"
+          git push origin "HEAD:refs/heads/$SOURCE_BRANCH"

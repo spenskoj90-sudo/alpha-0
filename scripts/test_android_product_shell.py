@@ -238,6 +238,18 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("compact: Boolean = false", self.chrome)
         self.assertIn('"PHYSICAL TEST · $metadata"', self.chrome)
 
+    def test_security_status_badges_are_localized_and_single_line(self) -> None:
+        design_tokens = read("app/src/main/java/com/alpha0/app/ui/DesignTokens.kt")
+        security_hub = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
+        dashboard = read("app/src/main/java/com/alpha0/app/dashboard/DashboardScreen.kt")
+        self.assertIn("fun SentinelStatus.labelKey(): String", design_tokens)
+        self.assertIn("maxLines = 1", design_tokens)
+        self.assertIn("TextOverflow.Ellipsis", design_tokens)
+        self.assertIn("strings.text(status.labelKey())", security_hub)
+        self.assertNotIn("status.name.lowercase()", security_hub)
+        self.assertIn("modifier = Modifier.weight(1f)", dashboard)
+        self.assertIn("strings.text(status.labelKey())", dashboard)
+
     def test_release_gate_names_product_shell(self) -> None:
         gates = read("docs/RELEASE_GATES.md")
         self.assertIn("Android product-shell contract", gates)

@@ -330,6 +330,35 @@ def request_email_verification(payload: EmailActionRequest, request: Request) ->
     return AuthActionResponse(status="ACCEPTED")
 
 
+@app.post("/v1/account/email-verification/request", response_model=AuthActionResponse, status_code=202)
+def request_authenticated_email_verification(
+    request: Request,
+    authorization_header: str = Header(..., alias="Authorization"),
+) -> AuthActionResponse:
+    """Request verification for the authenticated account and report delivery readiness truthfully.
+
+    The public auth endpoint remains enumeration-safe and always returns ACCEPTED.
+    This account-scoped endpoint may surface provider unavailability because the
+    caller already proved account ownership with a valid SENTINEL session.
+    """
+    rate_limit(request, "account-email-verification-request")
+    principal = principal_from_token(require_bearer(authorization_header))
+    state = user_store.security_state(principal.user_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="ACCOUNT_NOT_FOUND")
+    if bool(state.get("email_verified")):
+        raise HTTPException(status_code=409, detail="EMAIL_ALREADY_VERIFIED")
+    email = state.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(status_code=409, detail="ACCOUNT_EMAIL_UNAVAILABLE")
+    token = user_store.issue_action_token(email, "EMAIL_VERIFY", 86_400)
+    if not token:
+        raise HTTPException(status_code=409, detail="EMAIL_VERIFICATION_UNAVAILABLE")
+    if not send_verification_email(email_transport, email, token):
+        raise HTTPException(status_code=503, detail="EMAIL_PROVIDER_UNAVAILABLE")
+    return AuthActionResponse(status="ACCEPTED")
+
+
 @app.post("/v1/auth/email-verification/confirm", response_model=AuthActionResponse)
 def confirm_email_verification(payload: AuthTokenRequest, request: Request) -> AuthActionResponse:
     rate_limit(request, "auth-email-verification-confirm")

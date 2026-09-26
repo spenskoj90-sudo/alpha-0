@@ -41,6 +41,15 @@ class DashboardApi(
         val validUntil: String
     )
 
+    data class AuditEvent(
+        val action: String,
+        val resource: String,
+        val decision: String,
+        val reasonCode: String,
+        val requestId: String?,
+        val createdAt: String?,
+    )
+
     data class GameDetails(
         val id: String,
         val gameId: String,
@@ -107,6 +116,25 @@ class DashboardApi(
         request(accessToken, "/v1/sessions/revoke", "SESSION_REVOKE", "POST") {
             it.optBoolean("revoked")
         }
+
+    fun getAudit(accessToken: String): Result<List<AuditEvent>> = request(accessToken, "/v1/audit", "AUDIT_LIST") { json ->
+        val array = json.optJSONArray("events") ?: JSONArray()
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                add(
+                    AuditEvent(
+                        action = item.optString("action").ifBlank { "unknown" },
+                        resource = item.optString("resource").ifBlank { "unknown" },
+                        decision = item.optString("decision").ifBlank { "UNKNOWN" },
+                        reasonCode = item.optString("reason_code").ifBlank { "UNKNOWN" },
+                        requestId = item.optString("request_id").takeIf { it.isNotBlank() },
+                        createdAt = item.optString("created_at").takeIf { it.isNotBlank() },
+                    )
+                )
+            }
+        }
+    }
 
     fun getEntitlements(accessToken: String): Result<List<Entitlement>> = request(accessToken, "/v1/entitlements/me", "ENTITLEMENTS_LIST") { json ->
         val array = json.optJSONArray("entitlements") ?: JSONArray()

@@ -244,6 +244,17 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertNotIn("RoundedCornerShape(14.dp)", login)
         self.assertIn("RoundedCornerShape(6.dp)", login)
 
+    def test_forensic_export_handoff_is_uri_safe_and_observable(self) -> None:
+        diagnostics = read("app/src/main/java/com/alpha0/app/diagnostics/DiagnosticLogger.kt")
+        self.assertIn("ClipData.newUri", diagnostics)
+        self.assertIn("Intent.EXTRA_TITLE", diagnostics)
+        self.assertIn("Intent.FLAG_GRANT_READ_URI_PERMISSION", diagnostics)
+        self.assertIn("FORENSIC_EXPORT_CHOOSER_OPENED", diagnostics)
+        self.assertIn("FORENSIC_EXPORT_PREPARE_FAILED", diagnostics)
+        self.assertIn("BuildConfig.SENTINEL_SOURCE_SHA", diagnostics)
+        self.assertIn("system share sheet", self.strings)
+        self.assertIn("системное меню отправки Android", self.strings)
+
     def test_distribution_channels_keep_play_and_diagnostics_separate(self) -> None:
         self.assertIn('applicationIdSuffix = ".physicaltest"', self.gradle)
         for channel in ("development", "diagnostic", "play"):

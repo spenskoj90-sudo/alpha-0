@@ -348,8 +348,24 @@ private fun SentinelApplicationUi(
     val rootRoute = route.substringBefore('/')
     val primaryRoutes = PrimaryDestinations.map { it.route }.toSet()
     val showBottomBar = !activeSession?.deviceId.isNullOrBlank() && rootRoute in primaryRoutes
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val showSideRail = isLandscape && showBottomBar
+
+    LaunchedEffect(isLandscape, configuration.screenWidthDp, configuration.screenHeightDp) {
+        if (diagnostics.isForensicTest()) {
+            diagnostics.info(
+                "UI",
+                "ORIENTATION_STATE",
+                details = mapOf(
+                    "orientation" to if (isLandscape) "landscape" else "portrait",
+                    "screen_width_dp" to configuration.screenWidthDp,
+                    "screen_height_dp" to configuration.screenHeightDp,
+                    "adaptive_side_rail" to showSideRail,
+                ),
+            )
+        }
+    }
     val canGoBack = navController.previousBackStackEntry != null &&
         rootRoute !in primaryRoutes &&
         rootRoute != "login" &&

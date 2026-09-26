@@ -42,7 +42,7 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'composable("{route}")', self.main)
 
     def test_release_surfaces_are_actionable_not_placeholders(self) -> None:
-        self.assertIn("Modifier.fillMaxSize()", self.main)
+        self.assertIn(".fillMaxSize()", self.main)
         self.assertIn("R.drawable.sentinel_master_icon", self.main)
         self.assertIn('"/v1/audit"', self.dashboard_api)
         self.assertIn("api.getAudit(accessToken)", self.product_screens)

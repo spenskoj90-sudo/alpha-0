@@ -14,13 +14,14 @@ SHA = "a" * 40
 SIGNER = "b" * 64
 OTHER_SIGNER = "c" * 64
 ORIGIN = "https://sentinel-core-staging.onrender.com"
+FALLBACK = "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core"
 
 
 class PhysicalTestArtifactTests(unittest.TestCase):
     def fixture(self, root: Path, *, dex_suffix: bytes = b"", application_id: str = "com.alpha0.app.physicaltest") -> tuple[Path, Path, Path]:
         apk = root / "app-physicalTest.apk"
         with zipfile.ZipFile(apk, "w") as archive:
-            archive.writestr("classes.dex", b"dex\n" + SHA.encode() + b"\n" + ORIGIN.encode() + b"\nFORENSIC_TEST\n" + dex_suffix)
+            archive.writestr("classes.dex", b"dex\n" + SHA.encode() + b"\n" + ORIGIN.encode() + b"\n" + FALLBACK.encode() + b"\nFORENSIC_TEST\n" + dex_suffix)
         metadata = root / "output-metadata.json"
         metadata.write_text(
             json.dumps(
@@ -51,6 +52,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
             version_file=version,
             source_sha=SHA,
             api_base_url=ORIGIN,
+            api_fallback_base_url=FALLBACK,
             repository="spenskoj90-sudo/alpha-0",
             run_id="12345",
             run_attempt="2",
@@ -63,6 +65,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
             manifest = self.create_manifest(Path(temp))
         self.assertEqual(manifest["sourceSha"], SHA)
         self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
+        self.assertEqual(manifest["apiFallbackBaseUrl"], FALLBACK)
         self.assertEqual(manifest["runtimeEnvironment"], "staging")
         self.assertEqual(manifest["signingMode"], "ephemeral-debug")
         self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
@@ -83,6 +86,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 version_file=version,
                 source_sha=SHA,
                 api_base_url=ORIGIN,
+                api_fallback_base_url=FALLBACK,
                 repository="spenskoj90-sudo/alpha-0",
                 run_id="12345",
                 run_attempt="2",
@@ -109,6 +113,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                     version_file=version,
                     source_sha=SHA,
                     api_base_url=ORIGIN,
+                api_fallback_base_url=FALLBACK,
                     repository="spenskoj90-sudo/alpha-0",
                     run_id="12345",
                     run_attempt="2",
@@ -128,6 +133,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                     version_file=version,
                     source_sha=SHA,
                     api_base_url=ORIGIN,
+                api_fallback_base_url=FALLBACK,
                     repository="spenskoj90-sudo/alpha-0",
                     run_id="12345",
                     run_attempt="2",

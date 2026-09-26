@@ -17,6 +17,7 @@ concurrency:
 
 env:
   PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com
+  PHYSICAL_TEST_API_FALLBACK_BASE_URL: https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core
   PHYSICAL_TEST_EXPECTED_SIGNER_SHA256: ${{ vars.PHYSICAL_TEST_SIGNER_SHA256 }}
 
 jobs:
@@ -91,6 +92,7 @@ jobs:
       - name: Build exact-SHA stable-signed physical-test APK
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
+          SENTINEL_API_FALLBACK_BASE_URL: ${{ env.PHYSICAL_TEST_API_FALLBACK_BASE_URL }}
           SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
           SENTINEL_RUNTIME_ENVIRONMENT: staging
           SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD: ${{ secrets.PHYSICAL_TEST_KEYSTORE_PASSWORD }}
@@ -121,7 +123,7 @@ jobs:
       - name: Verify update artifact identity and signer lineage
         run: |
           set -euo pipefail
-          python scripts/physical_test_artifact.py             --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk             --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json             --version-file VERSION             --source-sha "${{ inputs.source_sha }}"             --api-base-url "$PHYSICAL_TEST_API_BASE_URL"             --repository "$GITHUB_REPOSITORY"             --run-id "$GITHUB_RUN_ID"             --run-attempt "$GITHUB_RUN_ATTEMPT"             --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"             --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"             --signing-mode stable-test             --workflow-name "Physical Test Update APK"             --output physical-test-manifest.json
+          python scripts/physical_test_artifact.py             --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk             --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json             --version-file VERSION             --source-sha "${{ inputs.source_sha }}"             --api-base-url "$PHYSICAL_TEST_API_BASE_URL"             --api-fallback-base-url "$PHYSICAL_TEST_API_FALLBACK_BASE_URL"             --repository "$GITHUB_REPOSITORY"             --run-id "$GITHUB_RUN_ID"             --run-attempt "$GITHUB_RUN_ATTEMPT"             --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"             --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"             --signing-mode stable-test             --workflow-name "Physical Test Update APK"             --output physical-test-manifest.json
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["signerLineageVerified"]).lower())')" = "true"
           test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"

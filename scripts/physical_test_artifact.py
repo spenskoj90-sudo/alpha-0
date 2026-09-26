@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 EXPECTED_APPLICATION_ID = "com.alpha0.app.physicaltest"
 EXPECTED_VARIANT = "physicalTest"
 EXPECTED_STAGING_ORIGIN = "https://sentinel-core-staging.onrender.com"
+EXPECTED_STAGING_FALLBACK = "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core"
 EXPECTED_HTTP_READ_TIMEOUT_MS = 75_000
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -44,6 +45,17 @@ def validate_staging_origin(raw: str) -> str:
     return value
 
 
+def validate_staging_fallback(raw: str) -> str:
+    value = raw.strip().rstrip("/")
+    parsed = urlsplit(value)
+    require(parsed.scheme == "https", "physical-test fallback must use HTTPS")
+    require(parsed.hostname is not None, "physical-test fallback must include a host")
+    require(parsed.username is None and parsed.password is None, "physical-test fallback must not contain credentials")
+    require(not parsed.query and not parsed.fragment, "physical-test fallback must not contain query or fragment")
+    require(value == EXPECTED_STAGING_FALLBACK, "physical-test fallback must be the canonical staging Web relay")
+    return value
+
+
 def load_output_metadata(path: Path, apk: Path, canonical_version: str) -> dict[str, object]:
     document = json.loads(path.read_text(encoding="utf-8"))
     require(document.get("artifactType", {}).get("type") == "APK", "Gradle output metadata must describe an APK")
@@ -58,13 +70,13 @@ def load_output_metadata(path: Path, apk: Path, canonical_version: str) -> dict[
     return element
 
 
-def inspect_apk(apk: Path, source_sha: str, api_base_url: str) -> None:
+def inspect_apk(apk: Path, source_sha: str, api_base_url: str, api_fallback_base_url: str) -> None:
     require(apk.is_file(), "physical-test APK is missing")
     with zipfile.ZipFile(apk) as archive:
         dex_names = sorted(name for name in archive.namelist() if DEX_ENTRY.fullmatch(name))
         require(bool(dex_names), "physical-test APK contains no classes*.dex")
         dex = b"".join(archive.read(name) for name in dex_names)
-    for expected in (source_sha, api_base_url, "FORENSIC_TEST"):
+    for expected in (source_sha, api_base_url, api_fallback_base_url, "FORENSIC_TEST"):
         require(expected.encode("utf-8") in dex, f"compiled APK is missing expected identity: {expected}")
     for forbidden in (b"http://127.0.0.1", b"https://127.0.0.1", b"http://localhost", b"https://localhost", b"10.0.2.2"):
         require(forbidden not in dex, f"compiled APK contains forbidden loopback endpoint: {forbidden.decode()}")
@@ -77,6 +89,7 @@ def build_manifest(
     version_file: Path,
     source_sha: str,
     api_base_url: str,
+    api_fallback_base_url: str,
     repository: str,
     run_id: str,
     run_attempt: str,
@@ -106,10 +119,11 @@ def build_manifest(
     else:
         require(expected_signer is None, "ephemeral-debug artifacts must not claim a pinned update signer lineage")
     origin = validate_staging_origin(api_base_url)
+    fallback = validate_staging_fallback(api_fallback_base_url)
     canonical_version = version_file.read_text(encoding="utf-8").strip()
     require(bool(canonical_version), "canonical VERSION is empty")
     metadata = load_output_metadata(output_metadata, apk, canonical_version)
-    inspect_apk(apk, source_sha, origin)
+    inspect_apk(apk, source_sha, origin, fallback)
     apk_bytes = apk.read_bytes()
     timestamp = generated_at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return {
@@ -139,6 +153,7 @@ def build_manifest(
         },
         "apiEnvironment": "staging",
         "apiBaseUrl": origin,
+        "apiFallbackBaseUrl": fallback,
         "runtimeEnvironment": "staging",
         "signingMode": signing_mode,
         "signerCertificateSha256": signer,
@@ -158,6 +173,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version-file", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--api-base-url", required=True)
+    parser.add_argument("--api-fallback-base-url", required=True)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--run-attempt", required=True)
@@ -179,6 +195,7 @@ def main() -> int:
             version_file=args.version_file,
             source_sha=args.source_sha,
             api_base_url=args.api_base_url,
+            api_fallback_base_url=args.api_fallback_base_url,
             repository=args.repository,
             run_id=args.run_id,
             run_attempt=args.run_attempt,

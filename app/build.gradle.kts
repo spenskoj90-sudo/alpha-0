@@ -16,6 +16,9 @@ val explicitApiBaseUrl = providers.environmentVariable("SENTINEL_API_BASE_URL").
     ?.trimEnd('/')
     ?.takeIf { it.isNotEmpty() }
 val apiBaseUrl = explicitApiBaseUrl ?: "http://127.0.0.1:8000"
+val apiFallbackBaseUrl = providers.environmentVariable("SENTINEL_API_FALLBACK_BASE_URL").orElse("").get()
+    .trim()
+    .trimEnd('/')
 val sentryDsn = providers.environmentVariable("SENTRY_DSN").orElse("").get()
 val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .orElse(providers.environmentVariable("GITHUB_SHA"))
@@ -78,6 +81,25 @@ if (releaseRequested || physicalTestRequested) {
     if (physicalTestRequested && uri.host.lowercase() != "sentinel-core-staging.onrender.com") {
         error("Physical-test builds must target the canonical staging Core")
     }
+
+    if (apiFallbackBaseUrl.isNotEmpty()) {
+        val fallbackUri = runCatching { URI(apiFallbackBaseUrl) }
+            .getOrElse { error("SENTINEL_API_FALLBACK_BASE_URL must be a valid HTTPS URL") }
+        if (
+            fallbackUri.scheme?.lowercase() != "https" ||
+            fallbackUri.host.isNullOrBlank() ||
+            fallbackUri.rawUserInfo != null ||
+            fallbackUri.rawQuery != null ||
+            fallbackUri.rawFragment != null
+        ) {
+            error("SENTINEL_API_FALLBACK_BASE_URL must use HTTPS without credentials, query, or fragment")
+        }
+        if (physicalTestRequested && apiFallbackBaseUrl != "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core") {
+            error("Physical-test fallback must target the canonical staging Web relay")
+        }
+    } else if (physicalTestRequested) {
+        error("Physical-test builds require SENTINEL_API_FALLBACK_BASE_URL")
+    }
 }
 
 if (sourceSha.isNotEmpty() && !Regex("[0-9a-f]{40}").matches(sourceSha)) {
@@ -116,6 +138,7 @@ android {
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
         buildConfigField("String", "SENTINEL_VK_REDIRECT_URI", "\"vk$vkClientId://vk.ru/blank.html\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
+        buildConfigField("String", "SENTINEL_API_FALLBACK_BASE_URL", "\"$apiFallbackBaseUrl\"")
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")

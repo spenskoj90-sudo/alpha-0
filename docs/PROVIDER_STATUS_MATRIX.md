@@ -26,7 +26,7 @@ Core owns plan-to-price mapping, checkout-session creation, native `Stripe-Signa
 
 ### Resend
 
-The provider-neutral mail boundary, deterministic test transport and bounded staging-only Resend adapter are implemented. Registration verification and recovery flows are wired to that boundary. Real current-candidate Resend delivery remains environment-unverified; production credentials and activation remain Owner-gated.
+The provider-neutral mail boundary, deterministic test transport and bounded staging-only Resend adapter are implemented. Public registration/recovery requests remain non-enumerating, while the authenticated account-security verification path now fails closed with explicit provider-unavailable state instead of claiming delivery. Real current-candidate Resend delivery remains environment-unverified; production credentials and activation remain Owner-gated.
 
 ### Sentry
 

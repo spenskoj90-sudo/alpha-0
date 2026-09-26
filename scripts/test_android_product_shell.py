@@ -27,6 +27,9 @@ class AndroidProductShellTests(unittest.TestCase):
         cls.gradle = read("app/build.gradle.kts")
         cls.manifest = read("app/src/main/AndroidManifest.xml")
         cls.launcher = read("app/src/main/res/mipmap-anydpi/ic_launcher.xml")
+        cls.product_screens = read("app/src/main/java/com/alpha0/app/dashboard/ProductScreens.kt")
+        cls.security_screens = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
+        cls.dashboard_api = read("app/src/main/java/com/alpha0/app/dashboard/DashboardApi.kt")
 
     def test_pre_auth_menu_and_product_routes_exist(self) -> None:
         for route in ("settings", "updates", "help", "about"):
@@ -37,6 +40,17 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'AppDestination("{route}"', self.chrome)
         for route in ("security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers"):
             self.assertIn(f'composable("{route}")', self.main)
+
+    def test_release_surfaces_are_actionable_not_placeholders(self) -> None:
+        self.assertIn(".fillMaxSize()", self.main)
+        self.assertIn("R.drawable.sentinel_master_icon", self.main)
+        self.assertIn('"/v1/audit"', self.dashboard_api)
+        self.assertIn("api.getAudit(accessToken)", self.product_screens)
+        self.assertNotIn('strings.text("activity_limited_title")', self.product_screens)
+        self.assertIn("requestEmailVerification", self.security_screens)
+        self.assertIn("confirmEmailVerification", self.security_screens)
+        self.assertIn("provider_ready_to_link", self.security_screens)
+        self.assertIn("provider_not_enabled_here", self.security_screens)
 
     def test_language_and_theme_preferences_are_complete_and_persistent(self) -> None:
         self.assertIn("enum class AppLanguage { SYSTEM, RUSSIAN, ENGLISH }", self.preferences)

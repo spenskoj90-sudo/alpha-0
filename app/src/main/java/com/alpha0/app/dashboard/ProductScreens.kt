@@ -89,8 +89,23 @@ fun GamesScreen(accessToken: String, api: DashboardApi, onGameClick: (String) ->
 }
 
 @Composable
-fun ActivityScreen(deviceId: String?) {
+fun ActivityScreen(accessToken: String, api: DashboardApi) {
     val strings = LocalAppStrings.current
+    var events by remember { mutableStateOf<List<DashboardApi.AuditEvent>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var generation by remember { mutableStateOf(0) }
+
+    LaunchedEffect(accessToken, generation) {
+        loading = true
+        error = null
+        when (val result = withContext(Dispatchers.IO) { api.getAudit(accessToken) }) {
+            is DashboardApi.Result.Success -> events = result.value
+            is DashboardApi.Result.Failure -> error = result.message
+        }
+        loading = false
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -99,20 +114,74 @@ fun ActivityScreen(deviceId: String?) {
             Text(strings.text("activity_title"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("activity_description"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        item {
+
+        if (loading) {
+            item { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
+        }
+
+        error?.let { message ->
+            item {
+                SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatusBadge(strings.text("status_unavailable"), SentinelStatus.UNAVAILABLE)
+                        Text(strings.text("load_failed", message), color = MaterialTheme.colorScheme.error)
+                        PrimaryButton(strings.text("retry"), { generation += 1 })
+                    }
+                }
+            }
+        }
+
+        if (!loading && error == null && events.isEmpty()) {
+            item {
+                SentinelCard(kind = SentinelCardKind.CONTENT) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StatusBadge(strings.text("status_active"), SentinelStatus.ACTIVE)
+                        Text(strings.text("activity_empty_title"), style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            strings.text("activity_empty_body"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        items(events) { event ->
+            val status = when (event.decision.uppercase()) {
+                "ALLOW" -> SentinelStatus.ACTIVE
+                "DENY" -> SentinelStatus.DENIED
+                else -> SentinelStatus.UNKNOWN
+            }
             SentinelCard(kind = SentinelCardKind.CONTENT) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusBadge(
-                        if (deviceId.isNullOrBlank()) strings.text("state_unavailable") else strings.text("limited_view"),
-                        if (deviceId.isNullOrBlank()) SentinelStatus.UNAVAILABLE else SentinelStatus.UNKNOWN,
+                        strings.text(
+                            when (status) {
+                                SentinelStatus.ACTIVE -> "activity_event_allowed"
+                                SentinelStatus.DENIED -> "activity_event_denied"
+                                else -> "status_unknown"
+                            }
+                        ),
+                        status,
                     )
-                    Text(strings.text("activity_limited_title"), style = MaterialTheme.typography.titleLarge)
                     Text(
-                        strings.text("activity_limited_body"),
+                        event.action.replace(":", " · ").replace("-", " "),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    DataText(strings.text("activity_event_resource", event.resource))
+                    Text(
+                        strings.text("activity_event_reason", event.reasonCode),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    deviceId?.let { DataText(it) }
+                    event.createdAt?.let {
+                        Text(
+                            strings.text("activity_event_time", it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }

@@ -34,6 +34,36 @@ class DashboardApiTest {
     }
 
     @Test
+    fun getAuditUsesCallerSessionAndParsesServerHistory() {
+        var captured: HttpRequest? = null
+        val transport = object : HttpTransport {
+            override fun execute(request: HttpRequest): HttpResponse {
+                captured = request
+                return HttpResponse(
+                    200,
+                    """{"events":[{"action":"auth:provider-link","resource":"provider:google","decision":"ALLOW","reason_code":"FEDERATED_IDENTITY_VALID","request_id":"req-1","created_at":"2026-09-26T06:00:00Z"}]}""",
+                )
+            }
+        }
+
+        val result = DashboardApi("https://example.test/", transport).getAudit("access")
+
+        assertTrue(result is DashboardApi.Result.Success)
+        val events = (result as DashboardApi.Result.Success).value
+        assertEquals(1, events.size)
+        assertEquals("auth:provider-link", events.single().action)
+        assertEquals("provider:google", events.single().resource)
+        assertEquals("ALLOW", events.single().decision)
+        assertEquals("FEDERATED_IDENTITY_VALID", events.single().reasonCode)
+        assertEquals("req-1", events.single().requestId)
+        assertEquals("2026-09-26T06:00:00Z", events.single().createdAt)
+        val request = requireNotNull(captured)
+        assertEquals(HttpMethod.GET, request.method)
+        assertEquals("https://example.test/v1/audit", request.url)
+        assertEquals("Bearer access", request.headers["Authorization"])
+    }
+
+    @Test
     fun networkFailureDoesNotExposeExceptionDetails() {
         val transport = object : HttpTransport {
             override fun execute(request: HttpRequest): HttpResponse {

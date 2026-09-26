@@ -211,11 +211,13 @@ fun AccountSecurityDetailScreen(
     val scope = rememberCoroutineScope()
     var account by remember { mutableStateOf<AuthApi.AccountSecurity?>(null) }
     var providers by remember { mutableStateOf<List<AuthApi.ProviderStatus>>(emptyList()) }
+    var providerCatalogError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var enrollment by remember { mutableStateOf<AuthApi.TotpEnrollment?>(null) }
     var code by remember { mutableStateOf("") }
+    var verificationCode by remember { mutableStateOf("") }
 
     suspend fun refresh() {
         when (val result = authApi.accountSecurity(accessToken)) {
@@ -226,8 +228,14 @@ fun AccountSecurityDetailScreen(
             is AuthApi.AccountSecurityResult.Failure -> error = result.message
         }
         providers = when (val result = authApi.providerCatalog()) {
-            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter { it.enabled && federatedAuth.isProviderCompatible(it) }
-            is AuthApi.ProviderCatalogResult.Failure -> emptyList()
+            is AuthApi.ProviderCatalogResult.Success -> {
+                providerCatalogError = null
+                result.providers.filter { federatedAuth.isProviderCompatible(it) }
+            }
+            is AuthApi.ProviderCatalogResult.Failure -> {
+                providerCatalogError = result.message
+                emptyList()
+            }
         }
     }
 
@@ -247,6 +255,45 @@ fun AccountSecurityDetailScreen(
         }
         onFederatedCallbackConsumed()
         busy = false
+    }
+
+    fun requestVerification() {
+        val email = account?.email
+        if (email.isNullOrBlank()) {
+            error = strings.text("state_unavailable")
+            return
+        }
+        busy = true
+        error = null
+        message = null
+        scope.launch {
+            when (val result = authApi.requestEmailVerification(email)) {
+                is AuthApi.ActionResult.Success -> message = strings.text("verification_sent")
+                is AuthApi.ActionResult.Failure -> error = strings.text("auth_failed", result.message)
+            }
+            busy = false
+        }
+    }
+
+    fun confirmVerification() {
+        if (verificationCode.isBlank()) {
+            error = strings.text("verification_code_required")
+            return
+        }
+        busy = true
+        error = null
+        message = null
+        scope.launch {
+            when (val result = authApi.confirmEmailVerification(verificationCode)) {
+                is AuthApi.ActionResult.Success -> {
+                    verificationCode = ""
+                    message = strings.text("email_verified")
+                    refresh()
+                }
+                is AuthApi.ActionResult.Failure -> error = strings.text("auth_failed", result.message)
+            }
+            busy = false
+        }
     }
 
     fun beginMfa() {
@@ -364,6 +411,33 @@ fun AccountSecurityDetailScreen(
                                 )
                                 DataText(strings.text("account_email", current.email ?: strings.text("not_available")))
                                 Text(strings.text("password_status", strings.text(if (current.passwordEnabled) "enabled" else "disabled")))
+                                if (!current.emailVerified && !current.email.isNullOrBlank()) {
+                                    Text(
+                                        strings.text("account_verify_email_hint"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    PrimaryButton(
+                                        strings.text("send_verification_code"),
+                                        ::requestVerification,
+                                        Modifier.fillMaxWidth(),
+                                        !busy,
+                                    )
+                                    OutlinedTextField(
+                                        value = verificationCode,
+                                        onValueChange = { verificationCode = it.trim(); error = null },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text(strings.text("auth_code")) },
+                                        enabled = !busy,
+                                        singleLine = true,
+                                    )
+                                    SecondaryButton(
+                                        strings.text("verify_email"),
+                                        ::confirmVerification,
+                                        Modifier.fillMaxWidth(),
+                                        !busy && verificationCode.isNotBlank(),
+                                    )
+                                }
                             }
                         }
                     }
@@ -445,11 +519,51 @@ fun AccountSecurityDetailScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 val linked = current.providers.toSet()
                                 StatusBadge(
-                                    if (linked.isEmpty()) strings.text("none") else linked.joinToString(", "),
-                                    if (linked.isEmpty()) SentinelStatus.UNKNOWN else SentinelStatus.VERIFIED,
+                                    if (linked.isEmpty()) strings.text("providers_not_linked") else linked.joinToString(", "),
+                                    if (linked.isEmpty()) SentinelStatus.PENDING else SentinelStatus.VERIFIED,
                                 )
-                                Text(strings.text("provider_link_privacy"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                val available = providers.filter { it.provider !in linked }
+                                Text(
+                                    strings.text("provider_link_privacy"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+
+                                providerCatalogError?.let {
+                                    StatusBadge(strings.text("status_unavailable"), SentinelStatus.UNAVAILABLE)
+                                    Text(strings.text("load_failed", it), color = MaterialTheme.colorScheme.error)
+                                }
+
+                                if (providers.isNotEmpty()) {
+                                    providers.forEach { provider ->
+                                        val isLinked = provider.provider in linked
+                                        val providerStatus = when {
+                                            isLinked -> SentinelStatus.VERIFIED
+                                            provider.enabled -> SentinelStatus.ACTIVE
+                                            else -> SentinelStatus.UNAVAILABLE
+                                        }
+                                        val providerState = when {
+                                            isLinked -> strings.text("status_verified")
+                                            provider.enabled -> strings.text("provider_ready_to_link")
+                                            else -> strings.text("provider_not_enabled_here")
+                                        }
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                when (provider.provider) { "google" -> "Google"; "telegram" -> "Telegram"; "vk" -> "VK"; else -> provider.provider.replaceFirstChar { it.uppercase() } },
+                                                style = MaterialTheme.typography.titleMedium,
+                                            )
+                                            StatusBadge(providerState, providerStatus)
+                                        }
+                                    }
+                                }
+
+                                val available = providers.filter { it.enabled && it.provider !in linked }
+                                if (available.isEmpty() && linked.isEmpty() && providerCatalogError == null) {
+                                    Text(
+                                        strings.text("provider_environment_unavailable"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 if (available.any { it.provider == "google" }) SecondaryButton(strings.text("link_google"), ::linkGoogle, Modifier.fillMaxWidth(), !busy)
                                 if (available.any { it.provider == "telegram" }) SecondaryButton(strings.text("link_telegram"), { linkBrowser("telegram") }, Modifier.fillMaxWidth(), !busy)
                                 if (available.any { it.provider == "vk" }) SecondaryButton(strings.text("link_vk"), { linkBrowser("vk") }, Modifier.fillMaxWidth(), !busy)
@@ -473,7 +587,7 @@ fun SessionsDetailScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusBadge(strings.text("sessions_current_only"), SentinelStatus.ACTIVE)
                     Text(
-                        strings.text("activity_limited_body"),
+                        strings.text("sessions_scope_body"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

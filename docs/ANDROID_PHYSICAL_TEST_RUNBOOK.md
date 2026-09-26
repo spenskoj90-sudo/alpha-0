@@ -164,7 +164,7 @@ Use the same Android phone and the current authorized staging Web origin for the
 ## 11. Diagnostics and quality report
 
 1. Reproduce one safe success flow and one offline/network failure.
-2. Tap **Export logs** in the PHYSICAL TEST identity strip. Expect the Android share sheet with a compressed `.jsonl.gz` forensic trace. Save it to **Google Drive → Sentinel → Логи** when practical; that folder is the standard post-test evidence source.
+2. Tap **Export logs** in the PHYSICAL TEST identity strip. Expect the Android share sheet with a compressed `.jsonl.gz` forensic trace and a share title containing the source-SHA prefix plus export timestamp. Save it to **Google Drive → Sentinel → Логи** when practical; that folder is the standard post-test evidence source. If the phone has multiple Google/cloud accounts, explicitly confirm the intended project account in the system share sheet before saving—the destination account is controlled by Android/Drive, not by SENTINEL.
 3. Save/send it only through the Owner's private evidence channel. Confirm the export action itself does not reveal a password, bearer token, refresh token, private key or raw request body.
 4. Open **Report a problem**. Confirm the diagnostic snapshot count/size/mode are shown before entering report text.
 5. Submit one staging report without attaching diagnostics.

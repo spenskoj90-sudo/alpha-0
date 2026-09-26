@@ -91,6 +91,8 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("requestPasswordReset", login)
         self.assertIn("confirmPasswordReset", login)
         self.assertIn("confirmEmailVerification", login)
+        self.assertIn("requestAccountEmailVerification(session.accessToken)", login)
+        self.assertIn('strings.text("verification_pending_delivery")', login)
         self.assertIn("completeMfa", login)
         self.assertIn("AuthMode.MFA", login)
         self.assertIn("verticalScroll(rememberScrollState())", login)

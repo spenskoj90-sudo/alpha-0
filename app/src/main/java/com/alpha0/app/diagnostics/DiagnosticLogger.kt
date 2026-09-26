@@ -1,5 +1,6 @@
 package com.alpha0.app.diagnostics
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -325,16 +326,36 @@ class DiagnosticLogger private constructor(private val context: Context) {
             }
             val authority = "${BuildConfig.APPLICATION_ID}.diagnostics.files"
             val uri: Uri = FileProvider.getUriForFile(context, authority, export)
+            val generatedAt = Instant.now().toString()
+            val shortSource = BuildConfig.SENTINEL_SOURCE_SHA
+                .trim()
+                .takeIf { Regex("[0-9a-f]{40}").matches(it) }
+                ?.take(8)
+                ?: "unknown"
+            val shareTitle = "SENTINEL diagnostics · $shortSource · $generatedAt"
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "application/gzip"
-                putExtra(Intent.EXTRA_SUBJECT, "SENTINEL physical-test diagnostics")
+                putExtra(Intent.EXTRA_SUBJECT, shareTitle)
+                putExtra(Intent.EXTRA_TITLE, shareTitle)
                 putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newUri(context.contentResolver, shareTitle, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             activityContext.startActivity(Intent.createChooser(send, "Export SENTINEL diagnostics"))
+            info(
+                "QUALITY",
+                "FORENSIC_EXPORT_CHOOSER_OPENED",
+                details = mapOf("source_short" to shortSource),
+            )
             true
         } catch (e: Exception) {
+            warn(
+                "QUALITY",
+                "FORENSIC_EXPORT_PREPARE_FAILED",
+                errorCode = e.javaClass.simpleName.take(96),
+                throwable = e,
+            )
             Log.w(TAG, "export failed: ${e.javaClass.simpleName}")
             false
         }

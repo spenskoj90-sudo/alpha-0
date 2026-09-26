@@ -64,6 +64,7 @@ import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
 import com.alpha0.app.help.HelpScreen
+import com.alpha0.app.net.DnsFailoverHttpTransport
 import com.alpha0.app.net.SessionCredentials
 import com.alpha0.app.net.SessionRefreshingHttpTransport
 import com.alpha0.app.net.UrlConnectionHttpTransport
@@ -115,7 +116,24 @@ class MainActivity : ComponentActivity() {
         val initialSession = sessionStore.load(this)
         val preferences = AppPreferences(this)
         val sessionSignals = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 8)
-        val rawHttpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
+        val directHttpTransport = UrlConnectionHttpTransport(readTimeoutMs = BuildConfig.SENTINEL_HTTP_READ_TIMEOUT_MS)
+        val rawHttpTransport = DnsFailoverHttpTransport(
+            primaryBaseUrl = BuildConfig.SENTINEL_API_BASE_URL,
+            fallbackBaseUrl = BuildConfig.SENTINEL_API_FALLBACK_BASE_URL,
+            delegate = directHttpTransport,
+            onDnsFailover = { primary, fallback ->
+                diag.warn(
+                    "NETWORK",
+                    "DNS_FAILOVER",
+                    result = "OBSERVED",
+                    errorCode = "PRIMARY_DNS_UNRESOLVED",
+                    details = mapOf(
+                        "primary_origin" to primary,
+                        "fallback_origin" to fallback,
+                    ),
+                )
+            },
+        )
         val httpTransport = SessionRefreshingHttpTransport(
             baseUrl = BuildConfig.SENTINEL_API_BASE_URL,
             delegate = rawHttpTransport,

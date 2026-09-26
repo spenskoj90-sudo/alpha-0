@@ -1,6 +1,7 @@
 package com.alpha0.app
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -73,6 +75,7 @@ import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryDestinations
 import com.alpha0.app.ui.PhysicalTestIdentityStrip
 import com.alpha0.app.ui.SentinelBottomBar
+import com.alpha0.app.ui.SentinelSideRail
 import com.alpha0.app.ui.SentinelTheme
 import com.alpha0.app.ui.SentinelTopBar
 import com.alpha0.app.ui.rememberAppStrings
@@ -345,6 +348,8 @@ private fun SentinelApplicationUi(
     val rootRoute = route.substringBefore('/')
     val primaryRoutes = PrimaryDestinations.map { it.route }.toSet()
     val showBottomBar = !activeSession?.deviceId.isNullOrBlank() && rootRoute in primaryRoutes
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val showSideRail = isLandscape && showBottomBar
     val canGoBack = navController.previousBackStackEntry != null &&
         rootRoute !in primaryRoutes &&
         rootRoute != "login" &&
@@ -372,37 +377,54 @@ private fun SentinelApplicationUi(
                     diagnostics.info("QUALITY", "FORENSIC_EXPORT_REQUESTED", details = mapOf("surface" to "environment-strip"))
                     diagnostics.exportShare(activity)
                 },
+                compact = isLandscape,
             )
         }
 
-        Scaffold(
-            modifier = Modifier.weight(1f),
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                SentinelTopBar(
-                    title = title,
-                    canGoBack = canGoBack,
-                    onBack = { navController.popBackStack() },
-                    onNavigate = { destination ->
-                        if (rootRoute != "mfa-recovery-codes") {
-                            navController.navigate(destination) { launchSingleTop = true }
-                        }
-                    },
-                )
-            },
-            bottomBar = {
-                if (showBottomBar) {
-                    SentinelBottomBar(rootRoute) { destination ->
-                        navController.navigate(destination) {
-                            launchSingleTop = true
-                            popUpTo("home") { saveState = true }
-                            restoreState = true
-                        }
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            if (showSideRail) {
+                SentinelSideRail(rootRoute) { destination ->
+                    navController.navigate(destination) {
+                        launchSingleTop = true
+                        popUpTo("home") { saveState = true }
+                        restoreState = true
                     }
                 }
-            },
-        ) { padding ->
-            NavHost(
+            }
+
+            Scaffold(
+                modifier = Modifier.weight(1f),
+                containerColor = MaterialTheme.colorScheme.background,
+                topBar = {
+                    SentinelTopBar(
+                        title = title,
+                        canGoBack = canGoBack,
+                        onBack = { navController.popBackStack() },
+                        onNavigate = { destination ->
+                            if (rootRoute != "mfa-recovery-codes") {
+                                navController.navigate(destination) { launchSingleTop = true }
+                            }
+                        },
+                        compact = isLandscape,
+                    )
+                },
+                bottomBar = {
+                    if (showBottomBar && !isLandscape) {
+                        SentinelBottomBar(rootRoute) { destination ->
+                            navController.navigate(destination) {
+                                launchSingleTop = true
+                                popUpTo("home") { saveState = true }
+                                restoreState = true
+                            }
+                        }
+                    }
+                },
+            ) { padding ->
+                NavHost(
                 navController = navController,
                 startDestination = startDestination,
                 modifier = Modifier.padding(padding),
@@ -640,6 +662,7 @@ private fun SentinelApplicationUi(
                 composable("updates") { UpdateScreen() }
                 composable("help") { HelpScreen() }
                 composable("about") { AboutScreen() }
+                }
             }
         }
     }

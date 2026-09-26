@@ -197,7 +197,7 @@ fun LoginScreen(
                                 pendingSession = result.session
                                 actionCode = ""
                                 mode = AuthMode.VERIFY_EMAIL
-                                status = strings.text("verification_sent")
+                                status = strings.text("verification_pending_delivery")
                             } else {
                                 onAuthenticated(result.session)
                             }
@@ -540,9 +540,24 @@ fun LoginScreen(
                             busy = true
                             error = null
                             scope.launch {
-                                when (val result = api.requestEmailVerification(email)) {
-                                    is AuthApi.ActionResult.Success -> status = strings.text("verification_sent")
-                                    is AuthApi.ActionResult.Failure -> error = actionError(result.message)
+                                val session = pendingSession
+                                val result = if (session != null) {
+                                    api.requestAccountEmailVerification(session.accessToken)
+                                } else {
+                                    api.requestEmailVerification(email)
+                                }
+                                when (result) {
+                                    is AuthApi.ActionResult.Success -> {
+                                        status = if (session != null) strings.text("verification_sent")
+                                        else strings.text("verification_pending_delivery")
+                                    }
+                                    is AuthApi.ActionResult.Failure -> {
+                                        error = if (result.message == "EMAIL_PROVIDER_UNAVAILABLE") {
+                                            strings.text("email_delivery_unavailable")
+                                        } else {
+                                            actionError(result.message)
+                                        }
+                                    }
                                 }
                                 busy = false
                             }

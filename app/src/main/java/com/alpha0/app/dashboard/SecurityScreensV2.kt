@@ -519,8 +519,8 @@ fun AccountSecurityDetailScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 val linked = current.providers.toSet()
                                 StatusBadge(
-                                    if (linked.isEmpty()) strings.text("none") else linked.joinToString(", "),
-                                    if (linked.isEmpty()) SentinelStatus.UNKNOWN else SentinelStatus.VERIFIED,
+                                    if (linked.isEmpty()) strings.text("providers_not_linked") else linked.joinToString(", "),
+                                    if (linked.isEmpty()) SentinelStatus.PENDING else SentinelStatus.VERIFIED,
                                 )
                                 Text(
                                     strings.text("provider_link_privacy"),

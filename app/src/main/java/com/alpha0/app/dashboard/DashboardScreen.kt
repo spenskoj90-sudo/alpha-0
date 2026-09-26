@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,13 +26,13 @@ import com.alpha0.app.ui.GhostButton
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
+import com.alpha0.app.ui.SentinelLoadingState
 import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.labelKey
 import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.buttonCardSemantics
-import com.alpha0.app.ui.progressStatusSemantics
 import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -78,11 +77,10 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.progressStatusSemantics(strings.text("loading_status")),
-                    color = MaterialTheme.colorScheme.primary,
+                SentinelLoadingState(
+                    text = strings.text("loading_status"),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Text(strings.text("loading_status"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             return@Surface
         }

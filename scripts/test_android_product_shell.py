@@ -40,6 +40,7 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'AppDestination("{route}"', self.chrome)
         for route in ("security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers"):
             self.assertIn(f'composable("{route}")', self.main)
+        self.assertNotIn('composable("device-details")', self.main)
 
     def test_release_surfaces_are_actionable_not_placeholders(self) -> None:
         self.assertIn(".fillMaxSize()", self.main)
@@ -51,6 +52,12 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("confirmEmailVerification", self.security_screens)
         self.assertIn("provider_ready_to_link", self.security_screens)
         self.assertIn("provider_not_enabled_here", self.security_screens)
+        self.assertIn("fun SentinelLoadingState", self.tokens)
+        dashboard = read("app/src/main/java/com/alpha0/app/dashboard/DashboardScreen.kt")
+        game_details = read("app/src/main/java/com/alpha0/app/dashboard/GameDetailsScreen.kt")
+        for screen in (self.product_screens, self.security_screens, dashboard, game_details):
+            self.assertIn("SentinelLoadingState", screen)
+            self.assertNotIn("CircularProgressIndicator", screen)
 
     def test_language_and_theme_preferences_are_complete_and_persistent(self) -> None:
         self.assertIn("enum class AppLanguage { SYSTEM, RUSSIAN, ENGLISH }", self.preferences)
@@ -85,19 +92,19 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("AuthMode.MFA", login)
         self.assertIn("verticalScroll(rememberScrollState())", login)
         auth_api = read("app/src/main/java/com/alpha0/app/auth/AuthApi.kt")
-        security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        security = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
         self.assertIn("/v1/auth/mfa/complete", auth_api)
         self.assertIn("/v1/account/mfa/totp/enroll", auth_api)
-        self.assertIn("confirmMfaEnrollment", security)
+        self.assertIn("fun confirmMfa()", security)
         self.assertIn("rotateRecoveryCodes", security)
-        self.assertIn("enrollment.otpauthUri", security)
+        self.assertIn("setup.otpauthUri", security)
         self.assertIn('strings.text("open_authenticator")', security)
 
 
     def test_device_rotation_is_crash_recoverable(self) -> None:
         identity = read("app/src/main/java/com/alpha0/app/security/DeviceIdentity.kt")
         device_api = read("app/src/main/java/com/alpha0/app/device/DeviceApi.kt")
-        device_screen = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        device_screen = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
         core = read("server/app/main.py")
         store = read("server/app/core/store.py")
         self.assertIn("fun pendingRotation()", identity)
@@ -112,7 +119,7 @@ class AndroidProductShellTests(unittest.TestCase):
 
     def test_runtime_session_refresh_and_mfa_revocation_fail_closed(self) -> None:
         transport = read("app/src/main/java/com/alpha0/app/net/HttpTransport.kt")
-        security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        security = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
         self.assertIn("class SessionRefreshingHttpTransport", transport)
         self.assertIn('url = "$normalizedBaseUrl/v1/sessions/refresh"', transport)
         self.assertIn("isSessionAuthenticationFailure(first)", transport)
@@ -123,7 +130,8 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('navController.navigate("mfa-recovery-codes")', self.main)
         self.assertIn("sessionStore.clear(activity)", self.main)
         self.assertIn("activeSession = null", self.main)
-        self.assertIn("MfaRecoveryCodesScreen", security)
+        recovery_screen = read("app/src/main/java/com/alpha0/app/dashboard/MfaRecoveryCodesScreen.kt")
+        self.assertIn("fun MfaRecoveryCodesScreen", recovery_screen)
         self.assertIn("onMfaEnabled(result.codes)", security)
         self.assertNotIn("mfaSessionRevoked", security)
 
@@ -198,7 +206,7 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('vk$vkClientId://vk.ru/blank.html', self.gradle)
         self.assertIn('android:launchMode="singleTask"', self.manifest)
         self.assertIn("completeBrowserCallback", login)
-        device_security = read("app/src/main/java/com/alpha0/app/dashboard/DeviceDetailsScreen.kt")
+        device_security = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
         self.assertIn("completeBrowserLinkCallback", device_security)
         self.assertIn("linkGoogle", device_security)
         self.assertIn("verticalScroll(rememberScrollState())", device_security)

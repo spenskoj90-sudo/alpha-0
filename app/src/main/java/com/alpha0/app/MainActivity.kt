@@ -51,7 +51,6 @@ import com.alpha0.app.auth.SessionManager
 import com.alpha0.app.dashboard.ActivityScreen
 import com.alpha0.app.dashboard.DashboardApi
 import com.alpha0.app.dashboard.DashboardScreen
-import com.alpha0.app.dashboard.DeviceDetailsScreen
 import com.alpha0.app.dashboard.AccountSecurityDetailScreen
 import com.alpha0.app.dashboard.DeviceIdentityDetailScreen
 import com.alpha0.app.dashboard.SecurityDetailSection
@@ -420,7 +419,7 @@ private fun SentinelApplicationUi(
         "help" -> strings.text("help")
         "about" -> strings.text("about")
         "games" -> strings.text("games")
-        "security", "security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers", "device-details", "mfa-recovery-codes" -> strings.text("security")
+        "security", "security-account", "security-mfa", "security-recovery", "security-sessions", "security-device", "security-providers", "mfa-recovery-codes" -> strings.text("security")
         "activity" -> strings.text("activity")
         else -> strings.text("app_name")
     }
@@ -697,32 +696,6 @@ private fun SentinelApplicationUi(
                         )
                     }
                 }
-                composable("device-details") {
-                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
-                        DeviceDetailsContent(
-                            session = current,
-                            api = dashboardApi,
-                            authApi = authApi,
-                            federatedAuth = federatedAuth,
-                            federatedCallbackUri = federatedCallbackUri,
-                            onFederatedCallbackConsumed = onFederatedCallbackConsumed,
-                            identity = deviceIdentity,
-                            store = sessionStore,
-                            activity = activity,
-                            navController = navController,
-                            onMfaEnabled = { codes ->
-                                sessionStore.clear(activity)
-                                activeSession = null
-                                pendingMfaRecoveryCodes = codes
-                                navController.navigate("mfa-recovery-codes") {
-                                    popUpTo(navController.graph.id) { inclusive = true }
-                                }
-                            },
-                        ) {
-                            activeSession = it
-                        }
-                    }
-                }
                 composable(
                     "game-details/{entitlementId}",
                     arguments = listOf(navArgument("entitlementId") { type = NavType.StringType }),
@@ -766,47 +739,4 @@ private fun AuthenticatedRoute(
     } else {
         content(current)
     }
-}
-
-@Composable
-private fun DeviceDetailsContent(
-    session: SecureSessionStore.Companion.Session,
-    api: DashboardApi,
-    authApi: AuthApi,
-    federatedAuth: FederatedAuthCoordinator,
-    federatedCallbackUri: Uri?,
-    onFederatedCallbackConsumed: () -> Unit,
-    identity: DeviceIdentity,
-    store: SecureSessionStore,
-    activity: ComponentActivity,
-    navController: androidx.navigation.NavHostController,
-    onMfaEnabled: (List<String>) -> Unit,
-    onSessionChanged: (SecureSessionStore.Companion.Session?) -> Unit,
-) {
-    DeviceDetailsScreen(
-        accessToken = session.accessToken,
-        deviceId = session.deviceId!!,
-        api = api,
-        authApi = authApi,
-        federatedAuth = federatedAuth,
-        federatedCallbackUri = federatedCallbackUri,
-        onFederatedCallbackConsumed = onFederatedCallbackConsumed,
-        deviceIdentity = identity,
-        onMfaEnabled = onMfaEnabled,
-        onRevoked = {
-            store.clear(activity)
-            onSessionChanged(null)
-            navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }
-        },
-        onRotated = { rotated ->
-            val deviceId = rotated.deviceId
-            val access = rotated.sessionToken
-            val refresh = rotated.refreshToken
-            if (!deviceId.isNullOrBlank() && !access.isNullOrBlank() && !refresh.isNullOrBlank()) {
-                store.save(activity, access, refresh, deviceId)
-                onSessionChanged(store.load(activity))
-                navController.navigate("home") { popUpTo("home") { inclusive = true } }
-            }
-        },
-    )
 }

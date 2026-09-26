@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -21,6 +20,7 @@ import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
+import com.alpha0.app.ui.SentinelLoadingState
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.statusFromRaw
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +45,7 @@ fun GameDetailsScreen(accessToken: String, entitlementId: String, api: Dashboard
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(strings.text("game_details"), style = MaterialTheme.typography.headlineMedium)
             when {
-                loading -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                loading -> SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth())
                 error != null -> Text(strings.text("load_failed", error), color = MaterialTheme.colorScheme.error)
                 game != null -> {
                     val current = game!!

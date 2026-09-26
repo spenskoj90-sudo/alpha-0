@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -38,6 +37,7 @@ import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SecondaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelCardKind
+import com.alpha0.app.ui.SentinelLoadingState
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.statusFromRaw
@@ -396,7 +396,7 @@ fun AccountSecurityDetailScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineLarge)
-            if (account == null && error == null) CircularProgressIndicator()
+            if (account == null && error == null) SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth())
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             message?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
 
@@ -657,7 +657,7 @@ fun DeviceIdentityDetailScreen(
         ) {
             Text(strings.text("device_identity"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("device_identity_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (device == null && error == null) CircularProgressIndicator()
+            if (device == null && error == null) SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth())
             error?.let { Text(strings.text("load_failed", it), color = MaterialTheme.colorScheme.error) }
             message?.let { Text(it, color = MaterialTheme.colorScheme.secondary) }
 

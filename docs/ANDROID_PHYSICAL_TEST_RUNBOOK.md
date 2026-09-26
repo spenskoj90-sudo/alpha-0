@@ -125,7 +125,7 @@ Perform these transitions without changing any credential:
 2. Enable airplane mode, then open/reload a server-backed screen. Expect a bounded network error, not a crash or endless spinner.
 3. On dashboard load failure, tap **Retry** while still offline. Expect the same recoverable error.
 4. Restore Wi-Fi and tap **Retry**. Expect recovery.
-5. Switch Wi-Fi → mobile data and repeat a dashboard/device-details request.
+5. Switch Wi-Fi → mobile data and repeat a Home/Security → Device identity request.
 6. Switch mobile data → Wi-Fi while the app is backgrounded, then foreground it and retry.
 7. Repeat at least three disconnect/reconnect cycles.
 

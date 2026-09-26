@@ -3,20 +3,24 @@ package com.alpha0.app.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -211,6 +215,37 @@ fun SentinelCard(
         border = BorderStroke(1.dp, border),
     ) {
         Box(modifier = Modifier.padding(20.dp), content = content)
+    }
+}
+
+@Composable
+fun SentinelLoadingState(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    SentinelCard(
+        modifier = modifier,
+        kind = SentinelCardKind.OPERATIONAL,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .size(28.dp)
+                    .progressStatusSemantics(text),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.5.dp,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
     }
 }
 

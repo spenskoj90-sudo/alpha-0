@@ -67,6 +67,9 @@ fun SentinelTopBar(
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
     compact: Boolean = false,
+    compactContext: String? = null,
+    compactActionLabel: String? = null,
+    onCompactAction: (() -> Unit)? = null,
 ) {
     val strings = LocalAppStrings.current
     var expanded by remember { mutableStateOf(false) }
@@ -97,13 +100,37 @@ fun SentinelTopBar(
                 }
                 Text(
                     text = title,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = if (canGoBack) 0.dp else 12.dp),
+                    modifier = Modifier.padding(start = if (canGoBack) 0.dp else 12.dp),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!compactContext.isNullOrBlank()) {
+                    Text(
+                        text = compactContext,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Box(modifier = Modifier.weight(1f))
+                }
+                if (!compactActionLabel.isNullOrBlank() && onCompactAction != null) {
+                    TextButton(
+                        onClick = onCompactAction,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            compactActionLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Box {
                     IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = strings.text("menu"))
@@ -170,7 +197,7 @@ fun SentinelSideRail(selectedRoute: String?, onNavigate: (String) -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .width(76.dp)
+                .width(72.dp)
                 .navigationBarsPadding()
                 .padding(vertical = 4.dp)
                 .selectableGroup(),
@@ -181,14 +208,14 @@ fun SentinelSideRail(selectedRoute: String?, onNavigate: (String) -> Unit) {
                 val selected = selectedRoute == destination.route
                 Column(
                     modifier = Modifier
-                        .width(72.dp)
-                        .heightIn(min = 64.dp)
+                        .width(68.dp)
+                        .heightIn(min = 48.dp)
                         .selectable(
                             selected = selected,
                             role = Role.Tab,
                             onClick = { onNavigate(destination.route) },
                         )
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                        .padding(horizontal = 3.dp, vertical = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -205,15 +232,15 @@ fun SentinelSideRail(selectedRoute: String?, onNavigate: (String) -> Unit) {
                         painter = painterResource(destination.iconRes),
                         contentDescription = null,
                         modifier = Modifier
-                            .padding(top = 5.dp)
-                            .size(22.dp),
+                            .padding(top = 3.dp)
+                            .size(20.dp),
                         tint = if (selected) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = strings.text(destination.labelKey),
                         modifier = Modifier.padding(top = 2.dp),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = if (selected) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

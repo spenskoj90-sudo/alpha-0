@@ -351,9 +351,17 @@ private fun SentinelApplicationUi(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val showSideRail = isLandscape && showBottomBar
+    val forensicTest = diagnostics.isForensicTest()
+    val landscapePhysicalContext = if (forensicTest && isLandscape) {
+        val source = BuildConfig.SENTINEL_SOURCE_SHA.take(12).ifBlank { "sha-unavailable" }
+        val environment = BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT.ifBlank { "staging" }.uppercase()
+        "PHYSICAL TEST · ${BuildConfig.VERSION_NAME} · $source · $environment"
+    } else {
+        null
+    }
 
     LaunchedEffect(isLandscape, configuration.screenWidthDp, configuration.screenHeightDp) {
-        if (diagnostics.isForensicTest()) {
+        if (forensicTest) {
             diagnostics.info(
                 "UI",
                 "ORIENTATION_STATE",
@@ -383,7 +391,7 @@ private fun SentinelApplicationUi(
     }
 
     Column {
-        if (diagnostics.isForensicTest()) {
+        if (forensicTest && !isLandscape) {
             PhysicalTestIdentityStrip(
                 version = BuildConfig.VERSION_NAME,
                 sourceSha = BuildConfig.SENTINEL_SOURCE_SHA,
@@ -426,6 +434,20 @@ private fun SentinelApplicationUi(
                             }
                         },
                         compact = isLandscape,
+                        compactContext = landscapePhysicalContext,
+                        compactActionLabel = if (landscapePhysicalContext != null) strings.text("export_logs") else null,
+                        onCompactAction = if (landscapePhysicalContext != null) {
+                            {
+                                diagnostics.info(
+                                    "QUALITY",
+                                    "FORENSIC_EXPORT_REQUESTED",
+                                    details = mapOf("surface" to "landscape-top-bar"),
+                                )
+                                diagnostics.exportShare(activity)
+                            }
+                        } else {
+                            null
+                        },
                     )
                 },
                 bottomBar = {

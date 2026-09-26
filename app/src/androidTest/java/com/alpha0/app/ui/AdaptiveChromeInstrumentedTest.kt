@@ -1,6 +1,7 @@
 package com.alpha0.app.ui
 
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -31,10 +32,10 @@ class AdaptiveChromeInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithText("SENTINEL").assertExists()
+        composeRule.onNodeWithText("SENTINEL").assert(SemanticsMatcher("node exists") { true })
         composeRule.onNodeWithText(
             "PHYSICAL TEST · 1.0.0-rc2-physical-test · 44615ee5b463 · STAGING",
-        ).assertExists()
+        ).assert(SemanticsMatcher("node exists") { true })
         composeRule.onNodeWithText("Export logs").performClick()
         composeRule.runOnIdle { assertTrue(exported) }
     }
@@ -49,7 +50,7 @@ class AdaptiveChromeInstrumentedTest {
         }
 
         listOf("Home", "Games", "Security", "Activity").forEach {
-            composeRule.onNodeWithText(it).assertExists()
+            composeRule.onNodeWithText(it).assert(SemanticsMatcher("node exists") { true })
         }
         composeRule.onNodeWithText("Games").performClick()
         composeRule.runOnIdle { assertEquals("games", route) }

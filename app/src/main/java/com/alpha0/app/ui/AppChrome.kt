@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.R
 
@@ -64,46 +66,163 @@ fun SentinelTopBar(
     canGoBack: Boolean,
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
+    compact: Boolean = false,
 ) {
     val strings = LocalAppStrings.current
     var expanded by remember { mutableStateOf(false) }
-    TopAppBar(
-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.onBackground,
-            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        navigationIcon = {
-            if (canGoBack) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.text("back"))
+    val menuEntries = listOf(
+        "settings" to "settings",
+        "updates" to "updates",
+        "help" to "help",
+        "about" to "about",
+    )
+
+    if (compact) {
+        Surface(
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            tonalElevation = 0.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (canGoBack) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.text("back"))
+                    }
+                }
+                Text(
+                    text = title,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = if (canGoBack) 0.dp else 12.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Box {
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = strings.text("menu"))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        menuEntries.forEach { (route, label) ->
+                            DropdownMenuItem(
+                                text = { Text(strings.text(label)) },
+                                onClick = {
+                                    expanded = false
+                                    onNavigate(route)
+                                },
+                            )
+                        }
+                    }
                 }
             }
-        },
-        actions = {
-            IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = strings.text("menu"))
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                listOf(
-                    "settings" to "settings",
-                    "updates" to "updates",
-                    "help" to "help",
-                    "about" to "about",
-                ).forEach { (route, label) ->
-                    DropdownMenuItem(
-                        text = { Text(strings.text(label)) },
-                        onClick = {
-                            expanded = false
-                            onNavigate(route)
-                        },
+        }
+    } else {
+        TopAppBar(
+            title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground,
+                navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            navigationIcon = {
+                if (canGoBack) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.text("back"))
+                    }
+                }
+            },
+            actions = {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = strings.text("menu"))
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    menuEntries.forEach { (route, label) ->
+                        DropdownMenuItem(
+                            text = { Text(strings.text(label)) },
+                            onClick = {
+                                expanded = false
+                                onNavigate(route)
+                            },
+                        )
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+fun SentinelSideRail(selectedRoute: String?, onNavigate: (String) -> Unit) {
+    val strings = LocalAppStrings.current
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f)),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(76.dp)
+                .navigationBarsPadding()
+                .padding(vertical = 4.dp)
+                .selectableGroup(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            PrimaryDestinations.forEach { destination ->
+                val selected = selectedRoute == destination.route
+                Column(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .heightIn(min = 64.dp)
+                        .selectable(
+                            selected = selected,
+                            role = Role.Tab,
+                            onClick = { onNavigate(destination.route) },
+                        )
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .width(if (selected) 24.dp else 12.dp)
+                            .height(2.dp)
+                            .background(
+                                if (selected) MaterialTheme.colorScheme.primary
+                                else Color.Transparent,
+                            ),
+                    )
+                    Icon(
+                        painter = painterResource(destination.iconRes),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(top = 5.dp)
+                            .size(22.dp),
+                        tint = if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = strings.text(destination.labelKey),
+                        modifier = Modifier.padding(top = 2.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (selected) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -177,6 +296,7 @@ fun PhysicalTestIdentityStrip(
     environment: String,
     exportLabel: String,
     onExport: () -> Unit,
+    compact: Boolean = false,
 ) {
     val metadata = listOf(
         version,
@@ -195,32 +315,53 @@ fun PhysicalTestIdentityStrip(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                .padding(
+                    start = if (compact) 10.dp else 14.dp,
+                    end = 6.dp,
+                    top = if (compact) 0.dp else 4.dp,
+                    bottom = if (compact) 0.dp else 4.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
         ) {
             Box(
                 Modifier
                     .size(8.dp)
                     .background(MaterialTheme.colorScheme.secondary),
             )
-            Column(modifier = Modifier.weight(1f)) {
+            if (compact) {
                 Text(
-                    "PHYSICAL TEST",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    metadata,
+                    text = "PHYSICAL TEST · $metadata",
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+            } else {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "PHYSICAL TEST",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        metadata,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             TextButton(
                 onClick = onExport,
                 modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Text(exportLabel, style = MaterialTheme.typography.labelLarge)
+                Text(
+                    exportLabel,
+                    style = if (compact) MaterialTheme.typography.labelMedium
+                    else MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                )
             }
         }
     }

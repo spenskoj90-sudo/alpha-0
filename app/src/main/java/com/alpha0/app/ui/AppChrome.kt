@@ -67,6 +67,9 @@ fun SentinelTopBar(
     onBack: () -> Unit,
     onNavigate: (String) -> Unit,
     compact: Boolean = false,
+    compactContext: String? = null,
+    compactActionLabel: String? = null,
+    onCompactAction: (() -> Unit)? = null,
 ) {
     val strings = LocalAppStrings.current
     var expanded by remember { mutableStateOf(false) }
@@ -97,13 +100,37 @@ fun SentinelTopBar(
                 }
                 Text(
                     text = title,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = if (canGoBack) 0.dp else 12.dp),
+                    modifier = Modifier.padding(start = if (canGoBack) 0.dp else 12.dp),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (!compactContext.isNullOrBlank()) {
+                    Text(
+                        text = compactContext,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = SentinelDataFont),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Box(modifier = Modifier.weight(1f))
+                }
+                if (!compactActionLabel.isNullOrBlank() && onCompactAction != null) {
+                    TextButton(
+                        onClick = onCompactAction,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(
+                            compactActionLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Box {
                     IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = strings.text("menu"))

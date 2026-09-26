@@ -4,10 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +23,7 @@ import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelCardKind
+import com.alpha0.app.ui.SentinelLoadingState
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.statusFromRaw
@@ -53,7 +54,7 @@ fun GamesScreen(accessToken: String, api: DashboardApi, onGameClick: (String) ->
             Text(strings.text("games_title"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("games_description"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        if (loading) item { CircularProgressIndicator() }
+        if (loading) item { SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth()) }
         error?.let { message ->
             item {
                 SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
@@ -116,7 +117,7 @@ fun ActivityScreen(accessToken: String, api: DashboardApi) {
         }
 
         if (loading) {
-            item { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
+            item { SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth()) }
         }
 
         error?.let { message ->

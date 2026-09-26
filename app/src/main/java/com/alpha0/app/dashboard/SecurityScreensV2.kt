@@ -41,6 +41,7 @@ import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import com.alpha0.app.ui.statusFromRaw
+import com.alpha0.app.ui.labelKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -186,7 +187,8 @@ private fun SecurityHubRow(
                 Text(title, style = MaterialTheme.typography.titleLarge)
                 Text("›", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            StatusBadge(status.name.lowercase().replaceFirstChar { it.uppercase() }, status)
+            val strings = LocalAppStrings.current
+            StatusBadge(strings.text(status.labelKey()), status)
             Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

@@ -30,6 +30,7 @@ import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
+import com.alpha0.app.ui.labelKey
 import com.alpha0.app.ui.assertiveStatusSemantics
 import com.alpha0.app.ui.buttonCardSemantics
 import com.alpha0.app.ui.progressStatusSemantics
@@ -231,8 +232,16 @@ private fun SecurityPostureRow(
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(value, style = MaterialTheme.typography.titleLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(
+                value,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge,
+            )
             val strings = LocalAppStrings.current
             StatusBadge(strings.text(status.labelKey()), status)
         }
@@ -245,15 +254,3 @@ internal fun isTrustedDeviceState(state: String?, securityStatus: String?): Bool
     state.equals("ACTIVE", ignoreCase = true) &&
         (securityStatus.equals("OK", ignoreCase = true) || securityStatus.equals("SECURE", ignoreCase = true))
 
-private fun SentinelStatus.labelKey(): String = when (this) {
-    SentinelStatus.VERIFIED -> "status_verified"
-    SentinelStatus.ACTIVE -> "status_active"
-    SentinelStatus.PENDING -> "status_pending"
-    SentinelStatus.WARNING -> "status_warning"
-    SentinelStatus.DENIED -> "status_denied"
-    SentinelStatus.REVOKED -> "status_revoked_label"
-    SentinelStatus.FAILED -> "status_failed"
-    SentinelStatus.UNKNOWN -> "status_unknown"
-    SentinelStatus.UNAVAILABLE -> "status_unavailable"
-    SentinelStatus.STOPPED -> "status_stopped"
-}

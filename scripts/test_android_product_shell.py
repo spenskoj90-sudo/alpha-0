@@ -223,6 +223,33 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'SENTINEL_DISTRIBUTION_CHANNEL", "\\\"{channel}\\\""', self.gradle)
         self.assertIn("BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL", self.update)
 
+    def test_landscape_shell_preserves_vertical_content_budget(self) -> None:
+        self.assertIn("Configuration.ORIENTATION_LANDSCAPE", self.main)
+        self.assertIn("val showSideRail = isLandscape && showBottomBar", self.main)
+        self.assertIn("SentinelSideRail(rootRoute)", self.main)
+        self.assertIn("if (showBottomBar && !isLandscape)", self.main)
+        self.assertIn("compact = isLandscape", self.main)
+        self.assertIn('"ORIENTATION_STATE"', self.main)
+        self.assertIn('"adaptive_side_rail" to showSideRail', self.main)
+        self.assertIn("fun SentinelSideRail(", self.chrome)
+        self.assertIn(".fillMaxHeight()", self.chrome)
+        self.assertIn(".width(76.dp)", self.chrome)
+        self.assertIn("fun PhysicalTestIdentityStrip(", self.chrome)
+        self.assertIn("compact: Boolean = false", self.chrome)
+        self.assertIn('"PHYSICAL TEST · $metadata"', self.chrome)
+
+    def test_security_status_badges_are_localized_and_single_line(self) -> None:
+        design_tokens = read("app/src/main/java/com/alpha0/app/ui/DesignTokens.kt")
+        security_hub = read("app/src/main/java/com/alpha0/app/dashboard/SecurityScreensV2.kt")
+        dashboard = read("app/src/main/java/com/alpha0/app/dashboard/DashboardScreen.kt")
+        self.assertIn("fun SentinelStatus.labelKey(): String", design_tokens)
+        self.assertIn("maxLines = 1", design_tokens)
+        self.assertIn("TextOverflow.Ellipsis", design_tokens)
+        self.assertIn("strings.text(status.labelKey())", security_hub)
+        self.assertNotIn("status.name.lowercase()", security_hub)
+        self.assertIn("modifier = Modifier.weight(1f)", dashboard)
+        self.assertIn("strings.text(status.labelKey())", dashboard)
+
     def test_release_gate_names_product_shell(self) -> None:
         gates = read("docs/RELEASE_GATES.md")
         self.assertIn("Android product-shell contract", gates)

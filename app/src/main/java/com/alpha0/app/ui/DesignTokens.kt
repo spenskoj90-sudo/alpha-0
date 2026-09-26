@@ -85,6 +85,19 @@ enum class SentinelStatus {
     STOPPED,
 }
 
+fun SentinelStatus.labelKey(): String = when (this) {
+    SentinelStatus.VERIFIED -> "status_verified"
+    SentinelStatus.ACTIVE -> "status_active"
+    SentinelStatus.PENDING -> "status_pending"
+    SentinelStatus.WARNING -> "status_warning"
+    SentinelStatus.DENIED -> "status_denied"
+    SentinelStatus.REVOKED -> "status_revoked_label"
+    SentinelStatus.FAILED -> "status_failed"
+    SentinelStatus.UNKNOWN -> "status_unknown"
+    SentinelStatus.UNAVAILABLE -> "status_unavailable"
+    SentinelStatus.STOPPED -> "status_stopped"
+}
+
 enum class SentinelCardKind {
     CONTENT,
     OPERATIONAL,
@@ -161,7 +174,13 @@ fun StatusBadge(
         Row(modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) {
             Text(status.glyph(), color = color, style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.width(6.dp))
-            Text(text = text, color = color, style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = text,
+                color = color,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         }
     }
 }

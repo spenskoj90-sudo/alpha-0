@@ -113,6 +113,23 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("onMfaEnabled(result.codes)", security)
         self.assertNotIn("mfaSessionRevoked", security)
 
+    def test_landscape_shell_reclaims_vertical_space(self) -> None:
+        self.assertIn("Configuration.ORIENTATION_LANDSCAPE", self.main)
+        self.assertIn("LocalConfiguration.current", self.main)
+        self.assertIn("showSideRail = isLandscape && showBottomBar", self.main)
+        self.assertIn("if (showBottomBar && !isLandscape)", self.main)
+        self.assertIn("if (forensicTest && !isLandscape)", self.main)
+        self.assertIn("compactContext = landscapePhysicalContext", self.main)
+        self.assertIn("landscape-top-bar", self.main)
+        self.assertIn("SentinelSideRail(rootRoute)", self.main)
+        self.assertIn("fun SentinelSideRail(", self.chrome)
+        self.assertIn(".width(76.dp)", self.chrome)
+        self.assertIn("compactContext: String? = null", self.chrome)
+        self.assertIn("compactActionLabel: String? = null", self.chrome)
+        self.assertIn(".heightIn(min = 48.dp)", self.chrome)
+        self.assertIn('"ORIENTATION_STATE"', self.main)
+        self.assertIn('"adaptive_side_rail" to showSideRail', self.main)
+
     def test_onboarding_layout_has_no_layout_stretching_decoration(self) -> None:
         self.assertIn("verticalScroll(rememberScrollState())", self.setup)
         self.assertNotIn("Canvas(", self.tokens)

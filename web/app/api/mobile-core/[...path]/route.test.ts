@@ -53,6 +53,22 @@ describe('/api/mobile-core/[...path]', () => {
     expect(headers.get('cookie')).toBeNull();
   });
 
+  it('relays the Core health probe used by Android preflight', async () => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"status":"UP","version":"test"}', { status: 200 }),
+    );
+    const response = await GET(
+      new NextRequest('https://web.example/api/mobile-core/healthz'),
+      ctx('healthz'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('{"status":"UP","version":"test"}');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://core.example/healthz');
+  });
+
   it('allows caller-scoped mobile reads', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"events":[]}', { status: 200 }));

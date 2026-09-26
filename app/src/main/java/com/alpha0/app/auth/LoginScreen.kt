@@ -72,14 +72,25 @@ fun LoginScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var providerStatuses by remember { mutableStateOf<List<AuthApi.ProviderStatus>>(emptyList()) }
+    var coreReady by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        providerStatuses = when (val result = api.providerCatalog()) {
-            is AuthApi.ProviderCatalogResult.Success -> result.providers.filter {
-                it.enabled && federatedAuth.isProviderCompatible(it)
+        status = strings.text("core_starting")
+        when (api.coreReadiness()) {
+            AuthApi.CoreReadinessResult.Success -> {
+                coreReady = true
+                status = null
+                providerStatuses = when (val result = api.providerCatalog()) {
+                    is AuthApi.ProviderCatalogResult.Success -> result.providers.filter {
+                        it.enabled && federatedAuth.isProviderCompatible(it)
+                    }
+                    is AuthApi.ProviderCatalogResult.Failure -> emptyList()
+                }
             }
-            is AuthApi.ProviderCatalogResult.Failure -> emptyList()
+            is AuthApi.CoreReadinessResult.Failure -> {
+                status = strings.text("core_retry_on_action")
+            }
         }
     }
 
@@ -114,6 +125,27 @@ fun LoginScreen(
         "REQUEST_TIMEOUT" -> strings.text("request_timeout")
         "NETWORK_ERROR" -> strings.text("server_unreachable")
         else -> strings.text("auth_failed", message)
+    }
+
+    suspend fun ensureCoreReady(): Boolean {
+        if (coreReady) return true
+        status = strings.text("core_starting")
+        error = null
+        return when (val readiness = api.coreReadiness()) {
+            AuthApi.CoreReadinessResult.Success -> {
+                coreReady = true
+                status = null
+                true
+            }
+            is AuthApi.CoreReadinessResult.Failure -> {
+                status = null
+                error = when (readiness.message) {
+                    "REQUEST_TIMEOUT" -> strings.text("request_timeout")
+                    else -> strings.text("server_unreachable")
+                }
+                false
+            }
+        }
     }
 
     fun handleFederatedResult(result: AuthApi.Result) {
@@ -185,6 +217,10 @@ fun LoginScreen(
                 error = null
                 status = null
                 scope.launch {
+                    if (!ensureCoreReady()) {
+                        busy = false
+                        return@launch
+                    }
                     val result = if (mode == AuthMode.REGISTER) {
                         api.register(normalizedEmail, password)
                     } else {
@@ -265,6 +301,10 @@ fun LoginScreen(
         error = null
         status = null
         scope.launch {
+            if (!ensureCoreReady()) {
+                busy = false
+                return@launch
+            }
             when (val result = api.requestPasswordReset(normalizedEmail)) {
                 is AuthApi.ActionResult.Success -> {
                     resetCodeRequested = true

@@ -133,6 +133,19 @@ class MainActivity : ComponentActivity() {
                     ),
                 )
             },
+            onSafeReadFailover = { reason, primary, fallback ->
+                diag.warn(
+                    "NETWORK",
+                    "SAFE_READ_FAILOVER",
+                    result = "OBSERVED",
+                    errorCode = "PRIMARY_READ_UNAVAILABLE",
+                    details = mapOf(
+                        "reason" to reason,
+                        "primary_origin" to primary,
+                        "fallback_origin" to fallback,
+                    ),
+                )
+            },
         )
         val httpTransport = SessionRefreshingHttpTransport(
             baseUrl = BuildConfig.SENTINEL_API_BASE_URL,

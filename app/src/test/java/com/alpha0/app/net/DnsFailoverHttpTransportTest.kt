@@ -1,6 +1,7 @@
 package com.alpha0.app.net
 
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
@@ -63,7 +64,7 @@ class DnsFailoverHttpTransportTest {
     }
 
     @Test
-    fun genericIoFailureIsNeverRetriedBecauseOutcomeMayBeAmbiguous() {
+    fun genericIoFailureIsNeverRetriedForPostBecauseOutcomeMayBeAmbiguous() {
         val delegate = RecordingTransport { _, _ -> throw IOException("connection reset") }
         val transport = DnsFailoverHttpTransport(
             primaryBaseUrl = "https://core.example",
@@ -77,6 +78,54 @@ class DnsFailoverHttpTransportTest {
         } catch (_: IOException) {
             assertEquals(1, delegate.requests.size)
         }
+    }
+
+    @Test
+    fun genericReadIoFailureFailsOverOnceBecauseGetIsReplaySafe() {
+        val delegate = RecordingTransport { request, index ->
+            if (index == 0) throw IOException("unexpected end of stream")
+            assertEquals("https://relay.example/mobile-core/v1/auth/providers", request.url)
+            HttpResponse(200, """{"providers":[]}""")
+        }
+        var reason: String? = null
+        val transport = DnsFailoverHttpTransport(
+            primaryBaseUrl = "https://core.example",
+            fallbackBaseUrl = "https://relay.example/mobile-core",
+            delegate = delegate,
+            requestIdFactory = { "read-failover-request" },
+            onSafeReadFailover = { observed, primary, fallback ->
+                reason = observed
+                assertEquals("https://core.example", primary)
+                assertEquals("https://relay.example/mobile-core", fallback)
+            },
+        )
+
+        val response = transport.execute(HttpRequest(HttpMethod.GET, "https://core.example/v1/auth/providers"))
+
+        assertEquals(200, response.status)
+        assertEquals(2, delegate.requests.size)
+        assertEquals("read-failover-request", delegate.requests[0].headers["X-Request-ID"])
+        assertEquals("read-failover-request", delegate.requests[1].headers["X-Request-ID"])
+        assertEquals("IOException", reason)
+    }
+
+    @Test
+    fun connectTimeoutOnHealthReadFailsOverWithoutReplayingWrites() {
+        val delegate = RecordingTransport { request, index ->
+            if (index == 0) throw SocketTimeoutException("connect timed out")
+            assertEquals("https://relay.example/mobile-core/healthz", request.url)
+            HttpResponse(200, """{"status":"UP"}""")
+        }
+        val transport = DnsFailoverHttpTransport(
+            primaryBaseUrl = "https://core.example",
+            fallbackBaseUrl = "https://relay.example/mobile-core",
+            delegate = delegate,
+        )
+
+        val response = transport.execute(HttpRequest(HttpMethod.GET, "https://core.example/healthz"))
+
+        assertEquals(200, response.status)
+        assertEquals(2, delegate.requests.size)
     }
 
     @Test

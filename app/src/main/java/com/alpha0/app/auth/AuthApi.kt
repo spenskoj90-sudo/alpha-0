@@ -50,6 +50,11 @@ class AuthApi(
         data class Failure(val message: String) : ProviderCatalogResult
     }
 
+    sealed interface CoreReadinessResult {
+        data object Success : CoreReadinessResult
+        data class Failure(val message: String) : CoreReadinessResult
+    }
+
     data class GoogleChallenge(val clientId: String, val nonce: String)
 
     sealed interface GoogleChallengeResult {
@@ -171,6 +176,44 @@ class AuthApi(
             }.toString(),
             "PASSWORD_RESET_CONFIRM",
         )
+    }
+
+    suspend fun coreReadiness(): CoreReadinessResult = withContext(Dispatchers.IO) {
+        val t0 = System.currentTimeMillis()
+        val normalizedBase = baseUrl.trim().trimEnd('/')
+        try {
+            val response = transport.execute(
+                HttpRequest(
+                    method = HttpMethod.GET,
+                    url = "$normalizedBase/healthz",
+                    headers = mapOf("Accept" to "application/json"),
+                )
+            )
+            val json = runCatching { JSONObject(response.body) }.getOrNull()
+            val duration = System.currentTimeMillis() - t0
+            if (response.status !in 200..299 || json?.optString("status") != "UP") {
+                val code = json?.optString("code")?.takeIf { it.isNotBlank() }
+                    ?: json?.optString("error")?.takeIf { it.isNotBlank() }
+                    ?: "HTTP_${response.status}"
+                diag?.warn("AUTH", "CORE_READINESS", "FAILURE", errorCode = code, durationMs = duration)
+                CoreReadinessResult.Failure(code)
+            } else {
+                diag?.info("AUTH", "CORE_READINESS", "SUCCESS", durationMs = duration)
+                CoreReadinessResult.Success
+            }
+        } catch (_: SocketTimeoutException) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.warn("AUTH", "CORE_READINESS", "FAILURE", errorCode = "REQUEST_TIMEOUT", durationMs = duration)
+            CoreReadinessResult.Failure("REQUEST_TIMEOUT")
+        } catch (_: IOException) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.warn("AUTH", "CORE_READINESS", "FAILURE", errorCode = "NETWORK_ERROR", durationMs = duration)
+            CoreReadinessResult.Failure("NETWORK_ERROR")
+        } catch (e: Exception) {
+            val duration = System.currentTimeMillis() - t0
+            diag?.error("AUTH", "CORE_READINESS", "FAILURE", errorCode = "UNEXPECTED_ERROR", durationMs = duration, throwable = e)
+            CoreReadinessResult.Failure("UNEXPECTED_ERROR")
+        }
     }
 
     suspend fun providerCatalog(): ProviderCatalogResult = withContext(Dispatchers.IO) {

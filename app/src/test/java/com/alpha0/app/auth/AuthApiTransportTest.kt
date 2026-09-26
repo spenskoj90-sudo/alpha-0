@@ -168,6 +168,28 @@ class AuthApiTransportTest {
 
 
     @Test
+    fun coreReadinessRequiresHealthyCoreStatus() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"UP\",\"version\":\"test\"}"))
+        val result = AuthApi("https://example.test", transport).coreReadiness()
+
+        assertEquals(AuthApi.CoreReadinessResult.Success, result)
+        val request = requireNotNull(transport.request)
+        assertEquals(HttpMethod.GET, request.method)
+        assertEquals("https://example.test/healthz", request.url)
+    }
+
+    @Test
+    fun coreReadinessRejectsRelayOrCoreFailure() = runBlocking {
+        val transport = FakeTransport(HttpResponse(502, "{\"error\":\"SENTINEL_CORE_UNAVAILABLE\"}"))
+        val result = AuthApi("https://example.test", transport).coreReadiness()
+
+        assertEquals(
+            AuthApi.CoreReadinessResult.Failure("SENTINEL_CORE_UNAVAILABLE"),
+            result,
+        )
+    }
+
+    @Test
     fun providerCatalogParsesOnlyServerDeclaredProviderState() = runBlocking {
         val transport = FakeTransport(
             HttpResponse(

@@ -74,12 +74,16 @@ Complete these checks before entering account credentials:
 
 ## 5. Authentication and first device proof
 
-The free staging Core can be asleep after inactivity. The first authenticated
-request may therefore remain in progress for roughly a minute while Render
-wakes the service. The physical-test build waits up to 75 seconds for the
-authoritative response. Do not tap repeatedly or leave the app while the button
-is busy. A registration timeout is an unknown write outcome: wait for staging
-and try **Sign in** before attempting to create the account again.
+The physical-test client now performs a replay-safe `GET /healthz` preflight while the sign-in surface is visible. If the canonical Core ingress fails on a replay-safe GET, Android may make one alternate-ingress read attempt. Credential-bearing or other non-idempotent POST requests are never replayed after a generic I/O/timeout failure.
+
+The free staging Core can still be asleep after inactivity. The preflight may therefore show **Preparing a secure connection to SENTINEL…** while Render wakes the service. If readiness is not established, the app does not send the credential write; pressing **Sign in** checks readiness again before authentication.
+
+In forensic evidence:
+- `CORE_READINESS / SUCCESS` means Core was confirmed healthy before an auth write;
+- `SAFE_READ_FAILOVER / PRIMARY_READ_UNAVAILABLE` means a replay-safe read used the alternate ingress;
+- `DNS_FAILOVER / PRIMARY_DNS_UNRESOLVED` means canonical DNS resolution failed before connection establishment.
+
+The physical-test build still waits up to 75 seconds for the authoritative response after a connection is established. Do not tap repeatedly or leave the app while the button is busy. A registration timeout is an unknown write outcome: wait for staging and try **Sign in** before attempting to create the account again.
 
 1. On **Sign in / Вход в аккаунт**, enter a malformed email and a short password. Expect local validation and no navigation.
 2. Enter plausible but invalid existing-account credentials. Expect a bounded authentication error; do not expect access.

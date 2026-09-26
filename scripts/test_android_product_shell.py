@@ -52,6 +52,12 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("confirmEmailVerification", self.security_screens)
         self.assertIn("provider_ready_to_link", self.security_screens)
         self.assertIn("provider_not_enabled_here", self.security_screens)
+        self.assertIn("fun SentinelLoadingState", self.tokens)
+        dashboard = read("app/src/main/java/com/alpha0/app/dashboard/DashboardScreen.kt")
+        game_details = read("app/src/main/java/com/alpha0/app/dashboard/GameDetailsScreen.kt")
+        for screen in (self.product_screens, self.security_screens, dashboard, game_details):
+            self.assertIn("SentinelLoadingState", screen)
+            self.assertNotIn("CircularProgressIndicator", screen)
 
     def test_language_and_theme_preferences_are_complete_and_persistent(self) -> None:
         self.assertIn("enum class AppLanguage { SYSTEM, RUSSIAN, ENGLISH }", self.preferences)

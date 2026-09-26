@@ -418,7 +418,7 @@ fun AccountSecurityDetailScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     PrimaryButton(
-                                        strings.text("resend_code"),
+                                        strings.text("send_verification_code"),
                                         ::requestVerification,
                                         Modifier.fillMaxWidth(),
                                         !busy,
@@ -548,7 +548,7 @@ fun AccountSecurityDetailScreen(
                                         }
                                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text(
-                                                provider.provider.replaceFirstChar { it.uppercase() },
+                                                when (provider.provider) { "google" -> "Google"; "telegram" -> "Telegram"; "vk" -> "VK"; else -> provider.provider.replaceFirstChar { it.uppercase() } },
                                                 style = MaterialTheme.typography.titleMedium,
                                             )
                                             StatusBadge(providerState, providerStatus)

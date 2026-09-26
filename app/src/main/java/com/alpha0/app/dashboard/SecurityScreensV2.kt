@@ -587,7 +587,7 @@ fun SessionsDetailScreen() {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatusBadge(strings.text("sessions_current_only"), SentinelStatus.ACTIVE)
                     Text(
-                        strings.text("activity_limited_body"),
+                        strings.text("sessions_scope_body"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

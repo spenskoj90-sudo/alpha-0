@@ -37,7 +37,8 @@ function coreOrigin(): string | null {
 
 function mobilePath(parts: string[]): string | null {
   if (!Array.isArray(parts) || parts.length === 0) return null;
-  const path = '/' + parts.map((part) => encodeURIComponent(part)).join('/');
+  if (parts.some((part) => !/^[A-Za-z0-9._:-]{1,128}$/.test(part))) return null;
+  const path = '/' + parts.join('/');
   if (ALLOWED_EXACT.has(path) || ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) return path;
   return null;
 }
@@ -58,14 +59,14 @@ async function proxy(request: NextRequest, parts: string[], method: 'GET' | 'POS
   const path = mobilePath(parts);
   if (!path) return NextResponse.json({ error: 'MOBILE_RELAY_ROUTE_DENIED' }, { status: 404 });
 
-  let body: Uint8Array | undefined;
+  let body: string | undefined;
   if (method === 'POST') {
     const declared = Number.parseInt(request.headers.get('content-length') ?? '', 10);
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
       return NextResponse.json({ error: 'REQUEST_TOO_LARGE' }, { status: 413 });
     }
-    body = new Uint8Array(await request.arrayBuffer());
-    if (body.byteLength > MAX_BODY_BYTES) {
+    body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > MAX_BODY_BYTES) {
       return NextResponse.json({ error: 'REQUEST_TOO_LARGE' }, { status: 413 });
     }
   }

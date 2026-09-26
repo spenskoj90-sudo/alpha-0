@@ -427,7 +427,7 @@ fun AccountSecurityDetailScreen(
                                         value = verificationCode,
                                         onValueChange = { verificationCode = it.trim(); error = null },
                                         modifier = Modifier.fillMaxWidth(),
-                                        label = { Text(strings.text("verification_code")) },
+                                        label = { Text(strings.text("auth_code")) },
                                         enabled = !busy,
                                         singleLine = true,
                                     )

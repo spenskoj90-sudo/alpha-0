@@ -166,7 +166,7 @@ fun ActivityScreen(accessToken: String, api: DashboardApi) {
                         status,
                     )
                     Text(
-                        event.action.replace(':', ' · ').replace('-', ' '),
+                        event.action.replace(":", " · ").replace("-", " "),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     DataText(strings.text("activity_event_resource", event.resource))

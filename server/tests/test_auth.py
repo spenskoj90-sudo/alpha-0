@@ -5,7 +5,7 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app import main as main_module
-from app.core.email_provider import TestEmailTransport
+from app.core.email_provider import DisabledEmailTransport, TestEmailTransport
 from app.main import app, store, user_store
 
 
@@ -122,6 +122,41 @@ def test_account_action_requests_do_not_enumerate_unknown_email(monkeypatch):
     assert verification.json() == {"status": "ACCEPTED"}
     assert reset.json() == {"status": "ACCEPTED"}
     assert transport.snapshot() == ()
+
+
+def test_authenticated_email_verification_reports_delivery_provider_state(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    email = f"verify-account-{uuid.uuid4().hex}@example.com"
+    password = "Account-verification-provider-state-123"
+
+    registered = client.post("/v1/auth/register", json={"email": email, "password": password})
+    assert registered.status_code == 200
+    headers = {"Authorization": f"Bearer {registered.json()['session_token']}"}
+
+    delivered = client.post("/v1/account/email-verification/request", headers=headers)
+    assert delivered.status_code == 202
+    assert delivered.json() == {"status": "ACCEPTED"}
+    assert len(transport.snapshot()) == 2
+
+    monkeypatch.setattr(main_module, "email_transport", DisabledEmailTransport())
+    unavailable = client.post("/v1/account/email-verification/request", headers=headers)
+    assert unavailable.status_code == 503
+    assert unavailable.json()["code"] == "EMAIL_PROVIDER_UNAVAILABLE"
+
+    public_request = client.post("/v1/auth/email-verification/request", json={"email": email})
+    assert public_request.status_code == 202
+    assert public_request.json() == {"status": "ACCEPTED"}
+
+
+def test_authenticated_email_verification_requires_valid_session(monkeypatch):
+    monkeypatch.setattr(main_module, "email_transport", TestEmailTransport())
+    response = client.post(
+        "/v1/account/email-verification/request",
+        headers={"Authorization": "Bearer not-a-valid-session"},
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == "INVALID_SESSION"
 
 
 def test_password_reset_changes_password_revokes_sessions_and_rejects_replay(monkeypatch):

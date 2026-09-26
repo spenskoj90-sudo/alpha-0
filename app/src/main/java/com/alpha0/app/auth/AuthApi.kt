@@ -137,6 +137,15 @@ class AuthApi(
         )
     }
 
+    suspend fun requestAccountEmailVerification(accessToken: String): ActionResult = withContext(Dispatchers.IO) {
+        requestAction(
+            "/v1/account/email-verification/request",
+            "{}",
+            "ACCOUNT_EMAIL_VERIFY_REQUEST",
+            mapOf("Authorization" to "Bearer $accessToken"),
+        )
+    }
+
     suspend fun confirmEmailVerification(token: String): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/auth/email-verification/confirm",

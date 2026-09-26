@@ -130,6 +130,33 @@ class AuthApiTransportTest {
     }
 
     @Test
+    fun accountEmailVerificationUsesAuthenticatedDeliveryAwareEndpoint() = runBlocking {
+        val transport = FakeTransport(HttpResponse(202, "{\"status\":\"ACCEPTED\"}"))
+        val result = AuthApi("https://example.test", transport)
+            .requestAccountEmailVerification("access-secret")
+
+        assertEquals(AuthApi.ActionResult.Success("ACCEPTED"), result)
+        val request = requireNotNull(transport.request)
+        assertEquals("https://example.test/v1/account/email-verification/request", request.url)
+        assertEquals("Bearer access-secret", request.headers["Authorization"])
+        assertEquals("{}", String(requireNotNull(request.body)))
+    }
+
+    @Test
+    fun accountEmailVerificationSurfacesProviderUnavailable() = runBlocking {
+        val transport = FakeTransport(
+            HttpResponse(
+                503,
+                "{\"code\":\"EMAIL_PROVIDER_UNAVAILABLE\",\"message\":\"Request rejected\",\"request_id\":\"rid\"}",
+            ),
+        )
+        val result = AuthApi("https://example.test", transport)
+            .requestAccountEmailVerification("access-secret")
+
+        assertEquals(AuthApi.ActionResult.Failure("EMAIL_PROVIDER_UNAVAILABLE"), result)
+    }
+
+    @Test
     fun emailVerificationConfirmationUsesDedicatedActionParser() = runBlocking {
         val transport = FakeTransport(HttpResponse(200, "{\"status\":\"VERIFIED\"}"))
         val result = AuthApi("https://example.test", transport)

@@ -267,9 +267,15 @@ fun AccountSecurityDetailScreen(
         error = null
         message = null
         scope.launch {
-            when (val result = authApi.requestEmailVerification(email)) {
+            when (val result = authApi.requestAccountEmailVerification(accessToken)) {
                 is AuthApi.ActionResult.Success -> message = strings.text("verification_sent")
-                is AuthApi.ActionResult.Failure -> error = strings.text("auth_failed", result.message)
+                is AuthApi.ActionResult.Failure -> {
+                    error = when (result.message) {
+                        "EMAIL_PROVIDER_UNAVAILABLE" -> strings.text("email_delivery_unavailable")
+                        "EMAIL_ALREADY_VERIFIED" -> strings.text("email_already_verified")
+                        else -> strings.text("auth_failed", result.message)
+                    }
+                }
             }
             busy = false
         }

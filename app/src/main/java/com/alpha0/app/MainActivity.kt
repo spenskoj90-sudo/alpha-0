@@ -9,12 +9,15 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
@@ -333,7 +338,37 @@ private fun SentinelApplicationUi(
     }
 
     if (!refreshComplete) {
-        Box(contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.sentinel_master_icon),
+                    contentDescription = null,
+                    modifier = Modifier.size(88.dp),
+                    contentScale = ContentScale.Fit,
+                )
+                Text(
+                    strings.text("app_name"),
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp,
+                )
+                Text(
+                    strings.text("loading_status"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         return
     }
 
@@ -654,7 +689,14 @@ private fun SentinelApplicationUi(
                         }
                     }
                 }
-                composable("activity") { ActivityScreen(activeSession?.deviceId) }
+                composable("activity") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
+                        ActivityScreen(
+                            accessToken = current.accessToken,
+                            api = dashboardApi,
+                        )
+                    }
+                }
                 composable("device-details") {
                     AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
                         DeviceDetailsContent(

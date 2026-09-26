@@ -12,6 +12,7 @@ const ALLOWED_PREFIXES = [
   '/v1/quality/reports',
 ];
 const ALLOWED_EXACT = new Set([
+  '/healthz',
   '/v1/auth/providers',
   '/v1/audit',
   '/v1/devices/bind',

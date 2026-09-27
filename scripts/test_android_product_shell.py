@@ -97,6 +97,7 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("requestAccountEmailVerification(session.accessToken)", login)
         self.assertIn('strings.text("verification_pending_delivery")', login)
         self.assertIn("completeMfa", login)
+        self.assertIn('"mfa_or_recovery_code"', login)
         self.assertIn("AuthMode.MFA", login)
         self.assertIn("verticalScroll(rememberScrollState())", login)
         auth_api = read("app/src/main/java/com/alpha0/app/auth/AuthApi.kt")

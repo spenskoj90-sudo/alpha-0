@@ -396,6 +396,8 @@ def check_governance(checks: Checks) -> None:
     checks.require(
         "BRANCH_HYGIENE deleted=40 already_absent=0" in branch_inventory
         and "Reviewed 2026-09-27 cleanup ledger" in branch_inventory
+        and "fix/android-navigation-optical-polish-20260927" in branch_inventory
+        and "feat/email-http-provider-fallback-rebased-20260927" in branch_inventory
         and "| `main` | ACTIVE |" in branch_inventory
         and "every push to protected `main`" in branch_inventory,
         "active branch inventory preserves prior cleanup evidence and the reviewed continuous-cleanup ledger",

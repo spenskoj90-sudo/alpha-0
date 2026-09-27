@@ -1,9 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 type Appearance = 'system' | 'dark' | 'light';
 const STORAGE_KEY = 'sentinel.web.appearance';
+const CHANGE_EVENT = 'sentinel-appearance-change';
+
+function readAppearance(): Appearance {
+  const stored = window.localStorage.getItem(STORAGE_KEY);
+  return stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
+}
+
+function subscribe(onStoreChange: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === STORAGE_KEY) onStoreChange();
+  };
+  window.addEventListener('storage', onStorage);
+  window.addEventListener(CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStorage);
+    window.removeEventListener(CHANGE_EVENT, onStoreChange);
+  };
+}
 
 function applyAppearance(value: Appearance) {
   if (value === 'system') {
@@ -14,20 +32,16 @@ function applyAppearance(value: Appearance) {
 }
 
 export function AppearanceToggle() {
-  const [appearance, setAppearance] = useState<Appearance>('system');
+  const appearance = useSyncExternalStore(subscribe, readAppearance, () => 'system');
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const next: Appearance = stored === 'dark' || stored === 'light' || stored === 'system' ? stored : 'system';
-    setAppearance(next);
-    applyAppearance(next);
-  }, []);
+    applyAppearance(appearance);
+  }, [appearance]);
 
   function cycle() {
     const next: Appearance = appearance === 'system' ? 'dark' : appearance === 'dark' ? 'light' : 'system';
-    setAppearance(next);
     window.localStorage.setItem(STORAGE_KEY, next);
-    applyAppearance(next);
+    window.dispatchEvent(new Event(CHANGE_EVENT));
   }
 
   const readable = appearance === 'system' ? 'System' : appearance === 'dark' ? 'Dark' : 'Light';

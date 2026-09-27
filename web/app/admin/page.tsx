@@ -325,7 +325,7 @@ export default function AdminPage() {
         ))}
       </div>
 
-      <section className="section">
+      <section className={`section ${activeTab === 'Catalog' ? '' : 'admin-access-only'}`}>
         <article className="card">
           <div className="label">ADMIN TOKEN</div>
           <input value={token} onChange={event => setToken(event.target.value)} type="password" autoComplete="off" placeholder="Environment-issued token" />

@@ -21,3 +21,7 @@ The latest design-reference Voice and Resilience studies are translated into the
 - generic voice requests remain presentation-only and action-incapable;
 - Overlay empty state now distinguishes normal waiting from DEGRADED / LOCAL-ONLY / OFFLINE authority;
 - the kill switch and existing security boundaries remain unchanged.
+
+## Web Admin reconciliation · 2026-09-27
+
+The latest Admin study is translated into the native Next.js control plane rather than imported as prototype code. Admin remains a distinct fail-closed elevated surface with an explicit `ELEVATED ACCESS · AUDITED` boundary and operation-oriented **Catalog / Entitlements / Quality** tabs. The environment-issued admin token and TOTP boundary remains visible across tabs; the change does not broaden Core authorization or persist admin factors in the browser/server.

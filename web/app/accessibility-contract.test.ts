@@ -5,6 +5,7 @@ const page = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8');
 const css = readFileSync(new URL('./globals.css', import.meta.url), 'utf8');
 const recommendation = readFileSync(new URL('./components/recommendation-panel.tsx', import.meta.url), 'utf8');
 const accountControl = readFileSync(new URL('./components/account-control.tsx', import.meta.url), 'utf8');
+const appearanceToggle = readFileSync(new URL('./components/appearance-toggle.tsx', import.meta.url), 'utf8');
 
 describe('Web accessibility contract', () => {
   it('keeps skip navigation and a focusable main landmark', () => {
@@ -22,6 +23,16 @@ describe('Web accessibility contract', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(css).toContain('@media (forced-colors: active)');
     expect(css).toContain('.skip-link:focus-visible');
+  });
+
+  it('keeps an accessible persistent system/dark/light appearance control', () => {
+    expect(page).toContain('<AppearanceToggle');
+    expect(appearanceToggle).toContain("type Appearance = 'system' | 'dark' | 'light'");
+    expect(appearanceToggle).toContain('document.documentElement.dataset.theme');
+    expect(appearanceToggle).toContain('Current mode:');
+    expect(css).toContain('[data-theme="light"]');
+    expect(css).toContain('[data-theme="dark"]');
+    expect(css).toContain(':root:not([data-theme])');
   });
 
   it('announces asynchronous recommendation state without changing authority boundaries', () => {

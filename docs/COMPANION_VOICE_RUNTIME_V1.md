@@ -18,7 +18,7 @@ The renderer never receives the Core access or refresh token. It also cannot cho
 
 - Voice consent defaults to disabled and is held only in Electron main-process memory.
 - Sign-out and main-window close clear consent.
-- Consent by itself does **not** leave microphone permission enabled. Each explicit push-to-talk action first asks Electron main to arm a five-second capture-permission lease.
+- Consent by itself does **not** leave microphone permission enabled. Push-to-talk is a true hold/release interaction: pointer or keyboard hold begins capture, release submits, pointer leave/cancel/blur discards. Each explicit hold first asks Electron main to arm a five-second capture-permission lease.
 - Voice IPC is sender-bound to the current launcher main `webContents`; the overlay or another renderer cannot arm/submit through the same channel names.
 - Electron permission handlers are default-deny. The `media` permission is granted only to the trusted launcher main `webContents` while consent **and** the short-lived capture lease are active and the request originates from the local `file://` launcher surface.
 - The renderer immediately disarms the lease after the `getUserMedia` request resolves or rejects. Submit, Companion stop, sign-out, entitlement revocation and application shutdown also clear the lease defensively.
@@ -27,7 +27,7 @@ The renderer never receives the Core access or refresh token. It also cannot cho
 - Capture format is fixed to `audio/webm;codecs=opus`.
 - Capture duration is capped at six seconds and the byte payload is capped at 512,000 bytes before Core/provider I/O.
 - Capture errors, sign-out and Companion kill-switch discard partial audio instead of submitting it.
-- No background-listening loop exists. Capture begins only after the player invokes push-to-talk.
+- No background-listening loop exists. Capture begins only while the player is actively holding the push-to-talk control; a quick release before capture becomes active is discarded rather than becoming an implicit recording.
 
 Electron's `media` permission is a Chromium/Electron permission category and is not represented here as a stronger OS guarantee than the API provides. The implementation additionally constrains the trusted renderer capture request to audio-only and narrows the permission request to a one-shot main-process lease.
 

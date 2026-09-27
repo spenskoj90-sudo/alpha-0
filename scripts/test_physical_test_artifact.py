@@ -15,13 +15,30 @@ SIGNER = "b" * 64
 OTHER_SIGNER = "c" * 64
 ORIGIN = "https://sentinel-core-staging.onrender.com"
 FALLBACK = "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core"
+CALLBACK = "com.alpha0.app.physicaltest.auth"
+VK_ID = "123456"
+VK_REDIRECT = f"vk{VK_ID}://vk.ru/blank.html"
 
 
 class PhysicalTestArtifactTests(unittest.TestCase):
     def fixture(self, root: Path, *, dex_suffix: bytes = b"", application_id: str = "com.alpha0.app.physicaltest") -> tuple[Path, Path, Path]:
         apk = root / "app-physicalTest.apk"
         with zipfile.ZipFile(apk, "w") as archive:
-            archive.writestr("classes.dex", b"dex\n" + SHA.encode() + b"\n" + ORIGIN.encode() + b"\n" + FALLBACK.encode() + b"\nFORENSIC_TEST\n" + dex_suffix)
+            archive.writestr(
+                "classes.dex",
+                b"dex\n"
+                + SHA.encode()
+                + b"\n"
+                + ORIGIN.encode()
+                + b"\n"
+                + FALLBACK.encode()
+                + b"\nFORENSIC_TEST\n"
+                + CALLBACK.encode()
+                + b"\n"
+                + VK_REDIRECT.encode()
+                + b"\n"
+                + dex_suffix,
+            )
         metadata = root / "output-metadata.json"
         metadata.write_text(
             json.dumps(
@@ -57,6 +74,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
             run_id="12345",
             run_attempt="2",
             signer_sha256=SIGNER,
+            vk_client_id=VK_ID,
             generated_at="2026-09-16T20:00:00Z",
         )
 
@@ -67,6 +85,9 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["apiBaseUrl"], ORIGIN)
         self.assertEqual(manifest["apiFallbackBaseUrl"], FALLBACK)
         self.assertEqual(manifest["runtimeEnvironment"], "staging")
+        self.assertEqual(manifest["federatedAuth"]["authCallbackScheme"], CALLBACK)
+        self.assertEqual(manifest["federatedAuth"]["vkClientId"], VK_ID)
+        self.assertEqual(manifest["federatedAuth"]["vkRedirectUri"], VK_REDIRECT)
         self.assertEqual(manifest["signingMode"], "ephemeral-debug")
         self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
         self.assertFalse(manifest["signerLineageVerified"])
@@ -91,6 +112,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 run_id="12345",
                 run_attempt="2",
                 signer_sha256=SIGNER,
+                vk_client_id=VK_ID,
                 expected_signer_sha256=SIGNER,
                 signing_mode="stable-test",
                 workflow_name="Physical Test Update APK",
@@ -138,9 +160,28 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                     run_id="12345",
                     run_attempt="2",
                     signer_sha256=OTHER_SIGNER,
+                    vk_client_id=VK_ID,
                     expected_signer_sha256=SIGNER,
                     signing_mode="stable-test",
                     workflow_name="Physical Test Update APK",
+                )
+
+    def test_invalid_vk_client_id_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            with self.assertRaisesRegex(ValueError, "VK client ID"):
+                build_manifest(
+                    apk=apk,
+                    output_metadata=metadata,
+                    version_file=version,
+                    source_sha=SHA,
+                    api_base_url=ORIGIN,
+                    api_fallback_base_url=FALLBACK,
+                    repository="spenskoj90-sudo/alpha-0",
+                    run_id="12345",
+                    run_attempt="2",
+                    signer_sha256=SIGNER,
+                    vk_client_id="not-digits",
                 )
 
     def test_loopback_bytes_in_compiled_dex_fail_closed(self) -> None:

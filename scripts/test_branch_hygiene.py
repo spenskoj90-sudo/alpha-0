@@ -50,6 +50,8 @@ class BranchHygieneWorkflowTests(unittest.TestCase):
                 self.assertIn("| RECONCILED:", line)
 
     def test_current_merge_branch_cleanup_requires_exact_same_repository_lineage(self) -> None:
+        self.assertIn("Merge pull request #([0-9]+) from", WORKFLOW)
+        self.assertIn("Merge PR #([0-9]+):", WORKFLOW)
         self.assertIn('merge_sha" = "$GITHUB_SHA"', WORKFLOW)
         self.assertIn('base_ref" = "main"', WORKFLOW)
         self.assertIn('head_repo" = "$GITHUB_REPOSITORY"', WORKFLOW)

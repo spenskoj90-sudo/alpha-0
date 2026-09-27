@@ -53,6 +53,9 @@ Deletion requires full live-tip revalidation. `MERGED_EXACT` additionally requir
 | `fix/android-landscape-viewport-followup-2026-09-26` | `0939f79891ca7ae63e91ad58a0632e586943623a` | MERGED_EXACT | PR #352 merged; live tip equals exact PR head |
 | `fix/android-loading-polish-20260926` | `8c180a4db8afc381b31a98de510bd616e8649b4e` | MERGED_EXACT | PR #354 merged; live tip equals exact PR head |
 | `fix/android-product-gaps-20260926` | `ecc84f9004a5b6c8dce3e13ac53bf9c5c0820798` | MERGED_EXACT | PR #353 merged; live tip equals exact PR head |
+| `fix/android-navigation-optical-polish-20260927` | `dbe3c880f78ac783d46813ee8b9c29f17ebf88d1` | MERGED_EXACT | PR #367 merged; live tip equals exact PR head |
+| `feat/email-http-provider-fallback-20260927` | `f10f099a188d002dbd87d82490f2bfb144e462ee` | CONTENT_SUPERSEDED | RECONCILED: PR #368 was intentionally closed after protected main advanced; the reviewed email fallback change set was reapplied from current main and merged as PR #369 |
+| `feat/email-http-provider-fallback-rebased-20260927` | `21cd506cd8a975d62a94e62b7f435cddcef18ac6` | MERGED_EXACT | PR #369 merged; live tip equals exact PR head |
 
 The current PR branch that carries this ledger is intentionally omitted from the table: after merge, the workflow's independent same-repository merge-lineage gate handles that exact head automatically.
 

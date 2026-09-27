@@ -1,8 +1,9 @@
 # PostgreSQL / Neon staging audit — 2026-09-23
 
-**Status:** PARTIALLY VERIFIED  
+**Status:** HISTORICAL EVIDENCE RECORD — SUPERSEDED FOR CURRENT RUNTIME STATE  
 **Repository PostgreSQL:** INTEGRATION-TESTED  
-**Live Neon inspection:** ENVIRONMENT-UNVERIFIED due connector schema/runtime mismatch
+**Live Neon inspection in this specific pass:** ENVIRONMENT-UNVERIFIED due connector schema/runtime mismatch  
+**Current-state authority:** `docs/SENTINEL_CURRENT_STATE.md` and exact runtime/CI evidence; this dated audit must not override later or separately established staging evidence.
 
 ## Repository database truth
 
@@ -30,4 +31,4 @@ This is a connector contract defect/limitation, not evidence of a database defec
 
 ## Acceptance rule
 
-Repository PostgreSQL behavior may be marked INTEGRATION-TESTED only when the exact PR/main SHA passes the PostgreSQL integration and recovery jobs. Neon staging compatibility remains ENVIRONMENT-UNVERIFIED until the connector can identify the authorized project without guessed identifiers, or the Owner explicitly supplies the intended project identity through a safe channel.
+Repository PostgreSQL behavior may be marked INTEGRATION-TESTED only when the exact PR/main SHA passes the PostgreSQL integration and recovery jobs. This document records only the connector limitation observed during this 2026-09-23 pass; it is not a current claim that Neon staging itself remains unverified. Current staging/database status must be taken from the active state guide and exact environment evidence rather than inferred from this historical connector snapshot.

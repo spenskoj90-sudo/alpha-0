@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { AppearanceToggle } from '../components/appearance-toggle';
 import { useMemo, useState } from 'react';
 
 type Game = {
@@ -294,9 +295,17 @@ export default function AdminPage() {
 
   return (
     <main className="shell">
-      <header className="top">
-        <div><div className="brand">SENTINEL ADMIN</div><div className="label">SECURITY + QUALITY CONTROL PLANE</div></div>
-        <div className="top-actions"><Link className="badge" href="/">USER CONTROL</Link><div className="badge">FAIL-CLOSED</div></div>
+      <header className="top admin-top">
+        <div>
+          <div className="eyebrow">OPERATIONS / ADMIN</div>
+          <div className="brand admin-brand">SENTINEL ADMIN</div>
+          <div className="label">SECURITY + QUALITY CONTROL PLANE</div>
+        </div>
+        <div className="top-actions">
+          <div className="admin-elevated">ELEVATED ACCESS · AUDITED</div>
+          <Link className="badge" href="/">USER CONTROL</Link>
+          <AppearanceToggle />
+        </div>
       </header>
 
       <section className="section">

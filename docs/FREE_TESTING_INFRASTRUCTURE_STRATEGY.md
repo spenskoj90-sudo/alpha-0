@@ -14,7 +14,7 @@ The Human Owner has chosen to defer paid infrastructure until the product is clo
 | Web Control Plane | Render Free | **KEEP** | choose production CDN/server runtime after final Web acceptance |
 | Independent edge ingress | Cloudflare Workers Free is suitable for a lightweight relay/health edge, not the Python Core | **PREPARE, DO NOT REQUIRE** | production DNS/WAF/edge provider selected at release stage |
 | PostgreSQL | existing external PostgreSQL boundary; Supabase Free is an optional test/recovery target | **DO NOT MIGRATE WITHOUT NEED** | managed production PostgreSQL with backups/availability evidence |
-| Email | Resend Free | **USE WHEN DOMAIN/CREDENTIALS ARE OWNER-CONFIGURED** | stay on free tier while limits/reliability fit, otherwise upgrade |
+| Email | Resend Free primary; Brevo Free HTTPS fallback | **USE FIRST VERIFIED PROVIDER** | stay on free tier while limits/reliability fit, otherwise upgrade or switch adapter |
 | Error monitoring | Sentry Developer/Free where a DSN is configured | **OPTIONAL TEST OBSERVABILITY** | production plan selected from measured event volume |
 | Billing | Stripe test/sandbox mode | **USE FOR ACCEPTANCE WITHOUT LIVE MONEY** | live mode only after Owner authorization |
 | Federated auth | provider development/test apps | **USE FREE PROVIDER SANDBOX/DEV CONFIG** | production registrations/redirects at release stage |
@@ -65,11 +65,13 @@ Official references:
 
 ## Email testing
 
-Resend Free currently includes 3,000 transactional emails/month, 100/day and up to three verified domains. That is sufficient for SENTINEL staging and early closed testing without a paid email plan.
+Resend Free currently includes 3,000 transactional emails/month and 100/day. It remains the preferred staging path because a Resend connector is already available, but the connected SENTINEL account currently has no verified domain and no API key.
 
-The remaining blocker is not pricing: the connected SENTINEL Resend account currently has no verified domain and no API key. Credentials and DNS ownership remain Owner-managed.
+Brevo Free is now a repository-supported HTTPS fallback. Its current Free plan includes 300 email sends/day and supports transactional email. SENTINEL uses Brevo's `POST https://api.brevo.com/v3/smtp/email` HTTP API rather than SMTP because Render Free blocks outbound SMTP ports 25, 465 and 587. The Brevo adapter pins the official HTTPS endpoint, bounds responses and remains staging-only/fail-closed.
 
-Resend test addresses such as `delivered@resend.dev`, `bounced@resend.dev` and `complained@resend.dev` may be used for provider integration tests without affecting domain reputation. They do not replace real mailbox verification acceptance.
+Exactly one external email provider may be enabled at a time. A real mailbox delivery test still requires Owner-managed provider credentials plus a verified sender/domain as required by the selected provider. This is an external credential/DNS action, not a paid-plan blocker.
+
+Resend test addresses such as `delivered@resend.dev`, `bounced@resend.dev` and `complained@resend.dev` may be used for provider integration tests without affecting domain reputation. Brevo also provides an API sandbox mode that validates requests without sending. Neither substitutes for real mailbox verification acceptance.
 
 Official references:
 - https://resend.com/pricing

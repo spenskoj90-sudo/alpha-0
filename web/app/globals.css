@@ -55,6 +55,12 @@ button, a, input, select { min-height: 44px; }
 .admin-top { align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:18px; }
 .admin-brand { margin-top:7px; font-size:1.35rem; letter-spacing:.06em; }
 .admin-elevated { min-height:44px; display:inline-flex; align-items:center; border:1px solid color-mix(in srgb, var(--warning), transparent 40%); border-radius:3px; color:var(--warning); padding:7px 10px; font:600 11px/1.2 var(--font-data, ui-monospace, monospace); letter-spacing:.04em; }
+.admin-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin:0 0 24px; padding:0 0 8px; overflow-x:auto; }
+.admin-tab { min-height:44px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--muted); padding:9px 13px; cursor:pointer; font-weight:650; }
+.admin-tab:hover { color:var(--text); background:var(--panel-2); }
+.admin-tab[data-active="true"] { color:var(--text); background:var(--panel-2); border-color:var(--border); box-shadow:inset 2px 0 0 var(--accent); }
+.admin-access-only { grid-template-columns:minmax(0,640px); }
+@media (max-width:767px) { .admin-access-only { grid-template-columns:1fr; } .admin-tab { flex:0 0 auto; } }
 .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
 
 .card { background: var(--panel); border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:0 1px 2px rgba(0,0,0,.14); }
@@ -113,7 +119,7 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
 
 @media (forced-colors: active) {
   :focus-visible { outline:3px solid Highlight; }
-  .card, .badge, .status-message, .state, input, select, .ghost-btn, .nav-item, .appearance-toggle, .admin-elevated { border-color:CanvasText; }
+  .card, .badge, .status-message, .state, input, select, .ghost-btn, .nav-item, .appearance-toggle, .admin-elevated, .admin-tab { border-color:CanvasText; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }

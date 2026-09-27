@@ -114,10 +114,14 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("/brand/icon-512.png", self.web_manifest)
 
     def test_companion_v3_and_kill_switch(self) -> None:
-        for section in ("Overview","Account","Runtime","Host configuration","Games","Adapters","Voice","Overlay","Diagnostics","Updates"):
+        for section in ("Overview","Account","Runtime","Resilience","Host configuration","Games","Adapters","Voice","Overlay","Diagnostics","Updates"):
             self.assertIn(section, self.launcher)
         self.assertIn("STOP / KILL SWITCH", self.launcher)
         self.assertIn("window.confirm(", self.launcher_renderer)
+        self.assertIn("HOLD TO TALK", self.launcher)
+        self.assertIn("LOCAL-ONLY", self.launcher)
+        self.assertIn("OFFLINE", self.launcher)
+        self.assertIn("voiceHoldActive", self.launcher_renderer)
         self.assertIn("microphone is not continuously listening", self.launcher.lower())
         self.assertIn("@media(forced-colors:active)", self.launcher)
         self.assertIn("@media(prefers-reduced-motion:reduce)", self.launcher)

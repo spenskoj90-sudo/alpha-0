@@ -121,7 +121,7 @@ PostHog delivery is fail-isolated: provider failure increments a bounded local d
 
 This repository contract does not claim production PostHog activation, account-side retention configuration or production alert thresholds.
 
-## 4. Resend email boundary
+## 4. Transactional email boundary
 
 Email delivery now has a provider-neutral bounded transport contract:
 
@@ -165,8 +165,8 @@ This implementation does **not** claim or perform:
 - Stripe live-mode objects or live charges (the current product/price inventory is sandbox-only);
 - production payment credentials;
 - production PostHog ingestion, retention or alert provisioning;
-- a real Resend delivery to a user;
-- production Resend credentials;
+- a real external email-provider delivery to a user;
+- production email-provider credentials;
 - release signing, version tagging or publication;
 - physical-device acceptance.
 

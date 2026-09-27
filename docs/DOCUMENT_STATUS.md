@@ -31,6 +31,7 @@ When an active architecture document contains a future target, its target langua
 
 - `PLATFORM_DEPENDENCY_AUDIT_2026-09-23.md` — **HISTORICAL EVIDENCE RECORD**; current version authority is `PLATFORM_MODERNIZATION_2026Q3.md` plus live upstream verification.
 - `BRANCH_DELETION_MANIFEST_2026-09-23.md` — **EVIDENCE RECORD / HISTORICAL**; superseded for live branch decisions by `BRANCH_INVENTORY.md`.
+- `POSTGRES_NEON_AUDIT_2026-09-23.md` — **HISTORICAL EVIDENCE RECORD**; its connector limitation is point-in-time evidence and does not override the later PostgreSQL 18.6 staging cutover recorded in active state/runtime evidence.
 - `DESIGN_SYSTEM_V1.md`, `DESIGN_SYSTEM_V2_1.md` and their v1/v2.1 machine manifests — retained design lineage; v3.0 is the active authority.
 
 - root `HANDOVER_DOCUMENT.md`;

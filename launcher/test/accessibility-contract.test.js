@@ -18,7 +18,7 @@ test('launcher exposes keyboard and landmark accessibility contract', () => {
 });
 
 test('launcher runtime state is announced through bounded live regions', () => {
-  for (const id of ['account-status', 'companion-status', 'wow-checkpoint-status', 'voice-status', 'voice-result']) {
+  for (const id of ['account-status', 'companion-status', 'resilience-status', 'wow-checkpoint-status', 'voice-status', 'voice-result']) {
     assert.match(
       index,
       new RegExp(`id="${id}"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"`),

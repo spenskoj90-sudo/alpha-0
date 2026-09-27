@@ -170,6 +170,8 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertNotIn("secrets.", self.physical_workflow)
         self.assertIn("--signing-mode \"$SENTINEL_PHYSICAL_TEST_SIGNING_MODE\"", self.physical_workflow)
         self.assertIn("SENTINEL_PHYSICAL_TEST_SIGNING_MODE=ephemeral-debug", self.physical_workflow)
+        self.assertIn("vars.SENTINEL_VK_CLIENT_ID", self.physical_workflow)
+        self.assertIn('--vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID"', self.physical_workflow)
 
         update_workflow = read(".github/workflows/physical-test-update-apk.yml")
         self.assertIn("workflow_dispatch:", update_workflow)
@@ -178,6 +180,8 @@ class TelemetryContractTests(unittest.TestCase):
         self.assertIn("PHYSICAL_TEST_KEYSTORE_BASE64", update_workflow)
         self.assertIn("--signing-mode stable-test", update_workflow)
         self.assertIn('--workflow-name "Physical Test Update APK"', update_workflow)
+        self.assertIn("vk_client_id:", update_workflow)
+        self.assertIn('--vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID"', update_workflow)
 
     def test_user_ticket_diagnostics_require_explicit_consent_and_remain_bounded(self) -> None:
         local = self.contract["localDiagnostics"]

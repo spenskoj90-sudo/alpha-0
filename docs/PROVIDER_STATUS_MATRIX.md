@@ -1,7 +1,7 @@
 # SENTINEL Provider Status Matrix
 
 **Status:** ACTIVE  
-**Reconciled:** 2026-09-25  
+**Reconciled:** 2026-09-27  
 **Rule:** integration code, deterministic tests, staging network evidence, physical evidence and production activation are separate claims. No cell may be promoted by inference from another column.
 
 The status vocabulary follows the repository product-truth model: `IMPLEMENTED`, `TESTED`, `STAGING-VERIFIED`, `PHYSICAL-VERIFIED`, `ENVIRONMENT-UNVERIFIED`, `MISSING`, `SUPERSEDED`, `HISTORICAL`, `OWNER-GATED`.
@@ -38,7 +38,7 @@ The staging-only low-cardinality non-person sink is implemented, deterministic a
 
 ### Google / Telegram / VK
 
-Provider discovery, challenge/state/nonce handling, PKCE where applicable, provider-token verification, FORCE-RLS challenge persistence, explicit account linking and Android callback isolation are implemented and tested. Google Credential Manager and Telegram OIDC/PKCE were rechecked against current September 2026 provider guidance; no protocol rewrite is currently required. Real provider-console application registration, credentials, network login and physical-device provider acceptance remain environment/Owner gates.
+Provider discovery, challenge/state/nonce handling, PKCE where applicable, provider-token verification, FORCE-RLS challenge persistence, explicit account linking and Android callback isolation are implemented and tested. Google Credential Manager and Telegram OIDC/PKCE were rechecked against current September 2026 provider guidance; no protocol rewrite is currently required. Android physical/release artifact generation now binds the public VK application identity and exact callback URI into compiled-artifact evidence rather than relying on an implicit build default. Real provider-console application registration, credentials, network login and physical-device provider acceptance remain environment/Owner gates.
 
 ### STT / TTS
 

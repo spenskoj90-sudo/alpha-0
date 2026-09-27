@@ -9,7 +9,7 @@ The status vocabulary follows the repository product-truth model: `IMPLEMENTED`,
 | Provider / boundary | CODE | TEST | STAGING | CREDENTIALS | NETWORK | PHYSICAL | PRODUCTION |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Stripe Billing | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
-| Resend email | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
+| Transactional email (Resend / Brevo HTTPS) | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
 | Sentry Android | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | HISTORICAL | HISTORICAL | OWNER-GATED |
 | PostHog operational telemetry | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |
 | Google federated auth | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
@@ -24,9 +24,9 @@ The status vocabulary follows the repository product-truth model: `IMPLEMENTED`,
 
 Core owns plan-to-price mapping, checkout-session creation, native `Stripe-Signature` verification, metadata binding, replay-safe lifecycle reconciliation and entitlement authority. CI proves fail-closed/test-mode behavior without live credentials or live charges. The connected sandbox now contains a non-live `SENTINEL Core Plus` product and EUR 9.99/month test price, but Core checkout is still environment-unverified until staging test credentials/webhook configuration are injected and an exact-candidate checkout is exercised. No live payment acceptance is claimed.
 
-### Resend
+### Transactional email
 
-The provider-neutral mail boundary, deterministic test transport and bounded staging-only Resend adapter are implemented. Public registration/recovery requests remain non-enumerating, while the authenticated account-security verification path now fails closed with explicit provider-unavailable state instead of claiming delivery. Real current-candidate Resend delivery remains environment-unverified; production credentials and activation remain Owner-gated.
+The provider-neutral mail boundary, deterministic test transport and two bounded staging-only HTTPS adapters are implemented: Resend and Brevo. Exactly one provider may be enabled at a time; conflicting provider activation fails closed. This deliberately avoids SMTP because Render Free blocks outbound ports 25/465/587. Public registration/recovery requests remain non-enumerating, while authenticated account-security verification fails closed with explicit provider-unavailable state instead of claiming delivery. Real current-candidate delivery remains environment-unverified until one Owner-managed account/sender/API key is configured and exercised.
 
 ### Sentry
 
@@ -49,7 +49,7 @@ The voice runtime has provider-neutral HTTPS contracts, bounded payloads, explic
 Pre-release testing does not require paid provider plans. The active strategy is documented in `docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md`.
 
 - Stripe acceptance uses sandbox/test mode; live charges remain Owner-gated.
-- Resend's free tier is sufficient for staging volume once an Owner-managed domain/API key exists.
+- Resend Free remains the simplest connected option once an Owner-managed sending domain/API key exists; Brevo Free is an HTTPS fallback when a verified sender/API key is available.
 - Sentry free/developer monitoring is optional; Physical Test remains local-forensic by design.
 - Federated auth uses provider development/test registrations before production credentials.
 - Free hosting/database alternatives are evaluated as testing dependencies only; they are not promoted into production merely because they cost zero.

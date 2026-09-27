@@ -119,6 +119,11 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("STOP / KILL SWITCH", self.launcher)
         self.assertIn("window.confirm(", self.launcher_renderer)
         self.assertIn("microphone is not continuously listening", self.launcher.lower())
+        self.assertIn('id="resilience-status"', self.launcher)
+        self.assertIn("Hold the button while speaking; release to send", self.launcher)
+        self.assertIn("voicePtt.onpointerdown", self.launcher_renderer)
+        self.assertIn("voicePtt.onpointerup", self.launcher_renderer)
+        self.assertNotIn("voicePtt.onclick", self.launcher_renderer)
         self.assertIn("@media(forced-colors:active)", self.launcher)
         self.assertIn("@media(prefers-reduced-motion:reduce)", self.launcher)
         for asset in ("assets/sentinel-glyph.svg", "assets/sentinel-glyph-mono.svg", "assets/sentinel-icon-64.png", "assets/sentinel-master-512.png"):

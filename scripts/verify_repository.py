@@ -355,6 +355,7 @@ def check_governance(checks: Checks) -> None:
         "docs/SENTINEL_FINAL_AUDIT_2026-08-26.md": "Status: HISTORICAL",
         "docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md": "Status: HISTORICAL",
         "docs/BRANCH_DELETION_MANIFEST_2026-09-23.md": "Status:** HISTORICAL EVIDENCE RECORD",
+        "docs/POSTGRES_NEON_AUDIT_2026-09-23.md": "Status:** HISTORICAL EVIDENCE RECORD",
     }
     for path, marker in required_status.items():
         checks.require(marker in read(path).splitlines()[0:8].__str__(), f"{path} has explicit {marker} banner")

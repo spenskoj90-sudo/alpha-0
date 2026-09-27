@@ -7,6 +7,7 @@ const test = require('node:test');
 
 const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const runtime = fs.readFileSync(path.join(__dirname, '..', 'accessibility-runtime.js'), 'utf8');
+const renderer = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
 
 test('launcher exposes keyboard and landmark accessibility contract', () => {
   assert.match(index, /<html lang="en">/);
@@ -36,6 +37,18 @@ test('launcher exposes bounded account busy state during async account operation
   assert.match(runtime, /\['login', 'logout'\]/);
   assert.match(runtime, /setAccountBusy\(true\)/);
   assert.match(runtime, /MutationObserver\(\(\) => setAccountBusy\(false\)\)/);
+});
+
+test('voice push-to-talk remains explicit hold/release interaction', () => {
+  assert.match(index, /id="voice-ptt"[^>]*aria-pressed="false"[^>]*data-listening="false"/);
+  assert.match(index, /Hold the button while speaking; release to send/);
+  assert.match(renderer, /voicePtt\.onpointerdown/);
+  assert.match(renderer, /voicePtt\.onpointerup/);
+  assert.match(renderer, /voicePtt\.onpointerleave/);
+  assert.match(renderer, /voicePtt\.onkeydown/);
+  assert.match(renderer, /voicePtt\.onkeyup/);
+  assert.doesNotMatch(renderer, /voicePtt\.onclick/);
+  assert.match(renderer, /LISTENING — RELEASE TO SEND/);
 });
 
 test('launcher form controls retain explicit labels and semantic native controls', () => {

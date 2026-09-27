@@ -248,6 +248,29 @@ def check_versions(checks: Checks) -> None:
     checks.require(python_version == canonical, "Core package version matches VERSION")
     checks.require(read(".node-version").strip() == "24.21.0", "Node runtime is pinned to 24.21.0 LTS")
     checks.require(read(".python-version").strip() == "3.14.7", "Python runtime is pinned to 3.14.7")
+    runtime_workflows = (
+        "deploy.yml",
+        "release.yml",
+        "release-evidence.yml",
+        "release-candidate.yml",
+        "final-release-acceptance.yml",
+        "staging-mfa-acceptance.yml",
+    )
+    for workflow_name in runtime_workflows:
+        workflow = read(f".github/workflows/{workflow_name}")
+        checks.require(
+            "Setup Python 3.12" not in workflow
+            and "Setup Python 3.14.7" in workflow
+            and 'python-version: "3.14.7"' in workflow,
+            f"{workflow_name} uses and truthfully labels the pinned Python 3.14.7 runtime",
+        )
+    performance = read("docs/SENTINEL_PERFORMANCE_BASELINE.md")
+    checks.require(
+        "JDK 25 LTS for Gradle/CI" in performance
+        and "Python 3.14.7" in performance
+        and "Core tests and coverage job, Python 3.12" not in performance,
+        "active performance contract names the current CI runtimes",
+    )
     web_package = json.loads(read("web/package.json"))
     checks.require(web_package.get("engines", {}).get("node") == "24.x", "Web declares Node 24 LTS")
     checks.require(web_package.get("dependencies", {}).get("next") == "16.3.6", "Web pins Next.js 16.3.6")

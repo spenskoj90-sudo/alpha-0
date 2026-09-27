@@ -169,6 +169,11 @@ def check_workflow_boundaries(checks: Checks) -> None:
         "branch hygiene has only the authority needed for exact-ref deletion and PR verification",
     )
     checks.require(
+        "push:\n    branches:\n      - main" in branch_hygiene
+        and "\n    paths:" not in branch_hygiene,
+        "branch hygiene executes after every protected-main push rather than only inventory/workflow edits",
+    )
+    checks.require(
         '"docs/BRANCH_INVENTORY.md"' in branch_hygiene
         and '{"MERGED_EXACT", "PURE_BEHIND", "CONTENT_SUPERSEDED"}' in branch_hygiene,
         "branch hygiene consumes only the active reconciled inventory classifications",
@@ -355,6 +360,7 @@ def check_governance(checks: Checks) -> None:
         "docs/SENTINEL_FINAL_AUDIT_2026-08-26.md": "Status: HISTORICAL",
         "docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md": "Status: HISTORICAL",
         "docs/BRANCH_DELETION_MANIFEST_2026-09-23.md": "Status:** HISTORICAL EVIDENCE RECORD",
+        "docs/POSTGRES_NEON_AUDIT_2026-09-23.md": "Status:** HISTORICAL EVIDENCE RECORD",
     }
     for path, marker in required_status.items():
         checks.require(marker in read(path).splitlines()[0:8].__str__(), f"{path} has explicit {marker} banner")
@@ -389,9 +395,10 @@ def check_governance(checks: Checks) -> None:
     )
     checks.require(
         "BRANCH_HYGIENE deleted=40 already_absent=0" in branch_inventory
+        and "Reviewed 2026-09-27 cleanup ledger" in branch_inventory
         and "| `main` | ACTIVE |" in branch_inventory
-        and "only protected `main`" in branch_inventory,
-        "active branch inventory records completed exact-tip cleanup and compact durable state",
+        and "every push to protected `main`" in branch_inventory,
+        "active branch inventory preserves prior cleanup evidence and the reviewed continuous-cleanup ledger",
     )
     historical_branch_manifest = read("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md")
     checks.require(

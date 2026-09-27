@@ -10,10 +10,9 @@ INVENTORY = (ROOT / "docs" / "BRANCH_INVENTORY.md").read_text(encoding="utf-8")
 
 
 class BranchHygieneWorkflowTests(unittest.TestCase):
-    def test_workflow_is_path_scoped_to_protected_main(self) -> None:
+    def test_workflow_runs_after_every_protected_main_push(self) -> None:
         self.assertIn('branches:\n      - main', WORKFLOW)
-        self.assertIn('      - ".github/workflows/branch-hygiene.yml"', WORKFLOW)
-        self.assertIn('      - "docs/BRANCH_INVENTORY.md"', WORKFLOW)
+        self.assertNotIn('\n    paths:', WORKFLOW)
         self.assertIn('test "$GITHUB_REF" = "refs/heads/main"', WORKFLOW)
         self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', WORKFLOW)
 

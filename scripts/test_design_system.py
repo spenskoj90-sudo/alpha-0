@@ -96,6 +96,8 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("SENTINEL Design System v3.0", self.web)
         self.assertIn("--radius-card: 8px", self.web)
         self.assertIn("@media (prefers-color-scheme: light)", self.web)
+        self.assertIn('[data-theme="light"]', self.web)
+        self.assertIn('[data-theme="dark"]', self.web)
         self.assertIn("@media (forced-colors: active)", self.web)
         self.assertIn("@media (prefers-reduced-motion: reduce)", self.web)
         self.assertIn("grid-template-columns: 232px", self.web)

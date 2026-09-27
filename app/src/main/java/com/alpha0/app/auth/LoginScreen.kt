@@ -423,7 +423,7 @@ fun LoginScreen(
                     value = actionCode,
                     onValueChange = { actionCode = it.trim(); error = null },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(strings.text(if (mode == AuthMode.MFA) "mfa_code" else "auth_code")) },
+                    label = { Text(strings.text(if (mode == AuthMode.MFA) "mfa_or_recovery_code" else "auth_code")) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     enabled = !busy,

@@ -76,6 +76,18 @@ The local subscription UUID is carried in server-created Stripe metadata. A sign
 
 `PENDING`, `PAST_DUE`, `CANCELED` and `EXPIRED` never grant paid features. Terminal SENTINEL states remain terminal. Snapshot reconciliation maps provider state through the same state machine and uses a deterministic provider-revision event ID for replay safety.
 
+### Current Stripe sandbox inventory · 2026-09-27
+
+The connected Stripe account is a **test/sandbox** account. The following non-live catalog objects now exist for pre-release acceptance:
+
+- product: `prod_VKsUERZXQrdT93` — **SENTINEL Core Plus**;
+- recurring price: `price_1UKCjxHDnOpHCmiXzQg7aFXf`;
+- amount: EUR 9.99 / month;
+- lookup key: `sentinel_core_plus_monthly_test`;
+- both objects report `livemode=false`.
+
+This proves catalog preparation only. Core checkout remains intentionally disabled until the **test-mode** Stripe secret key, webhook signing secret, success/cancel URLs and price ID are injected through the staging secret channel. None of those secrets belong in Git, documentation, chat or Android assets.
+
 ### Live-mode gate
 
 Normal pre-release configuration is Stripe test mode. Live mode additionally requires all of:
@@ -133,6 +145,16 @@ Google, Telegram and VK authentication are disabled by default and become visibl
 - Android encrypts pending provider/state/PKCE verifier data with AES-GCM under Android Keystore and consumes it on callback.
 - Existing accounts are never auto-linked from an email collision. Linking requires a valid SENTINEL Bearer session and a new verified provider proof.
 
+### Current provider-console activation checklist · 2026-09-27
+
+Repository implementation was reconciled against current provider guidance without enabling any external credential:
+
+- **Google:** Android uses Credential Manager and the current Google ID library line. Provider setup needs a Google Auth Platform project plus the Web OAuth client ID used as the server client ID; Android distribution identity additionally binds package name and signing-certificate fingerprint. The ID token is still validated by Core. Current official Android guidance: https://developer.android.com/identity/sign-in/credential-manager-siwg
+- **Telegram:** the implemented Authorization Code + PKCE flow matches Telegram's current OIDC login contract. BotFather supplies the Login client ID/secret and Allowed URLs; Core validates the returned ID token against Telegram JWKS. Current official contract: https://core.telegram.org/bots/telegram-login
+- **VK ID:** the existing PKCE/provider-specific redirect implementation remains fail-closed and environment-unverified. Production or staging promotion still requires provider-console registration and exact real-account callback evidence.
+
+External provider credentials remain Owner-managed. The client never enables a provider simply because code exists; Core discovery must report a complete configuration first.
+
 Provider-console setup and real-account external login are environment evidence, not repository claims. See `docs/FEDERATED_AUTH_V1.md`.
 
 ## 6. Explicit non-claims
@@ -140,7 +162,7 @@ Provider-console setup and real-account external login are environment evidence,
 This implementation does **not** claim or perform:
 
 - production deployment or production traffic;
-- Stripe live-mode objects or live charges;
+- Stripe live-mode objects or live charges (the current product/price inventory is sandbox-only);
 - production payment credentials;
 - production PostHog ingestion, retention or alert provisioning;
 - a real Resend delivery to a user;

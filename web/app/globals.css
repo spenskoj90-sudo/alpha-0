@@ -50,6 +50,11 @@ button, a, input, select { min-height: 44px; }
 .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:28px; }
 .top-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
 .badge { display:inline-flex; align-items:center; border:1px solid var(--border); padding:7px 10px; border-radius:8px; color:var(--muted); font-size:12px; }
+.appearance-toggle { min-height:44px; border:1px solid var(--border-strong); border-radius:6px; background:var(--panel-2); color:var(--text); padding:8px 11px; cursor:pointer; font:600 11px/1.2 var(--font-data, ui-monospace, monospace); }
+.appearance-toggle:hover { border-color:var(--accent); }
+.admin-top { align-items:flex-start; border-bottom:1px solid var(--border); padding-bottom:18px; }
+.admin-brand { margin-top:7px; font-size:1.35rem; letter-spacing:.06em; }
+.admin-elevated { min-height:44px; display:inline-flex; align-items:center; border:1px solid color-mix(in srgb, var(--warning), transparent 40%); border-radius:3px; color:var(--warning); padding:7px 10px; font:600 11px/1.2 var(--font-data, ui-monospace, monospace); letter-spacing:.04em; }
 .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
 
 .card { background: var(--panel); border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:0 1px 2px rgba(0,0,0,.14); }
@@ -108,7 +113,7 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
 
 @media (forced-colors: active) {
   :focus-visible { outline:3px solid Highlight; }
-  .card, .badge, .status-message, .state, input, select, .ghost-btn, .nav-item { border-color:CanvasText; }
+  .card, .badge, .status-message, .state, input, select, .ghost-btn, .nav-item, .appearance-toggle, .admin-elevated { border-color:CanvasText; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
@@ -166,7 +171,7 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
   --font-data: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 html, body { font-family: var(--font-ui); font-synthesis: none; }
-.brand, .page-header h1, .section-title, .recommendation-heading h2, .panel-heading h2 { font-family: var(--font-brand); }
+.brand, .page-header h1, .section-title, .recommendation-heading h2, .panel-heading h2, .admin-brand { font-family: var(--font-brand); }
 .microcopy, code, pre, .technical, .confidence { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .product-shell { grid-template-columns: 232px minmax(0, 1fr); }
 .side-nav { background: #081722; }
@@ -183,16 +188,34 @@ html, body { font-family: var(--font-ui); font-synthesis: none; }
 .intelligence-kind[data-kind="INFERENCE"] { color:var(--accent); }
 .intelligence-kind[data-kind="RECOMMENDATION"] { color:var(--text); }
 .data-unavailable { color:var(--warning); }
+[data-theme="light"] {
+  color-scheme: light;
+  --bg:#f4f8fb; --panel:#ffffff; --panel-2:#eaf1f6; --sunken:#edf4f8;
+  --text:#10202b; --muted:#506875; --tertiary:#667e8b;
+  --accent:#006c88; --accent-2:#0b6f67; --success:#147251; --warning:#8a5a00;
+  --danger:#b4233a; --border:#b8c8d3; --border-strong:#8299a8;
+}
+[data-theme="light"] .side-nav { background:#eef4f7; }
+[data-theme="light"] .brand-mark { color:var(--accent); }
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#061018; --panel:#0d1b29; --panel-2:#13263a; --sunken:#091722;
+  --text:#e6f1f7; --muted:#a6b7c5; --tertiary:#7f95a4;
+  --accent:#2dd4ff; --accent-2:#00e0c2; --success:#22c55e; --warning:#f59e0b;
+  --danger:#f43f5e; --border:#29485f; --border-strong:#3a627d;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme]) {
     color-scheme: light;
     --bg:#f4f8fb; --panel:#ffffff; --panel-2:#eaf1f6; --sunken:#edf4f8;
     --text:#10202b; --muted:#506875; --tertiary:#667e8b;
     --accent:#006c88; --accent-2:#0b6f67; --success:#147251; --warning:#8a5a00;
     --danger:#b4233a; --border:#b8c8d3; --border-strong:#8299a8;
   }
-  .side-nav { background:#eef4f7; }
-  .brand-mark { color:var(--accent); }
+  :root:not([data-theme]) .side-nav { background:#eef4f7; }
+  :root:not([data-theme]) .brand-mark { color:var(--accent); }
 }
 @media (max-width:1199px) {
   .product-shell { grid-template-columns: 216px minmax(0,1fr); }

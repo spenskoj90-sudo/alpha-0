@@ -6,6 +6,11 @@
 
 ## Current v3 product state
 
+The current design-laboratory reference is the latest reconciled revision recorded in `design/sentinel-design-system.v3.json`. The refresh adds explicit Voice, Admin, Access, Billing and Resilience studies while preserving the v3 foundations already adopted in production. Production remains native to `alpha-0`; reference code is translated per platform rather than imported wholesale.
+
+Pre-release infrastructure follows a zero-cost-first rule documented in `docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md`: paid compute and production provider activation are deferred until release-stage evidence requires them. Free tiers remain testing dependencies and are not silently treated as production SLO evidence.
+
+
 SENTINEL Design System v3.0 is the active design authority across Android, Web, Companion and Overlay. The canonical direction is **CALM PRECISION / TRUSTED INTELLIGENCE**. v2.1 and earlier design contracts are historical lineage rather than active visual authority.
 
 The production asset family is bound to the approved design-reference shield/S/signal artwork. Byte-exact 512/192/64 raster derivatives and favicon are stored in production, while compact/system contexts use the exact studio reduced glyph geometry. Android no longer uses stock Material bottom-navigation presentation or the rejected large red physical-test banner. Web and Companion preserve their existing architectures while applying v3 information hierarchy, low-radius geometry, accessibility modes and explicit authority boundaries. Overlay remains presentation-only and shows one meaningful message at a time.

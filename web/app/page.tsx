@@ -1,4 +1,5 @@
 import { AccountControl } from './components/account-control';
+import { AppearanceToggle } from './components/appearance-toggle';
 import { BrandMark } from './components/brand-mark';
 import { RecommendationPanel } from './components/recommendation-panel';
 
@@ -48,8 +49,12 @@ export default function Dashboard() {
         <main id="main-content" className="dashboard-main" tabIndex={-1}>
           <header className="page-header">
             <div>
+              <div className="eyebrow">CONTROL PLANE / OVERVIEW</div>
               <h1>Overview</h1>
               <p>Calm, explicit security and intelligence state. Missing data is never rendered as healthy or zero.</p>
+            </div>
+            <div className="top-actions">
+              <AppearanceToggle />
             </div>
           </header>
 

@@ -36,8 +36,15 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertEqual(self.manifest["revision"], "3.0.0")
         self.assertEqual(self.manifest["status"], "ACTIVE")
         self.assertEqual(self.manifest["direction"], "CALM PRECISION / TRUSTED INTELLIGENCE")
-        self.assertEqual(self.manifest["designReference"]["sha"], "60629603299fd8af035c6f05991482cde0363c33")
+        self.assertEqual(self.manifest["designReference"]["sha"], "a6fc9d4c513dde9d549e5dd70159b1365a76b95c")
         self.assertEqual(self.manifest["predecessor"]["status"], "HISTORICAL_REFERENCE")
+        self.assertEqual(
+            set(self.manifest["designReference"]["referenceSurfaces"]),
+            {"Control plane","Android","Companion","Overlay","Voice","Admin","Access","Billing","Resilience","System"},
+        )
+        self.assertTrue(self.manifest["platform"]["web"]["adminDistinctShell"])
+        self.assertTrue(self.manifest["platform"]["voice"]["explicitConsent"])
+        self.assertFalse(self.manifest["platform"]["voice"]["continuousListening"])
 
     def test_contract_has_every_machine_domain(self) -> None:
         required = {
@@ -89,6 +96,8 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("SENTINEL Design System v3.0", self.web)
         self.assertIn("--radius-card: 8px", self.web)
         self.assertIn("@media (prefers-color-scheme: light)", self.web)
+        self.assertIn('[data-theme="light"]', self.web)
+        self.assertIn('[data-theme="dark"]', self.web)
         self.assertIn("@media (forced-colors: active)", self.web)
         self.assertIn("@media (prefers-reduced-motion: reduce)", self.web)
         self.assertIn("grid-template-columns: 232px", self.web)

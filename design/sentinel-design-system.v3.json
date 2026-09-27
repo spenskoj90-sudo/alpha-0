@@ -5,13 +5,27 @@
   "direction": "CALM PRECISION / TRUSTED INTELLIGENCE",
   "designReference": {
     "repository": "spenskoj90-sudo/sentinel-aware-companion",
-    "sha": "60629603299fd8af035c6f05991482cde0363c33",
+    "sha": "a6fc9d4c513dde9d549e5dd70159b1365a76b95c",
     "masterArtwork": {
       "path": "src/assets/sentinel-master-icon.png",
       "blobSha": "bc0fe93d932023798291c45602100f025341d884",
       "pixelSize": 1024,
       "role": "approved full-color master source"
-    }
+    },
+    "reconciledAt": "2026-09-27",
+    "deltaFromInitialV3": "13 commits",
+    "referenceSurfaces": [
+      "Control plane",
+      "Android",
+      "Companion",
+      "Overlay",
+      "Voice",
+      "Admin",
+      "Access",
+      "Billing",
+      "Resilience",
+      "System"
+    ]
   },
   "predecessor": {
     "schema": "sentinel.design-system.v2.1",
@@ -219,10 +233,38 @@
     },
     "web": {
       "forcedColors": true,
-      "reducedMotion": true
+      "reducedMotion": true,
+      "surfaces": [
+        "Overview",
+        "Intelligence",
+        "Games",
+        "Activity",
+        "Security",
+        "Devices",
+        "Account",
+        "Subscription",
+        "Billing",
+        "Settings",
+        "Support",
+        "Diagnostics",
+        "Admin"
+      ],
+      "adminDistinctShell": true
     },
     "companion": {
-      "killSwitchConfirmation": true
+      "killSwitchConfirmation": true,
+      "surfaces": [
+        "Overview",
+        "Account",
+        "Runtime",
+        "Host",
+        "Games",
+        "Adapters",
+        "Voice",
+        "Overlay",
+        "Diagnostics",
+        "Updates"
+      ]
     },
     "overlay": {
       "density": [
@@ -236,6 +278,25 @@
         "Recommendation",
         "Warning",
         "Degraded"
+      ]
+    },
+    "voice": {
+      "explicitConsent": true,
+      "pushToTalk": true,
+      "continuousListening": false,
+      "states": [
+        "UNAVAILABLE",
+        "CONSENT_REQUIRED",
+        "READY",
+        "LISTENING",
+        "PROCESSING",
+        "RECOGNIZED",
+        "RESPONSE",
+        "NO_SPEECH",
+        "TIMEOUT",
+        "PROVIDER_FAILURE",
+        "NETWORK_FAILURE",
+        "DISABLED"
       ]
     }
   },
@@ -285,5 +346,30 @@
     "nonColorStatus": true,
     "androidMinTouchDp": 48,
     "desktopMinTargetPx": 44
+  },
+  "referenceFlows": {
+    "access": [
+      "SIGN_IN",
+      "REGISTER",
+      "PASSWORD_RECOVERY",
+      "MFA",
+      "DEVICE_ONBOARDING"
+    ],
+    "billing": [
+      "PLAN_SELECTION",
+      "CHECKOUT",
+      "ACTIVE",
+      "PAST_DUE",
+      "GRACE",
+      "EXPIRED"
+    ],
+    "resilience": [
+      "FULL",
+      "DEGRADED",
+      "LOCAL-ONLY",
+      "OFFLINE",
+      "RECONNECTING",
+      "RESTORED"
+    ]
   }
 }

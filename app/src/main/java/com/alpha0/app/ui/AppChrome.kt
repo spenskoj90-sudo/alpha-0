@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
@@ -220,23 +221,24 @@ fun SentinelSideRail(selectedRoute: String?, onNavigate: (String) -> Unit) {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
-                        Modifier
-                            .width(if (selected) 24.dp else 12.dp)
-                            .height(2.dp)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else Color.Transparent,
-                            ),
-                    )
-                    Icon(
-                        painter = painterResource(destination.iconRes),
-                        contentDescription = null,
                         modifier = Modifier
-                            .padding(top = 3.dp)
-                            .size(20.dp),
-                        tint = if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                            .width(40.dp)
+                            .height(28.dp)
+                            .background(
+                                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(destination.iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
                         text = strings.text(destination.labelKey),
                         modifier = Modifier.padding(top = 2.dp),
@@ -286,27 +288,28 @@ fun SentinelBottomBar(selectedRoute: String?, onNavigate: (String) -> Unit) {
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Box(
-                        Modifier
-                            .width(if (selected) 24.dp else 12.dp)
-                            .height(2.dp)
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else Color.Transparent,
-                            ),
-                    )
-                    Icon(
-                        painter = painterResource(destination.iconRes),
-                        contentDescription = null,
                         modifier = Modifier
-                            .padding(top = 6.dp)
-                            .size(22.dp),
-                        tint = if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                            .width(44.dp)
+                            .height(30.dp)
+                            .background(
+                                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else Color.Transparent,
+                                shape = RoundedCornerShape(9.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(destination.iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                            tint = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
                         text = strings.text(destination.labelKey),
-                        modifier = Modifier.padding(top = 3.dp),
-                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(top = 4.dp),
+                        style = MaterialTheme.typography.labelMedium,
                         color = if (selected) MaterialTheme.colorScheme.onSurface
                         else MaterialTheme.colorScheme.onSurfaceVariant,
                     )

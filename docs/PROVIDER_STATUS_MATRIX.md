@@ -44,6 +44,16 @@ Provider discovery, challenge/state/nonce handling, PKCE where applicable, provi
 
 The voice runtime has provider-neutral HTTPS contracts, bounded payloads, explicit consent, short-lived microphone lease, presentation-only classification, action-like speech fail-closed behavior and fixed-text TTS authority. No production vendor is selected/accepted here. Provider credentials/network behavior and real microphone/acoustic acceptance remain Owner/environment gates.
 
+## Zero-cost testing posture
+
+Pre-release testing does not require paid provider plans. The active strategy is documented in `docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md`.
+
+- Stripe acceptance uses sandbox/test mode; live charges remain Owner-gated.
+- Resend's free tier is sufficient for staging volume once an Owner-managed domain/API key exists.
+- Sentry free/developer monitoring is optional; Physical Test remains local-forensic by design.
+- Federated auth uses provider development/test registrations before production credentials.
+- Free hosting/database alternatives are evaluated as testing dependencies only; they are not promoted into production merely because they cost zero.
+
 ## Release rule
 
 A provider may be promoted to `STAGING-VERIFIED`, `PHYSICAL-VERIFIED` or production acceptance only with evidence bound to the exact candidate being accepted. Historical provider smoke, repository tests or configuration presence cannot substitute for that evidence.

@@ -339,6 +339,20 @@ def check_versions(checks: Checks) -> None:
         and '--signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"' in physical_update,
         "stable physical-test update requires pinned signer continuity evidence",
     )
+    checks.require(
+        "vars.SENTINEL_VK_CLIENT_ID" in physical_routine
+        and '--vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID"' in physical_routine
+        and "vk_client_id:" in physical_update
+        and '--vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID"' in physical_update,
+        "physical-test artifacts bind the optional public VK application identity into exact callback evidence",
+    )
+    release_candidate = read(".github/workflows/release-candidate.yml")
+    checks.require(
+        "vk_client_id:" in release_candidate
+        and "SENTINEL_VK_CLIENT_ID: ${{ inputs.vk_client_id }}" in release_candidate
+        and 'grep -F -- "vk${VK_CLIENT_ID}://vk.ru/blank.html"' in release_candidate,
+        "signed release candidate validates the selected public VK callback identity in compiled APK bytes",
+    )
 
     wrapper = read("gradle/wrapper/gradle-wrapper.properties")
     checksum = re.search(r"^distributionSha256Sum=([0-9a-f]{64})$", wrapper, re.MULTILINE)

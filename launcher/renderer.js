@@ -3,6 +3,7 @@
 const $ = id => document.getElementById(id);
 const accountStatus = $('account-status');
 const companionStatus = $('companion-status');
+const resilienceStatus = $('resilience-status');
 const wowCheckpointStatus = $('wow-checkpoint-status');
 const voiceStatus = $('voice-status');
 const voiceResult = $('voice-result');
@@ -30,6 +31,7 @@ let voiceChunks = [];
 let voiceCaptureTimer = null;
 let voiceCaptureDiscarded = false;
 let voiceBusy = false;
+let voiceHoldActive = false;
 
 function refreshButtons() {
   loginButton.disabled = signedIn || mfaRequired;
@@ -43,8 +45,10 @@ function refreshButtons() {
   const voiceReady = signedIn && grantedFeatures.includes('companion') && companionReady && currentVoice.consentGranted && currentVoice.sttAvailable;
   voiceConsent.disabled = !signedIn || !grantedFeatures.includes('companion') || voiceBusy || Boolean(voiceRecorder);
   voiceLocale.disabled = voiceBusy || Boolean(voiceRecorder);
-  voicePtt.disabled = voiceRecorder ? false : (!voiceReady || voiceBusy);
-  voicePtt.textContent = voiceRecorder ? 'STOP & SEND' : voiceBusy ? 'PROCESSING…' : 'START PUSH-TO-TALK';
+  voicePtt.disabled = voiceRecorder ? false : (!voiceReady || (voiceBusy && !voiceHoldActive));
+  voicePtt.textContent = voiceRecorder ? 'LISTENING — RELEASE TO SEND' : voiceBusy ? 'PROCESSING…' : 'HOLD TO TALK';
+  voicePtt.dataset.listening = voiceRecorder ? 'true' : 'false';
+  voicePtt.setAttribute('aria-pressed', voiceRecorder ? 'true' : 'false');
 }
 
 function setAccount(status, features = [], mfa = null) {
@@ -65,6 +69,19 @@ function setCompanion(status) {
   const reason = status?.reason ? ` / ${status.reason}` : '';
   companionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : companionState === 'DEGRADED' ? 'warn' : ''}`;
   companionStatus.textContent = `COMPANION: ${companionState}${reason}`;
+
+  if (resilienceStatus) {
+    const messages = {
+      ACTIVE: 'Companion is connected. Current source freshness and capability state remain authoritative below.',
+      CONNECTING: 'Reconnecting to Core. Local controls remain available while remote authority is re-established.',
+      DEGRADED: 'Runtime is degraded. Missing inputs remain explicit; confidence is not silently preserved.',
+      'LOCAL-ONLY': 'Local-only runtime. Observations remain on this computer until remote authority returns.',
+      OFFLINE: 'Offline. Last-known state is not treated as current evidence.',
+      STOPPED: 'Runtime is stopped. Start Companion when you are ready.',
+    };
+    resilienceStatus.dataset.state = companionState;
+    resilienceStatus.textContent = messages[companionState] || `Runtime state: ${companionState}${reason}`;
+  }
   refreshButtons();
 }
 
@@ -195,6 +212,7 @@ async function submitVoiceBlob(blob) {
 
 async function finalizeVoiceCapture() {
   clearVoiceTimer();
+  voiceHoldActive = false;
   const chunks = voiceChunks;
   const discarded = voiceCaptureDiscarded;
   voiceChunks = [];
@@ -280,6 +298,7 @@ function stopVoiceCapture() {
 
 function cancelVoiceCapture() {
   clearVoiceTimer();
+  voiceHoldActive = false;
   voiceCaptureDiscarded = true;
   voiceChunks = [];
   if (voiceRecorder && voiceRecorder.state !== 'inactive') {
@@ -361,13 +380,54 @@ voiceConsent.onchange = async () => {
   }
 };
 
-voicePtt.onclick = async () => {
-  if (voiceRecorder) {
-    stopVoiceCapture();
+async function beginVoiceHold(event) {
+  if (voicePtt.disabled || voiceRecorder || voiceBusy) return;
+  if (event?.type === 'pointerdown' && event.button !== 0) return;
+  event?.preventDefault?.();
+  voiceHoldActive = true;
+  try {
+    await startVoiceCapture();
+    if (!voiceHoldActive && voiceRecorder) cancelVoiceCapture();
+  } catch (error) {
+    voiceHoldActive = false;
+    showError(voiceResult, error);
+    refreshButtons();
+  }
+}
+
+function endVoiceHold(send) {
+  const hadActiveHold = voiceHoldActive;
+  voiceHoldActive = false;
+  if (!voiceRecorder) {
+    if (hadActiveHold) refreshButtons();
     return;
   }
-  try { await startVoiceCapture(); }
-  catch (error) { showError(voiceResult, error); refreshButtons(); }
+  if (send) stopVoiceCapture();
+  else cancelVoiceCapture();
+}
+
+voicePtt.onpointerdown = event => { void beginVoiceHold(event); };
+voicePtt.onpointerup = event => {
+  event.preventDefault();
+  endVoiceHold(true);
+};
+voicePtt.onpointerleave = () => {
+  if (voiceHoldActive) endVoiceHold(false);
+};
+voicePtt.onpointercancel = () => endVoiceHold(false);
+voicePtt.onblur = () => {
+  if (voiceHoldActive) endVoiceHold(false);
+};
+voicePtt.onkeydown = event => {
+  if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+    void beginVoiceHold(event);
+  }
+};
+voicePtt.onkeyup = event => {
+  if (event.key === ' ' || event.key === 'Enter') {
+    event.preventDefault();
+    endVoiceHold(true);
+  }
 };
 
 window.sentinel.onCompanionStatus(setCompanion);

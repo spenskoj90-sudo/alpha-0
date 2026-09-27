@@ -2,7 +2,13 @@
 
 **Status:** ACTIVE  
 **Direction:** CALM PRECISION / TRUSTED INTELLIGENCE  
-**Design-reference:** `spenskoj90-sudo/sentinel-aware-companion@60629603299fd8af035c6f05991482cde0363c33`
+**Design-reference:** `spenskoj90-sudo/sentinel-aware-companion@a6fc9d4c513dde9d549e5dd70159b1365a76b95c`
+
+## Reference refresh · 2026-09-27
+
+The latest design-laboratory reference extends the already-adopted v3 foundations without replacing production architecture. The refreshed reference adds explicit interactive studies for **Voice**, **Admin**, **Access**, **Billing** and **Resilience**, plus a detailed cross-platform screen/state inventory and Compose/Electron handoff guidance. The foundational brand artwork, semantic color direction, typography families, low-radius geometry, status grammar and accessibility rules remain compatible with the existing v3 production contract.
+
+Production adoption is incremental and evidence-bound: reference UI code is never copied wholesale into Android/Next.js/Electron. Each surface is translated into the native production architecture and must pass its existing security/runtime tests.
 
 v3.0 is the active cross-surface design authority. v2.1 remains historical reference only.
 

@@ -6,7 +6,7 @@
 
 ## Current v3 product state
 
-The current design-laboratory reference is `spenskoj90-sudo/sentinel-aware-companion@a6fc9d4c513dde9d549e5dd70159b1365a76b95c`. The refresh adds explicit Voice, Admin, Access, Billing and Resilience studies while preserving the v3 foundations already adopted in production. Production remains native to `alpha-0`; reference code is translated per platform rather than imported wholesale.
+The current design-laboratory reference is the latest reconciled revision recorded in `design/sentinel-design-system.v3.json`. The refresh adds explicit Voice, Admin, Access, Billing and Resilience studies while preserving the v3 foundations already adopted in production. Production remains native to `alpha-0`; reference code is translated per platform rather than imported wholesale.
 
 Pre-release infrastructure follows a zero-cost-first rule documented in `docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md`: paid compute and production provider activation are deferred until release-stage evidence requires them. Free tiers remain testing dependencies and are not silently treated as production SLO evidence.
 

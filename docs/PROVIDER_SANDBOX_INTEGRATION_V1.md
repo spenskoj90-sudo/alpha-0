@@ -123,16 +123,18 @@ This repository contract does not claim production PostHog activation, account-s
 
 ## 4. Transactional email boundary
 
-Email delivery now has a provider-neutral bounded transport contract:
+Email delivery has a provider-neutral bounded transport contract:
 
 - `DisabledEmailTransport` is the default and fails closed;
 - `TestEmailTransport` is deterministic, bounded and network-free;
 - `ResendEmailTransport` is an HTTPS adapter with bounded request/response handling;
-- Resend activation is staging-only and requires externally injected API key and verified sender address configuration.
+- `BrevoEmailTransport` is a second bounded HTTPS adapter pinned to `https://api.brevo.com/v3/smtp/email`;
+- exactly one external provider may be enabled at a time; ambiguous multi-provider activation fails closed;
+- external activation is staging-only and requires an injected provider API key plus a provider-accepted sender identity.
 
-Recipient, subject and plain-text body are validated and bounded. Provider credentials are excluded from object representations and repository state.
+Recipient, subject and plain-text body are validated and bounded. Provider credentials are excluded from object representations and repository state. The Brevo path deliberately uses HTTPS instead of SMTP so staging does not depend on outbound SMTP ports.
 
-Account registration/email-verification and password-recovery flows now use this transport. Requests remain non-enumerating, raw one-time credentials are never persisted, and provider delivery failure does not roll back account creation or reveal whether an email is registered. Real external delivery still requires the staging-only Resend configuration; production Resend activation remains an external Owner gate.
+Account registration/email-verification and password-recovery flows use this shared boundary. Requests remain non-enumerating, raw one-time credentials are never persisted, and provider delivery failure does not roll back account creation or reveal whether an email is registered. Real external delivery still requires one staging provider to be configured and exercised; production email-provider activation remains an external Owner gate.
 
 ## 5. Federated authentication boundary
 

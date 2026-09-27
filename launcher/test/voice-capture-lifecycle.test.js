@@ -10,7 +10,8 @@ const renderer = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf
 test('capture error marks audio discarded before MediaRecorder stop', () => {
   assert.match(renderer, /recorder\.onerror\s*=\s*\(\)\s*=>\s*\{[\s\S]*?voiceCaptureDiscarded\s*=\s*true;[\s\S]*?recorder\.stop\(\)/);
   assert.match(renderer, /const discarded = voiceCaptureDiscarded;/);
-  assert.match(renderer, /if \(discarded\) throw new Error\('VOICE_CAPTURE_DISCARDED'\);/);
+  assert.match(renderer, /if \(discarded\) return;/);
+  assert.match(renderer, /VOICE RESULT: CANCELED/);
 });
 
 test('logout and Companion kill switch cancel rather than submit active capture', () => {

@@ -175,7 +175,8 @@ jobs:
 
           # Delete the branch that produced this merge commit as well, but only
           # after GitHub independently proves exact same-repository PR lineage.
-          merge_pr="$(git show -s --format=%s "$GITHUB_SHA" | sed -nE 's/^Merge PR #([0-9]+):.*$/\1/p')"
+          merge_subject="$(git show -s --format=%s "$GITHUB_SHA")"
+          merge_pr="$(printf '%s\n' "$merge_subject" | sed -nE             -e 's/^Merge PR #([0-9]+):.*$/\1/p'             -e 's/^Merge pull request #([0-9]+) from .*$/\1/p' | head -n1)"
           if [ -n "$merge_pr" ]; then
             pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$merge_pr")"
             merged_at="$(jq -r '.merged_at // ""' <<<"$pr_json")"

@@ -30,8 +30,7 @@ PR #335 merged to protected `main` as `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`
 - [x] **IMPLEMENTED:** dependency automation restored without auto-merge; PostgreSQL 18.6 exact image/digest pin and dependency audit recorded.
 - [x] **OBSERVED / DOCUMENTED:** rc2 StrictMode SurfaceControl/InsetsSourceControl finalizer findings classified as framework/platform-observed without suppression.
 - [x] **IMPLEMENTED / ENVIRONMENT-UNVERIFIED:** correlated Android client-total request timing expanded; exact staging cold-start server/network decomposition awaits runtime-log correlation.
-- [ ] **ENVIRONMENT-UNVERIFIED:** final physical optical acceptance of launcher/domain icons and full Android v3 flows on the new exact-SHA APK.
-- [ ] **ENVIRONMENT-UNVERIFIED:** physical Windows packaged Companion, real microphone/driver/acoustic behavior and exact WoW 3.3.5a/private-server L3 acceptance.
+Physical optical/host/game acceptance is tracked once in the canonical acceptance queue below (#314, #315 and #277); these design-history sections do not create duplicate tasks.
 - [x] **REPOSITORY HYGIENE AUTHORIZED:** remote branch deletion is autonomous only after immediate live tip revalidation proves `MERGED_EXACT`, `PURE_BEHIND` or fully reconciled/superseded content. Branches with unresolved unique commits remain preserved until reconciliation.
 
 ## SENTINEL Design System v3.0 consolidation
@@ -41,9 +40,7 @@ PR #335 merged to protected `main` as `457f2a7d5cb638a1925ee87f4770f5e91a687ad9`
 - [x] **IMPLEMENTED:** dependency automation restored without auto-merge; PostgreSQL 18.6 image exact-patch/digest pin; Core warning cleanup and additional event-runtime/request-limit failure-path tests.
 - [x] **DOCUMENTED:** physical StrictMode finding classified as framework/platform-observed from the available stack evidence; warning remains visible.
 - [x] **DOCUMENTED:** branch inventory and cleanup policy are evidence-gated; dated manifests are evidence records, while live Git state and revalidation control deletion.
-- [ ] **ENVIRONMENT-UNVERIFIED:** physical Android v3 visual/accessibility/latency acceptance on the new exact-SHA APK.
-- [ ] **ENVIRONMENT-UNVERIFIED:** physical Windows packaged Companion, production-selected microphone/provider path and exact WoW WotLK 3.3.5a/private-server L3 run.
-- [ ] **OWNER/EXTERNAL GATE:** production database/provider activation, release signing/publication and live deployment.
+Remaining physical/provider/release acceptance is tracked once in the canonical acceptance queue below. Repository-internal implementation stays complete unless exact external evidence exposes a new defect.
 
 ## Active internal completion program
 
@@ -67,14 +64,17 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 - [x] **Physical-test diagnostics and scalable quality intelligence.** Android has an isolated `.physicaltest` build with a larger app-private forensic ring, visible test identity, local export, disabled remote telemetry and an exact-SHA 90-day APK artifact. Production keeps a much smaller local ring and never uploads it automatically. Authenticated user reports have independent diagnostics consent and bounded retention. Core groups likely duplicates into deterministic problem groups while preserving every report as evidence; tracks occurrences plus distinct affected users/devices/versions; prioritizes by bounded severity/recurrence/breadth; exposes admin group triage, sticky severity override and explicit merge; and keeps private report text out of public trackers and external AI grouping. High-volume hardening resolves every merged fingerprint to one active root, flattens chained aliases, serializes rare PostgreSQL manual merges, verifies same-fingerprint counter convergence under concurrent PostgreSQL ingestion, and prevents a user-selected `SECURITY_PRIVACY` category from self-asserting `CRITICAL` without machine-observed critical evidence or an operator override. Physical-device execution remains a final evidence gate rather than an internal implementation claim.
 - [x] **Firebase Test Lab dependency retired.** FTL is optional informational evidence only. GitHub Emulator instrumentation remains the routine automated Android gate and exact-candidate physical Android acceptance remains the final device gate; issue #59 is closed `not planned`.
 
-## External / Owner-gated evidence
+## Canonical acceptance queue
+
+This is the **only authoritative unchecked queue** in this file. Completed repository work is not reopened merely because an external acceptance item remains. Each item maps to one active GitHub acceptance issue.
 
 - [x] **Neon pre-release PostgreSQL 18 cutover.** On 2026-09-21 the staging Core was intentionally reset onto the prepared PostgreSQL 18.6 `sentinel-pre-release` database instead of importing the historical PG17 application dataset. The exact migration/FORCE-RLS baseline is preserved, the Render deployment reached `live`, and the former PG17 project is retained as `sentinel-pre-release-pg17-rollback` for rollback/evidence. Historical pre-release identities/users/devices/sessions are intentionally not part of the new baseline.
-- [ ] Exact WoW 3.3.5a/private-server L3 validation; capabilities remain `UNVERIFIED` until exercised in that environment.
-- [ ] Production Stripe credentials plus live account/price/webhook/network/payment acceptance, production PostHog/email-provider account configuration where selected, production database/ingress configuration and signing-key custody.
-- [ ] Selected production STT/TTS provider credentials/network acceptance plus physical microphone/driver/acoustic-quality evidence on the release host.
-- [ ] Signed release-candidate execution, final exact-candidate acceptance recording, release tag/publication and live production deployment.
-- [ ] Physical-device and real packaged Companion-host acceptance, including final accessibility/visual checks, where not already tied to the selected release commit.
+- [ ] **#371 — ZERO-COST STAGING PROVIDERS:** activate one real transactional-email sender (Resend or Brevo HTTPS) and any selected Google/Telegram/VK development registration, then capture exact-candidate staging/physical evidence. Repository adapters and fail-closed provider discovery are already implemented/tested.
+- [ ] **#314 — PHYSICAL ANDROID / COMPANION:** verify the post-PR #367 Android optical correction, accessibility/latency/recovery behavior and intended packaged Companion host on one exact candidate.
+- [ ] **#277 — EXACT GAME ENVIRONMENT:** execute the real WoW 3.3.5a/private-server L3 run; capabilities remain `ENVIRONMENT-UNVERIFIED` until that environment is exercised.
+- [ ] **#315 — VOICE ENVIRONMENT:** validate selected STT/TTS provider network behavior plus real microphone/driver/acoustic quality on the release host.
+- [ ] **#316 — PRODUCTION ACTIVATION (OWNER GATE):** production Stripe/database/ingress/email/federated-provider credentials and network acceptance for the requested profile. Production PostHog remains prohibited by the current telemetry contract rather than waiting for credentials.
+- [ ] **#317 — SIGN / PUBLISH / DEPLOY (OWNER GATE):** signed exact release-candidate execution, final acceptance manifest, release/tag publication and live deployment after all applicable prerequisite gates pass.
 
 ## Rules
 

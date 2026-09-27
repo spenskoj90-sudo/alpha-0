@@ -73,6 +73,9 @@ def main() -> int:
     require("credential-manager-siwg" in federated, "federated contract links current Google Credential Manager guidance")
     require("core.telegram.org/bots/telegram-login" in federated, "federated contract links current Telegram OIDC guidance")
     require("zero-cost" in provider_matrix.lower(), "provider matrix records zero-cost pre-release posture")
+    require("artifact" in provider_matrix.lower() and "VK application identity" in provider_matrix, "provider matrix records Android provider identity binding")
+    require("## Canonical acceptance queue" in tasks and "#371" in tasks and "#314" in tasks and "#277" in tasks and "#315" in tasks and "#316" in tasks and "#317" in tasks, "task board exposes one issue-linked acceptance queue")
+    require(tasks.count("- [ ]") == 6, "task board has exactly six non-duplicated active acceptance gates")
     require("Render Free" in free_strategy and "Stripe test/sandbox mode" in free_strategy, "free strategy keeps test infrastructure distinct from production")
 
     print(f"\nPROVIDER_STATE_PASSED={passed} PROVIDER_STATE_FAILED={len(failures)}")

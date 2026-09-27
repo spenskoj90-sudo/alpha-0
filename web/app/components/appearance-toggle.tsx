@@ -32,7 +32,7 @@ function applyAppearance(value: Appearance) {
 }
 
 export function AppearanceToggle() {
-  const appearance = useSyncExternalStore(subscribe, readAppearance, () => 'system');
+  const appearance = useSyncExternalStore<Appearance>(subscribe, readAppearance, (): Appearance => 'system');
 
   useEffect(() => {
     applyAppearance(appearance);

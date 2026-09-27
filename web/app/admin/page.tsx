@@ -88,6 +88,7 @@ export default function AdminPage() {
   const [mergeTarget, setMergeTarget] = useState('');
   const [status, setStatus] = useState('MFA REQUIRED');
   const [busy, setBusy] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Catalog' | 'Entitlements' | 'Quality'>('Catalog');
 
   const visibleClusters = useMemo(() => qualityClusters.filter(cluster =>
     (clusterStatusFilter === 'ALL' || cluster.status === clusterStatusFilter)
@@ -308,7 +309,23 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <section className="section">
+      <div className="admin-tabs" role="tablist" aria-label="Admin operation surface">
+        {(['Catalog', 'Entitlements', 'Quality'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className="admin-tab"
+            data-active={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <section className={`section ${activeTab === 'Catalog' ? '' : 'admin-access-only'}`}>
         <article className="card">
           <div className="label">ADMIN TOKEN</div>
           <input value={token} onChange={event => setToken(event.target.value)} type="password" autoComplete="off" placeholder="Environment-issued token" />
@@ -338,7 +355,7 @@ export default function AdminPage() {
           <p className="boundary-copy">The admin token and current authenticator code stay in this browser session only and are forwarded to the Core control-plane boundary. The Web server does not persist either factor.</p>
         </article>
 
-        <article className="card">
+        {activeTab === 'Catalog' && <article className="card">
           <div className="label">CORE GAME CATALOG</div>
           {games.length === 0 && <p className="muted">No catalog loaded.</p>}
           {games.map(game => <div className="item" key={game.id}>
@@ -346,10 +363,10 @@ export default function AdminPage() {
             <div className="muted">{game.platform} · {game.id}</div>
             <div className="microcopy">{game.interaction_mode} · launcher {game.launcher_supported ? 'supported' : 'not supported'}</div>
           </div>)}
-        </article>
+        </article>}
       </section>
 
-      <article className="card entitlement-card">
+      {activeTab === 'Entitlements' && <article className="card entitlement-card">
         <div className="label">ENTITLEMENT READBACK</div>
         {entitlements.length === 0 && <p className="muted">No entitlement records loaded.</p>}
         {entitlements.map(item => <div className="item" key={item.id}>
@@ -357,8 +374,9 @@ export default function AdminPage() {
           <div className="muted">User: {item.user_id} · Source: {item.source}</div>
           <div className="microcopy">Valid until {new Date(item.valid_until).toLocaleString()}</div>
         </div>)}
-      </article>
+      </article>}
 
+      {activeTab === 'Quality' && <>
       <article className="card entitlement-card">
         <div className="label">QUALITY PROBLEM GROUPS · PRIORITY QUEUE</div>
         <p className="boundary-copy">Operational triage happens at the problem-group level. Duplicate reports remain preserved evidence while frequency, user breadth, affected versions and severity drive priority.</p>
@@ -448,6 +466,7 @@ export default function AdminPage() {
           )}
         </div>
       </article>}
+      </>}
     </main>
   );
 }

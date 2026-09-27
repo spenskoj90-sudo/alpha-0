@@ -6,6 +6,7 @@ const css = readFileSync(new URL('./globals.css', import.meta.url), 'utf8');
 const recommendation = readFileSync(new URL('./components/recommendation-panel.tsx', import.meta.url), 'utf8');
 const accountControl = readFileSync(new URL('./components/account-control.tsx', import.meta.url), 'utf8');
 const appearanceToggle = readFileSync(new URL('./components/appearance-toggle.tsx', import.meta.url), 'utf8');
+const admin = readFileSync(new URL('./admin/page.tsx', import.meta.url), 'utf8');
 
 describe('Web accessibility contract', () => {
   it('keeps skip navigation and a focusable main landmark', () => {
@@ -33,6 +34,15 @@ describe('Web accessibility contract', () => {
     expect(css).toContain('[data-theme="light"]');
     expect(css).toContain('[data-theme="dark"]');
     expect(css).toContain(':root:not([data-theme])');
+  });
+
+  it('keeps admin operations distinct, audited and keyboard-selectable', () => {
+    expect(admin).toContain('ELEVATED ACCESS · AUDITED');
+    expect(admin).toContain('role="tablist"');
+    expect(admin).toContain('role="tab"');
+    expect(admin).toContain('aria-selected={activeTab === tab}');
+    expect(admin).toContain("useState<'Catalog' | 'Entitlements' | 'Quality'>('Catalog')");
+    expect(css).toContain('.admin-tab[data-active="true"]');
   });
 
   it('announces asynchronous recommendation state without changing authority boundaries', () => {

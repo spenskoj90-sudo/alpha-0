@@ -31,7 +31,14 @@ Core validates the token before creating or linking any SENTINEL identity:
 - exact server-issued nonce;
 - non-empty provider `sub`.
 
-The Google Web client ID is public configuration and may be returned to Android. No Google client secret is required in the APK.
+The Google Web client ID is public configuration and may be returned to Android. No Google client secret is required in the APK. The Android OAuth client remains a provider-console distribution binding: its package name and signing-certificate SHA-1 must match the APK identity being accepted. The Web OAuth client is the server client ID supplied to Credential Manager.
+
+The current Android dependency line uses `androidx.credentials:1.6.0` and Google ID `1.2.1`; the latter matches Google's September 2026 Google ID release. Provider-console configuration, rather than another application-code migration, is the remaining Google acceptance gate.
+
+Official current guidance:
+- https://developer.android.com/identity/sign-in/credential-manager-siwg
+- https://developer.android.com/identity/sign-in/credential-manager-siwg-implementation
+- https://developers.google.com/identity/android-credential-manager/releases
 
 Google-reported email is metadata, never the provider identity key. SENTINEL promotes Google email verification only when Google's documented authoritative-email conditions are met; otherwise email remains unverified locally.
 
@@ -58,6 +65,11 @@ Core generates the OAuth state. Android receives the state and PKCE verifier onl
 Core exchanges the code server-side at `https://oauth.telegram.org/token` using HTTP Basic client authentication, then validates the returned ID token against Telegram JWKS, issuer, audience, expiration, issued-at and nonce.
 
 The current SENTINEL verifier intentionally accepts Telegram's default RS256 configuration. Changing the BotFather signing algorithm requires a corresponding reviewed verifier change; the server does not silently accept arbitrary algorithms.
+
+Current Telegram Login documentation describes the same OIDC Authorization Code flow with PKCE, Allowed URLs managed through BotFather, server-side token exchange and ID-token validation. SENTINEL deliberately requests only `openid profile`; phone access and bot direct-message permission are not required for authentication.
+
+Official current guidance:
+- https://core.telegram.org/bots/telegram-login
 
 Required external configuration:
 
@@ -123,3 +135,5 @@ Repository completion does not claim:
 - production deployment or release publication.
 
 Those are Owner/environment gates and must be recorded against the exact selected release candidate.
+
+For closed testing, provider development/test registrations are preferred. No provider needs to be promoted to production configuration merely to prove the repository flow.

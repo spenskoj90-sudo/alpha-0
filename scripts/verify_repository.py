@@ -421,7 +421,7 @@ def check_governance(checks: Checks) -> None:
     checks.require(
         "**Status:** ACTIVE" in provider_matrix
         and "Stripe Billing" in provider_matrix
-        and "Resend email" in provider_matrix
+        and "Transactional email (Resend / Brevo HTTPS)" in provider_matrix
         and "Sentry Android" in provider_matrix
         and "PostHog operational telemetry" in provider_matrix
         and "Google federated auth" in provider_matrix

@@ -18,7 +18,7 @@ SENTINEL uses deep structural navy, precise low-radius geometry, restrained mate
 
 ## Brand and iconography
 
-The approved full-color shield/S/signal studio artwork is used for brand, launch and high-value moments. It must not be reconstructed as a primitive VectorDrawable. The studio reduced shield/S/signal glyph is used for compact, monochrome, themed-icon, tray and notification contexts. Reduced-glyph optical approval at 16/20/24/32/48 px and Android launcher masking remains a physical acceptance gate.
+The approved full-color shield/S/signal studio artwork is used for brand, launch and high-value moments. It must not be reconstructed as a primitive VectorDrawable. The studio reduced shield/S glyph is used for compact, monochrome, themed-icon, tray and notification contexts. The earlier hand-drawn-looking reduced S/signal study is rejected after physical review; compact product navigation uses a separate optically consistent domain-icon family rather than repurposing the brand glyph. Reduced-glyph optical approval at 16/20/24/32/48 px and Android launcher masking remains a physical acceptance gate.
 
 Primary domain iconography covers Home, Games, Security, Activity, Intelligence, Companion, Overlay and Signal/Connection. Standard utility actions may retain platform icons when optically calibrated.
 
@@ -50,7 +50,7 @@ Unavailable upstream fields are shown as unavailable; the UI must not invent pro
 
 ## Platform calibration
 
-Android uses four canonical primary destinations: Home, Games, Security and Activity. Stock Material `NavigationBar/NavigationBarItem` presentation is not a v3 primitive.
+Android uses four canonical primary destinations: Home, Games, Security and Activity. Their icons use one consistent 24dp rounded-stroke family with no miniature brand reconstruction. Stock Material `NavigationBar/NavigationBarItem` presentation is not a v3 primitive; selected state is a quiet bounded capsule behind the icon rather than an ornamental top dash.
 
 Web retains the Next.js architecture, uses responsive structural navigation and preserves Admin as a privileged fail-closed utility shell.
 

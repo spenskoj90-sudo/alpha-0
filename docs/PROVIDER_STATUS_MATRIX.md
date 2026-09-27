@@ -22,7 +22,7 @@ The status vocabulary follows the repository product-truth model: `IMPLEMENTED`,
 
 ### Stripe
 
-Core owns plan-to-price mapping, checkout-session creation, native `Stripe-Signature` verification, metadata binding, replay-safe lifecycle reconciliation and entitlement authority. CI proves fail-closed/test-mode behavior without live credentials or live charges. No current exact-candidate external Stripe network/payment acceptance is claimed.
+Core owns plan-to-price mapping, checkout-session creation, native `Stripe-Signature` verification, metadata binding, replay-safe lifecycle reconciliation and entitlement authority. CI proves fail-closed/test-mode behavior without live credentials or live charges. The connected sandbox now contains a non-live `SENTINEL Core Plus` product and EUR 9.99/month test price, but Core checkout is still environment-unverified until staging test credentials/webhook configuration are injected and an exact-candidate checkout is exercised. No live payment acceptance is claimed.
 
 ### Resend
 
@@ -38,7 +38,7 @@ The staging-only low-cardinality non-person sink is implemented, deterministic a
 
 ### Google / Telegram / VK
 
-Provider discovery, challenge/state/nonce handling, PKCE where applicable, provider-token verification, FORCE-RLS challenge persistence, explicit account linking and Android callback isolation are implemented and tested. Real provider-console application registration, credentials, network login and physical-device provider acceptance remain environment/Owner gates.
+Provider discovery, challenge/state/nonce handling, PKCE where applicable, provider-token verification, FORCE-RLS challenge persistence, explicit account linking and Android callback isolation are implemented and tested. Google Credential Manager and Telegram OIDC/PKCE were rechecked against current September 2026 provider guidance; no protocol rewrite is currently required. Real provider-console application registration, credentials, network login and physical-device provider acceptance remain environment/Owner gates.
 
 ### STT / TTS
 

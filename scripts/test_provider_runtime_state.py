@@ -27,6 +27,9 @@ def main() -> int:
     tasks = read("docs/TASKS.md")
     current = read("docs/SENTINEL_CURRENT_STATE.md")
     provider = read("docs/PROVIDER_SANDBOX_INTEGRATION_V1.md")
+    provider_matrix = read("docs/PROVIDER_STATUS_MATRIX.md")
+    federated = read("docs/FEDERATED_AUTH_V1.md")
+    free_strategy = read("docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md")
 
     for path in (
         "server/app/core/database_engine.py",
@@ -65,6 +68,12 @@ def main() -> int:
 
     require("production deployment" in provider, "provider contract preserves production non-claim")
     require("live charges" in provider, "provider contract preserves live-charge non-claim")
+    require("prod_VKsUERZXQrdT93" in provider and "livemode=false" in provider, "provider contract records sandbox-only Stripe catalog")
+    require("price_1UKCjxHDnOpHCmiXzQg7aFXf" in provider, "provider contract records exact non-live Core Plus price")
+    require("credential-manager-siwg" in federated, "federated contract links current Google Credential Manager guidance")
+    require("core.telegram.org/bots/telegram-login" in federated, "federated contract links current Telegram OIDC guidance")
+    require("zero-cost" in provider_matrix.lower(), "provider matrix records zero-cost pre-release posture")
+    require("Render Free" in free_strategy and "Stripe test/sandbox mode" in free_strategy, "free strategy keeps test infrastructure distinct from production")
 
     print(f"\nPROVIDER_STATE_PASSED={passed} PROVIDER_STATE_FAILED={len(failures)}")
     if failures:

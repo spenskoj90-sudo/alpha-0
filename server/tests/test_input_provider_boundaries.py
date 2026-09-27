@@ -12,6 +12,8 @@ import app.core.email_provider as email_module
 import app.core.posthog_telemetry as posthog_module
 from app.core.companion_observability import CompanionTelemetryEvent
 from app.core.email_provider import (
+    BrevoConfig,
+    BrevoEmailTransport,
     EmailMessage,
     EmailProviderUnavailable,
     ResendConfig,
@@ -280,12 +282,112 @@ def test_resend_transport_maps_network_failure_and_accepts_valid_provider_id(mon
     assert captured["request"].full_url == "https://api.resend.com/emails"
 
 
-def test_resend_activation_parser_is_strict_and_accepts_complete_staging_configuration(monkeypatch) -> None:
+
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "error"),
+    [
+        ({"api_key": "bad"}, "BREVO_API_KEY_INVALID"),
+        ({"from_address": "bad"}, "BREVO_FROM_ADDRESS_INVALID"),
+        ({"from_name": ""}, "BREVO_FROM_NAME_INVALID"),
+        ({"from_name": "bad\nname"}, "BREVO_FROM_NAME_INVALID"),
+        ({"endpoint": "https://example.com/v3/smtp/email"}, "BREVO_ENDPOINT_INVALID"),
+        ({"endpoint": "http://api.brevo.com/v3/smtp/email"}, "BREVO_ENDPOINT_INVALID"),
+    ],
+)
+def test_brevo_config_rejects_invalid_credentials_sender_name_and_endpoint(kwargs, error) -> None:
+    values = {
+        "api_key": "xkeysib-test-secret-key-123456",
+        "from_address": "sentinel@example.com",
+        "from_name": "SENTINEL",
+        "endpoint": "https://api.brevo.com/v3/smtp/email",
+    }
+    values.update(kwargs)
+    with pytest.raises(ValueError, match=error):
+        BrevoConfig(**values)
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 21])
+def test_brevo_transport_rejects_invalid_timeout(timeout: float) -> None:
+    with pytest.raises(ValueError, match="BREVO_TIMEOUT_INVALID"):
+        BrevoEmailTransport(
+            BrevoConfig(
+                api_key="xkeysib-test-secret-key-123456",
+                from_address="sentinel@example.com",
+            ),
+            timeout_seconds=timeout,
+        )
+
+
+@pytest.mark.parametrize(
+    ("raw", "error"),
+    [
+        (b"x" * 65_537, "BREVO_RESPONSE_TOO_LARGE"),
+        (b"{", "BREVO_RESPONSE_INVALID"),
+        (b"[]", "BREVO_RESPONSE_INVALID"),
+        (b'{"messageId":"bad\\nvalue"}', "BREVO_RESPONSE_INVALID"),
+    ],
+)
+def test_brevo_transport_bounds_provider_responses(monkeypatch, raw: bytes, error: str) -> None:
+    monkeypatch.setattr(email_module, "urlopen", lambda *_a, **_k: _Response(raw))
+    transport = BrevoEmailTransport(
+        BrevoConfig(
+            api_key="xkeysib-test-secret-key-123456",
+            from_address="sentinel@example.com",
+        )
+    )
+    with pytest.raises(EmailProviderUnavailable, match=error):
+        transport.send(EmailMessage("to@example.com", "Subject", "Body"))
+
+
+def test_brevo_transport_maps_network_failure_and_accepts_valid_message_id(monkeypatch) -> None:
+    transport = BrevoEmailTransport(
+        BrevoConfig(
+            api_key="xkeysib-test-secret-key-123456",
+            from_address="sentinel@example.com",
+        )
+    )
+    monkeypatch.setattr(
+        email_module,
+        "urlopen",
+        lambda *_a, **_k: (_ for _ in ()).throw(URLError("private")),
+    )
+    with pytest.raises(EmailProviderUnavailable, match="BREVO_UNAVAILABLE"):
+        transport.send(EmailMessage("to@example.com", "Subject", "Body"))
+
+    captured = {}
+
+    def open_ok(request, timeout):
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return _Response(b'{"messageId":"<test-message@relay.example>"}')
+
+    monkeypatch.setattr(email_module, "urlopen", open_ok)
+    assert transport.send(EmailMessage("to@example.com", "Subject", "Body")) == "<test-message@relay.example>"
+    assert captured["timeout"] == 8.0
+    assert captured["request"].full_url == "https://api.brevo.com/v3/smtp/email"
+    assert captured["request"].headers["Api-key"] == "xkeysib-test-secret-key-123456"
+    body = json.loads(captured["request"].data.decode("utf-8"))
+    assert body == {
+        "sender": {"email": "sentinel@example.com", "name": "SENTINEL"},
+        "subject": "Subject",
+        "textContent": "Body",
+        "to": [{"email": "to@example.com"}],
+    }
+
+
+def test_email_provider_activation_parser_is_strict_and_accepts_one_complete_provider(monkeypatch) -> None:
     monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "yes")
     with pytest.raises(RuntimeError, match="SENTINEL_RESEND_ENABLED_INVALID"):
         configured_email_transport()
 
     monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "true")
+    with pytest.raises(RuntimeError, match="EMAIL_PROVIDER_MULTIPLE_ENABLED"):
+        configured_email_transport()
+
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "false")
     monkeypatch.setenv("SENTINEL_ENV", "staging")
     monkeypatch.setenv("SENTINEL_RESEND_API_KEY", "bad")
     monkeypatch.setenv("SENTINEL_RESEND_FROM_ADDRESS", "sentinel@example.com")
@@ -294,6 +396,16 @@ def test_resend_activation_parser_is_strict_and_accepts_complete_staging_configu
 
     monkeypatch.setenv("SENTINEL_RESEND_API_KEY", "re_test_secret_key_123")
     assert isinstance(configured_email_transport(), ResendEmailTransport)
+
+    monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "false")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_BREVO_API_KEY", "bad")
+    monkeypatch.setenv("SENTINEL_BREVO_FROM_ADDRESS", "sentinel@example.com")
+    with pytest.raises(RuntimeError, match="BREVO_API_KEY_INVALID"):
+        configured_email_transport()
+
+    monkeypatch.setenv("SENTINEL_BREVO_API_KEY", "xkeysib-test-secret-key-123456")
+    assert isinstance(configured_email_transport(), BrevoEmailTransport)
 
 
 @pytest.mark.parametrize(

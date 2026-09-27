@@ -2,7 +2,7 @@
 
 const accountPanel = document.getElementById('account-panel');
 const accountStatus = document.getElementById('account-status');
-const statusIds = ['account-status', 'companion-status', 'wow-checkpoint-status', 'voice-status', 'voice-result'];
+const statusIds = ['account-status', 'companion-status', 'wow-checkpoint-status', 'connection-status', 'voice-status', 'voice-result'];
 
 function syncStatusTone(node) {
   if (!node) return;

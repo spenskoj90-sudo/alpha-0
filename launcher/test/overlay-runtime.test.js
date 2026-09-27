@@ -85,4 +85,7 @@ test('dedicated overlay renderer is sandboxed, non-actionable and tied to main-w
   assert.doesNotMatch(preload, /ipcRenderer\.(?:invoke|send)\s*\(/);
   assert.doesNotMatch(renderer, /innerHTML|eval\(|new Function|ipcRenderer/);
   assert.match(renderer, /textContent/);
+  assert.match(renderer, /No authoritative overlay presentation/);
+  assert.match(renderer, /LOCAL-ONLY/);
+  assert.match(renderer, /OFFLINE/);
 });

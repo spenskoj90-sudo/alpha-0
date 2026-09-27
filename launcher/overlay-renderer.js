@@ -39,7 +39,11 @@ function render(snapshot) {
   if (!presentation) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = 'Waiting for Companion presentation.';
+    empty.textContent = ['OFFLINE', 'LOCAL-ONLY'].includes(companionState)
+      ? `No authoritative overlay presentation · ${companionState}`
+      : companionState === 'DEGRADED'
+        ? 'Companion degraded · waiting for authoritative presentation.'
+        : 'Waiting for Companion presentation.';
     listNode.appendChild(empty);
     return;
   }

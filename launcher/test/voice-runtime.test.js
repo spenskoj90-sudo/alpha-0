@@ -176,6 +176,13 @@ test('launcher static voice composition has no arbitrary synthesis IPC and reque
   assert.match(renderer, /audio:\s*\{/);
   assert.match(renderer, /video:\s*false/);
   assert.match(renderer, /MediaRecorder/);
+  assert.match(renderer, /voiceHoldActive/);
+  assert.match(renderer, /addEventListener\('pointerdown'/);
+  assert.match(renderer, /addEventListener\('pointerup'/);
+  assert.match(renderer, /addEventListener\('pointerleave'/);
+  assert.match(renderer, /VOICE RESULT: CANCELED/);
+  assert.match(html, /HOLD TO TALK/);
+  assert.match(html, /Release to send\. Move away to cancel/);
   assert.match(html, /I explicitly consent to microphone capture/);
   assert.match(html, /media-src 'self' blob:/);
 });

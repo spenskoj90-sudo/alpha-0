@@ -1,7 +1,8 @@
 # SENTINEL master artwork provenance
 
 **Production design authority:** SENTINEL Design System v3.0  
-**Design laboratory:** `spenskoj90-sudo/sentinel-aware-companion@60629603299fd8af035c6f05991482cde0363c33`
+**Current design laboratory reference:** `spenskoj90-sudo/sentinel-aware-companion@a6fc9d4c513dde9d549e5dd70159b1365a76b95c`  
+**Original byte-exact asset import commit:** `60629603299fd8af035c6f05991482cde0363c33`
 
 ## Approved source
 

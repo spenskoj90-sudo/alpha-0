@@ -11,6 +11,11 @@ on:
         description: "Exact HTTPS SENTINEL Core origin embedded in the signed APK"
         required: true
         type: string
+      vk_client_id:
+        description: "Public VK ID application ID compiled into the release callback identity; use 0 when VK is disabled"
+        required: false
+        default: "0"
+        type: string
 
 permissions:
   actions: read
@@ -36,6 +41,7 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           API_BASE_URL: ${{ inputs.api_base_url }}
+          VK_CLIENT_ID: ${{ inputs.vk_client_id }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF_NAME" = "main"
@@ -44,6 +50,7 @@ jobs:
           esac
           test "${#SOURCE_SHA}" -eq 40
           test "$GITHUB_SHA" = "$SOURCE_SHA"
+          case "$VK_CLIENT_ID" in *[!0-9]*|'') echo "vk_client_id must contain decimal digits only"; exit 1 ;; esac
           python - <<'PY'
           import os
           from urllib.parse import urlsplit
@@ -223,6 +230,7 @@ jobs:
           SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
           SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
           SENTINEL_RUNTIME_ENVIRONMENT: release-candidate
+          SENTINEL_VK_CLIENT_ID: ${{ inputs.vk_client_id }}
         run: |
           set -euo pipefail
           chmod +x gradlew
@@ -231,6 +239,7 @@ jobs:
       - name: Verify release APK
         env:
           SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
+          VK_CLIENT_ID: ${{ inputs.vk_client_id }}
         run: |
           set -euo pipefail
           apk="app/build/outputs/apk/release/app-release.apk"
@@ -254,6 +263,7 @@ jobs:
             exit 1
           fi
           unzip -p "$apk" 'classes*.dex' | strings | grep -F -- "$SENTINEL_API_BASE_URL" >/dev/null
+          unzip -p "$apk" 'classes*.dex' | strings | grep -F -- "vk${VK_CLIENT_ID}://vk.ru/blank.html" >/dev/null
           echo "Verified release APK: $apk"
 
       - name: Build release-candidate lineage package

@@ -37,6 +37,7 @@ let voiceCaptureTimer = null;
 let voiceCaptureDiscarded = false;
 let voiceBusy = false;
 let suppressNextVoiceClick = false;
+let voiceHoldActive = false;
 
 function refreshButtons() {
   loginButton.disabled = signedIn || mfaRequired;
@@ -247,11 +248,18 @@ async function finalizeVoiceCapture() {
   stopVoiceTracks();
   voiceBusy = true;
   if (voiceMicState) voiceMicState.textContent = 'CLOSED';
-  if (voiceHeadline) voiceHeadline.textContent = 'Understanding request';
-  if (voiceDetail) voiceDetail.textContent = 'Capture ended. SENTINEL is evaluating the bounded voice request.';
+  if (discarded) {
+    if (voiceHeadline) voiceHeadline.textContent = 'Capture canceled';
+    if (voiceDetail) voiceDetail.textContent = 'Nothing was sent. Hold the control again when you are ready.';
+    voiceResult.className = 'status';
+    voiceResult.textContent = 'VOICE RESULT: CANCELED';
+  } else {
+    if (voiceHeadline) voiceHeadline.textContent = 'Understanding request';
+    if (voiceDetail) voiceDetail.textContent = 'Capture ended. SENTINEL is evaluating the bounded voice request.';
+  }
   refreshButtons();
   try {
-    if (discarded) throw new Error('VOICE_CAPTURE_DISCARDED');
+    if (discarded) return;
     const blob = new Blob(chunks, { type: currentVoice.captureContentType || 'audio/webm;codecs=opus' });
     await submitVoiceBlob(blob);
   } catch (error) {
@@ -416,7 +424,10 @@ voiceConsent.onchange = async () => {
 
 async function beginVoiceHold() {
   if (voiceRecorder || voiceBusy || voicePtt.disabled) return;
-  try { await startVoiceCapture(); }
+  try {
+    await startVoiceCapture();
+    if (!voiceHoldActive && voiceRecorder) stopVoiceCapture();
+  }
   catch (error) {
     showError(voiceResult, error);
     if (voiceMicState) voiceMicState.textContent = 'CLOSED';
@@ -429,27 +440,35 @@ async function beginVoiceHold() {
 voicePtt.addEventListener('pointerdown', event => {
   if (voicePtt.disabled) return;
   suppressNextVoiceClick = true;
+  voiceHoldActive = true;
   event.preventDefault();
   void beginVoiceHold();
 });
 voicePtt.addEventListener('pointerup', event => {
+  voiceHoldActive = false;
   event.preventDefault();
   if (voiceRecorder) stopVoiceCapture();
 });
 voicePtt.addEventListener('pointerleave', () => {
+  voiceHoldActive = false;
+  suppressNextVoiceClick = false;
   if (voiceRecorder) cancelVoiceCapture();
 });
 voicePtt.addEventListener('pointercancel', () => {
+  voiceHoldActive = false;
+  suppressNextVoiceClick = false;
   if (voiceRecorder) cancelVoiceCapture();
 });
 voicePtt.addEventListener('keydown', event => {
   if (![' ', 'Enter'].includes(event.key) || event.repeat || voicePtt.disabled) return;
   suppressNextVoiceClick = true;
+  voiceHoldActive = true;
   event.preventDefault();
   void beginVoiceHold();
 });
 voicePtt.addEventListener('keyup', event => {
   if (![' ', 'Enter'].includes(event.key)) return;
+  voiceHoldActive = false;
   event.preventDefault();
   if (voiceRecorder) stopVoiceCapture();
 });
@@ -461,8 +480,13 @@ voicePtt.addEventListener('click', event => {
   }
   // Assistive-technology fallback where no pointer/key hold events are emitted:
   // first activation starts a bounded capture, second activation sends it.
-  if (voiceRecorder) stopVoiceCapture();
-  else void beginVoiceHold();
+  if (voiceRecorder) {
+    voiceHoldActive = false;
+    stopVoiceCapture();
+  } else {
+    voiceHoldActive = true;
+    void beginVoiceHold();
+  }
 });
 
 window.sentinel.onCompanionStatus(setCompanion);

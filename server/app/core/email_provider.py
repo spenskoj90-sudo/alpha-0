@@ -87,6 +87,92 @@ class ResendConfig:
             raise ValueError("RESEND_ENDPOINT_INVALID")
 
 
+@dataclass(frozen=True)
+class BrevoConfig:
+    api_key: str = field(repr=False)
+    from_address: str
+    from_name: str = "SENTINEL"
+    endpoint: str = "https://api.brevo.com/v3/smtp/email"
+
+    def __post_init__(self) -> None:
+        if not self.api_key.startswith("xkeysib-") or len(self.api_key) < 20 or len(self.api_key) > 512:
+            raise ValueError("BREVO_API_KEY_INVALID")
+        if not _EMAIL.fullmatch(self.from_address):
+            raise ValueError("BREVO_FROM_ADDRESS_INVALID")
+        if not self.from_name or len(self.from_name.encode("utf-8")) > 120 or "\r" in self.from_name or "\n" in self.from_name:
+            raise ValueError("BREVO_FROM_NAME_INVALID")
+        parts = urlsplit(self.endpoint)
+        if (
+            parts.scheme != "https"
+            or parts.hostname != "api.brevo.com"
+            or parts.path != "/v3/smtp/email"
+            or parts.query
+            or parts.fragment
+            or parts.username
+            or parts.password
+        ):
+            raise ValueError("BREVO_ENDPOINT_INVALID")
+
+
+class BrevoEmailTransport:
+    """Fail-closed Brevo HTTPS adapter for Render-free-compatible staging delivery."""
+
+    def __init__(self, config: BrevoConfig, *, timeout_seconds: float = 8.0) -> None:
+        if timeout_seconds <= 0 or timeout_seconds > 20:
+            raise ValueError("BREVO_TIMEOUT_INVALID")
+        self._config = config
+        self._timeout_seconds = timeout_seconds
+
+    def send(self, message: EmailMessage) -> str:
+        payload = json.dumps(
+            {
+                "sender": {
+                    "email": self._config.from_address,
+                    "name": self._config.from_name,
+                },
+                "to": [{"email": message.to_address}],
+                "subject": message.subject,
+                "textContent": message.text,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request = Request(
+            self._config.endpoint,
+            data=payload,
+            method="POST",
+            headers={
+                "api-key": self._config.api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "sentinel-core/brevo-adapter",
+            },
+        )
+        try:
+            with urlopen(request, timeout=self._timeout_seconds) as response:
+                raw = response.read(_MAX_RESPONSE_BYTES + 1)
+        except HTTPError as exc:
+            raise EmailProviderUnavailable(f"BREVO_HTTP_{exc.code}") from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise EmailProviderUnavailable("BREVO_UNAVAILABLE") from exc
+        if len(raw) > _MAX_RESPONSE_BYTES:
+            raise EmailProviderUnavailable("BREVO_RESPONSE_TOO_LARGE")
+        try:
+            result = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise EmailProviderUnavailable("BREVO_RESPONSE_INVALID") from exc
+        message_id = result.get("messageId") if isinstance(result, dict) else None
+        if (
+            not isinstance(message_id, str)
+            or len(message_id) < 6
+            or len(message_id) > 512
+            or "\r" in message_id
+            or "\n" in message_id
+        ):
+            raise EmailProviderUnavailable("BREVO_RESPONSE_INVALID")
+        return message_id
+
+
 class ResendEmailTransport:
     """Fail-closed Resend adapter; credentials remain environment-injected."""
 
@@ -138,19 +224,36 @@ class ResendEmailTransport:
 
 
 def configured_email_transport() -> EmailTransport:
-    """Return a provider only when staging Resend configuration is complete."""
+    """Return exactly one configured staging email provider or fail closed."""
 
-    if not _strict_env_bool("SENTINEL_RESEND_ENABLED", default=False):
+    resend_enabled = _strict_env_bool("SENTINEL_RESEND_ENABLED", default=False)
+    brevo_enabled = _strict_env_bool("SENTINEL_BREVO_ENABLED", default=False)
+    enabled_count = int(resend_enabled) + int(brevo_enabled)
+    if enabled_count == 0:
         return DisabledEmailTransport()
+    if enabled_count > 1:
+        raise RuntimeError("EMAIL_PROVIDER_MULTIPLE_ENABLED")
+
     environment = os.getenv("SENTINEL_ENV", "development").strip().lower()
     if environment != "staging":
-        raise RuntimeError("RESEND_STAGING_ONLY")
-    api_key = os.getenv("SENTINEL_RESEND_API_KEY", "")
-    from_address = os.getenv("SENTINEL_RESEND_FROM_ADDRESS", "")
-    if not api_key or not from_address:
-        raise RuntimeError("RESEND_NOT_CONFIGURED")
+        raise RuntimeError("EMAIL_PROVIDER_STAGING_ONLY")
+
     try:
-        return ResendEmailTransport(ResendConfig(api_key=api_key, from_address=from_address))
+        if resend_enabled:
+            api_key = os.getenv("SENTINEL_RESEND_API_KEY", "")
+            from_address = os.getenv("SENTINEL_RESEND_FROM_ADDRESS", "")
+            if not api_key or not from_address:
+                raise RuntimeError("RESEND_NOT_CONFIGURED")
+            return ResendEmailTransport(ResendConfig(api_key=api_key, from_address=from_address))
+
+        api_key = os.getenv("SENTINEL_BREVO_API_KEY", "")
+        from_address = os.getenv("SENTINEL_BREVO_FROM_ADDRESS", "")
+        from_name = os.getenv("SENTINEL_BREVO_FROM_NAME", "SENTINEL")
+        if not api_key or not from_address:
+            raise RuntimeError("BREVO_NOT_CONFIGURED")
+        return BrevoEmailTransport(
+            BrevoConfig(api_key=api_key, from_address=from_address, from_name=from_name)
+        )
     except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
 

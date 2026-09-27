@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from app.core.email_provider import (
+    BrevoConfig,
+    BrevoEmailTransport,
     DisabledEmailTransport,
     EmailMessage,
     EmailProviderUnavailable,
@@ -50,20 +52,60 @@ def test_resend_config_hides_key_and_requires_https() -> None:
         )
 
 
-def test_resend_is_disabled_by_default_and_staging_only(monkeypatch) -> None:
+def test_email_providers_are_disabled_by_default_and_staging_only(monkeypatch) -> None:
     for name in (
         "SENTINEL_RESEND_ENABLED",
         "SENTINEL_RESEND_API_KEY",
         "SENTINEL_RESEND_FROM_ADDRESS",
+        "SENTINEL_BREVO_ENABLED",
+        "SENTINEL_BREVO_API_KEY",
+        "SENTINEL_BREVO_FROM_ADDRESS",
+        "SENTINEL_BREVO_FROM_NAME",
     ):
         monkeypatch.delenv(name, raising=False)
     assert isinstance(configured_email_transport(), DisabledEmailTransport)
 
     monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "true")
     monkeypatch.setenv("SENTINEL_ENV", "production")
-    with pytest.raises(RuntimeError, match="RESEND_STAGING_ONLY"):
+    with pytest.raises(RuntimeError, match="EMAIL_PROVIDER_STAGING_ONLY"):
         configured_email_transport()
 
     monkeypatch.setenv("SENTINEL_ENV", "staging")
     with pytest.raises(RuntimeError, match="RESEND_NOT_CONFIGURED"):
         configured_email_transport()
+
+    monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "false")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "true")
+    with pytest.raises(RuntimeError, match="BREVO_NOT_CONFIGURED"):
+        configured_email_transport()
+
+
+def test_brevo_config_hides_key_and_pins_https_api() -> None:
+    config = BrevoConfig(
+        api_key="xkeysib-test-secret-key-123456",
+        from_address="sentinel@example.com",
+    )
+    assert "xkeysib-test-secret-key-123456" not in repr(config)
+
+    with pytest.raises(ValueError, match="BREVO_ENDPOINT_INVALID"):
+        BrevoConfig(
+            api_key="xkeysib-test-secret-key-123456",
+            from_address="sentinel@example.com",
+            endpoint="https://example.com/v3/smtp/email",
+        )
+
+    with pytest.raises(ValueError, match="BREVO_FROM_NAME_INVALID"):
+        BrevoConfig(
+            api_key="xkeysib-test-secret-key-123456",
+            from_address="sentinel@example.com",
+            from_name="bad\nname",
+        )
+
+
+def test_brevo_complete_staging_configuration_is_selected(monkeypatch) -> None:
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "false")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_BREVO_API_KEY", "xkeysib-test-secret-key-123456")
+    monkeypatch.setenv("SENTINEL_BREVO_FROM_ADDRESS", "sentinel@example.com")
+    assert isinstance(configured_email_transport(), BrevoEmailTransport)

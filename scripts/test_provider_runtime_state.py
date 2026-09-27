@@ -55,13 +55,13 @@ def main() -> int:
 
     for document_name, document in (("TASKS", tasks), ("CURRENT_STATE", current)):
         require("PostHog" in document and "staging" in document, f"{document_name} records staging-only PostHog boundary")
-        require("Resend" in document and "staging" in document, f"{document_name} records staging-only Resend boundary")
+        require("Resend" in document and "Brevo" in document and "staging" in document, f"{document_name} records staging-only multi-provider email boundary")
         require("transaction-local" in document and "FORCE RLS" in document, f"{document_name} records transaction-local RLS service role")
 
     for phrase in (
         "Stripe pre-release billing",
         "PostHog staging telemetry",
-        "Resend email boundary",
+        "Transactional email boundary",
         "PgBouncer service-role boundary",
     ):
         require(phrase in provider, f"provider contract retains {phrase}")

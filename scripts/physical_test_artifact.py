@@ -20,6 +20,8 @@ EXPECTED_VARIANT = "physicalTest"
 EXPECTED_STAGING_ORIGIN = "https://sentinel-core-staging.onrender.com"
 EXPECTED_STAGING_FALLBACK = "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core"
 EXPECTED_HTTP_READ_TIMEOUT_MS = 75_000
+EXPECTED_AUTH_CALLBACK_SCHEME = "com.alpha0.app.physicaltest.auth"
+VK_CLIENT_ID = re.compile(r"^[0-9]+$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DEX_ENTRY = re.compile(r"^classes(?:\d+)?\.dex$")
@@ -70,13 +72,26 @@ def load_output_metadata(path: Path, apk: Path, canonical_version: str) -> dict[
     return element
 
 
-def inspect_apk(apk: Path, source_sha: str, api_base_url: str, api_fallback_base_url: str) -> None:
+def inspect_apk(
+    apk: Path,
+    source_sha: str,
+    api_base_url: str,
+    api_fallback_base_url: str,
+    vk_redirect_uri: str,
+) -> None:
     require(apk.is_file(), "physical-test APK is missing")
     with zipfile.ZipFile(apk) as archive:
         dex_names = sorted(name for name in archive.namelist() if DEX_ENTRY.fullmatch(name))
         require(bool(dex_names), "physical-test APK contains no classes*.dex")
         dex = b"".join(archive.read(name) for name in dex_names)
-    for expected in (source_sha, api_base_url, api_fallback_base_url, "FORENSIC_TEST"):
+    for expected in (
+        source_sha,
+        api_base_url,
+        api_fallback_base_url,
+        "FORENSIC_TEST",
+        EXPECTED_AUTH_CALLBACK_SCHEME,
+        vk_redirect_uri,
+    ):
         require(expected.encode("utf-8") in dex, f"compiled APK is missing expected identity: {expected}")
     for forbidden in (b"http://127.0.0.1", b"https://127.0.0.1", b"http://localhost", b"https://localhost", b"10.0.2.2"):
         require(forbidden not in dex, f"compiled APK contains forbidden loopback endpoint: {forbidden.decode()}")
@@ -94,6 +109,7 @@ def build_manifest(
     run_id: str,
     run_attempt: str,
     signer_sha256: str,
+    vk_client_id: str = "0",
     expected_signer_sha256: str | None = None,
     signing_mode: str = "ephemeral-debug",
     workflow_name: str = "Physical Test APK",
@@ -109,6 +125,9 @@ def build_manifest(
         (signing_mode == "stable-test") == (workflow_name == "Physical Test Update APK"),
         "stable-test signing must use the dedicated update workflow",
     )
+    vk_id = vk_client_id.strip()
+    require(VK_CLIENT_ID.fullmatch(vk_id) is not None, "VK client ID must contain decimal digits only")
+    vk_redirect_uri = f"vk{vk_id}://vk.ru/blank.html"
     signer = signer_sha256.strip().lower()
     require(SHA256.fullmatch(signer) is not None, "signer certificate SHA-256 must be 64-character lowercase hex")
     expected_signer = expected_signer_sha256.strip().lower() if expected_signer_sha256 is not None else None
@@ -123,7 +142,7 @@ def build_manifest(
     canonical_version = version_file.read_text(encoding="utf-8").strip()
     require(bool(canonical_version), "canonical VERSION is empty")
     metadata = load_output_metadata(output_metadata, apk, canonical_version)
-    inspect_apk(apk, source_sha, origin, fallback)
+    inspect_apk(apk, source_sha, origin, fallback, vk_redirect_uri)
     apk_bytes = apk.read_bytes()
     timestamp = generated_at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return {
@@ -155,6 +174,11 @@ def build_manifest(
         "apiBaseUrl": origin,
         "apiFallbackBaseUrl": fallback,
         "runtimeEnvironment": "staging",
+        "federatedAuth": {
+            "authCallbackScheme": EXPECTED_AUTH_CALLBACK_SCHEME,
+            "vkClientId": vk_id,
+            "vkRedirectUri": vk_redirect_uri,
+        },
         "signingMode": signing_mode,
         "signerCertificateSha256": signer,
         "signerLineageVerified": signing_mode == "stable-test",
@@ -178,6 +202,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--run-attempt", required=True)
     parser.add_argument("--signer-sha256", required=True)
+    parser.add_argument("--vk-client-id", default="0")
     parser.add_argument("--expected-signer-sha256")
     parser.add_argument("--signing-mode", default="ephemeral-debug")
     parser.add_argument("--workflow-name", default="Physical Test APK")
@@ -200,6 +225,7 @@ def main() -> int:
             run_id=args.run_id,
             run_attempt=args.run_attempt,
             signer_sha256=args.signer_sha256,
+            vk_client_id=args.vk_client_id,
             expected_signer_sha256=args.expected_signer_sha256,
             signing_mode=args.signing_mode,
             workflow_name=args.workflow_name,

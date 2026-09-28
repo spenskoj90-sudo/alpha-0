@@ -32,6 +32,7 @@ Read this file first. Do not load the entire repository documentation set by def
 - Public Website: site/AGENTS.md
 - Companion/Overlay/Voice: launcher/AGENTS.md
 - WoW addon/exact game environment: wow-addon/AGENTS.md
+- Control Bridge/agent runtime: control-bridge/AGENTS.md and docs/CONTROL_BRIDGE_ARCHITECTURE.md
 - Release/signing/deployment: RELEASE_GATES, SENTINEL_EVIDENCE_PROTOCOL, FINAL_RELEASE_ACCEPTANCE_V1
 - Design migration: DESIGN_SYSTEM_V3 and current design-reference provenance
 

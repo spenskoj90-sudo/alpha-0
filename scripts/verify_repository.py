@@ -525,6 +525,11 @@ def check_governance(checks: Checks) -> None:
         and "Staging runtime: Render" in working_environment,
         "working-environment contract names canonical infrastructure control planes",
     )
+    checks.require(
+        "ChatGPT Plus cannot directly attach a custom remote MCP server" in working_environment
+        and "OpenAI API billing are separate" in working_environment,
+        "working-environment contract does not overstate Plus custom-MCP/API availability",
+    )
     for scoped in (
         "app/AGENTS.md",
         "server/AGENTS.md",

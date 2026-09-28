@@ -34,3 +34,15 @@ Web/Core staging must keep declared repository runtime versions aligned with Ren
 Secrets are stored only in provider/runtime secret stores or Owner-controlled local custody. Do not place raw secrets in Git, Project attachments, Google Drive operational docs, issue bodies, logs or chat messages.
 
 OpenAI API keys belong to the consuming orchestration runtime. The Control Bridge itself does not require an OpenAI API key.
+
+## Current ChatGPT plan boundary
+
+The current Human Owner uses ChatGPT Plus.
+
+As of 2026-09-28, ChatGPT Plus cannot directly attach a custom remote MCP server as a full custom ChatGPT app. Therefore:
+
+- the SENTINEL Control Bridge staging service remains a fail-closed infrastructure foundation;
+- do not represent it as an active ChatGPT Plus tool;
+- use current built-in plugins, ChatGPT Work and scheduled automations for the primary Plus workflow;
+- connect the bridge only through a separately billed OpenAI API orchestration runtime or after moving to a ChatGPT plan/workspace that supports the required custom MCP capability;
+- ChatGPT subscription/usage credits and OpenAI API billing are separate. Do not start paid API orchestration merely because an API key exists; define a cost/budget guardrail first.

@@ -163,9 +163,9 @@ Firebase Test Lab is retired as a project dependency and remains optional inform
 
 ## 8. Governance
 
-The canonical operating model is `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT/ChatGPT is the sole AI engineering participant, the Human Owner is final authority, routine CI failures are diagnosed/fixed autonomously, and GPT may merge only after exact-PR-HEAD required checks are successful without bypassing security or repository protection.
+The canonical operating model is `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md`: the Human Owner is final authority, GPT/ChatGPT is primary orchestrator and final technical integrator, and bounded secondary agents may execute independent work in isolated lanes. One mutable worktree has one writer, integration is serialized, routine CI failures are diagnosed/fixed autonomously, and GPT may merge only after exact-PR-HEAD required checks are successful without bypassing security or repository protection.
 
-Historical workflow or playbook documents that prohibit GPT merge are superseded where they conflict with that canonical operating system.
+The former GPT-only restriction and redundant role/playbook contracts are superseded. They remain historical context only and cannot override the active multi-agent operating system.
 
 ## 9. Source-of-truth model
 

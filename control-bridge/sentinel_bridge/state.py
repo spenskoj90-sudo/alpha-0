@@ -18,8 +18,11 @@ def _read_json(relative: str) -> dict[str, Any]:
     return json.loads(_read_text(relative))
 
 def _source_sha() -> str:
-    value = os.getenv("SENTINEL_SOURCE_SHA", "").strip().lower()
-    return value if SHA40.fullmatch(value) else "UNKNOWN"
+    for name in ("SENTINEL_SOURCE_SHA", "RENDER_GIT_COMMIT", "GITHUB_SHA"):
+        value = os.getenv(name, "").strip().lower()
+        if SHA40.fullmatch(value):
+            return value
+    return "UNKNOWN"
 
 def _configured(name: str) -> bool:
     return bool(os.getenv(name, "").strip())

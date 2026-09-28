@@ -210,3 +210,15 @@
 **Decision:** Root `VERSION` is the canonical cross-surface release-candidate version. Android reads it directly; repository verification requires equivalent npm and Python package versions. The release workflow rejects a tag that does not match it. Release tag creation and publication remain Owner-only.
 
 **Reason:** Android already carried the monotonic RC2 build (`versionCode 10002`) while web/Core metadata and RC1-labelled documents lagged. Reconciliation must not downgrade an installed Android build or silently publish a version.
+
+
+## D-032 — Controlled multi-agent engineering replaces GPT-only restriction
+
+**Date:** 2026-09-28  
+**Decision:** The Human Owner explicitly authorized retiring the strict GPT-only participation rule. SENTINEL now uses controlled multi-agent engineering: GPT/ChatGPT remains the primary orchestrator and final technical integrator; secondary OpenAI agents and external model families may perform bounded independent work under least privilege and isolated mutable state. Parallel results integrate serially through the existing exact-SHA PR gate.
+
+**Safety/integration constraints:** Secondary agents cannot merge protected main, access production secrets/signing material, change branch protection or repository permissions, perform live production deployment/release publication, or silently share a mutable worktree with another writer. Security-sensitive shared-state work defaults to one primary writer. External-model review is optional and evidence-bound rather than majority-vote authority.
+
+**Context decision:** Root/scoped AGENTS.md files become the compact agent context router. The former redundant role/playbook/permissions contracts are superseded to reduce context dilution; Git history preserves them.
+
+**Supersedes:** the strict AI-participation restriction adopted in September and the single-AI rationale in D-025. It does not supersede repository-first truth, exact-SHA merge validation, branch protection, Owner gates, release/security evidence requirements, or user-visible acceptance.

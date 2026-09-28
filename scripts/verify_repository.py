@@ -203,12 +203,27 @@ def check_web(checks: Checks) -> None:
     checks.require(root_lock.get("dependencies") == package.get("dependencies"), "npm locked runtime dependency declarations agree")
     checks.require(root_lock.get("devDependencies") == package.get("devDependencies"), "npm locked development dependency declarations agree")
 
+    site_package = json.loads(read("site/package.json"))
+    site_lock = json.loads(read("site/package-lock.json"))
+    site_root_lock = site_lock.get("packages", {}).get("", {})
+    checks.require(site_package.get("name") == "sentinel-public-site", "public site has a distinct package identity")
+    checks.require(site_lock.get("lockfileVersion", 0) >= 3, "public-site npm lockfile format is deterministic")
+    checks.require(site_lock.get("version") == site_package.get("version"), "public-site package and lockfile versions agree")
+    checks.require(site_root_lock.get("dependencies") == site_package.get("dependencies"), "public-site locked runtime dependency declarations agree")
+    checks.require(site_root_lock.get("devDependencies") == site_package.get("devDependencies"), "public-site locked development dependency declarations agree")
+    checks.require(site_package.get("dependencies") == package.get("dependencies"), "public site stays on the validated Web runtime dependency line")
+    checks.require(site_package.get("devDependencies") == package.get("devDependencies"), "public site stays on the validated Web tooling dependency line")
+    checks.require('output: "export"' in read("site/next.config.mjs"), "public site is a static export with no application server boundary")
+    checks.require(not (ROOT / "site" / "app" / "api").exists(), "public site exposes no account/session/billing/admin API routes")
+
     build = read(".github/workflows/build.yml")
     p1 = read(".github/workflows/p1-evidence.yml")
     security = read(".github/workflows/security.yml")
     checks.require("npm install" not in build + p1 + security, "validation workflows do not resolve web dependencies with npm install")
     checks.require("npm ci" in build and "npm test" in build, "Web build gates deterministic install and Vitest")
     checks.require("npm run test:coverage" in build, "Web build enforces measured API/server coverage")
+    checks.require("working-directory: site" in build and "Build static public site" in build, "Web build also lints and builds the isolated public site")
+    checks.require("Audit public-site dependencies" in security, "Security workflow audits public-site dependencies")
     checks.require("npm ci" in p1 and "npm ci" in security, "security/evidence workflows use npm ci")
 
     checks.require(
@@ -243,6 +258,7 @@ def check_versions(checks: Checks) -> None:
     checks.require(bool(SEMVER_RC.fullmatch(canonical)), "VERSION uses canonical release-candidate SemVer")
 
     package = json.loads(read("web/package.json"))["version"].lower()
+    site_package = json.loads(read("site/package.json"))["version"].lower()
     pyproject = read("server/pyproject.toml")
     match = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
     python_version = normalize_python_version(match.group(1)) if match else ""
@@ -250,6 +266,7 @@ def check_versions(checks: Checks) -> None:
     main = read("server/app/main.py")
 
     checks.require(package == canonical, "web version matches VERSION")
+    checks.require(site_package == canonical, "public-site version matches VERSION")
     checks.require(python_version == canonical, "Core package version matches VERSION")
     checks.require(read(".node-version").strip() == "24.21.0", "Node runtime is pinned to 24.21.0 LTS")
     checks.require(read(".python-version").strip() == "3.14.7", "Python runtime is pinned to 3.14.7")
@@ -282,6 +299,11 @@ def check_versions(checks: Checks) -> None:
     checks.require(web_package.get("dependencies", {}).get("react") == "19.3.0", "Web pins React 19.3.0")
     checks.require(web_package.get("devDependencies", {}).get("typescript") == "6.0.3", "Web pins TypeScript 6.0.3")
     checks.require(web_package.get("devDependencies", {}).get("eslint") == "9.39.5", "Web uses Next-compatible ESLint 9.39.5")
+    site_web_package = json.loads(read("site/package.json"))
+    checks.require(site_web_package.get("engines", {}).get("node") == "24.x", "Public site declares Node 24 LTS")
+    checks.require(site_web_package.get("dependencies", {}).get("next") == "16.3.6", "Public site pins Next.js 16.3.6")
+    checks.require(site_web_package.get("dependencies", {}).get("react") == "19.3.0", "Public site pins React 19.3.0")
+    checks.require(site_web_package.get("devDependencies", {}).get("typescript") == "6.0.3", "Public site pins TypeScript 6.0.3")
     checks.require("node:24.21.0-alpine3.24@sha256:" in read("web/Dockerfile"), "Web image pins Node 24.21.0 by digest")
     checks.require("python:3.14.7-slim@sha256:" in read("server/Dockerfile"), "Core image pins Python 3.14.7 by digest")
     launcher = json.loads(read("launcher/package.json"))

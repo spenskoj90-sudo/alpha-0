@@ -59,12 +59,20 @@ jobs:
         with:
           node-version: "24.21.0"
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            site/package-lock.json
       - name: Install web dependencies without executing lifecycle scripts
         working-directory: web
         run: npm ci --ignore-scripts --no-audit
       - name: Audit web dependencies
         working-directory: web
+        run: npm audit --audit-level=high
+      - name: Install public-site dependencies without executing lifecycle scripts
+        working-directory: site
+        run: npm ci --ignore-scripts --no-audit
+      - name: Audit public-site dependencies
+        working-directory: site
         run: npm audit --audit-level=high
       - name: Audit repository dependency manifests with OSV
         uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0

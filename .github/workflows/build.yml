@@ -213,12 +213,28 @@ jobs:
         with:
           node-version: "24.21.0"
           cache: npm
-          cache-dependency-path: web/package-lock.json
-      - run: npm ci
-      - run: npm test
-      - run: npm run test:coverage
-      - run: npm run lint
-      - run: npm run build
+          cache-dependency-path: |
+            web/package-lock.json
+            site/package-lock.json
+      - name: Install Control Plane dependencies
+        run: npm ci
+      - name: Test Control Plane
+        run: npm test
+      - name: Enforce Control Plane coverage
+        run: npm run test:coverage
+      - name: Lint Control Plane
+        run: npm run lint
+      - name: Build Control Plane
+        run: npm run build
+      - name: Install public-site dependencies
+        working-directory: site
+        run: npm ci
+      - name: Lint public site
+        working-directory: site
+        run: npm run lint
+      - name: Build static public site
+        working-directory: site
+        run: npm run build
 
   launcher:
     name: Launcher runtime tests

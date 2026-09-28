@@ -23,7 +23,8 @@ The prior physical Android diagnostic bundle remains historical evidence for its
 
 - Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, server-driven Google/Telegram/VK federated sign-in, explicit provider linking from Security, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
 - FastAPI Core exists under `server/`.
-- Next.js control plane exists under `web/`.
+- Next.js authenticated control plane exists under `web/`.
+- An isolated pre-release public website exists under `site/` as a static-export Next.js surface. It contains no account/session/billing/admin API routes, is non-indexable while pre-release, and does not expose public download claims before signed publication acceptance. It is source/build ready only; production hosting remains an Owner-gated deployment action.
 - Electron launcher exists under `launcher/` and exposes account/Companion runtime state, local game launching, passive WoW checkpoint state, a read-only Companion overlay renderer and an explicit-consent push-to-talk voice surface.
 - The Electron launcher also has an unsigned source-bound Windows x64 packaging path with pinned Electron provenance, reproducibility comparison and packaged-executable smoke evidence. This is packaged CI evidence, not signed-release or physical-host acceptance.
 - WoW addon sources exist under `wow-addon/`.

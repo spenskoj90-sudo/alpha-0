@@ -29,7 +29,8 @@ The repository's canonical build version is stored in [`VERSION`](VERSION). Rele
 - Provider-neutral knowledge/recommendation routing with bounded confidence/provenance and Command Center presentation.
 - Android proven-device session establishment and retry-safe event-batch delivery to Core.
 - Diablo catalog, entitlement gate, admin entitlement control and WoW support.
-- Next.js web control plane.
+- Next.js authenticated web control plane.
+- Isolated static-export public website under `site/`; pre-release indexing/download publication remain disabled until release acceptance.
 - Docker Compose reference deployment.
 - GitHub Actions build, security, deployment and release workflows.
 

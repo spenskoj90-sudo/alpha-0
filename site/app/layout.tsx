@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   },
   description:
     "SENTINEL is a pre-release trusted intelligence platform spanning Android, Web Control Plane, Windows Companion and player-facing guidance.",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/brand/icon-64.png",
   },

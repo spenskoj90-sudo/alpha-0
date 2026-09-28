@@ -1,0 +1,13 @@
+{
+  "name": "SENTINEL",
+  "short_name": "SENTINEL",
+  "description": "SENTINEL pre-release trusted intelligence platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#061018",
+  "theme_color": "#061018",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

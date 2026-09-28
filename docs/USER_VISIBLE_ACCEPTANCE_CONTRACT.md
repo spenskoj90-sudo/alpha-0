@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE  
 **Effective:** 2026-09-28  
-**Authority:** Human Owner instruction + canonical GPT-only engineering OS  
+**Authority:** Human Owner instruction + canonical controlled multi-agent engineering OS  
 **Issue:** #375
 
 ## Purpose

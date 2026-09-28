@@ -33,8 +33,7 @@ jobs:
           python scripts/staging_surface_smoke.py \
             --expected-sha "$SENTINEL_SOURCE_SHA" \
             --expected-version "$(cat VERSION)" \
-            --probe-id "$SENTINEL_PROBE_ID" \
-            --output artifacts/staging-synthetic.json
+            --probe-id "$SENTINEL_PROBE_ID"
       - name: Upload staging synthetic evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

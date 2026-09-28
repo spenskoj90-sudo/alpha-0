@@ -20,6 +20,7 @@ _BRIDGE_URL = "https://sentinel-control-bridge-staging.onrender.com"
 _CORE_URL = "https://sentinel-core-staging.onrender.com"
 _WEB_URL = "https://sentinel-web-staging-fxhn.onrender.com"
 _SITE_URL = "https://sentinel-public-site-staging.onrender.com"
+_OUTPUT_PATH = Path("artifacts/staging-synthetic.json")
 
 
 class SmokeFailure(RuntimeError):
@@ -224,13 +225,12 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--probe-id", default=os.getenv("GITHUB_RUN_ID", "manual"))
     value.add_argument("--deploy-timeout-seconds", type=int, default=900)
     value.add_argument("--poll-seconds", type=int, default=15)
-    value.add_argument("--output", required=True)
     return value
 
 
 def main() -> int:
     args = parser().parse_args()
-    output = Path(args.output)
+    output = _OUTPUT_PATH
     output.parent.mkdir(parents=True, exist_ok=True)
     try:
         evidence = run(args)

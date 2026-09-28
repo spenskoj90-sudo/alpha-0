@@ -550,6 +550,11 @@ def check_governance(checks: Checks) -> None:
         "staging synthetic network destinations are literal and not caller-controlled",
     )
     checks.require(
+        'value.add_argument("--output"' not in staging_smoke
+        and '_OUTPUT_PATH = Path("artifacts/staging-synthetic.json")' in staging_smoke,
+        "staging synthetic evidence path is literal and not caller-controlled",
+    )
+    checks.require(
         "/api/session/login" in staging_smoke
         and "INVALID_CREDENTIALS" in staging_smoke
         and "SENTINEL_CORE_URL_NOT_CONFIGURED" not in staging_smoke,

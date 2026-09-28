@@ -295,6 +295,10 @@ def check_versions(checks: Checks) -> None:
     )
     web_package = json.loads(read("web/package.json"))
     checks.require(web_package.get("engines", {}).get("node") == "24.x", "Web declares Node 24 LTS")
+    checks.require(
+        web_package.get("scripts", {}).get("start") == "next start -H 0.0.0.0",
+        "Web runtime binds Next to the external service interface explicitly",
+    )
     checks.require(web_package.get("dependencies", {}).get("next") == "16.3.6", "Web pins Next.js 16.3.6")
     checks.require(web_package.get("dependencies", {}).get("react") == "19.3.0", "Web pins React 19.3.0")
     checks.require(web_package.get("devDependencies", {}).get("typescript") == "6.0.3", "Web pins TypeScript 6.0.3")

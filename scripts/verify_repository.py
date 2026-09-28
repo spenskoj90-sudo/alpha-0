@@ -530,6 +530,29 @@ def check_governance(checks: Checks) -> None:
         and "OpenAI API billing are separate" in working_environment,
         "working-environment contract does not overstate Plus custom-MCP/API availability",
     )
+    staging_workflow = read(".github/workflows/staging-synthetic.yml")
+    staging_smoke = read("scripts/staging_surface_smoke.py")
+    checks.require(
+        "Exact-SHA staging synthetic" in staging_workflow
+        and "branches: [main]" in staging_workflow,
+        "post-merge staging synthetic workflow is main-bound",
+    )
+    checks.require(
+        "sentinel-control-bridge-staging.onrender.com" in staging_smoke
+        and "BRIDGE_EXACT_SHA_TIMEOUT" in staging_smoke,
+        "staging synthetic waits for exact deployed source identity",
+    )
+    checks.require(
+        "/api/session/login" in staging_smoke
+        and "INVALID_CREDENTIALS" in staging_smoke
+        and "SENTINEL_CORE_URL_NOT_CONFIGURED" not in staging_smoke,
+        "staging synthetic proves Web-to-Core login through authoritative invalid-credential behavior",
+    )
+    checks.require(
+        "@example.invalid" in staging_smoke
+        and "/v1/auth/register" not in staging_smoke,
+        "staging synthetic avoids persistent account creation",
+    )
     for scoped in (
         "app/AGENTS.md",
         "server/AGENTS.md",

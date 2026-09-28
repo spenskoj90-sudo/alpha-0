@@ -55,3 +55,7 @@ As of 2026-09-28, ChatGPT Plus cannot directly attach a custom remote MCP server
 - use current built-in plugins, ChatGPT Work and scheduled automations for the primary Plus workflow;
 - connect the bridge only through a separately billed OpenAI API orchestration runtime or after moving to a ChatGPT plan/workspace that supports the required custom MCP capability;
 - ChatGPT subscription/usage credits and OpenAI API billing are separate. Do not start paid API orchestration merely because an API key exists; define a cost/budget guardrail first.
+
+## Automated staging evidence
+
+Protected-main pushes run `.github/workflows/staging-synthetic.yml`. It waits for the exact SHA on Control Bridge and verifies Core health/version, Web reachability, the real Web→Core invalid-login path, Public Website reachability and the pre-release robots guard. The resulting JSON artifact is runtime evidence, not visual acceptance.

@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import json
+import unittest
+
+from scripts.staging_surface_smoke import (
+    HttpResult,
+    SmokeFailure,
+    validate_bridge_health,
+    validate_core_health,
+    validate_login_probe,
+    validate_robots,
+)
+
+
+class StagingSurfaceSmokeTests(unittest.TestCase):
+    def test_bridge_requires_exact_sha(self) -> None:
+        result = HttpResult(200, {}, json.dumps({"status": "ok", "sourceSha": "a" * 40}).encode())
+        self.assertEqual(validate_bridge_health(result, "a" * 40)["status"], "ok")
+        with self.assertRaisesRegex(SmokeFailure, "BRIDGE_SHA_MISMATCH"):
+            validate_bridge_health(result, "b" * 40)
+
+    def test_core_requires_up_and_exact_version(self) -> None:
+        result = HttpResult(200, {}, b'{"status":"UP","version":"1.0.0-rc2"}')
+        self.assertEqual(validate_core_health(result, "1.0.0-rc2")["status"], "UP")
+        with self.assertRaisesRegex(SmokeFailure, "CORE_VERSION_MISMATCH"):
+            validate_core_health(result, "1.0.0")
+
+    def test_login_probe_distinguishes_core_denial_from_proxy_failure(self) -> None:
+        good = HttpResult(401, {"x-request-id": "synthetic-abc"}, b'{"detail":"INVALID_CREDENTIALS"}')
+        self.assertEqual(validate_login_probe(good)["detail"], "INVALID_CREDENTIALS")
+        broken = HttpResult(
+            503,
+            {"x-request-id": "synthetic-abc"},
+            b'{"error":"SENTINEL_CORE_URL_NOT_CONFIGURED"}',
+        )
+        with self.assertRaisesRegex(SmokeFailure, "WEB_CORE_LOGIN_PATH_UNHEALTHY"):
+            validate_login_probe(broken)
+
+    def test_robots_keeps_prerelease_site_non_indexable(self) -> None:
+        result = HttpResult(200, {}, b"User-agent: *\nDisallow: /\n")
+        self.assertTrue(validate_robots(result)["preReleaseDisallow"])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -46,24 +46,19 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 
 ## Engineering operating model
 
-**ACTIVE under Issue #167:** SENTINEL uses a GPT-only autonomous engineering organization:
+**ACTIVE under issue #377:** SENTINEL uses controlled multi-agent engineering.
 
 - **Human Owner** — ultimate authority for product direction and protected actions.
-- **GPT / ChatGPT** — the **sole AI engineering participant**, responsible for architecture, implementation, testing, security analysis, CI/CD, review, documentation, PR lifecycle, failure remediation and final technical integration.
+- **GPT / ChatGPT** — primary orchestrator and final technical integrator.
+- **Secondary agents / external model families** — permitted only for bounded, explicit work under least privilege and isolated mutable state.
 
-No other AI system has an engineering role. GPT does not delegate engineering, review, testing, security, research, architecture, CI diagnosis, DevOps or integration to another AI.
+Independent work may run in parallel, but one mutable worktree has one writer and integration is serialized. Secondary agents never merge protected main. GPT may merge only after every required check succeeds on the exact PR HEAD SHA and canonical security/evidence gates remain intact.
 
-The normal autonomous loop is:
+Protected Owner gates remain production secrets/credentials, signing material, branch-protection or repository-permission changes, irreversible destructive operations, production/live deployment, release publication, and fundamental product-direction decisions.
 
-`DISCOVER → BASELINE → PLAN → IMPLEMENT → TEST → DIAGNOSE/FIX → REVIEW → COMMIT → PR → CI → ANALYZE → FIX/CI → READY → MERGE → POST-MERGE VERIFY`
+For user-facing work, build success is not readiness; docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md requires runnable-surface and Owner visual evidence.
 
-Routine CI failures are worked through autonomously. GPT may merge a PR into `main` only when all required checks have successfully passed on the exact PR HEAD SHA being merged. GPT must never bypass or weaken branch protection or required checks.
-
-Protected Owner gates remain: production secrets/credentials, signing material, branch-protection changes, irreversible destructive operations, production/live deployment, release publication and unresolved fundamental product-direction decisions.
-
-Exact CI/test claims require exact commit SHA plus workflow/check evidence and Run ID where available. Repository state is authoritative over conversation memory.
-
-Canonical governance: `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`, `docs/AI_ROLES.md`, `docs/AUTONOMOUS_ENGINEERING_CONTRACT.md`, `docs/AUTONOMOUS_PERMISSIONS.md`, `docs/WORKFLOW_CONTRACT.md` and `docs/OPERATING_PLAYBOOK.md`.
+Start agent work from root AGENTS.md. Canonical governance is docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md; compact execution rules are in docs/WORKFLOW_CONTRACT.md.
 
 ## Runtime findings
 

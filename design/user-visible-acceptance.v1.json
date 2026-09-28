@@ -1,0 +1,68 @@
+{
+  "schema": "sentinel.user-visible-acceptance.v1",
+  "status": "ACTIVE",
+  "issue": 375,
+  "ownerVisualAcceptanceRequired": true,
+  "designReference": {
+    "productionPinned": "a6fc9d4c513dde9d549e5dd70159b1365a76b95c",
+    "labPass": "ACTIVE_IN_PROGRESS",
+    "productionParityClaimed": false,
+    "nextAction": "WAIT_FOR_FINAL_LAB_SHA_THEN_RECONCILE"
+  },
+  "surfaces": [
+    {
+      "id": "android",
+      "engineeringState": "SUBSTANTIAL_IMPLEMENTATION",
+      "runnableEvidence": "PHYSICAL_REVIEW_PARTIAL",
+      "ownerVisible": "PARTIAL",
+      "ownerVisualAccepted": false,
+      "ready": false
+    },
+    {
+      "id": "web-control-plane",
+      "engineeringState": "FUNCTIONAL_FOUNDATION",
+      "runnableEvidence": "CI_BUILD",
+      "ownerVisible": "NO",
+      "ownerVisualAccepted": false,
+      "ready": false
+    },
+    {
+      "id": "public-site",
+      "engineeringState": "FOUNDATION_ONLY",
+      "runnableEvidence": "CI_STATIC_BUILD",
+      "ownerVisible": "NO",
+      "ownerVisualAccepted": false,
+      "ready": false
+    },
+    {
+      "id": "companion",
+      "engineeringState": "FUNCTIONAL_FOUNDATION",
+      "runnableEvidence": "PACKAGED_CI",
+      "ownerVisible": "NO",
+      "ownerVisualAccepted": false,
+      "ready": false
+    },
+    {
+      "id": "overlay",
+      "engineeringState": "FUNCTIONAL_FOUNDATION",
+      "runnableEvidence": "PACKAGED_CI",
+      "ownerVisible": "NO",
+      "ownerVisualAccepted": false,
+      "ready": false
+    },
+    {
+      "id": "voice",
+      "engineeringState": "FUNCTIONAL_FOUNDATION",
+      "runnableEvidence": "CI_PROVIDER_NEUTRAL",
+      "ownerVisible": "NO",
+      "ownerVisualAccepted": false,
+      "ready": false
+    }
+  ],
+  "rules": {
+    "screenshotAloneIsAcceptance": false,
+    "ciGreenMeansReady": false,
+    "designPrototypeMeansProductionParity": false,
+    "percentageCompleteRequiresEnumeratedEvidence": true
+  }
+}

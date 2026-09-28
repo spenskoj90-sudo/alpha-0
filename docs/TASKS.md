@@ -71,6 +71,7 @@ This is the **only authoritative unchecked queue** in this file. Completed repos
 - [x] **Neon pre-release PostgreSQL 18 cutover.** On 2026-09-21 the staging Core was intentionally reset onto the prepared PostgreSQL 18.6 `sentinel-pre-release` database instead of importing the historical PG17 application dataset. The exact migration/FORCE-RLS baseline is preserved, the Render deployment reached `live`, and the former PG17 project is retained as `sentinel-pre-release-pg17-rollback` for rollback/evidence. Historical pre-release identities/users/devices/sessions are intentionally not part of the new baseline.
 - [ ] **#371 — ZERO-COST STAGING PROVIDERS:** activate one real transactional-email sender (Resend or Brevo HTTPS) and any selected Google/Telegram/VK development registration, then capture exact-candidate staging/physical evidence. Repository adapters and fail-closed provider discovery are already implemented/tested.
 - [ ] **#314 — PHYSICAL ANDROID / COMPANION:** verify the post-PR #367 Android optical correction, accessibility/latency/recovery behavior and intended packaged Companion host on one exact candidate.
+- [ ] **#375 — OWNER-VISIBLE PRODUCT UX:** require real runnable/preview evidence and explicit Owner visual acceptance for Android, Web Control Plane, Public Website, Companion, Overlay and Voice before any of those surfaces can be called ready or release-ready. A screenshot or CI-green build alone is not acceptance.
 - [ ] **#277 — EXACT GAME ENVIRONMENT:** execute the real WoW 3.3.5a/private-server L3 run; capabilities remain `ENVIRONMENT-UNVERIFIED` until that environment is exercised.
 - [ ] **#315 — VOICE ENVIRONMENT:** validate selected STT/TTS provider network behavior plus real microphone/driver/acoustic quality on the release host.
 - [ ] **#316 — PRODUCTION ACTIVATION (OWNER GATE):** production Stripe/database/ingress/email/federated-provider credentials and network acceptance for the requested profile. Production PostHog remains prohibited by the current telemetry contract rather than waiting for credentials.
@@ -80,7 +81,7 @@ This is the **only authoritative unchecked queue** in this file. Completed repos
 
 - Do not mark `[x]` without direct evidence appropriate to the claim: exact SHA + PR/commit + CI Run ID and/or device/runtime evidence.
 - Do not treat a stale document, old branch, old audit, design mockup, or AI report as proof of current implementation.
-- Distinguish **IMPLEMENTED**, **INTEGRATION-TESTED**, **SIMULATED**, **PRODUCTIZED**, **ENVIRONMENT-UNVERIFIED**, **MISSING** and **TECHNICAL-DEBT** when a broad feature spans more than one evidence level.
+- Distinguish **SOURCE-PRESENT**, **BUILD-VERIFIED**, **RUNNABLE**, **OWNER-VISIBLE**, **OWNER-VISUAL-ACCEPTED**, **IMPLEMENTED**, **INTEGRATION-TESTED**, **SIMULATED**, **PRODUCTIZED**, **ENVIRONMENT-UNVERIFIED**, **MISSING** and **TECHNICAL-DEBT** when a broad feature spans more than one evidence level. For a user-facing surface, `IMPLEMENTED` or `BUILD-VERIFIED` must never be paraphrased as `ready`.
 - Do not convert proposed thresholds or UNVERIFIED capabilities into achieved facts.
 - Do not weaken security gates to obtain green CI.
 - Prefer one coherent, independently testable large vertical per PR; split only when a block cannot remain safe and independently verifiable.
@@ -94,7 +95,7 @@ This is the **only authoritative unchecked queue** in this file. Completed repos
 
 ### Definition of Done for every substantive block
 
-A block is complete only when all applicable dimensions are addressed: implementation/contract, UX/design/visualization, security/privacy/failure, performance/resource, automated tests, runtime/device/integration evidence, and semantic documentation as applicable. Large blocks may be split into short-lived PRs, but each increment must remain independently testable, reviewable and integrable.
+A block is complete only when all applicable dimensions are addressed: implementation/contract, UX/design/visualization, security/privacy/failure, performance/resource, automated tests, runtime/device/integration evidence, and semantic documentation as applicable. For user-facing blocks, completion additionally requires the applicable stage in `USER_VISIBLE_ACCEPTANCE_CONTRACT.md`; source presence, screenshots and CI success are not substitutes for a runnable surface opened and evaluated by the Owner. Large blocks may be split into short-lived PRs, but each increment must remain independently testable, reviewable and integrable.
 
 ### Scope discipline
 

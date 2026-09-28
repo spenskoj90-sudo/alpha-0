@@ -178,3 +178,18 @@ After final physical testing:
 - remove the `.physicaltest` app and its local forensic data from test devices;
 - do not distribute the test APK as the public application;
 - keep production diagnostics in the bounded privacy/consent model defined by `docs/DIAGNOSTICS_AND_QUALITY_PROGRAM_V1.md`.
+
+
+## Product-visual acceptance is separate
+
+The physical accessibility checkpoints above do not establish whole-product visual readiness.
+
+Issue #375 and `docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md` add a separate `product-visual` publication gate. It requires the Human Owner to open the actual runnable release-facing surfaces and explicitly accept their visual/product state. In particular:
+
+- a screenshot does not substitute for a browser-openable Web/Public Site build;
+- CI-green static export does not establish a finished public website;
+- API/session correctness does not establish a finished Web Control Plane;
+- packaged CI smoke does not establish Companion/Overlay visual acceptance on the intended Windows host;
+- Android automated instrumentation does not replace physical Owner visual review.
+
+Record those observations in the exact-candidate `product-visual` checkpoint/evidence set rather than folding them into accessibility claims.

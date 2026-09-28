@@ -42,6 +42,7 @@ Required before the Owner creates the release tag / publication path can succeed
 3. `wow-exact-environment` — exact intended WoW/client/server L3 acceptance, using `docs/EXACT_ENVIRONMENT_L3_EVIDENCE_V1.md` where that target remains in release scope.
 4. `voice-acoustic` — selected real microphone/driver/acoustic path acceptance for the packaged Companion.
 5. `accessibility-visual` — final physical TalkBack plus packaged-host keyboard/NVDA/JAWS/visual/overlay acceptance as applicable to release scope.
+6. `product-visual` — explicit Human Owner visual acceptance of the actual runnable Android, Web Control Plane, Public Website, Companion, Overlay and Voice surfaces, including final design-reference reconciliation, responsive/state review and retained runnable/preview evidence. Screenshots are supplemental evidence only and cannot satisfy this gate by themselves.
 
 This profile intentionally moves real-device/environment work to the final pre-release stage without allowing it to be skipped at publication time.
 
@@ -165,6 +166,7 @@ python scripts/final_release_acceptance.py create \
   --gate wow-exact-environment.gate.json \
   --gate voice-acoustic.gate.json \
   --gate accessibility-visual.gate.json \
+  --gate product-visual.gate.json \
   --output final-release-acceptance.json
 ```
 
@@ -244,6 +246,7 @@ Repository tests for this contract use synthetic fixtures only. They do **not** 
 - a Windows target host has passed;
 - exact WoW/private-server L3 has passed;
 - microphone/acoustic behavior has passed;
+- the Owner has visually accepted Android, Web Control Plane, Public Website, Companion, Overlay or Voice;
 - production payment/STT/TTS/observability/ingress/database infrastructure is configured;
 - runtime penetration testing has passed;
 - release signing has been executed;

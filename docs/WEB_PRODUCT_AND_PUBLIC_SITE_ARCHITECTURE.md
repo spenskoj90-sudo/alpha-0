@@ -16,6 +16,9 @@ They are intentionally not the same trust surface.
 
 ## 2. Current authenticated Web Control Plane
 
+**User-visible status: FUNCTIONAL FOUNDATION / PRODUCT UX INCOMPLETE / OWNER-VISUAL-UNACCEPTED.** This document records architecture and implementation scope, not a visual-completion claim.
+
+
 The existing production-side Web application remains under `web/` and uses Next.js 16.3.6 / React 19.3.0.
 
 Verified implementation anchors include:
@@ -48,7 +51,9 @@ Therefore:
 
 ## 4. Public Website architecture
 
-The public website is implemented under:
+**User-visible status: FOUNDATION ONLY / OWNER-VISUAL-UNACCEPTED.** The current surface is intentionally minimal and must not be described as a finished SENTINEL website. Build success only proves that the static implementation is technically valid. Owner-visible acceptance requires a real browser-openable exact-build surface; screenshots alone do not satisfy the acceptance contract.
+
+The public website foundation is implemented under:
 
 `site/`
 

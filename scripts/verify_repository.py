@@ -455,6 +455,15 @@ def check_governance(checks: Checks) -> None:
     )
     checks.require("sole AI engineering participant" in workflow, "workflow contract remains GPT-only")
     checks.require("DOCUMENT_STATUS.md" in read("README.md") or (ROOT / "docs/DOCUMENT_STATUS.md").exists(), "document authority map exists")
+    ux_contract = read("docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md")
+    ux_state = json.loads(read("design/user-visible-acceptance.v1.json"))
+    checks.require("**Status:** ACTIVE" in ux_contract and "Issue:** #375" in ux_contract, "Owner-visible UX acceptance contract is active and issue-bound")
+    checks.require("A screenshot" in ux_contract and "cannot by itself satisfy" in ux_contract, "UX acceptance forbids screenshot-only readiness claims")
+    checks.require(ux_state.get("schema") == "sentinel.user-visible-acceptance.v1", "machine-readable UX acceptance schema is canonical")
+    checks.require(ux_state.get("ownerVisualAcceptanceRequired") is True, "Owner visual acceptance is required for user-facing readiness")
+    checks.require(all(surface.get("ready") is False for surface in ux_state.get("surfaces", [])), "no currently unaccepted user-facing surface is marked ready")
+    checks.require(ux_state.get("designReference", {}).get("productionParityClaimed") is False, "production does not claim parity with the in-progress design-lab pass")
+    checks.require("#375" in tasks and tasks.count("- [ ]") == 7, "task board includes the Owner-visible UX acceptance gate")
     provider_matrix = read("docs/PROVIDER_STATUS_MATRIX.md")
     checks.require(
         "**Status:** ACTIVE" in provider_matrix

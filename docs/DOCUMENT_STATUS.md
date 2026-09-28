@@ -9,8 +9,9 @@
 - `WORKFLOW_CONTRACT.md`, `AUTONOMOUS_ENGINEERING_CONTRACT.md`, `AUTONOMOUS_PERMISSIONS.md`, `OPERATING_PLAYBOOK.md`, `AI_ROLES.md` — active subordinate operating contracts.
 - `SENTINEL_CURRENT_STATE.md` — semantic orientation only; it deliberately contains no mutable HEAD mirror.
 - `TASKS.md` — active work queue, never implementation evidence.
-- `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md` and `FINAL_RELEASE_ACCEPTANCE_V1.md` — active evidence, provenance, exact-candidate physical/environment acceptance and release-acceptance contracts.
+- `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md`, `FINAL_RELEASE_ACCEPTANCE_V1.md` and `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` — active evidence, provenance, exact-candidate physical/environment, Owner-visible product-UX and release-acceptance contracts.
 - `DESIGN_SYSTEM_V3.md` plus `../design/sentinel-design-system.v3.json` — active cross-surface visual/interaction contract and machine-readable drift authority. The design-reference repository is an input laboratory; production repository assets/code/tests remain canonical.
+- `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` plus `../design/user-visible-acceptance.v1.json` — active evidence ladder preventing build/test success, screenshots or design prototypes from being mislabeled as Owner-accepted product readiness.
 - `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
 - `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
 - `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.

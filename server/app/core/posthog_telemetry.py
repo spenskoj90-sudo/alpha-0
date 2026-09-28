@@ -148,13 +148,21 @@ class PostHogCompanionTelemetrySink(CompanionTelemetrySink):
             self._delivered += 1
 
 
+def _runtime_source_sha() -> str:
+    for name in ("SENTINEL_SOURCE_SHA", "RENDER_GIT_COMMIT", "GITHUB_SHA"):
+        value = os.getenv(name, "").strip().lower()
+        if _SOURCE_SHA.fullmatch(value):
+            return value
+    return ""
+
+
 def configured_posthog_sink() -> PostHogCompanionTelemetrySink | None:
     if not _strict_env_bool("SENTINEL_POSTHOG_ENABLED", default=False):
         return None
     required = {
         "project_key": os.getenv("SENTINEL_POSTHOG_PROJECT_KEY", ""),
         "release": os.getenv("SENTINEL_RELEASE", ""),
-        "source_sha": os.getenv("SENTINEL_SOURCE_SHA", ""),
+        "source_sha": _runtime_source_sha(),
     }
     if any(not value for value in required.values()):
         raise RuntimeError("POSTHOG_NOT_CONFIGURED")

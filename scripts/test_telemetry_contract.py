@@ -92,7 +92,8 @@ class TelemetryContractTests(unittest.TestCase):
             '"$process_person_profile": False',
             'os.getenv("SENTINEL_POSTHOG_PROJECT_KEY", "")',
             'os.getenv("SENTINEL_RELEASE", "")',
-            'os.getenv("SENTINEL_SOURCE_SHA", "")',
+            'for name in ("SENTINEL_SOURCE_SHA", "RENDER_GIT_COMMIT", "GITHUB_SHA")',
+            'if _SOURCE_SHA.fullmatch(value):',
             'raise RuntimeError("POSTHOG_NOT_CONFIGURED")',
         ):
             self.assertIn(value, self.posthog)

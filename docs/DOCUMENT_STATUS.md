@@ -5,8 +5,9 @@
 
 ## Active authority and orientation
 
-- `GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md` — canonical governance; only the Human Owner may amend it.
-- `WORKFLOW_CONTRACT.md`, `AUTONOMOUS_ENGINEERING_CONTRACT.md`, `AUTONOMOUS_PERMISSIONS.md`, `OPERATING_PLAYBOOK.md`, `AI_ROLES.md` — active subordinate operating contracts.
+- `AI_ORCHESTRATION_OPERATING_SYSTEM.md` — canonical engineering governance; only the Human Owner may fundamentally amend it.
+- root/scoped `AGENTS.md` files — compact context-routing and subsystem instructions for agents.
+- `WORKFLOW_CONTRACT.md` and `AI_ORCHESTRATION_ROUTING.md` — active execution and routing contracts.
 - `SENTINEL_CURRENT_STATE.md` — semantic orientation only; it deliberately contains no mutable HEAD mirror.
 - `TASKS.md` — active work queue, never implementation evidence.
 - `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md`, `FINAL_RELEASE_ACCEPTANCE_V1.md` and `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` — active evidence, provenance, exact-candidate physical/environment, Owner-visible product-UX and release-acceptance contracts.
@@ -45,6 +46,8 @@ Historical documents are retained for traceability. Their actors, SHA snapshots,
 
 ## Superseded
 
+- `GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md` — strict GPT-only participation replaced by controlled multi-agent governance on 2026-09-28.
+- `AUTONOMOUS_ENGINEERING_CONTRACT.md`, `AUTONOMOUS_PERMISSIONS.md`, `OPERATING_PLAYBOOK.md`, `AI_ROLES.md` — redundant operating contracts collapsed into the canonical multi-agent OS, compact workflow contract, and scoped AGENTS routing.
 - `API_REFERENCE.md` — replaced by `API.md` and runtime OpenAPI.
 - `PLATFORM_RC.md` — replaced by repository-first current-state/evidence rules.
 - `PROJECT_STATE.md` — replaced by `SENTINEL_CURRENT_STATE.md` plus live Git/Actions evidence.

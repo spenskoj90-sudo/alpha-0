@@ -543,6 +543,13 @@ def check_governance(checks: Checks) -> None:
         "staging synthetic waits for exact deployed source identity",
     )
     checks.require(
+        'value.add_argument("--bridge-url"' not in staging_smoke
+        and 'value.add_argument("--core-url"' not in staging_smoke
+        and 'value.add_argument("--web-url"' not in staging_smoke
+        and 'value.add_argument("--site-url"' not in staging_smoke,
+        "staging synthetic network destinations are literal and not caller-controlled",
+    )
+    checks.require(
         "/api/session/login" in staging_smoke
         and "INVALID_CREDENTIALS" in staging_smoke
         and "SENTINEL_CORE_URL_NOT_CONFIGURED" not in staging_smoke,

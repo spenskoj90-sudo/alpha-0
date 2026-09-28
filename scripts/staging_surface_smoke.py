@@ -16,6 +16,10 @@ from typing import Any
 
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_BRIDGE_URL = "https://sentinel-control-bridge-staging.onrender.com"
+_CORE_URL = "https://sentinel-core-staging.onrender.com"
+_WEB_URL = "https://sentinel-web-staging-fxhn.onrender.com"
+_SITE_URL = "https://sentinel-public-site-staging.onrender.com"
 
 
 class SmokeFailure(RuntimeError):
@@ -167,17 +171,17 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     }
 
     evidence["surfaces"]["bridge"] = wait_for_exact_bridge(
-        args.bridge_url,
+        _BRIDGE_URL,
         args.expected_sha,
         timeout_seconds=args.deploy_timeout_seconds,
         poll_seconds=args.poll_seconds,
     )
     evidence["surfaces"]["core"] = validate_core_health(
-        _request("GET", f"{_base(args.core_url)}/healthz"),
+        _request("GET", f"{_CORE_URL}/healthz"),
         args.expected_version,
     )
     evidence["surfaces"]["web"] = validate_html(
-        _request("GET", _base(args.web_url)),
+        _request("GET", _WEB_URL),
         "WEB_ROOT",
     )
 
@@ -191,23 +195,23 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     ).encode("utf-8")
     login = _request(
         "POST",
-        f"{_base(args.web_url)}/api/session/login",
+        f"{_WEB_URL}/api/session/login",
         body=body,
         headers={
             "content-type": "application/json",
             "accept": "application/json",
-            "origin": _base(args.web_url),
+            "origin": _WEB_URL,
             "x-request-id": f"synthetic-{args.expected_sha[:12]}-{probe_id}"[:128],
         },
     )
     evidence["surfaces"]["webCoreLogin"] = validate_login_probe(login)
 
     evidence["surfaces"]["publicSite"] = validate_html(
-        _request("GET", _base(args.site_url)),
+        _request("GET", _SITE_URL),
         "PUBLIC_SITE_ROOT",
     )
     evidence["surfaces"]["publicRobots"] = validate_robots(
-        _request("GET", f"{_base(args.site_url)}/robots.txt")
+        _request("GET", f"{_SITE_URL}/robots.txt")
     )
     evidence["result"] = "PASS"
     return evidence
@@ -218,10 +222,6 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--expected-sha", required=True)
     value.add_argument("--expected-version", required=True)
     value.add_argument("--probe-id", default=os.getenv("GITHUB_RUN_ID", "manual"))
-    value.add_argument("--bridge-url", default="https://sentinel-control-bridge-staging.onrender.com")
-    value.add_argument("--core-url", default="https://sentinel-core-staging.onrender.com")
-    value.add_argument("--web-url", default="https://sentinel-web-staging-fxhn.onrender.com")
-    value.add_argument("--site-url", default="https://sentinel-public-site-staging.onrender.com")
     value.add_argument("--deploy-timeout-seconds", type=int, default=900)
     value.add_argument("--poll-seconds", type=int, default=15)
     value.add_argument("--output", required=True)

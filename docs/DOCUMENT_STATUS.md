@@ -14,6 +14,7 @@
 - `DESIGN_SYSTEM_V3.md` plus `../design/sentinel-design-system.v3.json` — active cross-surface visual/interaction contract and machine-readable drift authority. The design-reference repository is an input laboratory; production repository assets/code/tests remain canonical.
 - `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` plus `../design/user-visible-acceptance.v1.json` — active evidence ladder preventing build/test success, screenshots or design prototypes from being mislabeled as Owner-accepted product readiness.
 - `CONTROL_BRIDGE_ARCHITECTURE.md` plus `../control-bridge/` — active compact authenticated MCP evidence/control foundation tracked by #382.
+- `CHATGPT_PROJECT_INSTRUCTIONS.md` and `CHATGPT_WORKING_ENVIRONMENT.md` — active compact ChatGPT/Work context and tool-routing contracts.
 - `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
 - `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
 - `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.

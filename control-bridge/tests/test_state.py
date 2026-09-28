@@ -37,4 +37,11 @@ def test_design_state_reports_unreconciled_lab():
 
 def test_invalid_source_sha_is_not_echoed(monkeypatch):
     monkeypatch.setenv("SENTINEL_SOURCE_SHA", "not-a-sha")
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
     assert state.project_state()["sourceSha"] == "UNKNOWN"
+
+def test_source_sha_uses_render_commit_fallback(monkeypatch):
+    monkeypatch.delenv("SENTINEL_SOURCE_SHA", raising=False)
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "b" * 40)
+    assert state.project_state()["sourceSha"] == "b" * 40

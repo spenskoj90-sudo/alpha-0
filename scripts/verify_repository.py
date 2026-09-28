@@ -501,6 +501,30 @@ def check_governance(checks: Checks) -> None:
         "Context routing" in root_agents and "docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md" in root_agents,
         "root AGENTS file is a compact context router",
     )
+    project_instructions = read("docs/CHATGPT_PROJECT_INSTRUCTIONS.md")
+    working_environment = read("docs/CHATGPT_WORKING_ENVIRONMENT.md")
+    checks.require(
+        "SENTINEL is an autonomous engineering project." in project_instructions,
+        "ChatGPT Project instructions expose the compact SENTINEL mission",
+    )
+    checks.require(
+        "Read root `AGENTS.md` first" in project_instructions
+        and "Do not preload the entire documentation corpus" in project_instructions,
+        "ChatGPT Project context is routed rather than monolithic",
+    )
+    checks.require(
+        "Tell the Owner to switch the current task to **ChatGPT Work**" in project_instructions,
+        "ChatGPT Project instructions define the browser/Work escalation boundary",
+    )
+    checks.require(
+        "Generated conversation previews are not product evidence" in working_environment,
+        "working-environment contract rejects generated preview files as authority",
+    )
+    checks.require(
+        "Managed PostgreSQL: Neon" in working_environment
+        and "Staging runtime: Render" in working_environment,
+        "working-environment contract names canonical infrastructure control planes",
+    )
     for scoped in (
         "app/AGENTS.md",
         "server/AGENTS.md",

@@ -35,6 +35,15 @@ Secrets are stored only in provider/runtime secret stores or Owner-controlled lo
 
 OpenAI API keys belong to the consuming orchestration runtime. The Control Bridge itself does not require an OpenAI API key.
 
+## Current staging endpoints
+
+- Core: `https://sentinel-core-staging.onrender.com`
+- Authenticated Web Control Plane: `https://sentinel-web-staging-fxhn.onrender.com`
+- Public Website preview: `https://sentinel-public-site-staging.onrender.com`
+- Control Bridge MCP foundation: `https://sentinel-control-bridge-staging.onrender.com`
+
+These are staging endpoints, not production release publication. Web/Core runtime pins are Node 24.21.0 and Python 3.14.7 respectively. Public Site is an Owner-visible preview surface but remains product-incomplete until design migration and visual acceptance.
+
 ## Current ChatGPT plan boundary
 
 The current Human Owner uses ChatGPT Plus.

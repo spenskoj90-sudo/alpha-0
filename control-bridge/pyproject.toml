@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinel-control-bridge"
+version = "1.0.0rc2"
+description = "SENTINEL compact MCP evidence and control bridge"
+requires-python = ">=3.14"
+dependencies = [
+  "mcp==2.2.0",
+  "uvicorn[standard]==0.53.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest==9.1.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sentinel_bridge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

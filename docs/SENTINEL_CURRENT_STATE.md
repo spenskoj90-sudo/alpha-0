@@ -23,13 +23,21 @@ The prior physical Android diagnostic bundle remains historical evidence for its
 
 - Android client exists under `app/`. Its product shell includes a pre-authentication menu (Settings, Updates, Help and About), persistent System/Russian/English language selection, persistent System/Light/Dark appearance, scroll-safe authentication/password recovery/email verification, server-driven Google/Telegram/VK federated sign-in, explicit provider linking from Security, scroll-safe device onboarding and authenticated Home/Games/Security/Activity navigation. The Update Center integrates Google Play In-App Updates, while Play Console setup, tester enrollment and track publication remain Owner/external activation work.
 - FastAPI Core exists under `server/`.
-- Next.js authenticated control plane exists under `web/`.
-- An isolated pre-release public website exists under `site/` as a static-export Next.js surface. It contains no account/session/billing/admin API routes, is non-indexable while pre-release, and does not expose public download claims before signed publication acceptance. It is source/build ready only; production hosting remains an Owner-gated deployment action.
+- Next.js authenticated control plane exists under `web/`. **User-visible status: FUNCTIONAL FOUNDATION / PRODUCT UX INCOMPLETE / OWNER-VISUAL-UNACCEPTED.** Its API/security/session foundations must not be described as a finished Web product until dedicated routes/states and Owner-visible browser acceptance exist.
+- An isolated pre-release public website exists under `site/` as a static-export Next.js surface. **User-visible status: FOUNDATION ONLY / OWNER-VISUAL-UNACCEPTED.** The current four-route implementation is build-verified but is not a finished product website and has no Owner-approved live preview. It contains no account/session/billing/admin API routes, is non-indexable while pre-release, and exposes no public download claims before signed publication acceptance. Production/live hosting remains an Owner-gated deployment action.
 - Electron launcher exists under `launcher/` and exposes account/Companion runtime state, local game launching, passive WoW checkpoint state, a read-only Companion overlay renderer and an explicit-consent push-to-talk voice surface.
 - The Electron launcher also has an unsigned source-bound Windows x64 packaging path with pinned Electron provenance, reproducibility comparison and packaged-executable smoke evidence. This is packaged CI evidence, not signed-release or physical-host acceptance.
 - WoW addon sources exist under `wow-addon/`.
 
 Existence of a source tree does not by itself establish that the surface is packaged, integrated or accepted in a real target environment.
+
+### User-visible acceptance truth
+
+`docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md` is the active product-UX evidence contract. For Android, Web Control Plane, Public Website, Companion, Overlay and Voice, automated build/test/security success proves engineering validity only. It does **not** prove visual quality, product completeness or Owner acceptance.
+
+A screenshot is supplemental evidence only. Web/Public Site acceptance requires a real browser-openable exact-build surface (Owner-approved preview deployment or equivalent exact artifact opened by the Owner). Android requires the exact physical APK. Companion/Overlay/Voice require the intended packaged host. No user-facing surface may be called READY or RELEASE-READY before explicit Owner visual acceptance is recorded.
+
+The active design-laboratory repository has advanced beyond the production-pinned design-reference while its current pass is still in progress. Production therefore does **not** claim current design parity. Reconciliation happens only after the design pass produces a final SHA and the production implementation is migrated and re-accepted.
 
 ### Current platform baseline
 

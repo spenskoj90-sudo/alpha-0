@@ -10,6 +10,8 @@ The latest design-laboratory reference extends the already-adopted v3 foundation
 
 Production adoption is incremental and evidence-bound: reference UI code is never copied wholesale into Android/Next.js/Electron. Each surface is translated into the native production architecture and must pass its existing security/runtime tests.
 
+**Current synchronization warning (2026-09-28):** the design-laboratory `main` has advanced beyond the production-pinned design-reference during an unfinished Owner-directed design pass. The production repository therefore does not claim current design parity. Do not update the production pin to an intermediate lab commit merely to appear synchronized; wait for the final design-pass SHA, reconcile its screen/component/token/asset registries, migrate the production surfaces, then perform Owner-visible acceptance.
+
 v3.0 is the active cross-surface design authority. v2.1 remains historical reference only.
 
 ## Visual language

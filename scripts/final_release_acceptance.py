@@ -31,6 +31,7 @@ PUBLICATION_GATES = {
     "wow-exact-environment",
     "voice-acoustic",
     "accessibility-visual",
+    "product-visual",
 }
 DEPLOYMENT_GATES = PUBLICATION_GATES | {
     "payment-provider-network",
@@ -101,6 +102,19 @@ REQUIRED_CHECKPOINTS: dict[str, tuple[str, ...]] = {
         "windows_visible_focus_state",
         "windows_overlay_focus_clickthrough",
         "windows_scaling_dpi_multimonitor",
+    ),
+    "product-visual": (
+        "design_reference_final_sha_reconciled",
+        "android_owner_visual_acceptance",
+        "web_control_plane_owner_visual_acceptance",
+        "public_site_owner_visual_acceptance",
+        "companion_owner_visual_acceptance",
+        "overlay_owner_visual_acceptance",
+        "voice_surface_owner_visual_acceptance",
+        "responsive_target_form_factors_reviewed",
+        "loading_empty_error_offline_degraded_reviewed",
+        "cross_surface_brand_consistency_reviewed",
+        "runnable_or_preview_evidence_retained",
     ),
     "payment-provider-network": (
         "sandbox_or_target_provider_config_bound",

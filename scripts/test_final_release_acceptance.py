@@ -224,6 +224,28 @@ class FinalReleaseAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing required"):
             acceptance.verify_manifest(manifest, self.candidate, self.apk, COMPANION)
 
+    def test_publication_rejects_missing_product_visual_gate(self) -> None:
+        manifest = self.manifest("publication")
+        manifest["gates"] = [gate for gate in manifest["gates"] if gate["id"] != "product-visual"]
+        manifest["acceptanceDigest"] = acceptance._canonical_digest(manifest, "acceptanceDigest")
+        with self.assertRaisesRegex(ValueError, "missing required"):
+            acceptance.verify_manifest(manifest, self.candidate, self.apk, COMPANION)
+
+    def test_product_visual_gate_requires_owner_visible_surface_checkpoints(self) -> None:
+        checkpoints = self.checkpoint_document("product-visual")
+        self.assertEqual(
+            {item["id"] for item in checkpoints["checkpoints"]},
+            set(acceptance.REQUIRED_CHECKPOINTS["product-visual"]),
+        )
+        required = {item["id"] for item in checkpoints["checkpoints"]}
+        for checkpoint in (
+            "web_control_plane_owner_visual_acceptance",
+            "public_site_owner_visual_acceptance",
+            "runnable_or_preview_evidence_retained",
+            "design_reference_final_sha_reconciled",
+        ):
+            self.assertIn(checkpoint, required)
+
     def test_gate_from_other_candidate_is_rejected(self) -> None:
         manifest = self.manifest("publication")
         other_apk = b"different-signed-apk"

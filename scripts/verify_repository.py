@@ -445,15 +445,77 @@ def check_governance(checks: Checks) -> None:
         "dated branch manifest is historical evidence, not live deletion authority",
     )
 
-    canonical = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")
+    canonical = read("docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md")
     workflow = read("docs/WORKFLOW_CONTRACT.md")
-    checks.require("only AI" in canonical and "No other AI" in canonical, "canonical governance remains GPT-only")
+    orchestration = json.loads(read("automation/ai-orchestration.v1.json"))
+    root_agents = read("AGENTS.md")
     checks.require(
-        "exact PR HEAD SHA" in canonical
-        and ("authorized to merge" in canonical or "may merge" in canonical),
+        "**Status:** ACTIVE" in canonical and "**Tracking issue:** #377" in canonical,
+        "controlled multi-agent governance is canonical and issue-bound",
+    )
+    checks.require(
+        "primary engineering orchestrator and final technical integrator" in canonical,
+        "GPT remains accountable final technical integrator",
+    )
+    checks.require(
+        "Secondary AI agents and external model families are permitted" in canonical,
+        "canonical governance permits bounded secondary agents",
+    )
+    checks.require(
+        "One logical change set has one accountable writer" in canonical
+        and "Parallel branches are integrated serially" in canonical,
+        "multi-agent writes remain isolated and serially integrated",
+    )
+    checks.require(
+        "Secondary agents receive least-privilege context" in canonical
+        and "production secrets or credentials" in canonical,
+        "secondary-agent context is least-privilege and excludes protected secrets",
+    )
+    checks.require(
+        "exact PR HEAD SHA" in canonical and "GPT may merge a PR into main only when" in canonical,
         "canonical governance retains exact-SHA merge authority",
     )
-    checks.require("sole AI engineering participant" in workflow, "workflow contract remains GPT-only")
+    checks.require(
+        "ROUTE" in workflow and "Secondary agents cannot merge protected main" in workflow,
+        "workflow contract routes parallel lanes without delegating integration authority",
+    )
+    checks.require(
+        orchestration.get("schema") == "sentinel.ai-orchestration.v1"
+        and orchestration.get("status") == "ACTIVE",
+        "machine-readable AI orchestration policy is active",
+    )
+    checks.require(
+        orchestration.get("authority", {}).get("finalIntegrator") == "GPT/ChatGPT",
+        "machine policy keeps one final integrator",
+    )
+    checks.require(
+        orchestration.get("concurrency", {}).get("oneWriterPerMutableWorktree") is True
+        and orchestration.get("concurrency", {}).get("serialIntegration") is True,
+        "machine policy enforces one-writer and serial integration",
+    )
+    checks.require(
+        orchestration.get("secondaryAgents", {}).get("externalModelFamilies", {}).get("productionSecrets") is False,
+        "external model families cannot receive production secrets",
+    )
+    checks.require(
+        "Context routing" in root_agents and "docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md" in root_agents,
+        "root AGENTS file is a compact context router",
+    )
+    for scoped in (
+        "app/AGENTS.md",
+        "server/AGENTS.md",
+        "web/AGENTS.md",
+        "site/AGENTS.md",
+        "launcher/AGENTS.md",
+        "wow-addon/AGENTS.md",
+    ):
+        checks.require((ROOT / scoped).exists(), f"{scoped} scoped agent instructions exist")
+    legacy_gpt = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")
+    checks.require(
+        "**Status:** SUPERSEDED" in legacy_gpt
+        and "AI_ORCHESTRATION_OPERATING_SYSTEM.md" in legacy_gpt,
+        "former GPT-only OS is explicitly superseded",
+    )
     checks.require("DOCUMENT_STATUS.md" in read("README.md") or (ROOT / "docs/DOCUMENT_STATUS.md").exists(), "document authority map exists")
     ux_contract = read("docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md")
     ux_state = json.loads(read("design/user-visible-acceptance.v1.json"))

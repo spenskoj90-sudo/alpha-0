@@ -23,6 +23,9 @@ node_modules/
 web/.next/
 web/out/
 web/.turbo/
+site/.next/
+site/out/
+site/.turbo/
 
 # Python
 __pycache__/

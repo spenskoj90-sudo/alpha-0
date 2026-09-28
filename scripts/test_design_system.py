@@ -21,6 +21,10 @@ class DesignSystemContractTests(unittest.TestCase):
         cls.web_admin = read("web/app/admin/page.tsx")
         cls.web_brand = read("web/app/components/brand-mark.tsx")
         cls.web_intelligence = read("web/app/components/recommendation-panel.tsx")
+        cls.site_css = read("site/app/globals.css")
+        cls.site_page = read("site/app/page.tsx")
+        cls.site_security = read("site/app/security/page.tsx")
+        cls.site_config = read("site/next.config.mjs")
         cls.android = read("app/src/main/java/com/alpha0/app/ui/DesignTokens.kt")
         cls.chrome = read("app/src/main/java/com/alpha0/app/ui/AppChrome.kt")
         cls.main_activity = read("app/src/main/java/com/alpha0/app/MainActivity.kt")
@@ -129,6 +133,18 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertNotIn("background-image:", self.web)
         self.assertIn("/brand/icon-192.png", self.web_manifest)
         self.assertIn("/brand/icon-512.png", self.web_manifest)
+
+    def test_public_site_v3_and_security_separation(self) -> None:
+        self.assertIn("PRE-RELEASE", self.site_page)
+        self.assertIn("CALM PRECISION / TRUSTED INTELLIGENCE", self.site_page)
+        self.assertIn("/brand/sentinel-master-512.png", self.site_page)
+        self.assertIn("No public download is offered yet", self.site_page)
+        self.assertIn("@media (prefers-color-scheme: light)", self.site_css)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", self.site_css)
+        self.assertIn("@media (forced-colors: active)", self.site_css)
+        self.assertIn('output: "export"', self.site_config)
+        self.assertIn("separate surface from the authenticated Web Control Plane", self.site_security)
+        self.assertFalse((ROOT / "site" / "app" / "api").exists())
 
     def test_companion_v3_and_kill_switch(self) -> None:
         for section in ("Overview","Account","Runtime","Resilience","Host configuration","Games","Adapters","Voice","Overlay","Diagnostics","Updates"):

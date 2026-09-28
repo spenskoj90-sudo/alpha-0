@@ -538,8 +538,8 @@ def check_governance(checks: Checks) -> None:
         "post-merge staging synthetic workflow is main-bound",
     )
     checks.require(
-        "sentinel-control-bridge-staging.onrender.com" in staging_smoke
-        and "BRIDGE_EXACT_SHA_TIMEOUT" in staging_smoke,
+        "BRIDGE_EXACT_SHA_TIMEOUT" in staging_smoke
+        and '_request("bridge-health")' in staging_smoke,
         "staging synthetic waits for exact deployed source identity",
     )
     checks.require(

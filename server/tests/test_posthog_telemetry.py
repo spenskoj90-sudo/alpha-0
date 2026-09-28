@@ -126,3 +126,35 @@ def test_posthog_is_disabled_by_default_and_fails_closed_on_bad_activation(monke
     monkeypatch.setenv("SENTINEL_ENV", "production")
     with pytest.raises(RuntimeError, match="POSTHOG_STAGING_ONLY"):
         configured_posthog_sink()
+
+
+def test_posthog_source_sha_uses_render_commit_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("SENTINEL_POSTHOG_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_POSTHOG_PROJECT_KEY", "phc_test")
+    monkeypatch.setenv("SENTINEL_POSTHOG_REGION", "eu")
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_RELEASE", "1.0.0-rc2")
+    monkeypatch.delenv("SENTINEL_SOURCE_SHA", raising=False)
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "c" * 40)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+
+    sink = configured_posthog_sink()
+
+    assert sink is not None
+    assert sink.config.source_sha == "c" * 40
+
+
+def test_posthog_source_sha_prefers_explicit_identity(monkeypatch) -> None:
+    monkeypatch.setenv("SENTINEL_POSTHOG_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_POSTHOG_PROJECT_KEY", "phc_test")
+    monkeypatch.setenv("SENTINEL_POSTHOG_REGION", "eu")
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_RELEASE", "1.0.0-rc2")
+    monkeypatch.setenv("SENTINEL_SOURCE_SHA", "d" * 40)
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "e" * 40)
+    monkeypatch.setenv("GITHUB_SHA", "f" * 40)
+
+    sink = configured_posthog_sink()
+
+    assert sink is not None
+    assert sink.config.source_sha == "d" * 40

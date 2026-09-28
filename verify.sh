@@ -37,6 +37,7 @@ check 'CI release workflow' test -f .github/workflows/release.yml
 check 'CI release-candidate workflow' test -f .github/workflows/release-candidate.yml
 check 'CI release evidence workflow' test -f .github/workflows/release-evidence.yml
 check 'CI final release acceptance workflow' test -f .github/workflows/final-release-acceptance.yml
+check 'CI staging synthetic workflow' test -f .github/workflows/staging-synthetic.yml
 check 'API docs' test -f docs/API.md
 check 'Security docs' test -f docs/SECURITY.md
 check 'Architecture docs' test -f docs/ARCHITECTURE.md
@@ -91,7 +92,8 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_artifact_attestations.py scripts/test_design_system.py \
     scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py scripts/test_branch_hygiene.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
-    scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py
+    scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py \
+    scripts/staging_surface_smoke.py scripts/test_staging_surface_smoke.py
   check 'Android product shell invariants' python scripts/test_android_product_shell.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Branch hygiene safety invariants' python scripts/test_branch_hygiene.py
@@ -104,6 +106,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Provider runtime state invariants' python scripts/test_provider_runtime_state.py
   check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py
   check 'Physical-test artifact invariants' python scripts/test_physical_test_artifact.py
+  check 'Staging synthetic gate invariants' python scripts/test_staging_surface_smoke.py
 fi
 
 if command -v grep >/dev/null 2>&1; then

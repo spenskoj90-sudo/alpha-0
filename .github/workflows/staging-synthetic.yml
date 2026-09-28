@@ -1,0 +1,44 @@
+name: Staging Synthetic Runtime
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-synthetic-main
+  cancel-in-progress: true
+
+jobs:
+  staging-synthetic:
+    name: Exact-SHA staging synthetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+      - name: Run exact-SHA staging synthetic
+        env:
+          SENTINEL_SOURCE_SHA: ${{ github.sha }}
+          SENTINEL_PROBE_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          python scripts/staging_surface_smoke.py \
+            --expected-sha "$SENTINEL_SOURCE_SHA" \
+            --expected-version "$(cat VERSION)" \
+            --probe-id "$SENTINEL_PROBE_ID"
+      - name: Upload staging synthetic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sentinel-staging-synthetic-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/staging-synthetic.json
+          if-no-files-found: error
+          retention-days: 30

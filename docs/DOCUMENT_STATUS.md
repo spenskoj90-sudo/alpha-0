@@ -15,6 +15,7 @@
 - `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` plus `../design/user-visible-acceptance.v1.json` — active evidence ladder preventing build/test success, screenshots or design prototypes from being mislabeled as Owner-accepted product readiness.
 - `CONTROL_BRIDGE_ARCHITECTURE.md` plus `../control-bridge/` — active compact authenticated MCP evidence/control foundation tracked by #382.
 - `CHATGPT_PROJECT_INSTRUCTIONS.md` and `CHATGPT_WORKING_ENVIRONMENT.md` — active compact ChatGPT/Work context and tool-routing contracts.
+- `STAGING_SYNTHETIC_GATE.md` plus `.github/workflows/staging-synthetic.yml` — active exact-SHA post-merge Web/Core/Public Site runtime evidence contract (#388).
 - `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
 - `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
 - `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.

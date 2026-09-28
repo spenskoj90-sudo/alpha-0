@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -12,7 +13,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 _SHA40 = re.compile(r"^[0-9a-f]{40}$")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -44,13 +45,27 @@ class HttpResult:
 
 
 def _request(
-    method: str,
-    url: str,
+    destination: Literal["bridge-health", "core-health", "web-root", "web-login", "site-root", "site-robots"],
     *,
     body: bytes | None = None,
     headers: dict[str, str] | None = None,
     timeout_seconds: float = 15.0,
 ) -> HttpResult:
+    if destination == "bridge-health":
+        method, url = "GET", _BRIDGE_URL + "/healthz"
+    elif destination == "core-health":
+        method, url = "GET", _CORE_URL + "/healthz"
+    elif destination == "web-root":
+        method, url = "GET", _WEB_URL
+    elif destination == "web-login":
+        method, url = "POST", _WEB_URL + "/api/session/login"
+    elif destination == "site-root":
+        method, url = "GET", _SITE_URL
+    elif destination == "site-robots":
+        method, url = "GET", _SITE_URL + "/robots.txt"
+    else:
+        raise SmokeFailure("NETWORK_DESTINATION_NOT_ALLOWLISTED")
+
     request = urllib.request.Request(
         url,
         data=body,
@@ -72,10 +87,6 @@ def _request(
         )
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise SmokeFailure(f"NETWORK_ERROR:{type(exc).__name__}") from exc
-
-
-def _base(url: str) -> str:
-    return url.rstrip("/")
 
 
 def validate_bridge_health(result: HttpResult, expected_sha: str) -> dict[str, Any]:
@@ -136,7 +147,6 @@ def validate_robots(result: HttpResult) -> dict[str, Any]:
 
 
 def wait_for_exact_bridge(
-    bridge_url: str,
     expected_sha: str,
     *,
     timeout_seconds: int,
@@ -146,7 +156,7 @@ def wait_for_exact_bridge(
     last = "not-probed"
     while time.monotonic() < deadline:
         try:
-            result = _request("GET", f"{_base(bridge_url)}/healthz")
+            result = _request("bridge-health")
             payload = result.json() if result.status == 200 else {}
             last = f"http={result.status},sha={payload.get('sourceSha')}"
             if result.status == 200 and payload.get("status") == "ok" and payload.get("sourceSha") == expected_sha:
@@ -172,31 +182,32 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     }
 
     evidence["surfaces"]["bridge"] = wait_for_exact_bridge(
-        _BRIDGE_URL,
         args.expected_sha,
         timeout_seconds=args.deploy_timeout_seconds,
         poll_seconds=args.poll_seconds,
     )
     evidence["surfaces"]["core"] = validate_core_health(
-        _request("GET", f"{_CORE_URL}/healthz"),
+        _request("core-health"),
         args.expected_version,
     )
     evidence["surfaces"]["web"] = validate_html(
-        _request("GET", _WEB_URL),
+        _request("web-root"),
         "WEB_ROOT",
     )
 
     probe_id = re.sub(r"[^A-Za-z0-9_-]", "-", args.probe_id)[:48] or "probe"
+    synthetic_password = "synthetic-" + hashlib.sha256(
+        f"{args.expected_sha}:{probe_id}".encode("utf-8")
+    ).hexdigest()
     body = json.dumps(
         {
             "email": f"synthetic-{args.expected_sha[:12]}-{probe_id}@example.invalid",
-            "password": "SENTINEL-Synthetic-Never-Valid-2026!",
+            "password": synthetic_password,
         },
         separators=(",", ":"),
     ).encode("utf-8")
     login = _request(
-        "POST",
-        f"{_WEB_URL}/api/session/login",
+        "web-login",
         body=body,
         headers={
             "content-type": "application/json",
@@ -208,11 +219,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     evidence["surfaces"]["webCoreLogin"] = validate_login_probe(login)
 
     evidence["surfaces"]["publicSite"] = validate_html(
-        _request("GET", _SITE_URL),
+        _request("site-root"),
         "PUBLIC_SITE_ROOT",
     )
     evidence["surfaces"]["publicRobots"] = validate_robots(
-        _request("GET", f"{_SITE_URL}/robots.txt")
+        _request("site-robots")
     )
     evidence["result"] = "PASS"
     return evidence

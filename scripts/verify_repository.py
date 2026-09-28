@@ -555,6 +555,16 @@ def check_governance(checks: Checks) -> None:
         "staging synthetic evidence path is literal and not caller-controlled",
     )
     checks.require(
+        'Literal["bridge-health", "core-health", "web-root", "web-login", "site-root", "site-robots"]' in staging_smoke
+        and "NETWORK_DESTINATION_NOT_ALLOWLISTED" in staging_smoke,
+        "staging synthetic network helper accepts only a closed destination allowlist",
+    )
+    checks.require(
+        '"password": "SENTINEL-' not in staging_smoke
+        and "hashlib.sha256" in staging_smoke,
+        "staging synthetic contains no hard-coded credential-shaped password literal",
+    )
+    checks.require(
         "/api/session/login" in staging_smoke
         and "INVALID_CREDENTIALS" in staging_smoke
         and "SENTINEL_CORE_URL_NOT_CONFIGURED" not in staging_smoke,

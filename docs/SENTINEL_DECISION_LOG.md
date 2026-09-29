@@ -222,3 +222,13 @@
 **Context decision:** Root/scoped AGENTS.md files become the compact agent context router. The former redundant role/playbook/permissions contracts are superseded to reduce context dilution; Git history preserves them.
 
 **Supersedes:** the strict AI-participation restriction adopted in September and the single-AI rationale in D-025. It does not supersede repository-first truth, exact-SHA merge validation, branch protection, Owner gates, release/security evidence requirements, or user-visible acceptance.
+
+
+## D-033 — GPT remains the Owner's single orchestration interface
+
+**Date:** 2026-09-29  
+**Decision:** Controlled-agent engineering does not mean multi-authority. The Human Owner works through GPT/ChatGPT. GPT is the primary orchestrator, accountable final technical integrator and normal executor. Secondary workers and connected design/execution services are bounded tools under GPT supervision and independent validation.
+
+**Efficiency rule:** Direct GPT plus connected tools is the default. Work, Codex, parallel workers or external execution are used only when task shape has a concrete expected benefit. Repeated audit-only passes and unnecessary reruns are rejected in favor of coherent vertical passes and reuse of exact-SHA evidence.
+
+**Context rule:** Obsolete duplicate governance/state files are removed from the working tree after useful rules are consolidated into the active OS, AGENTS router, workflow contract and compact ChatGPT project memory. Git history preserves historical text.

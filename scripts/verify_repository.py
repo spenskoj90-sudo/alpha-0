@@ -570,9 +570,10 @@ def check_governance(checks: Checks) -> None:
     )
     checks.require(
         "/api/session/login" in staging_smoke
-        and "INVALID_CREDENTIALS" in staging_smoke
+        and 'payload.get("code") != "INVALID_CREDENTIALS"' in staging_smoke
+        and "WEB_CORE_LOGIN_REQUEST_ID_MISMATCH" in staging_smoke
         and "SENTINEL_CORE_URL_NOT_CONFIGURED" not in staging_smoke,
-        "staging synthetic proves Web-to-Core login through authoritative invalid-credential behavior",
+        "staging synthetic proves Web-to-Core login through the canonical Core error envelope",
     )
     checks.require(
         "@example.invalid" in staging_smoke

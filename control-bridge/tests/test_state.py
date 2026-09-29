@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from sentinel_bridge import state
 
@@ -45,3 +46,18 @@ def test_source_sha_uses_render_commit_fallback(monkeypatch):
     monkeypatch.delenv("SENTINEL_SOURCE_SHA", raising=False)
     monkeypatch.setenv("RENDER_GIT_COMMIT", "b" * 40)
     assert state.project_state()["sourceSha"] == "b" * 40
+
+
+def test_healthz_uses_render_commit_fallback(monkeypatch):
+    from sentinel_bridge import server
+
+    monkeypatch.delenv("SENTINEL_SOURCE_SHA", raising=False)
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "c" * 40)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+
+    response = asyncio.run(server.healthz(None))
+    payload = json.loads(response.body.decode("utf-8"))
+
+    assert payload["status"] == "ok"
+    assert payload["service"] == "sentinel-control-bridge"
+    assert payload["sourceSha"] == "c" * 40

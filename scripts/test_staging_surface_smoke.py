@@ -31,8 +31,12 @@ class StagingSurfaceSmokeTests(unittest.TestCase):
             validate_core_health(result, "1.0.0")
 
     def test_login_probe_distinguishes_core_denial_from_proxy_failure(self) -> None:
-        good = HttpResult(401, {"x-request-id": "synthetic-abc"}, b'{"detail":"INVALID_CREDENTIALS"}')
-        self.assertEqual(validate_login_probe(good)["detail"], "INVALID_CREDENTIALS")
+        good = HttpResult(
+            401,
+            {"x-request-id": "synthetic-abc"},
+            b'{"code":"INVALID_CREDENTIALS","message":"Request rejected","request_id":"synthetic-abc"}',
+        )
+        self.assertEqual(validate_login_probe(good)["code"], "INVALID_CREDENTIALS")
         broken = HttpResult(
             503,
             {"x-request-id": "synthetic-abc"},
@@ -40,6 +44,14 @@ class StagingSurfaceSmokeTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(SmokeFailure, "WEB_CORE_LOGIN_PATH_UNHEALTHY"):
             validate_login_probe(broken)
+
+        mismatched = HttpResult(
+            401,
+            {"x-request-id": "synthetic-header"},
+            b'{"code":"INVALID_CREDENTIALS","message":"Request rejected","request_id":"synthetic-body"}',
+        )
+        with self.assertRaisesRegex(SmokeFailure, "WEB_CORE_LOGIN_REQUEST_ID_MISMATCH"):
+            validate_login_probe(mismatched)
 
     def test_robots_keeps_prerelease_site_non_indexable(self) -> None:
         result = HttpResult(200, {}, b"User-agent: *\nDisallow: /\n")

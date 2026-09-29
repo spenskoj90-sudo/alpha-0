@@ -172,6 +172,10 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
   --radius-control: 6px;
   --radius-module: 6px;
   --radius-card: 8px;
+}
+/* next/font attaches its variables to body. Resolve these aliases on the same
+   element; resolving them on :root makes the entire font-family invalid. */
+body {
   --font-brand: var(--font-onest), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-ui: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Consolas, monospace;

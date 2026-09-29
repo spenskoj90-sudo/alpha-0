@@ -17,7 +17,7 @@ def _read_text(relative: str) -> str:
 def _read_json(relative: str) -> dict[str, Any]:
     return json.loads(_read_text(relative))
 
-def _source_sha() -> str:
+def source_sha() -> str:
     for name in ("SENTINEL_SOURCE_SHA", "RENDER_GIT_COMMIT", "GITHUB_SHA"):
         value = os.getenv(name, "").strip().lower()
         if SHA40.fullmatch(value):
@@ -33,7 +33,7 @@ def project_state() -> dict[str, Any]:
     return {
         "schema": "sentinel.control-bridge.project-state.v1",
         "version": _read_text("VERSION").strip(),
-        "sourceSha": _source_sha(),
+        "sourceSha": source_sha(),
         "environment": os.getenv("SENTINEL_ENV", "unknown").strip().lower() or "unknown",
         "design": {
             "revision": design.get("revision"),
@@ -89,7 +89,7 @@ def _probe(name: str, base_url: str, path: str, timeout_seconds: float = 5.0) ->
 def runtime_health() -> dict[str, Any]:
     return {
         "schema": "sentinel.control-bridge.runtime-health.v1",
-        "sourceSha": _source_sha(),
+        "sourceSha": source_sha(),
         "checks": [
             _probe("core", os.getenv("SENTINEL_CORE_URL", ""), "/healthz"),
             _probe("web", os.getenv("SENTINEL_WEB_URL", ""), "/"),
@@ -103,7 +103,7 @@ def release_readiness() -> dict[str, Any]:
     surfaces = ux.get("surfaces", [])
     return {
         "schema": "sentinel.control-bridge.release-readiness.v1",
-        "sourceSha": _source_sha(),
+        "sourceSha": source_sha(),
         "activeAcceptanceIssues": issue_ids,
         "ownerVisualAcceptance": {
             "required": bool(ux.get("ownerVisualAcceptanceRequired")),

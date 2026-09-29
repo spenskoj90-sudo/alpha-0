@@ -30,6 +30,11 @@ export default function StatusPage() {
             physical or production acceptance.
           </p>
           <div className="status-table" role="table" aria-label="SENTINEL release readiness">
+            <div className="status-header" role="row">
+              <span role="columnheader">Surface</span>
+              <span role="columnheader">Repository state</span>
+              <span role="columnheader">Remaining evidence</span>
+            </div>
             {rows.map(([surface, implemented, pending]) => (
               <div className="status-record" role="row" key={surface}>
                 <div role="cell">

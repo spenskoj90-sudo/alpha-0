@@ -81,7 +81,7 @@
 
 **Date:** 2026-08-27  
 **Original decision:** Merge only after exact-head product CI green and explicit Owner accept; agents must not merge.  
-**Status:** **SUPERSEDED by the GPT-only governance adopted 2026-09-06.** Current rule is the exact-SHA merge gate in `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT may merge when all required checks succeed on the exact PR HEAD SHA and repository protections permit the merge. Protected Owner gates remain unchanged.
+**Status:** **SUPERSEDED by D-032 and D-033.** Current merge authority is defined by the active engineering operating system: GPT may merge only after the exact-SHA gate passes and repository protections permit it. Protected Owner gates remain unchanged.
 
 ## D-016 — Historical branch cleanup groups 1+2 (issue #22)
 

@@ -1,0 +1,162 @@
+{
+ "assets": [
+  {
+   "path": "src/assets/sentinel-master-icon.png",
+   "role": "Master app icon",
+   "dimensions": "1024x1024",
+   "format": "raster/png",
+   "status": "APPROVED (raster master — no approved vector master exists)",
+   "source": "owner-approved concept, professional rework",
+   "context": "brand, stores source, launch"
+  },
+  {
+   "path": "public/brand/icon-16.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "16x16",
+   "format": "raster/png",
+   "status": "DERIVED from approved master — below 48px use compact glyph instead",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "reference only"
+  },
+  {
+   "path": "public/brand/icon-20.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "20x20",
+   "format": "raster/png",
+   "status": "DERIVED from approved master — below 48px use compact glyph instead",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "reference only"
+  },
+  {
+   "path": "public/brand/icon-24.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "24x24",
+   "format": "raster/png",
+   "status": "DERIVED from approved master — below 48px use compact glyph instead",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "reference only"
+  },
+  {
+   "path": "public/brand/icon-32.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "32x32",
+   "format": "raster/png",
+   "status": "DERIVED from approved master — below 48px use compact glyph instead",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "favicon comparison"
+  },
+  {
+   "path": "public/brand/icon-48.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "48x48",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "min full-colour size"
+  },
+  {
+   "path": "public/brand/icon-64.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "64x64",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "desktop"
+  },
+  {
+   "path": "public/brand/icon-96.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "96x96",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "launcher mdpi-xxhdpi ref"
+  },
+  {
+   "path": "public/brand/icon-128.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "128x128",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "desktop"
+  },
+  {
+   "path": "public/brand/icon-192.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "192x192",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "PWA"
+  },
+  {
+   "path": "public/brand/icon-256.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "256x256",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "Windows ref"
+  },
+  {
+   "path": "public/brand/icon-512.png",
+   "role": "Full-colour icon derivative",
+   "dimensions": "512x512",
+   "format": "raster/png",
+   "status": "DERIVED from approved master",
+   "source": "src/assets/sentinel-master-icon.png (Lanczos)",
+   "context": "PWA / store preview"
+  },
+  {
+   "path": "public/brand/glyph.svg",
+   "role": "Compact glyph ≥32px",
+   "dimensions": "vector 64x64",
+   "format": "vector/svg",
+   "status": "CANDIDATE — READY FOR OWNER OPTICAL SIGN-OFF",
+   "source": "hand-authored geometry after master",
+   "context": "tray, notification, themed icon, ≤24px"
+  },
+  {
+   "path": "public/brand/glyph-compact.svg",
+   "role": "Compact glyph 16–24px (simplified, no arcs)",
+   "dimensions": "vector 64x64",
+   "format": "vector/svg",
+   "status": "CANDIDATE — READY FOR OWNER OPTICAL SIGN-OFF",
+   "source": "hand-authored geometry after master",
+   "context": "tray, notification, themed icon, ≤24px"
+  },
+  {
+   "path": "public/brand/glyph-mono.svg",
+   "role": "Monochrome glyph on dark",
+   "dimensions": "vector 64x64",
+   "format": "vector/svg",
+   "status": "CANDIDATE — READY FOR OWNER OPTICAL SIGN-OFF",
+   "source": "hand-authored geometry after master",
+   "context": "tray, notification, themed icon, ≤24px"
+  },
+  {
+   "path": "public/favicon.png",
+   "role": "Favicon",
+   "dimensions": "-",
+   "format": "other",
+   "status": "DERIVED",
+   "source": "",
+   "context": "web"
+  },
+  {
+   "path": "public/manifest.webmanifest",
+   "role": "PWA manifest",
+   "dimensions": "-",
+   "format": "other",
+   "status": "CURRENT",
+   "source": "",
+   "context": "web"
+  }
+ ],
+ "nativeOnly": [
+  "Android adaptive icon (foreground/background/monochrome layers) — requires approved vector master + Android Studio Image Asset",
+  "Windows .ico multi-resolution + tray — requires vector master + native packaging",
+  "App Store / Google Play listing assets — require store tooling and approved copy"
+ ]
+}

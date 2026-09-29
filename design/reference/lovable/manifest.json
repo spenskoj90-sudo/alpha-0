@@ -1,0 +1,24 @@
+{
+  "schema": "sentinel.design-lab-reference.v1",
+  "sourceRepository": "spenskoj90-sudo/sentinel-aware-companion",
+  "sourceRef": "main",
+  "sourceSha": "a281479677d84de21a24db62b0b13af7ae11c623",
+  "sourceUpdatedAt": "2026-09-29T08:59:35Z",
+  "sourceAgent": "Lovable",
+  "status": "REFERENCE_IMPORTED",
+  "productionAuthority": "spenskoj90-sudo/alpha-0",
+  "nativeAccess": "NOT_AVAILABLE",
+  "visualAcceptance": "OWNER_REQUIRED",
+  "runtimePolicy": "Design registries and handoff are imported as non-runtime reference evidence. Native Android, Windows, signing, store and physical optical changes remain outside this transfer.",
+  "registries": {
+    "tokens": "tokens.json",
+    "components": "components.json",
+    "screens": "screens.json",
+    "assets": "assets.json"
+  },
+  "handoff": {
+    "production": "PRODUCTION-DESIGN-HANDOFF.md",
+    "foundations": "SENTINEL-FOUNDATIONS.md",
+    "validator": "validate-design.mjs"
+  }
+}

@@ -1,0 +1,3470 @@
+[
+ {
+  "id": "android.splash",
+  "platform": "android",
+  "name": "Splash / Launch",
+  "kind": "entry",
+  "summary": "Splash / Launch reference screen.",
+  "route": "/reference/android.splash",
+  "states": [
+   "initial-loading",
+   "success",
+   "offline",
+   "failed",
+   "unsupported"
+  ],
+  "items": [
+   "Brand mark",
+   "Integrity check",
+   "Version · SHA"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.entry",
+  "platform": "android",
+  "name": "Unauthenticated entry",
+  "kind": "entry",
+  "summary": "Unauthenticated entry reference screen.",
+  "route": "/reference/android.entry",
+  "states": [
+   "initial-loading",
+   "success",
+   "offline",
+   "failed",
+   "unsupported"
+  ],
+  "items": [
+   "Sign in",
+   "Create account",
+   "Continue with provider"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.sign-in",
+  "platform": "android",
+  "name": "Sign in",
+  "kind": "form",
+  "summary": "Sign in reference screen.",
+  "route": "/reference/android.sign-in",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Email",
+   "Password",
+   "Forgot password",
+   "Providers"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.register",
+  "platform": "android",
+  "name": "Register",
+  "kind": "form",
+  "summary": "Register reference screen.",
+  "route": "/reference/android.register",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Email",
+   "Password strength",
+   "Terms consent"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.verify-email",
+  "platform": "android",
+  "name": "Email verification",
+  "kind": "form",
+  "summary": "Email verification reference screen.",
+  "route": "/reference/android.verify-email",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Code sent to address",
+   "6-digit code",
+   "Resend in 00:45"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.password-recovery",
+  "platform": "android",
+  "name": "Password recovery",
+  "kind": "form",
+  "summary": "Password recovery reference screen.",
+  "route": "/reference/android.password-recovery",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Email",
+   "Reset link sent",
+   "New password"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.mfa-challenge",
+  "platform": "android",
+  "name": "MFA challenge",
+  "kind": "form",
+  "summary": "MFA challenge reference screen.",
+  "route": "/reference/android.mfa-challenge",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Authenticator code",
+   "Use recovery code",
+   "Time remaining"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding",
+   "security"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.mfa-enrollment",
+  "platform": "android",
+  "name": "MFA enrollment",
+  "kind": "form",
+  "summary": "MFA enrollment reference screen.",
+  "route": "/reference/android.mfa-enrollment",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Setup key",
+   "Scan in authenticator",
+   "Confirm code"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.recovery-codes",
+  "platform": "android",
+  "name": "Recovery codes",
+  "kind": "form",
+  "summary": "Recovery codes reference screen.",
+  "route": "/reference/android.recovery-codes",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "8 codes shown once",
+   "Copy",
+   "Storage confirmation"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.provider-auth",
+  "platform": "android",
+  "name": "Provider auth",
+  "kind": "form",
+  "summary": "Provider auth reference screen.",
+  "route": "/reference/android.provider-auth",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Google",
+   "Telegram",
+   "VK ID"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.provider-linking",
+  "platform": "android",
+  "name": "Provider linking",
+  "kind": "security",
+  "summary": "Provider linking reference screen.",
+  "route": "/reference/android.provider-linking",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Google · VERIFIED",
+   "Telegram · AVAILABLE",
+   "VK ID · AVAILABLE"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": "Access"
+ },
+ {
+  "id": "android.device-onboarding",
+  "platform": "android",
+  "name": "Device onboarding",
+  "kind": "form",
+  "summary": "Device onboarding reference screen.",
+  "route": "/reference/android.device-onboarding",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted",
+   "provider-unavailable"
+  ],
+  "items": [
+   "Name this device",
+   "Trust level",
+   "Notifications"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.device-check",
+  "platform": "android",
+  "name": "Device security check",
+  "kind": "detail",
+  "summary": "Device security check reference screen.",
+  "route": "/reference/android.device-check",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "OS integrity",
+   "App signature",
+   "Screen lock"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.home",
+  "platform": "android",
+  "name": "Home",
+  "kind": "dashboard",
+  "summary": "Home reference screen.",
+  "route": "/reference/android.home",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting"
+  ],
+  "items": [
+   "Runtime FULL",
+   "Top recommendation",
+   "Recent events"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "onboarding",
+   "intelligence"
+  ],
+  "liveReference": "Android"
+ },
+ {
+  "id": "android.games",
+  "platform": "android",
+  "name": "Games",
+  "kind": "list",
+  "summary": "Games reference screen.",
+  "route": "/reference/android.games",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "WoW Retail · ACTIVE",
+   "WoW Classic · LIMITED",
+   "Add game"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Android"
+ },
+ {
+  "id": "android.security",
+  "platform": "android",
+  "name": "Security",
+  "kind": "security",
+  "summary": "Security reference screen.",
+  "route": "/reference/android.security",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Account protection",
+   "Sessions",
+   "Devices",
+   "Providers"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": "Android"
+ },
+ {
+  "id": "android.activity",
+  "platform": "android",
+  "name": "Activity",
+  "kind": "list",
+  "summary": "Activity reference screen.",
+  "route": "/reference/android.activity",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Events",
+   "Alerts",
+   "Recommendations"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": "Android"
+ },
+ {
+  "id": "android.game-detail",
+  "platform": "android",
+  "name": "Game detail",
+  "kind": "detail",
+  "summary": "Game detail reference screen.",
+  "route": "/reference/android.game-detail",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Adapter state",
+   "Capabilities",
+   "Last session"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.adapter-config",
+  "platform": "android",
+  "name": "Adapter configuration",
+  "kind": "settings",
+  "summary": "Adapter configuration reference screen.",
+  "route": "/reference/android.adapter-config",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Profile",
+   "Capability discovery",
+   "Policy ALLOW/CONFIRM/DENY"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.intelligence",
+  "platform": "android",
+  "name": "Intelligence / recommendation",
+  "kind": "detail",
+  "summary": "Intelligence / recommendation reference screen.",
+  "route": "/reference/android.intelligence",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Recommendation",
+   "Fact",
+   "Inference · confidence",
+   "Acknowledge"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.alerts",
+  "platform": "android",
+  "name": "Alerts / events",
+  "kind": "list",
+  "summary": "Alerts / events reference screen.",
+  "route": "/reference/android.alerts",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Warning",
+   "Security event",
+   "Runtime change"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.account-security",
+  "platform": "android",
+  "name": "Account security",
+  "kind": "security",
+  "summary": "Account security reference screen.",
+  "route": "/reference/android.account-security",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Password",
+   "MFA",
+   "Recovery"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.mfa",
+  "platform": "android",
+  "name": "MFA",
+  "kind": "security",
+  "summary": "MFA reference screen.",
+  "route": "/reference/android.mfa",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Authenticator · VERIFIED",
+   "Disable (confirm)"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.recovery",
+  "platform": "android",
+  "name": "Recovery",
+  "kind": "security",
+  "summary": "Recovery reference screen.",
+  "route": "/reference/android.recovery",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Codes remaining 6/8",
+   "Regenerate (confirm)"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.sessions",
+  "platform": "android",
+  "name": "Sessions",
+  "kind": "security",
+  "summary": "Sessions reference screen.",
+  "route": "/reference/android.sessions",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Current session",
+   "Android · yesterday",
+   "Revoke all"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.devices",
+  "platform": "android",
+  "name": "Devices",
+  "kind": "list",
+  "summary": "Devices reference screen.",
+  "route": "/reference/android.devices",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Pixel 8 · trusted",
+   "Windows PC · trusted"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.device-detail",
+  "platform": "android",
+  "name": "Device detail / identity",
+  "kind": "detail",
+  "summary": "Device detail / identity reference screen.",
+  "route": "/reference/android.device-detail",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Fingerprint SHA",
+   "Trust since",
+   "Revoke device"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.linked-providers",
+  "platform": "android",
+  "name": "Linked providers",
+  "kind": "security",
+  "summary": "Linked providers reference screen.",
+  "route": "/reference/android.linked-providers",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Google",
+   "Telegram",
+   "VK ID",
+   "One method must remain"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.settings",
+  "platform": "android",
+  "name": "Settings",
+  "kind": "settings",
+  "summary": "Settings reference screen.",
+  "route": "/reference/android.settings",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Appearance",
+   "Language",
+   "Privacy",
+   "Diagnostics"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.appearance",
+  "platform": "android",
+  "name": "Appearance",
+  "kind": "settings",
+  "summary": "Appearance reference screen.",
+  "route": "/reference/android.appearance",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Light",
+   "Dark",
+   "System"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.language",
+  "platform": "android",
+  "name": "Language",
+  "kind": "settings",
+  "summary": "Language reference screen.",
+  "route": "/reference/android.language",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Русский",
+   "English",
+   "System"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.privacy",
+  "platform": "android",
+  "name": "Privacy / telemetry",
+  "kind": "settings",
+  "summary": "Privacy / telemetry reference screen.",
+  "route": "/reference/android.privacy",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Crash reports",
+   "Usage telemetry",
+   "Voice data retention"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.diagnostics",
+  "platform": "android",
+  "name": "Diagnostics",
+  "kind": "runtime",
+  "summary": "Diagnostics reference screen.",
+  "route": "/reference/android.diagnostics",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Environment",
+   "Source SHA",
+   "Export evidence"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.updates",
+  "platform": "android",
+  "name": "Updates",
+  "kind": "settings",
+  "summary": "Updates reference screen.",
+  "route": "/reference/android.updates",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Available",
+   "Required",
+   "Release notes"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.help",
+  "platform": "android",
+  "name": "Help",
+  "kind": "list",
+  "summary": "Help reference screen.",
+  "route": "/reference/android.help",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Guides",
+   "Contact support",
+   "Report a problem"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "android.about",
+  "platform": "android",
+  "name": "About",
+  "kind": "detail",
+  "summary": "About reference screen.",
+  "route": "/reference/android.about",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Version",
+   "Source SHA",
+   "Licenses"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "android.physical-test",
+  "platform": "android",
+  "name": "Physical Test / Staging identity",
+  "kind": "runtime",
+  "summary": "Physical Test / Staging identity reference screen.",
+  "route": "/reference/android.physical-test",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "24dp strip",
+   "ENV · version · SHA",
+   "Diagnostics access"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "narrow-mobile",
+   "standard-mobile"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Android"
+ },
+ {
+  "id": "web.overview",
+  "platform": "web",
+  "name": "Overview",
+  "kind": "dashboard",
+  "summary": "Overview reference screen.",
+  "route": "/reference/web.overview",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting"
+  ],
+  "items": [
+   "Runtime",
+   "Recommendation",
+   "Signal chart",
+   "Timeline"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": "Control plane"
+ },
+ {
+  "id": "web.intelligence",
+  "platform": "web",
+  "name": "Intelligence",
+  "kind": "list",
+  "summary": "Intelligence reference screen.",
+  "route": "/reference/web.intelligence",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Recommendations",
+   "Explanations",
+   "History"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.games",
+  "platform": "web",
+  "name": "Games",
+  "kind": "list",
+  "summary": "Games reference screen.",
+  "route": "/reference/web.games",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Catalog",
+   "Adapters",
+   "Capabilities"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.game-detail",
+  "platform": "web",
+  "name": "Game detail / configuration",
+  "kind": "detail",
+  "summary": "Game detail / configuration reference screen.",
+  "route": "/reference/web.game-detail",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Profile",
+   "Executable",
+   "Adapter policy"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.activity",
+  "platform": "web",
+  "name": "Activity",
+  "kind": "list",
+  "summary": "Activity reference screen.",
+  "route": "/reference/web.activity",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Event stream",
+   "Filters",
+   "Export"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "intelligence"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.security",
+  "platform": "web",
+  "name": "Security",
+  "kind": "security",
+  "summary": "Security reference screen.",
+  "route": "/reference/web.security",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "revoked",
+   "confirm-destructive",
+   "permission-denied"
+  ],
+  "items": [
+   "Protection",
+   "MFA",
+   "Sessions"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": "Control plane"
+ },
+ {
+  "id": "web.devices",
+  "platform": "web",
+  "name": "Devices",
+  "kind": "list",
+  "summary": "Devices reference screen.",
+  "route": "/reference/web.devices",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Trusted devices table",
+   "Revoke"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.account",
+  "platform": "web",
+  "name": "Account",
+  "kind": "settings",
+  "summary": "Account reference screen.",
+  "route": "/reference/web.account",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Profile",
+   "Email",
+   "Linked providers"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "security"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.subscription",
+  "platform": "web",
+  "name": "Subscription",
+  "kind": "billing",
+  "summary": "Subscription reference screen.",
+  "route": "/reference/web.subscription",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "past-due",
+   "expired",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Current plan",
+   "Entitlements",
+   "Lifecycle"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "plan"
+  ],
+  "liveReference": "Billing"
+ },
+ {
+  "id": "web.billing",
+  "platform": "web",
+  "name": "Billing",
+  "kind": "billing",
+  "summary": "Billing reference screen.",
+  "route": "/reference/web.billing",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "past-due",
+   "expired",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Plans Core/Pro/Studio",
+   "Payment method",
+   "Invoices"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "plan"
+  ],
+  "liveReference": "Billing"
+ },
+ {
+  "id": "web.settings",
+  "platform": "web",
+  "name": "Settings",
+  "kind": "settings",
+  "summary": "Settings reference screen.",
+  "route": "/reference/web.settings",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Appearance",
+   "Language",
+   "Notifications",
+   "Privacy"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "web.support",
+  "platform": "web",
+  "name": "Support",
+  "kind": "list",
+  "summary": "Support reference screen.",
+  "route": "/reference/web.support",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Report problem",
+   "Knowledge base",
+   "Tickets"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "web.diagnostics",
+  "platform": "web",
+  "name": "Diagnostics",
+  "kind": "runtime",
+  "summary": "Diagnostics reference screen.",
+  "route": "/reference/web.diagnostics",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Environment",
+   "Evidence",
+   "Export"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "mobile",
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "admin.catalog",
+  "platform": "admin",
+  "name": "Catalog",
+  "kind": "admin",
+  "summary": "Catalog reference screen.",
+  "route": "/reference/admin.catalog",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied",
+   "restricted"
+  ],
+  "items": [
+   "Games",
+   "Adapters",
+   "Coverage"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Admin"
+ },
+ {
+  "id": "admin.entitlements",
+  "platform": "admin",
+  "name": "Entitlements",
+  "kind": "admin",
+  "summary": "Entitlements reference screen.",
+  "route": "/reference/admin.entitlements",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied",
+   "restricted"
+  ],
+  "items": [
+   "Core",
+   "Pro",
+   "Beta channel"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Admin"
+ },
+ {
+  "id": "admin.quality",
+  "platform": "admin",
+  "name": "Quality / problem clusters",
+  "kind": "admin",
+  "summary": "Quality / problem clusters reference screen.",
+  "route": "/reference/admin.quality",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied",
+   "restricted"
+  ],
+  "items": [
+   "PC-0412",
+   "PC-0398",
+   "Evidence"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Admin"
+ },
+ {
+  "id": "admin.evidence",
+  "platform": "admin",
+  "name": "Operational evidence",
+  "kind": "admin",
+  "summary": "Operational evidence reference screen.",
+  "route": "/reference/admin.evidence",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied",
+   "restricted"
+  ],
+  "items": [
+   "Logs",
+   "Crash groups",
+   "SHA"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Admin"
+ },
+ {
+  "id": "admin.elevated",
+  "platform": "admin",
+  "name": "Elevated-access boundary",
+  "kind": "admin",
+  "summary": "Elevated-access boundary reference screen.",
+  "route": "/reference/admin.elevated",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied",
+   "restricted"
+  ],
+  "items": [
+   "Re-authenticate",
+   "Scope",
+   "Audit trail"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "tablet",
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": "Admin"
+ },
+ {
+  "id": "companion.overview",
+  "platform": "companion",
+  "name": "Overview",
+  "kind": "runtime",
+  "summary": "Overview reference screen.",
+  "route": "/reference/companion.overview",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Runtime",
+   "Game detected",
+   "Kill switch"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Companion"
+ },
+ {
+  "id": "companion.account",
+  "platform": "companion",
+  "name": "Account",
+  "kind": "settings",
+  "summary": "Account reference screen.",
+  "route": "/reference/companion.account",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Signed in",
+   "Entitlement",
+   "Sign out"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "plan"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.runtime",
+  "platform": "companion",
+  "name": "Runtime",
+  "kind": "runtime",
+  "summary": "Runtime reference screen.",
+  "route": "/reference/companion.runtime",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "CONNECTING/ACTIVE/DEGRADED/STOPPED",
+   "Latency",
+   "Stop"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "connection"
+  ],
+  "liveReference": "Companion"
+ },
+ {
+  "id": "companion.resilience",
+  "platform": "companion",
+  "name": "Resilience / connection",
+  "kind": "runtime",
+  "summary": "Resilience / connection reference screen.",
+  "route": "/reference/companion.resilience",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "FULL→DEGRADED→LOCAL-ONLY→OFFLINE→CONNECTING"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "connection"
+  ],
+  "liveReference": "Resilience"
+ },
+ {
+  "id": "companion.host",
+  "platform": "companion",
+  "name": "Host configuration",
+  "kind": "settings",
+  "summary": "Host configuration reference screen.",
+  "route": "/reference/companion.host",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Install path",
+   "Startup",
+   "Ports"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.games",
+  "platform": "companion",
+  "name": "Games",
+  "kind": "list",
+  "summary": "Games reference screen.",
+  "route": "/reference/companion.games",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "Detected games",
+   "Launch"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.executable",
+  "platform": "companion",
+  "name": "Executable configuration",
+  "kind": "settings",
+  "summary": "Executable configuration reference screen.",
+  "route": "/reference/companion.executable",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Path",
+   "Version check",
+   "Signature"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.adapters",
+  "platform": "companion",
+  "name": "Adapters",
+  "kind": "list",
+  "summary": "Adapters reference screen.",
+  "route": "/reference/companion.adapters",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "permission-denied"
+  ],
+  "items": [
+   "WoW Retail adapter",
+   "State",
+   "Version"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.capabilities",
+  "platform": "companion",
+  "name": "Capability discovery",
+  "kind": "detail",
+  "summary": "Capability discovery reference screen.",
+  "route": "/reference/companion.capabilities",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "AVAILABLE",
+   "LIMITED",
+   "UNVERIFIED"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.voice",
+  "platform": "companion",
+  "name": "Voice",
+  "kind": "voice",
+  "summary": "Voice reference screen.",
+  "route": "/reference/companion.voice",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Consent",
+   "Push-to-talk",
+   "Provider"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "companion.overlay-config",
+  "platform": "companion",
+  "name": "Overlay configuration",
+  "kind": "settings",
+  "summary": "Overlay configuration reference screen.",
+  "route": "/reference/companion.overlay-config",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Density",
+   "Position",
+   "Opacity"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.diagnostics",
+  "platform": "companion",
+  "name": "Diagnostics",
+  "kind": "runtime",
+  "summary": "Diagnostics reference screen.",
+  "route": "/reference/companion.diagnostics",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "restricted",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Logs",
+   "Evidence"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.export",
+  "platform": "companion",
+  "name": "Log / evidence export",
+  "kind": "detail",
+  "summary": "Log / evidence export reference screen.",
+  "route": "/reference/companion.export",
+  "states": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "stale",
+   "offline",
+   "failed",
+   "unknown",
+   "partial",
+   "unavailable",
+   "confirm-destructive"
+  ],
+  "items": [
+   "Bundle contents",
+   "Redaction",
+   "Export"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [
+   "diagnostics"
+  ],
+  "liveReference": null
+ },
+ {
+  "id": "companion.updates",
+  "platform": "companion",
+  "name": "Updates",
+  "kind": "settings",
+  "summary": "Updates reference screen.",
+  "route": "/reference/companion.updates",
+  "states": [
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "permission-missing"
+  ],
+  "items": [
+   "Channel",
+   "Available",
+   "Restart required"
+  ],
+  "components": [
+   "AppShell",
+   "KillSwitch",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop",
+   "wide"
+  ],
+  "flows": [],
+  "liveReference": null
+ },
+ {
+  "id": "overlay.minimal",
+  "platform": "overlay",
+  "name": "Minimal density",
+  "kind": "overlay",
+  "summary": "Minimal density reference screen.",
+  "route": "/reference/overlay.minimal",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "One priority action",
+   "One system line"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.standard",
+  "platform": "overlay",
+  "name": "Standard density",
+  "kind": "overlay",
+  "summary": "Standard density reference screen.",
+  "route": "/reference/overlay.standard",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Recommendation",
+   "Status",
+   "Confidence"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.expanded",
+  "platform": "overlay",
+  "name": "Expanded density",
+  "kind": "overlay",
+  "summary": "Expanded density reference screen.",
+  "route": "/reference/overlay.expanded",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Objective",
+   "Threat",
+   "Cooldowns"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.recommendation",
+  "platform": "overlay",
+  "name": "Recommendation",
+  "kind": "overlay",
+  "summary": "Recommendation reference screen.",
+  "route": "/reference/overlay.recommendation",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Action",
+   "Confidence"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.warning",
+  "platform": "overlay",
+  "name": "Warning",
+  "kind": "overlay",
+  "summary": "Warning reference screen.",
+  "route": "/reference/overlay.warning",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Warning",
+   "Acknowledge"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.degraded",
+  "platform": "overlay",
+  "name": "Connection degraded",
+  "kind": "overlay",
+  "summary": "Connection degraded reference screen.",
+  "route": "/reference/overlay.degraded",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Missing inputs named"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.offline",
+  "platform": "overlay",
+  "name": "Offline / local-only",
+  "kind": "overlay",
+  "summary": "Offline / local-only reference screen.",
+  "route": "/reference/overlay.offline",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Local signals only"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.voice",
+  "platform": "overlay",
+  "name": "Voice feedback",
+  "kind": "overlay",
+  "summary": "Voice feedback reference screen.",
+  "route": "/reference/overlay.voice",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Listening",
+   "Recognized"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "overlay.objective",
+  "platform": "overlay",
+  "name": "Objective / instruction",
+  "kind": "overlay",
+  "summary": "Objective / instruction reference screen.",
+  "route": "/reference/overlay.objective",
+  "states": [
+   "success",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unknown"
+  ],
+  "items": [
+   "Objective",
+   "Brief instruction"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "desktop"
+  ],
+  "flows": [
+   "game"
+  ],
+  "liveReference": "Overlay"
+ },
+ {
+  "id": "voice.consent",
+  "platform": "voice",
+  "name": "Consent required",
+  "kind": "voice",
+  "summary": "Consent required reference screen.",
+  "route": "/reference/voice.consent",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.ptt",
+  "platform": "voice",
+  "name": "Press-to-talk",
+  "kind": "voice",
+  "summary": "Press-to-talk reference screen.",
+  "route": "/reference/voice.ptt",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.listening",
+  "platform": "voice",
+  "name": "Listening",
+  "kind": "voice",
+  "summary": "Listening reference screen.",
+  "route": "/reference/voice.listening",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.processing",
+  "platform": "voice",
+  "name": "Processing",
+  "kind": "voice",
+  "summary": "Processing reference screen.",
+  "route": "/reference/voice.processing",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.recognized",
+  "platform": "voice",
+  "name": "Recognized intent",
+  "kind": "voice",
+  "summary": "Recognized intent reference screen.",
+  "route": "/reference/voice.recognized",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.response",
+  "platform": "voice",
+  "name": "Response",
+  "kind": "voice",
+  "summary": "Response reference screen.",
+  "route": "/reference/voice.response",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.no-speech",
+  "platform": "voice",
+  "name": "No speech",
+  "kind": "voice",
+  "summary": "No speech reference screen.",
+  "route": "/reference/voice.no-speech",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.timeout",
+  "platform": "voice",
+  "name": "Timeout",
+  "kind": "voice",
+  "summary": "Timeout reference screen.",
+  "route": "/reference/voice.timeout",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.recognition-failed",
+  "platform": "voice",
+  "name": "Recognition failure",
+  "kind": "voice",
+  "summary": "Recognition failure reference screen.",
+  "route": "/reference/voice.recognition-failed",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.network-failure",
+  "platform": "voice",
+  "name": "Network failure",
+  "kind": "voice",
+  "summary": "Network failure reference screen.",
+  "route": "/reference/voice.network-failure",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.disabled",
+  "platform": "voice",
+  "name": "Disabled",
+  "kind": "voice",
+  "summary": "Disabled reference screen.",
+  "route": "/reference/voice.disabled",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.privacy",
+  "platform": "voice",
+  "name": "Privacy state",
+  "kind": "voice",
+  "summary": "Privacy state reference screen.",
+  "route": "/reference/voice.privacy",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.unavailable",
+  "platform": "voice",
+  "name": "Unavailable",
+  "kind": "voice",
+  "summary": "Unavailable reference screen.",
+  "route": "/reference/voice.unavailable",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ },
+ {
+  "id": "voice.provider-unavailable",
+  "platform": "voice",
+  "name": "Provider unavailable",
+  "kind": "voice",
+  "summary": "Provider unavailable reference screen.",
+  "route": "/reference/voice.provider-unavailable",
+  "states": [
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "success",
+   "loading",
+   "failed",
+   "offline",
+   "restricted"
+  ],
+  "items": [
+   "Mic CLOSED unless held",
+   "Provider",
+   "Transcript"
+  ],
+  "components": [
+   "AppShell",
+   "PageHeader",
+   "StatePattern",
+   "StatusBadge"
+  ],
+  "responsive": [
+   "standard-mobile",
+   "desktop"
+  ],
+  "flows": [
+   "voice"
+  ],
+  "liveReference": "Voice"
+ }
+]

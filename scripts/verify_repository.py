@@ -392,10 +392,7 @@ def check_versions(checks: Checks) -> None:
 def check_governance(checks: Checks) -> None:
     required_status = {
         "HANDOVER_DOCUMENT.md": "Status: HISTORICAL",
-        "docs/API_REFERENCE.md": "Status: SUPERSEDED",
         "docs/AUDIT_CLOSURE_2026-08-13.md": "Status: HISTORICAL",
-        "docs/PLATFORM_RC.md": "Status: SUPERSEDED",
-        "docs/PROJECT_STATE.md": "Status: SUPERSEDED",
         "docs/SENTINEL_AUDIT_2026-08-25.md": "Status: HISTORICAL",
         "docs/SENTINEL_FINAL_AUDIT_2026-08-26.md": "Status: HISTORICAL",
         "docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md": "Status: HISTORICAL",
@@ -451,19 +448,24 @@ def check_governance(checks: Checks) -> None:
 
     canonical = read("docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md")
     workflow = read("docs/WORKFLOW_CONTRACT.md")
-    orchestration = json.loads(read("automation/ai-orchestration.v1.json"))
+    orchestration = json.loads(read("automation/ai-orchestration.v2.json"))
     root_agents = read("AGENTS.md")
     checks.require(
         "**Status:** ACTIVE" in canonical and "**Tracking issue:** #377" in canonical,
-        "controlled multi-agent governance is canonical and issue-bound",
+        "GPT-orchestrated controlled governance is canonical and issue-bound",
     )
     checks.require(
         "primary engineering orchestrator and final technical integrator" in canonical,
         "GPT remains accountable final technical integrator",
     )
     checks.require(
-        "Secondary AI agents and external model families are permitted" in canonical,
-        "canonical governance permits bounded secondary agents",
+        "single operational interface" in canonical
+        and "direct GPT + connected tools" in canonical.lower(),
+        "GPT is the Owner-facing orchestrator and direct execution is the default",
+    )
+    checks.require(
+        "Secondary AI agents and external model families are permitted only under GPT orchestration" in canonical,
+        "canonical governance permits only GPT-supervised bounded secondary agents",
     )
     checks.require(
         "One logical change set has one accountable writer" in canonical
@@ -484,7 +486,7 @@ def check_governance(checks: Checks) -> None:
         "workflow contract routes parallel lanes without delegating integration authority",
     )
     checks.require(
-        orchestration.get("schema") == "sentinel.ai-orchestration.v1"
+        orchestration.get("schema") == "sentinel.ai-orchestration.v2"
         and orchestration.get("status") == "ACTIVE",
         "machine-readable AI orchestration policy is active",
     )
@@ -589,12 +591,21 @@ def check_governance(checks: Checks) -> None:
         "wow-addon/AGENTS.md",
     ):
         checks.require((ROOT / scoped).exists(), f"{scoped} scoped agent instructions exist")
-    legacy_gpt = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")
-    checks.require(
-        "**Status:** SUPERSEDED" in legacy_gpt
-        and "AI_ORCHESTRATION_OPERATING_SYSTEM.md" in legacy_gpt,
-        "former GPT-only OS is explicitly superseded",
+    removed_obsolete = (
+        "docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md",
+        "docs/AUTONOMOUS_ENGINEERING_CONTRACT.md",
+        "docs/AUTONOMOUS_PERMISSIONS.md",
+        "docs/OPERATING_PLAYBOOK.md",
+        "docs/AI_ROLES.md",
+        "docs/API_REFERENCE.md",
+        "docs/PLATFORM_RC.md",
+        "docs/PROJECT_STATE.md",
+        "docs/SENTINEL_AUDIT_2026-09-23.md",
+        "automation/ai-orchestration.v1.json",
     )
+    for obsolete in removed_obsolete:
+        checks.require(not (ROOT / obsolete).exists(), f"{obsolete} obsolete working-tree path is removed")
+    checks.require((ROOT / "docs/CHATGPT_PROJECT_MEMORY.md").exists(), "compact ChatGPT project memory exists")
     checks.require("DOCUMENT_STATUS.md" in read("README.md") or (ROOT / "docs/DOCUMENT_STATUS.md").exists(), "document authority map exists")
     ux_contract = read("docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md")
     ux_state = json.loads(read("design/user-visible-acceptance.v1.json"))

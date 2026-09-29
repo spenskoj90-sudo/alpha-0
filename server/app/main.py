@@ -61,9 +61,7 @@ from app.core.models import (
     MfaRecoveryCodesResponse,
     TotpCodeRequest,
     TotpEnrollmentResponse,
-    Recommendation,
     RecommendationRequest,
-    RecommendationResponse,
     PasswordResetConfirmRequest,
     RefreshRequest,
     RegisterRequest,
@@ -1321,12 +1319,3 @@ def attest_integrity(payload: dict[str, object], request: Request, authorization
         "trusted": result.trusted,
         "package_name": result.package_name,
     }
-
-
-@app.post("/v1/recommendations", response_model=RecommendationResponse)
-def recommendations(payload: RecommendationRequest, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
-    rid = request_id(request, x_request_id)
-    principal = principal_from_token(require_bearer(authorization_header))
-    authorize_request(principal, "knowledge:recommend", "recommendation", rid)
-    result = [Recommendation(kind="recommendation", text="Review the most recent character events before making a progression decision.", confidence=0.72, provenance=["sentinel-core:context-baseline"])]
-    return RecommendationResponse(recommendations=result)

@@ -20,6 +20,14 @@ def _authorized(monkeypatch) -> None:
     monkeypatch.setattr(main, "request_id", lambda request, supplied=None: supplied or "request-generated")
 
 
+def test_application_registers_one_recommendation_route():
+    from app.main import app
+
+    routes = [route for route in app.routes if getattr(route, "path", None) == "/v1/recommendations"]
+    assert len(routes) == 1
+    assert routes[0].endpoint is recommendations_v2
+
+
 def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch):
     _authorized(monkeypatch)
     response = recommendations_v2(

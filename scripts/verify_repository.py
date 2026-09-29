@@ -392,10 +392,7 @@ def check_versions(checks: Checks) -> None:
 def check_governance(checks: Checks) -> None:
     required_status = {
         "HANDOVER_DOCUMENT.md": "Status: HISTORICAL",
-        "docs/API_REFERENCE.md": "Status: SUPERSEDED",
         "docs/AUDIT_CLOSURE_2026-08-13.md": "Status: HISTORICAL",
-        "docs/PLATFORM_RC.md": "Status: SUPERSEDED",
-        "docs/PROJECT_STATE.md": "Status: SUPERSEDED",
         "docs/SENTINEL_AUDIT_2026-08-25.md": "Status: HISTORICAL",
         "docs/SENTINEL_FINAL_AUDIT_2026-08-26.md": "Status: HISTORICAL",
         "docs/SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md": "Status: HISTORICAL",
@@ -454,26 +451,29 @@ def check_governance(checks: Checks) -> None:
     orchestration = json.loads(read("automation/ai-orchestration.v1.json"))
     root_agents = read("AGENTS.md")
     checks.require(
-        "**Status:** ACTIVE" in canonical and "**Tracking issue:** #377" in canonical,
-        "controlled multi-agent governance is canonical and issue-bound",
+        "**Status:** ACTIVE" in canonical
+        and "GPT-Controlled Engineering Orchestration OS" in canonical
+        and "issue #377" in canonical,
+        "GPT-controlled orchestration governance is canonical and transition-tracked",
     )
     checks.require(
-        "primary engineering orchestrator and final technical integrator" in canonical,
-        "GPT remains accountable final technical integrator",
+        "sole Owner-facing orchestrator and final integrator" in canonical,
+        "GPT remains the sole Owner-facing final integrator",
     )
     checks.require(
-        "Secondary AI agents and external model families are permitted" in canonical,
-        "canonical governance permits bounded secondary agents",
+        "Use a secondary agent/service only when" in canonical
+        and "concrete expected benefit" in canonical,
+        "canonical governance permits secondary agents only for measured bounded value",
     )
     checks.require(
-        "One logical change set has one accountable writer" in canonical
-        and "Parallel branches are integrated serially" in canonical,
-        "multi-agent writes remain isolated and serially integrated",
+        "One writer per logical change set" in canonical
+        and "Integration is serialized" in canonical,
+        "secondary-agent writes remain isolated and serially integrated",
     )
     checks.require(
-        "Secondary agents receive least-privilege context" in canonical
-        and "production secrets or credentials" in canonical,
-        "secondary-agent context is least-privilege and excludes protected secrets",
+        "Never expose production secrets" in canonical
+        and "signing material" in canonical,
+        "secondary-agent context excludes protected secrets and signing material",
     )
     checks.require(
         "exact PR HEAD SHA" in canonical and "GPT may merge a PR into main only when" in canonical,
@@ -508,16 +508,17 @@ def check_governance(checks: Checks) -> None:
     project_instructions = read("docs/CHATGPT_PROJECT_INSTRUCTIONS.md")
     working_environment = read("docs/CHATGPT_WORKING_ENVIRONMENT.md")
     checks.require(
-        "SENTINEL is an autonomous engineering project." in project_instructions,
-        "ChatGPT Project instructions expose the compact SENTINEL mission",
+        "SENTINEL is run through **GPT-controlled orchestration**." in project_instructions,
+        "ChatGPT Project instructions expose the current GPT-controlled mission",
     )
     checks.require(
-        "Read root `AGENTS.md` first" in project_instructions
-        and "Do not preload the entire documentation corpus" in project_instructions,
+        "Read root `AGENTS.md`" in project_instructions
+        and "Do not preload all docs" in project_instructions,
         "ChatGPT Project context is routed rather than monolithic",
     )
     checks.require(
-        "Tell the Owner to switch the current task to **ChatGPT Work**" in project_instructions,
+        "Use ChatGPT Work when the task needs" in project_instructions
+        and "real browser visual acceptance" in project_instructions,
         "ChatGPT Project instructions define the browser/Work escalation boundary",
     )
     checks.require(
@@ -530,9 +531,9 @@ def check_governance(checks: Checks) -> None:
         "working-environment contract names canonical infrastructure control planes",
     )
     checks.require(
-        "ChatGPT Plus cannot directly attach a custom remote MCP server" in working_environment
-        and "OpenAI API billing are separate" in working_environment,
-        "working-environment contract does not overstate Plus custom-MCP/API availability",
+        "ChatGPT subscription usage and OpenAI API billing are separate" in working_environment
+        and "Any paid API path needs a concrete need and cost guardrail" in working_environment,
+        "working-environment contract separates ChatGPT usage from paid API orchestration",
     )
     staging_workflow = read(".github/workflows/staging-synthetic.yml")
     staging_smoke = read("scripts/staging_surface_smoke.py")
@@ -589,12 +590,18 @@ def check_governance(checks: Checks) -> None:
         "wow-addon/AGENTS.md",
     ):
         checks.require((ROOT / scoped).exists(), f"{scoped} scoped agent instructions exist")
-    legacy_gpt = read("docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md")
-    checks.require(
-        "**Status:** SUPERSEDED" in legacy_gpt
-        and "AI_ORCHESTRATION_OPERATING_SYSTEM.md" in legacy_gpt,
-        "former GPT-only OS is explicitly superseded",
+    retired_docs = (
+        "docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md",
+        "docs/AUTONOMOUS_ENGINEERING_CONTRACT.md",
+        "docs/AUTONOMOUS_PERMISSIONS.md",
+        "docs/OPERATING_PLAYBOOK.md",
+        "docs/AI_ROLES.md",
+        "docs/API_REFERENCE.md",
+        "docs/PLATFORM_RC.md",
+        "docs/PROJECT_STATE.md",
     )
+    for retired in retired_docs:
+        checks.require(not (ROOT / retired).exists(), f"{retired} is removed from the active working tree")
     checks.require("DOCUMENT_STATUS.md" in read("README.md") or (ROOT / "docs/DOCUMENT_STATUS.md").exists(), "document authority map exists")
     ux_contract = read("docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md")
     ux_state = json.loads(read("design/user-visible-acceptance.v1.json"))

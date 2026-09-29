@@ -482,7 +482,7 @@ def check_governance(checks: Checks) -> None:
         "canonical governance retains exact-SHA merge authority",
     )
     checks.require(
-        "ROUTE" in workflow and "Secondary agents cannot merge protected main" in workflow,
+        "ROUTE" in workflow and "Secondary workers cannot merge protected `main`" in workflow,
         "workflow contract routes parallel lanes without delegating integration authority",
     )
     checks.require(

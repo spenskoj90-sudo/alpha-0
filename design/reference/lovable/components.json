@@ -1,0 +1,1073 @@
+[
+ {
+  "name": "AppShell",
+  "variants": [
+   "web",
+   "android",
+   "companion",
+   "admin"
+  ],
+  "states": [
+   "default",
+   "staging"
+  ],
+  "accessibility": [
+   "landmarks header/nav/main"
+  ],
+  "tokens": [
+   "background",
+   "layout.rail"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "SideRail",
+  "variants": [
+   "expanded",
+   "collapsed"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "selected"
+  ],
+  "accessibility": [
+   "nav landmark",
+   "aria-current=page"
+  ],
+  "tokens": [
+   "surface",
+   "primary",
+   "layout.rail"
+  ],
+  "platforms": [
+   "web",
+   "companion",
+   "admin"
+  ]
+ },
+ {
+  "name": "MobileBottomNav",
+  "variants": [
+   "4-domain"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "selected",
+   "badge"
+  ],
+  "accessibility": [
+   "48dp targets",
+   "aria-current"
+  ],
+  "tokens": [
+   "surface",
+   "primary",
+   "touchTarget.android"
+  ],
+  "platforms": [
+   "android",
+   "web"
+  ]
+ },
+ {
+  "name": "TopBar",
+  "variants": [
+   "default",
+   "admin"
+  ],
+  "states": [
+   "default",
+   "scrolled"
+  ],
+  "accessibility": [
+   "banner landmark"
+  ],
+  "tokens": [
+   "background",
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "PageHeader",
+  "variants": [
+   "default",
+   "with-actions"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "single h1"
+  ],
+  "tokens": [
+   "typography.scale.display"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "SectionHeader",
+  "variants": [
+   "default",
+   "with-aside"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "h2"
+  ],
+  "tokens": [
+   "typography.scale.section"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Panel",
+  "variants": [
+   "flat",
+   "signal",
+   "danger"
+  ],
+  "states": [
+   "default",
+   "selected"
+  ],
+  "accessibility": [
+   "region with label when standalone"
+  ],
+  "tokens": [
+   "surface",
+   "border",
+   "radius.lg"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Card",
+  "variants": [
+   "security",
+   "recommendation",
+   "game",
+   "device",
+   "session",
+   "entitlement"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "selected"
+  ],
+  "accessibility": [
+   "whole-card link has one accessible name"
+  ],
+  "tokens": [
+   "surface",
+   "border",
+   "radius.lg"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Metric",
+  "variants": [
+   "default",
+   "signal",
+   "warning"
+  ],
+  "states": [
+   "default",
+   "loading",
+   "unavailable"
+  ],
+  "accessibility": [
+   "unavailable reads 'Unavailable', never 0"
+  ],
+  "tokens": [
+   "typography.numeric"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "StatusBadge",
+  "variants": [
+   "VERIFIED",
+   "ACTIVE",
+   "PENDING",
+   "WARNING",
+   "DENIED",
+   "REVOKED",
+   "FAILED",
+   "UNKNOWN",
+   "UNAVAILABLE",
+   "STOPPED",
+   "AVAILABLE",
+   "LIMITED",
+   "UNVERIFIED",
+   "FULL",
+   "DEGRADED",
+   "LOCAL-ONLY",
+   "OFFLINE",
+   "ALLOW",
+   "CONFIRM",
+   "DENY",
+   "CONNECTING",
+   "READY",
+   "LISTENING",
+   "PROCESSING"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "text label always present",
+   "icon aria-hidden"
+  ],
+  "tokens": [
+   "toneColor"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "CapabilityBadge",
+  "variants": [
+   "AVAILABLE",
+   "LIMITED",
+   "UNAVAILABLE",
+   "UNVERIFIED"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "text label"
+  ],
+  "tokens": [
+   "toneColor"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "RuntimeIndicator",
+  "variants": [
+   "FULL",
+   "DEGRADED",
+   "LOCAL-ONLY",
+   "OFFLINE",
+   "CONNECTING"
+  ],
+  "states": [
+   "default",
+   "transition"
+  ],
+  "accessibility": [
+   "aria-live=polite on change"
+  ],
+  "tokens": [
+   "signal",
+   "warning"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Alert",
+  "variants": [
+   "info",
+   "warning",
+   "destructive",
+   "success"
+  ],
+  "states": [
+   "default",
+   "dismissible"
+  ],
+  "accessibility": [
+   "role=alert only for urgent"
+  ],
+  "tokens": [
+   "warning",
+   "destructive"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "StatePattern",
+  "variants": [
+   "initial-loading",
+   "loading",
+   "success",
+   "empty",
+   "partial",
+   "stale",
+   "offline",
+   "local-only",
+   "reconnecting",
+   "unavailable",
+   "provider-unavailable",
+   "permission-missing",
+   "permission-denied",
+   "unsupported",
+   "restricted",
+   "failed",
+   "unknown",
+   "expired",
+   "past-due",
+   "revoked",
+   "confirm-destructive"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "role=status for loading",
+   "retry is a real button"
+  ],
+  "tokens": [
+   "muted-foreground",
+   "motion"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Skeleton",
+  "variants": [
+   "line",
+   "block",
+   "row"
+  ],
+  "states": [
+   "default",
+   "reduced-motion"
+  ],
+  "accessibility": [
+   "aria-hidden, parent aria-busy"
+  ],
+  "tokens": [
+   "muted"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "InlineWarning",
+  "variants": [
+   "warning",
+   "stale"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "text + icon"
+  ],
+  "tokens": [
+   "warning"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Button",
+  "variants": [
+   "default",
+   "signal",
+   "outline",
+   "quiet",
+   "ghost",
+   "link",
+   "destructive"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "loading"
+  ],
+  "accessibility": [
+   "min 44px",
+   "visible focus ring"
+  ],
+  "tokens": [
+   "primary",
+   "ring",
+   "radius.sm"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "DestructiveButton",
+  "variants": [
+   "confirm-required"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "loading"
+  ],
+  "accessibility": [
+   "names consequence"
+  ],
+  "tokens": [
+   "destructive"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "KillSwitch",
+  "variants": [
+   "armed",
+   "confirm",
+   "stopped"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled"
+  ],
+  "accessibility": [
+   "isolated region",
+   "two-step confirm"
+  ],
+  "tokens": [
+   "destructive",
+   "danger-surface"
+  ],
+  "platforms": [
+   "companion"
+  ]
+ },
+ {
+  "name": "Input",
+  "variants": [
+   "text",
+   "password",
+   "code",
+   "search"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "error",
+   "success"
+  ],
+  "accessibility": [
+   "label element",
+   "aria-describedby for errors"
+  ],
+  "tokens": [
+   "input",
+   "ring"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Select",
+  "variants": [
+   "default"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "open",
+   "error"
+  ],
+  "accessibility": [
+   "native semantics via Radix"
+  ],
+  "tokens": [
+   "popover"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Tabs",
+  "variants": [
+   "underline",
+   "segmented"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "selected"
+  ],
+  "accessibility": [
+   "roving tabindex"
+  ],
+  "tokens": [
+   "primary"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Dialog",
+  "variants": [
+   "default"
+  ],
+  "states": [
+   "open",
+   "closing"
+  ],
+  "accessibility": [
+   "focus trap",
+   "Esc closes"
+  ],
+  "tokens": [
+   "popover",
+   "zIndex.dialog"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Confirmation",
+  "variants": [
+   "destructive",
+   "neutral"
+  ],
+  "states": [
+   "open"
+  ],
+  "accessibility": [
+   "cancel is default focus for destructive"
+  ],
+  "tokens": [
+   "destructive"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Toast",
+  "variants": [
+   "info",
+   "success",
+   "warning",
+   "error"
+  ],
+  "states": [
+   "enter",
+   "exit"
+  ],
+  "accessibility": [
+   "aria-live polite"
+  ],
+  "tokens": [
+   "zIndex.toast"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Timeline",
+  "variants": [
+   "full",
+   "compact"
+  ],
+  "states": [
+   "default",
+   "empty",
+   "loading"
+  ],
+  "accessibility": [
+   "ordered list"
+  ],
+  "tokens": [
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "EventRow",
+  "variants": [
+   "security",
+   "runtime",
+   "intelligence"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled"
+  ],
+  "accessibility": [
+   "time in <time>"
+  ],
+  "tokens": [
+   "mono"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "RecommendationModule",
+  "variants": [
+   "default",
+   "acknowledged",
+   "expanded"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "stale"
+  ],
+  "accessibility": [
+   "action stated first"
+  ],
+  "tokens": [
+   "primary",
+   "glow-brand"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "FactModule",
+  "variants": [
+   "default",
+   "stale"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "source + freshness"
+  ],
+  "tokens": [
+   "signal"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "InferenceModule",
+  "variants": [
+   "default",
+   "low-confidence"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "confidence as text %"
+  ],
+  "tokens": [
+   "info"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "ProviderRow",
+  "variants": [
+   "linked",
+   "available",
+   "unavailable"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "confirm-destructive"
+  ],
+  "accessibility": [
+   "last method cannot be unlinked"
+  ],
+  "tokens": [
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "DeviceRow",
+  "variants": [
+   "trusted",
+   "current",
+   "revoked"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "confirm-destructive"
+  ],
+  "accessibility": [
+   "stacks on mobile"
+  ],
+  "tokens": [
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "SessionRow",
+  "variants": [
+   "current",
+   "other",
+   "revoked"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled",
+   "confirm-destructive"
+  ],
+  "accessibility": [
+   "stacks on mobile"
+  ],
+  "tokens": [
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "SecurityRow",
+  "variants": [
+   "toggle",
+   "link"
+  ],
+  "states": [
+   "default",
+   "hover",
+   "pressed",
+   "focus-visible",
+   "disabled"
+  ],
+  "accessibility": [
+   "switch has label"
+  ],
+  "tokens": [
+   "border"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "EvidenceBlock",
+  "variants": [
+   "log",
+   "sha",
+   "bundle"
+  ],
+  "states": [
+   "default",
+   "redacted"
+  ],
+  "accessibility": [
+   "copy button labelled"
+  ],
+  "tokens": [
+   "mono"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "Identifier",
+  "variants": [
+   "sha",
+   "timestamp",
+   "fingerprint"
+  ],
+  "states": [
+   "default",
+   "truncated-with-copy"
+  ],
+  "accessibility": [
+   "full value in title/aria-label"
+  ],
+  "tokens": [
+   "typography.family.mono"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ },
+ {
+  "name": "StagingStrip",
+  "variants": [
+   "physical-test",
+   "staging"
+  ],
+  "states": [
+   "default"
+  ],
+  "accessibility": [
+   "not role=alert"
+  ],
+  "tokens": [
+   "layout.stagingStrip"
+  ],
+  "platforms": [
+   "android",
+   "web"
+  ]
+ },
+ {
+  "name": "OverlayModule",
+  "variants": [
+   "minimal",
+   "standard",
+   "expanded"
+  ],
+  "states": [
+   "default",
+   "stale",
+   "degraded"
+  ],
+  "accessibility": [
+   "peripheral-readable \u2265 4.5:1"
+  ],
+  "tokens": [
+   "opacity.overlayModule"
+  ],
+  "platforms": [
+   "overlay"
+  ]
+ },
+ {
+  "name": "FocusRing",
+  "variants": [
+   "default",
+   "forced-colors"
+  ],
+  "states": [
+   "focus-visible"
+  ],
+  "accessibility": [
+   "2px ring, 2px offset, CanvasText in forced colors"
+  ],
+  "tokens": [
+   "ring",
+   "border.focus"
+  ],
+  "platforms": [
+   "web",
+   "android",
+   "companion",
+   "overlay",
+   "admin"
+  ]
+ }
+]

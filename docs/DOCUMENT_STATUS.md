@@ -1,61 +1,50 @@
 # SENTINEL Document Authority Map
 
-**Status:** ACTIVE  
-**Purpose:** distinguish normative/current guidance from point-in-time history. A document never replaces live code, Git state or exact-SHA CI evidence.
+**Status:** ACTIVE
+**Purpose:** identify the smallest current instruction set. Live code/runtime/exact-SHA evidence always outranks prose.
 
 ## Active authority and orientation
 
-- `AI_ORCHESTRATION_OPERATING_SYSTEM.md` — canonical engineering governance; only the Human Owner may fundamentally amend it.
-- root/scoped `AGENTS.md` files — compact context-routing and subsystem instructions for agents.
-- `WORKFLOW_CONTRACT.md` and `AI_ORCHESTRATION_ROUTING.md` — active execution and routing contracts.
-- `SENTINEL_CURRENT_STATE.md` — semantic orientation only; it deliberately contains no mutable HEAD mirror.
-- `TASKS.md` — active work queue, never implementation evidence.
-- `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md`, `FINAL_RELEASE_ACCEPTANCE_V1.md` and `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` — active evidence, provenance, exact-candidate physical/environment, Owner-visible product-UX and release-acceptance contracts.
-- `DESIGN_SYSTEM_V3.md` plus `../design/sentinel-design-system.v3.json` — active cross-surface visual/interaction contract and machine-readable drift authority. The design-reference repository is an input laboratory; production repository assets/code/tests remain canonical.
-- `USER_VISIBLE_ACCEPTANCE_CONTRACT.md` plus `../design/user-visible-acceptance.v1.json` — active evidence ladder preventing build/test success, screenshots or design prototypes from being mislabeled as Owner-accepted product readiness.
-- `CONTROL_BRIDGE_ARCHITECTURE.md` plus `../control-bridge/` — active compact authenticated MCP evidence/control foundation tracked by #382.
-- `CHATGPT_PROJECT_INSTRUCTIONS.md` and `CHATGPT_WORKING_ENVIRONMENT.md` — active compact ChatGPT/Work context and tool-routing contracts.
-- `STAGING_SYNTHETIC_GATE.md` plus `.github/workflows/staging-synthetic.yml` — active exact-SHA post-merge Web/Core/Public Site runtime evidence contract (#388).
-- `OBSERVABILITY.md` plus `../observability/telemetry-contract.v1.json` — active runtime telemetry/privacy/release-correlation and GitHub/Linear triage contract; external provider account settings remain separate environment evidence.
-- `SENTINEL_DECISION_LOG.md` — active decision ledger; each entry retains its own current/superseded status.
-- `CHANGELOG.md` — active historical ledger; entries are scoped to their date/version.
+- `AI_ORCHESTRATION_OPERATING_SYSTEM.md` — canonical GPT-controlled governance.
+- root/scoped `AGENTS.md` — compact context routing.
+- `CHATGPT_PROJECT_INSTRUCTIONS.md` and `CHATGPT_WORKING_ENVIRONMENT.md` — compact ChatGPT/Work context.
+- `WORKFLOW_CONTRACT.md` and `AI_ORCHESTRATION_ROUTING.md` — execution/routing contracts.
+- `SENTINEL_CURRENT_STATE.md` — semantic orientation only; no mutable HEAD mirror.
+- `TASKS.md` — work queue, not implementation evidence.
+- release/evidence contracts: `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md`, `FINAL_RELEASE_ACCEPTANCE_V1.md`, `USER_VISIBLE_ACCEPTANCE_CONTRACT.md`.
+- design authority: `DESIGN_SYSTEM_V3.md` + `../design/sentinel-design-system.v3.json`; the design laboratory is input, not production truth.
+- `CONTROL_BRIDGE_ARCHITECTURE.md` + `../control-bridge/`.
+- `STAGING_SYNTHETIC_GATE.md` + `.github/workflows/staging-synthetic.yml`.
+- `OBSERVABILITY.md` + `../observability/telemetry-contract.v1.json`.
+- `SENTINEL_DECISION_LOG.md` and `CHANGELOG.md` are historical ledgers with current metadata.
 
-## Active architecture, implementation and operations references
+## Active architecture/implementation references
 
-The following are active within their stated scope but are not proof that a current build passed:
+Active within their stated scope: `README.md`, `ARCHITECTURE.md`, `ARCHITECTURE_V4.md`, `SENTINEL_MASTER_ARCHITECTURE_v0.3.md`, `SENTINEL_PRODUCT_VISION_CONTEXT.md`, `API.md`, `SECURITY.md`, `SECURITY_WHITEPAPER.md`, `DEPLOYMENT.md`, `DEVELOPER_GUIDE.md`, `CONTRIBUTING.md`, `FTL_POLICY.md`, `QUALITY_COVERAGE_POLICY.md`, `BRANCH_INVENTORY.md`, `PROVIDER_STATUS_MATRIX.md`, `PLATFORM_MODERNIZATION_2026Q3.md`, `SENTINEL_PERFORMANCE_BASELINE.md`, and versioned component/contract documents.
 
-- `README.md`, `ARCHITECTURE.md`, `ARCHITECTURE_V4.md`, `SENTINEL_MASTER_ARCHITECTURE_v0.3.md` and `SENTINEL_PRODUCT_VISION_CONTEXT.md`;
-- `API.md`, `SECURITY.md`, `SECURITY_WHITEPAPER.md`, `DEPLOYMENT.md`, `DEVELOPER_GUIDE.md`, `CONTRIBUTING.md`, `OBSERVABILITY.md`, `FTL_POLICY.md`, `QUALITY_COVERAGE_POLICY.md`, `BRANCH_INVENTORY.md`, `PROVIDER_STATUS_MATRIX.md`, `PLATFORM_MODERNIZATION_2026Q3.md` and `SENTINEL_PERFORMANCE_BASELINE.md`;
-- versioned component/contract documents (`*_V1.md`, `*_V2.md`, `UNIFIED_GAME_STATE_V1.md`, `GAME_ADAPTER_CONTRACT_V1.md`, and the Companion/recommendation/intelligence documents);
-- `PASS_1_UGS_COMPLETION_V1.md` through `PASS_6_ANDROID_CORE_LOOP.md`, which are implementation-boundary records for their respective merged passes;
-- `SENTINEL_GAME_CAPABILITY_MATRIX_v1.md` and `SENTINEL_REFERENCE_FAILURE_AUDIT_v1.md` remain active non-binding drafts where their own header says `DRAFT FOR OWNER REVIEW`.
+## Historical evidence retained intentionally
 
-When an active architecture document contains a future target, its target language is normative only after the applicable decision/acceptance process; it is not a claim of implementation.
+Point-in-time audit/evidence documents explicitly marked `HISTORICAL` remain for traceability. Their conclusions must be revalidated before current use.
 
-## Historical
+Older design-system lineage (v1/v2.1) remains historical; v3 is active.
 
-- `PLATFORM_DEPENDENCY_AUDIT_2026-09-23.md` — **HISTORICAL EVIDENCE RECORD**; current version authority is `PLATFORM_MODERNIZATION_2026Q3.md` plus live upstream verification.
-- `BRANCH_DELETION_MANIFEST_2026-09-23.md` — **EVIDENCE RECORD / HISTORICAL**; superseded for live branch decisions by `BRANCH_INVENTORY.md`.
-- `POSTGRES_NEON_AUDIT_2026-09-23.md` — **HISTORICAL EVIDENCE RECORD**; its connector limitation is point-in-time evidence and does not override the later PostgreSQL 18.6 staging cutover recorded in active state/runtime evidence.
-- `DESIGN_SYSTEM_V1.md`, `DESIGN_SYSTEM_V2_1.md` and their v1/v2.1 machine manifests — retained design lineage; v3.0 is the active authority.
+## Retired documents removed from the working tree
 
-- root `HANDOVER_DOCUMENT.md`;
-- `AUDIT_CLOSURE_2026-08-13.md`;
-- `SENTINEL_AUDIT_2026-08-25.md`;
-- `SENTINEL_FINAL_AUDIT_2026-08-26.md`;
-- `SENTINEL_SECURITY_BOUNDARY_AUDIT_ISSUE9.md`.
+To prevent stale instructions from being loaded as current context, superseded operating/state/reference files are removed rather than kept as tombstones. Their history remains available through Git.
 
-Historical documents are retained for traceability. Their actors, SHA snapshots, failures and conclusions must be revalidated before use.
-
-## Superseded
-
-- `GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md` — strict GPT-only participation replaced by controlled multi-agent governance on 2026-09-28.
-- `AUTONOMOUS_ENGINEERING_CONTRACT.md`, `AUTONOMOUS_PERMISSIONS.md`, `OPERATING_PLAYBOOK.md`, `AI_ROLES.md` — redundant operating contracts collapsed into the canonical multi-agent OS, compact workflow contract, and scoped AGENTS routing.
-- `API_REFERENCE.md` — replaced by `API.md` and runtime OpenAPI.
-- `PLATFORM_RC.md` — replaced by repository-first current-state/evidence rules.
-- `PROJECT_STATE.md` — replaced by `SENTINEL_CURRENT_STATE.md` plus live Git/Actions evidence.
+Removed on 2026-09-29:
+- `GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`
+- `AUTONOMOUS_ENGINEERING_CONTRACT.md`
+- `AUTONOMOUS_PERMISSIONS.md`
+- `OPERATING_PLAYBOOK.md`
+- `AI_ROLES.md`
+- `API_REFERENCE.md`
+- `PLATFORM_RC.md`
+- `PROJECT_STATE.md`
+- `SENTINEL_AUDIT_2026-09-23.md` — stale point-in-time file that incorrectly declared itself current and still asserted the retired GPT-only model.
 
 ## Classification rule
 
-New documents must declare `ACTIVE`, `HISTORICAL`, `SUPERSEDED`, or an explicit non-binding draft status near the title. A superseded document must name its replacement. Never edit historical conclusions to make them look current; add a banner or a new current decision instead.
+New persistent docs must declare `ACTIVE`, `HISTORICAL`, or an explicit non-binding draft status near the title.
 
+Do not create new tombstone files for retired guidance. Remove obsolete working-tree instructions after their replacement is active and rely on Git history for provenance.

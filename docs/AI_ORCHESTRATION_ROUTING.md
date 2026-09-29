@@ -1,13 +1,13 @@
 # SENTINEL — AI Orchestration Routing Guide
 
 **Status:** ACTIVE
-**Effective:** 2026-09-28
+**Effective:** 2026-09-29
 **Authority:** AI_ORCHESTRATION_OPERATING_SYSTEM.md
 **Tracking issue:** #377
 
 ## Objective
 
-Use parallel or heterogeneous agents only where they reduce wall-clock time, expand independent coverage, or expose different failure modes.
+Use secondary agents only where they materially reduce wall-clock time, expand independent coverage, provide a needed specialist surface, or expose different failure modes. GPT/ChatGPT remains the sole Owner-facing orchestrator.
 
 ## Default routing matrix
 
@@ -15,9 +15,9 @@ Use parallel or heterogeneous agents only where they reduce wall-clock time, exp
 |---|---|
 | Small, sequential, same-file | Single GPT |
 | Auth, authorization, RLS, migrations, release lineage | Single primary writer plus optional read-only independent review |
-| Broad audit or research | 2–4 parallel workers, coordinator synthesizes |
+| Broad audit or research | Single GPT first; add up to 2 bounded workers only when sectioning has measurable value |
 | Independent Android/Web/Site/Companion changes | Isolated workers/worktrees, serial integration |
-| Independent tests/docs/evidence | Parallel workers |
+| Independent tests/docs/evidence | Parallel workers only when they do not duplicate discovery/context work |
 | CI failure with several plausible causes | Parallel hypothesis investigation, one writer applies fix |
 | High-risk code review | Primary review plus optional different-model adversarial review |
 | UX/design critique | Independent reviewer may use a different model family |
@@ -26,7 +26,7 @@ Use parallel or heterogeneous agents only where they reduce wall-clock time, exp
 
 ## External-model rule
 
-Different model families are primarily a diversity/review tool, not the default source of repository mutations.
+Different model families are optional diversity/review tools, not the default source of repository mutations and never an independent Owner-facing channel.
 
 Never use majority vote as proof. A reviewer claim becomes actionable only after source, test, or runtime evidence supports it.
 
@@ -59,7 +59,7 @@ GPT final integrator:
 
 Do not claim a productivity percentage without measured project data.
 
-For the first multi-agent phase record:
+When secondary-agent use is material, record:
 - start/end timestamps per lane;
 - total parallel wall-clock;
 - sequential-equivalent estimate;
@@ -69,4 +69,4 @@ For the first multi-agent phase record:
 - CI reruns;
 - defects found by independent review and confirmed by executable evidence.
 
-Keep multi-agent routing only for task classes where the evidence supports it.
+Keep secondary-agent routing only for task classes where the evidence supports it. If coordination/token/credit/rework cost exceeds the benefit, route the next comparable task to one GPT-led pass.

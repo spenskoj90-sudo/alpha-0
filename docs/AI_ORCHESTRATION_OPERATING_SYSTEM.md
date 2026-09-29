@@ -1,13 +1,15 @@
-# SENTINEL — Controlled Multi-Agent Engineering Operating System
+# SENTINEL — GPT-Controlled Engineering Orchestration OS
 
 **Status:** ACTIVE
-**Effective:** 2026-09-28
+**Effective:** 2026-09-29
 **Authority:** Human Owner
-**Tracking issue:** #377
+**Tracking:** issue #377 records the governance transition history.
 
-This is the canonical engineering-governance contract for SENTINEL. It replaces the former GPT-only participation restriction while preserving repository-first truth, exact-SHA integration, security gates, user-visible acceptance, and Owner-only protected actions.
+This is the canonical engineering-governance contract for SENTINEL.
 
-## Human Owner
+The former strict GPT-only participation restriction is retired. The current model is **GPT-controlled orchestration**: the Human Owner works through GPT/ChatGPT; GPT/ChatGPT remains the sole Owner-facing engineering orchestrator and final technical integrator; bounded secondary agents, model families, studios, and connected services may contribute only under GPT supervision and only when their use improves verified delivery.
+
+## 1. Authority
 
 The Human Owner is the ultimate authority and final decision-maker.
 
@@ -15,179 +17,160 @@ Owner-only gates:
 - production/live deployment;
 - release publication and release tags;
 - production secrets and credentials;
-- signing keys, certificates and release-signing custody;
+- release signing keys/certificates and signing custody;
 - branch-protection or required-check policy changes;
 - repository permission changes;
 - irreversible destructive operations;
-- fundamental product-direction decisions;
-- explicit legal, compliance or operator approvals.
+- fundamental product-direction changes;
+- legal/compliance/operator approvals;
+- commercial purchases or paid-plan commitments.
 
-No AI agent may bypass these gates.
+No agent or service may bypass these gates.
 
-## Primary orchestrator and final integrator
+## 2. GPT/ChatGPT role
 
-GPT/ChatGPT is the primary engineering orchestrator and final technical integrator.
+GPT/ChatGPT is the sole Owner-facing orchestrator and final integrator.
 
 GPT owns:
-- decomposition and task routing;
-- canonical repository-state reconciliation;
-- architecture and invariant reconciliation;
-- integration ordering;
-- final diff review;
-- exact-SHA required-check verification;
-- merge into main when the exact-SHA gate passes;
-- post-merge verification;
-- truthful Owner-facing status.
+- task decomposition and routing;
+- choice of tools, agents, and services;
+- repository/runtime reconciliation;
+- architecture and security invariant reconciliation;
+- implementation ordering;
+- review of all externally produced work before production integration;
+- exact-SHA CI verification;
+- merge into `main` when all merge conditions are satisfied;
+- post-merge runtime verification;
+- compact truthful Owner-facing reporting.
 
-Secondary agents may contribute bounded work but do not become independent integration authorities.
+Secondary systems never become independent project authorities and never make final project decisions.
 
-## Permitted secondary agents
+## 3. Secondary agents and external services
 
-Secondary AI agents and external model families are permitted when their role is explicit, bounded, least-privilege, and evidence-producing.
+Use a secondary agent/service only when there is a concrete expected benefit in speed, independent coverage, specialist capability, or access to a required execution surface.
 
-Permitted modes:
-1. Parallel OpenAI/Codex subagents for independent repository exploration, testing, documentation, review, or isolated implementation.
-2. External-model specialists for independent research, adversarial review, architecture challenge, UX/design critique, test ideas, or isolated implementation when model diversity has a concrete expected benefit.
-3. Controlled design/product services used as laboratories or bounded implementation helpers. Their output is input evidence, not canonical production truth.
+Allowed examples:
+- OpenAI/Codex workers for independent bounded lanes;
+- Lovable for design-laboratory work;
+- Replit for isolated prototypes or disposable execution;
+- Figma for design-system/product-design work;
+- external model families for bounded research, adversarial review, UX critique, architecture challenge, or isolated implementation when the expected value exceeds context/cost overhead.
 
-Secondary-agent output is never trusted merely because it is independent or comes from a different model family. It must be validated against source, tests, runtime evidence, and project invariants.
+Rules:
+- GPT defines scope and acceptance criteria.
+- One writer per logical change set.
+- Mutable work is isolated by branch/worktree/project.
+- Parallel lanes must be independent.
+- Integration is serialized.
+- Secondary systems never merge protected `main`.
+- Secondary output is input evidence, not truth; GPT validates it against source, tests, runtime, and project invariants.
+- Never expose production secrets, signing material, protected admin credentials, or unnecessary personal data to secondary systems.
 
-## Single-integrator and one-writer rules
+For the design laboratory specifically, `spenskoj90-sudo/sentinel-aware-companion` may read production context when safe, but writes remain in the design repository. Production imports occur only after a stable finished design SHA is validated. Unfinished Lovable iterations must not be imported.
 
-- One logical change set has one accountable writer at a time.
-- Agents that may write use separate branches/worktrees or otherwise isolated mutable state.
-- Two agents must not concurrently edit the same mutable worktree.
-- Parallel branches are integrated serially.
-- Secondary agents never push directly to protected main.
-- Secondary agents never merge a PR into main.
-- GPT re-reads the complete resulting diff and exact current base before integration.
-- After one parallel branch lands, remaining branches are revalidated against the new main before merge.
+## 4. Default execution pattern
 
-Parallel execution never weakens trunk discipline.
+Prefer the simplest workflow that can solve the task reliably.
 
-## Task routing
+Default:
+`compact reconcile → execute → test → diagnose/fix → review → PR → CI → exact-SHA verify → merge → runtime verify`
 
-### Prefer one agent
-Use one primary agent when:
-- the task is short or inherently sequential;
-- each step depends directly on the previous step;
-- workers would contend over the same files or state;
-- the change crosses authentication, authorization, RLS, migrations, signing, release lineage, or another tightly coupled security boundary;
-- coordination overhead is likely to exceed available parallel work.
+Do not perform repeated full-project audits when a delta check is sufficient. Do not create an audit of an audit. Do not ask the Owner to reconfirm permissions already granted unless a real Owner-only gate is reached.
 
-### Prefer parallel same-family agents
-Use parallel GPT/Codex workers when work can be split into independent, bounded lanes such as:
-- Android vs Web vs Public Site vs Companion work;
-- independent test suites;
-- separate repository audits;
-- provider/infrastructure investigation;
-- documentation/evidence reconciliation;
-- independent failure hypotheses;
-- broad current-information research.
+Prefer one coherent vertical pass over many conversational micro-passes.
 
-### Add external-model review selectively
-Use a different model family when independent error patterns are valuable, especially for:
-- adversarial code/security review;
-- architecture challenge;
-- UX/design critique;
-- independent specification interpretation;
-- alternative implementation proposals.
+Parallelize only when:
+- lanes are truly independent;
+- expected wall-clock or quality benefit is material;
+- coordination cost is lower than the benefit.
 
-External-model participation is not a mandatory ceremony. Use it only when expected value exceeds extra cost, latency, context transfer, and integration overhead.
+If multi-agent orchestration creates more rework, token/credit cost, conflicts, or CI reruns than direct execution, return that task class to a single GPT-led pass.
 
-### External-model implementation
-External-model implementation is allowed only when:
-- scope and owned files are explicit;
-- work occurs in isolated mutable state;
-- no protected credentials are exposed;
-- no shared-state write race exists;
-- GPT performs final integration review and exact-SHA validation.
+## 5. Context and token discipline
 
-## Security boundary for secondary agents
+Use this context route:
+`root AGENTS.md → scoped AGENTS.md → relevant active contract → live source/runtime evidence`
 
-Secondary agents receive least-privilege context.
+Do not preload the full documentation corpus.
 
-They must not receive or retrieve:
-- production secrets or credentials;
-- signing material;
-- protected deployment tokens;
-- unnecessary personal/private user data;
-- repository administrative credentials.
+Reuse already discovered identifiers and evidence:
+- repository/service/project IDs;
+- branch names;
+- exact SHAs;
+- PR/issue/workflow IDs;
+- deployment IDs;
+- artifact IDs;
+- provider IDs;
+- Drive folders;
+- current design-reference SHA.
 
-External providers receive only the minimum source/context required for the bounded task. Provider retention, account scope, and data-handling terms are environment dependencies.
+Prefer exact queries and narrow log windows over broad scans and raw dumps.
 
-No secondary agent may change branch protection, required checks, repository permissions, production deployment authority, or release authority.
+Use SENTINEL Control Bridge when it provides a compact trustworthy answer; otherwise query the authoritative provider directly.
 
-## Autonomous lifecycle
+## 6. Evidence model
 
-DISCOVER → BASELINE → DECOMPOSE/ROUTE → EXECUTE → TEST → DIAGNOSE/FIX → REVIEW → PR → CI → EXACT-SHA VERIFY → SERIAL INTEGRATE → POST-MERGE RUNTIME/UX VERIFY
+Keep evidence classes separate:
 
-Independent lanes may run in parallel between ROUTE and REVIEW. Integration is serialized.
+- **SOURCE** — code/config/docs exist at an exact SHA.
+- **BUILD** — tests/build/lint/security/CI succeeded for an exact SHA.
+- **RUNTIME** — the exact deployed build/artifact executes correctly.
+- **OWNER-VISIBLE** — the Owner can open/use the intended surface.
+- **OWNER-ACCEPTED** — the Owner explicitly accepted the relevant visual/physical result.
+- **RELEASE-ACCEPTED** — all required release gates are satisfied.
 
-Routine build, test, lint, security, workflow, or CI failures are not Owner gates. GPT continues diagnose/fix/retest autonomously.
+Never promote one level to the next without evidence. Screenshots alone do not prove runnable-product acceptance. Emulator/CI evidence does not equal physical-device acceptance.
 
-## Exact-SHA merge gate
+## 7. CI and merge contract
 
-GPT may merge a PR into main only when:
-1. target branch is main;
+Routine build/test/lint/security/workflow failures are ordinary engineering work:
+`inspect → diagnose → fix → test → push → rerun → verify`
+
+Never weaken security or meaningful tests to obtain green CI.
+
+GPT may merge a PR into `main` only when:
+1. base is `main`;
 2. exact PR HEAD SHA is known;
 3. required checks are identified;
-4. every required check completed successfully;
-5. every required result belongs to that exact HEAD SHA;
-6. no required check is pending, failed, missing, or stale;
-7. the final diff remains in scope;
-8. base/integration state has not changed unexpectedly after validation.
+4. every required check completed successfully on that exact HEAD SHA;
+5. no required check is pending, failed, missing, or stale;
+6. the final diff remains in scope;
+7. base/integration state has not changed unexpectedly after validation.
 
-Never bypass or weaken branch protection or security gates to obtain a merge.
+Never bypass branch protection.
 
-## Evidence and user-visible truth
+## 8. Connected-service policy
 
-Repository source, tests, CI, and runtime evidence keep their existing authority hierarchy.
+Use connected services directly when they are the authoritative source instead of asking the Owner to relay routine data.
 
-For user-facing surfaces, docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md remains binding:
-- source/build success is not visual acceptance;
-- screenshots alone are not runnable-product evidence;
-- the Owner must open and accept the applicable runnable surface before it is called ready.
+Current control planes are documented in `docs/CHATGPT_WORKING_ENVIRONMENT.md`.
 
-Secondary-agent consensus is not evidence by itself.
+Google Drive is evidence/document storage, not a plaintext secret vault. Raw secrets belong in provider-native secret stores or Owner-controlled secure custody. Drive may hold non-secret credential inventories, setup checklists, recovery metadata, and evidence references.
 
-## Orchestration efficiency
+## 9. Owner interaction policy
 
-Multi-agent execution is a means, not a goal.
+Before asking the Owner to act:
+- finish all autonomous work that can be completed safely;
+- reduce the request to the smallest unavoidable action;
+- do not ask for secrets in chat;
+- do not ask repetitive confirmation questions.
 
-For recurring task classes, measure or record:
-- task success;
-- wall-clock duration;
-- agent/tool/token or credit consumption;
-- merge conflicts/rework;
-- CI reruns;
-- Owner interventions.
+When a prompt/task must be sent to Work, Lovable, Replit, Figma, or another service, provide it as one self-contained copy-ready block unless GPT can send it directly through the connected service.
 
-If orchestration costs more than direct execution without improving coverage or latency, return that task class to single-agent mode.
+Physical testing is batched and exact-candidate based. Prefer emulator, browser, synthetic, staging, and provider-side checks first; request physical testing only when the intended device/host itself is required for evidence.
 
-## Context routing
-
-The repository root AGENTS.md is the compact entrypoint for agent context.
-
-Agents:
-1. read root AGENTS.md;
-2. load only scoped AGENTS.md and canonical documents relevant to the active task;
-3. avoid loading the full documentation corpus by default.
-
-This reduces context dilution and stale-rule collisions.
-
-## Governance priority
+## 10. Governance priority
 
 1. explicit current Human Owner instruction;
 2. this operating system;
-3. repository security and branch protections;
-4. active evidence/release/security contracts;
-5. scoped AGENTS.md instructions;
+3. repository security, branch protection, and release gates;
+4. active evidence/security/acceptance contracts;
+5. root/scoped `AGENTS.md`;
 6. other active architecture/operations documentation;
-7. historical/superseded material.
+7. Git history for retired material.
 
-For implementation facts, live Git/runtime evidence outranks prose.
+For implementation facts, live repository/runtime/provider evidence outranks prose and conversational memory.
 
-## Amendment rule
+## 11. Amendment rule
 
-Only the Human Owner may fundamentally amend this operating model. GPT may reconcile subordinate documents after an explicit Owner decision.
+Only the Human Owner may fundamentally change this operating model. GPT may autonomously reconcile subordinate docs, tests, and repository instructions to an explicit Owner decision.

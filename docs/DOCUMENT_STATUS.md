@@ -41,6 +41,7 @@ Removed on 2026-09-29:
 - `API_REFERENCE.md`
 - `PLATFORM_RC.md`
 - `PROJECT_STATE.md`
+- `SENTINEL_AUDIT_2026-09-23.md` — stale point-in-time file that incorrectly declared itself current and still asserted the retired GPT-only model.
 
 ## Classification rule
 

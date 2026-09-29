@@ -4,11 +4,11 @@
 
 ## Governance rule
 
-**ACTIVE:** SENTINEL uses controlled multi-agent engineering. The Human Owner remains final authority and sole owner of protected actions. GPT/ChatGPT is primary orchestrator and final integrator; bounded secondary agents may work in isolated lanes. Parallel work integrates serially, and GPT may merge only after the exact-SHA gate passes.
+**ACTIVE:** SENTINEL uses GPT-controlled orchestration. The Human Owner remains final authority and sole owner of protected actions. GPT/ChatGPT is the sole Owner-facing orchestrator and final integrator; bounded secondary agents/services may work only under GPT supervision in isolated lanes. Parallel work integrates serially, and GPT may merge only after the exact-SHA gate passes.
 
 ## Completed foundation on main
 
-- [x] Controlled multi-agent governance, compact AGENTS context routing, exact-SHA merge gate and repository-first evidence model (#377). The former GPT-only restriction is superseded; secondary agents remain bounded and non-integrating.
+- [x] GPT-controlled orchestration governance, compact AGENTS context routing, exact-SHA merge gate and repository-first evidence model (#377). Retired GPT-only/tombstone instruction files were removed from the working tree on 2026-09-29; Git history preserves provenance.
 - [x] Identity/session/default-deny authorization, PostgreSQL/RLS, migrations, audit and device proof foundations.
 - [x] Adapter/capability contract, UGS validation, deterministic replay/simulation and character projection.
 - [x] PASS 1 — transactional event/outbox consistency and monotonic UGS projection.

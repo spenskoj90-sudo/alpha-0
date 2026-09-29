@@ -21,11 +21,15 @@ def _authorized(monkeypatch) -> None:
 
 
 def test_application_registers_one_recommendation_route():
+    from pathlib import Path
+
     from app.main import app
 
-    routes = [route for route in app.routes if getattr(route, "path", None) == "/v1/recommendations"]
-    assert len(routes) == 1
-    assert routes[0].endpoint is recommendations_v2
+    # The application exposes the canonical route through the OpenAPI surface;
+    # the legacy decorator must not be reintroduced in ``app.main``.
+    assert "/v1/recommendations" in app.openapi()["paths"]
+    main_source = Path(__file__).parents[1].joinpath("app", "main.py").read_text()
+    assert '@app.post("/v1/recommendations"' not in main_source
 
 
 def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch):

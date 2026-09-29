@@ -57,6 +57,18 @@ Deletion requires full live-tip revalidation. `MERGED_EXACT` additionally requir
 | `feat/email-http-provider-fallback-20260927` | `f10f099a188d002dbd87d82490f2bfb144e462ee` | CONTENT_SUPERSEDED | RECONCILED: PR #368 was intentionally closed after protected main advanced; the reviewed email fallback change set was reapplied from current main and merged as PR #369 |
 | `feat/email-http-provider-fallback-rebased-20260927` | `21cd506cd8a975d62a94e62b7f435cddcef18ac6` | MERGED_EXACT | PR #369 merged; live tip equals exact PR head |
 
+
+## Reviewed 2026-09-29 orchestration/design cleanup ledger
+
+| Branch | Exact reviewed tip | Classification | Evidence |
+| --- | --- | --- | --- |
+| `docs/consolidate-orchestration-governance-20260929` | `fdfb6afc942ba067de9430ac60cead3b6224957f` | MERGED_EXACT | PR #398 merged to `main`; live tip equals exact PR head |
+| `docs/design-lab-reconcile-20260929` | `031586fdb773814cdaab9bed79763e0f0809cbd8` | MERGED_EXACT | PR #396 merged to `main`; live tip equals exact PR head. This is the completed `a281479…` design-reference import only; later unfinished Lovable work is not included |
+| `fix/remove-duplicate-recommendation-route-20260929` | `146ff38dbab317584f168447a6ba2bd4ecfb5685` | MERGED_EXACT | PR #395 merged to `main`; live tip equals exact PR head |
+| `chore/consolidate-operating-model-20260929` | `3f27f8d98532110ca1ba3baaaa2a0635212d08b6` | CONTENT_SUPERSEDED | RECONCILED: PR #398 is the canonical GPT-controlled governance consolidation. This older parallel lane duplicates the same operating-model cleanup and adds extra current-memory/v2 instruction surfaces that are intentionally not retained because the compact active Project/Work instructions and v1 machine contract already encode the approved model |
+| `docs/project-memory-orchestration-v2-20260929` | `5bda869a57394ecc5123f25a264fa7471e11f37a` | CONTENT_SUPERSEDED | RECONCILED: its branch-only `CHATGPT_PROJECT_MEMORY.md` and `ai-orchestration.v2.json` duplicate the canonical active instruction surfaces merged by PR #398. Keeping a second mutable memory/governance layer would recreate the stale-context problem this cleanup removes |
+
+
 The current PR branch that carries this ledger is intentionally omitted from the table: after merge, the workflow's independent same-repository merge-lineage gate handles that exact head automatically.
 
 The older detailed reconciliation history remains preserved in Git history and `BRANCH_DELETION_MANIFEST_2026-09-23.md` as historical evidence; it is not live deletion authority.

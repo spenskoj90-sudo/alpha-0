@@ -1,72 +1,48 @@
-# SENTINEL — AI Orchestration Routing Guide
+# SENTINEL — Execution Routing Guide
 
 **Status:** ACTIVE
-**Effective:** 2026-09-28
-**Authority:** AI_ORCHESTRATION_OPERATING_SYSTEM.md
-**Tracking issue:** #377
+**Effective:** 2026-09-29
+**Authority:** `AI_ORCHESTRATION_OPERATING_SYSTEM.md`
 
-## Objective
+## Goal
 
-Use parallel or heterogeneous agents only where they reduce wall-clock time, expand independent coverage, or expose different failure modes.
+Minimize wall-clock time, token/credit use and Owner interruptions without reducing security or evidence quality.
 
-## Default routing matrix
+## Routing matrix
 
-| Task shape | Default execution |
+| Task shape | Default route |
 |---|---|
-| Small, sequential, same-file | Single GPT |
-| Auth, authorization, RLS, migrations, release lineage | Single primary writer plus optional read-only independent review |
-| Broad audit or research | 2–4 parallel workers, coordinator synthesizes |
-| Independent Android/Web/Site/Companion changes | Isolated workers/worktrees, serial integration |
-| Independent tests/docs/evidence | Parallel workers |
-| CI failure with several plausible causes | Parallel hypothesis investigation, one writer applies fix |
-| High-risk code review | Primary review plus optional different-model adversarial review |
-| UX/design critique | Independent reviewer may use a different model family |
-| Shared cross-cutting refactor | Single writer unless file ownership is proven disjoint |
+| Focused repo/service task | GPT + connected tool directly |
+| Small/sequential/shared-file task | Single GPT writer |
+| Auth, authorization, RLS, migrations, release lineage | Single GPT writer + optional read-only review |
+| Long multi-step/browser/authenticated-site task | ChatGPT Work |
+| Repository-local coding/testing needing dedicated compute | Codex / bounded same-family worker |
+| Broad independent research | 2–4 bounded workers only when synthesis cost is justified |
+| Independent Android/Web/Site/Companion lanes | Isolated workers, serial GPT integration |
+| CI failure with multiple independent hypotheses | Parallel investigation, one writer fixes |
+| Security/architecture challenge | Optional independent read-only reviewer |
+| UX/design exploration | Lovable/Figma or independent reviewer under GPT control |
+| Prototype/execution sandbox | Replit under GPT control |
 | Release/production action | GPT prepares evidence; Owner gate remains |
 
 ## External-model rule
 
-Different model families are primarily a diversity/review tool, not the default source of repository mutations.
+Different model families are optional diversity tools, not default engineers.
 
-Never use majority vote as proof. A reviewer claim becomes actionable only after source, test, or runtime evidence supports it.
+Use them only when scope is bounded, expected benefit is specific, least-privilege context is enough, protected credentials are unnecessary, and GPT will independently validate the result.
 
-## Parallel implementation contract
+Default to read-only. External write work must be isolated and reviewed before production translation.
 
-Each writing lane declares:
-- issue/task;
-- base SHA;
-- owned files or subsystem;
-- acceptance checks;
-- branch/worktree identity;
-- dependencies on other lanes.
+## Chat vs Work vs Codex
 
-A lane that discovers it must edit another lane's owned files stops writing and reports the dependency to the coordinator.
+- **Chat:** focused decisions, connectors, repository/service actions, PR/CI/evidence.
+- **Work:** long-running multi-step execution, cloud browser, authenticated websites, visual/browser acceptance, finished deliverables.
+- **Codex:** repository-local implementation/debug/test execution when that environment materially helps.
 
-## Integration queue
+Do not bounce the Owner between modes unnecessarily. When a mode switch is unavoidable, provide one complete copy-ready task with all context and acceptance criteria.
 
-Finished lanes do not merge themselves.
+## Cost/latency rule
 
-GPT final integrator:
-1. chooses landing order;
-2. refreshes against current main;
-3. reconciles dependency drift;
-4. reruns applicable validation;
-5. opens or updates the PR;
-6. verifies required checks on exact PR HEAD;
-7. merges only after canonical merge gate passes.
+Parallelism is justified only when its expected wall-clock or independent-coverage gain exceeds duplicated context, extra credits, conflict risk, extra CI reruns and synthesis overhead.
 
-## Efficiency measurement
-
-Do not claim a productivity percentage without measured project data.
-
-For the first multi-agent phase record:
-- start/end timestamps per lane;
-- total parallel wall-clock;
-- sequential-equivalent estimate;
-- credits/tokens when available;
-- retries and failed attempts;
-- conflict/rebase count;
-- CI reruns;
-- defects found by independent review and confirmed by executable evidence.
-
-Keep multi-agent routing only for task classes where the evidence supports it.
+No audit-of-the-audit loops. Reuse valid evidence and fix root causes in the same pass where practical.

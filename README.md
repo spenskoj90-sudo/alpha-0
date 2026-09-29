@@ -46,19 +46,19 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 
 ## Engineering operating model
 
-**ACTIVE under issue #377:** SENTINEL uses controlled multi-agent engineering.
+SENTINEL uses **GPT-orchestrated controlled engineering**.
 
-- **Human Owner** — ultimate authority for product direction and protected actions.
-- **GPT / ChatGPT** — primary orchestrator and final technical integrator.
-- **Secondary agents / external model families** — permitted only for bounded, explicit work under least privilege and isolated mutable state.
+- **Human Owner** — final authority and protected-action owner.
+- **GPT / ChatGPT** — the Owner's single operational interface, primary engineering orchestrator and final technical integrator.
+- **Secondary agents, model families and services** — bounded tools used only through GPT supervision and least privilege.
 
-Independent work may run in parallel, but one mutable worktree has one writer and integration is serialized. Secondary agents never merge protected main. GPT may merge only after every required check succeeds on the exact PR HEAD SHA and canonical security/evidence gates remain intact.
+Direct GPT + connected tools is the default. Work, Codex, parallel workers or external models are added only when task shape justifies the extra context and cost. One mutable worktree has one writer; parallel results integrate serially. Secondary workers never merge protected `main`.
 
-Protected Owner gates remain production secrets/credentials, signing material, branch-protection or repository-permission changes, irreversible destructive operations, production/live deployment, release publication, and fundamental product-direction decisions.
+GPT may merge only after the exact-SHA merge gate passes without bypassing repository or security controls. Protected Owner gates remain live production changes, release publication, protected credentials/signing custody, branch protection/permissions, irreversible destructive operations and unresolved fundamental product direction.
 
-For user-facing work, build success is not readiness; docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md requires runnable-surface and Owner visual evidence.
+For user-facing work, build success is not readiness; `docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md` requires runnable-surface and Owner visual evidence.
 
-Start agent work from root AGENTS.md. Canonical governance is docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md; compact execution rules are in docs/WORKFLOW_CONTRACT.md.
+Start agent work from root `AGENTS.md`. Canonical governance is `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md`; compact project continuity is in `docs/CHATGPT_PROJECT_MEMORY.md`.
 
 ## Runtime findings
 
@@ -169,7 +169,7 @@ See `docs/API.md` for the endpoint contract.
 
 ## Contributing
 
-See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. Update repository documentation when product or architecture meaning changes; do not create generated HEAD-sync documentation changes for ordinary code commits. The operational workflow is documented in `docs/OPERATING_PLAYBOOK.md`.
+See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. Update repository documentation when product or architecture meaning changes; do not create generated HEAD-sync documentation changes for ordinary code commits. The operational workflow is defined by `AGENTS.md`, `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md` and `docs/WORKFLOW_CONTRACT.md`.
 
 ## License
 

@@ -31,6 +31,23 @@ def test_release_readiness_fails_closed():
     assert payload["activeAcceptanceIssues"]
     assert payload["ownerVisualAcceptance"]["pendingSurfaces"]
 
+
+def test_release_readiness_requires_owner_visual_acceptance(monkeypatch):
+    monkeypatch.setattr(state, "_read_json", lambda _: {
+        "ownerVisualAcceptanceRequired": True,
+        "surfaces": [{"id": "web", "ready": True, "ownerVisualAccepted": False}],
+    })
+    monkeypatch.setattr(state, "_read_text", lambda _: "")
+    payload = state.release_readiness()
+    assert payload["releaseReady"] is False
+
+
+def test_release_readiness_rejects_empty_contract(monkeypatch):
+    monkeypatch.setattr(state, "_read_json", lambda _: {})
+    monkeypatch.setattr(state, "_read_text", lambda _: "")
+    payload = state.release_readiness()
+    assert payload["releaseReady"] is False
+
 def test_design_state_reports_unreconciled_lab():
     payload = state.design_state()
     assert payload["productionPinnedSha"]

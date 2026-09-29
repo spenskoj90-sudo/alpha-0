@@ -20,6 +20,18 @@ def _authorized(monkeypatch) -> None:
     monkeypatch.setattr(main, "request_id", lambda request, supplied=None: supplied or "request-generated")
 
 
+def test_application_registers_one_recommendation_route():
+    from pathlib import Path
+
+    from app.main import app
+
+    # The application exposes the canonical route through the OpenAPI surface;
+    # the legacy decorator must not be reintroduced in ``app.main``.
+    assert "/v1/recommendations" in app.openapi()["paths"]
+    main_source = Path(__file__).parents[1].joinpath("app", "main.py").read_text()
+    assert '@app.post("/v1/recommendations"' not in main_source
+
+
 def test_recommendation_endpoint_uses_application_provider_metadata(monkeypatch):
     _authorized(monkeypatch)
     response = recommendations_v2(

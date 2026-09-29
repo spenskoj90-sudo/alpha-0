@@ -1,12 +1,13 @@
 {
   "schema": "sentinel.ai-orchestration.v1",
   "status": "ACTIVE",
-  "effective": "2026-09-28",
+  "effective": "2026-09-29",
   "trackingIssue": 377,
   "authority": {
     "humanOwner": "ultimate",
     "primaryOrchestrator": "GPT/ChatGPT",
-    "finalIntegrator": "GPT/ChatGPT"
+    "finalIntegrator": "GPT/ChatGPT",
+    "ownerFacingOrchestrator": "GPT/ChatGPT"
   },
   "secondaryAgents": {
     "openaiSubagents": {
@@ -27,15 +28,17 @@
       "signingMaterial": false,
       "branchProtectionChanges": false,
       "liveDeployment": false,
-      "releasePublication": false
+      "releasePublication": false,
+      "requiredSupervisor": "GPT/ChatGPT",
+      "productionIntegrationAuthority": false
     }
   },
   "concurrency": {
     "oneWriterPerMutableWorktree": true,
     "serialIntegration": true,
     "defaultWorkerRange": [
-      2,
-      4
+      0,
+      2
     ],
     "parallelismRequired": false
   },
@@ -59,7 +62,10 @@
       "architecture_challenge",
       "ux_design_critique",
       "specification_interpretation"
-    ]
+    ],
+    "simpleFirst": true,
+    "deltaReconciliation": true,
+    "avoidRepeatedFullAudits": true
   },
   "mergeGate": {
     "finalIntegratorOnly": true,

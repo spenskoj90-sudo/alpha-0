@@ -439,6 +439,13 @@ def check_governance(checks: Checks) -> None:
         and "every push to protected `main`" in branch_inventory,
         "active branch inventory preserves prior cleanup evidence and the reviewed continuous-cleanup ledger",
     )
+    checks.require(
+        "fix/remove-duplicate-recommendation-route-20260929" in branch_inventory
+        and "docs/design-lab-reconcile-20260929" in branch_inventory
+        and "031586fdb773814cdaab9bed79763e0f0809cbd8" in branch_inventory
+        and "146ff38dbab317584f168447a6ba2bd4ecfb5685" in branch_inventory,
+        "active branch inventory covers the latest merged short-lived branches",
+    )
     historical_branch_manifest = read("docs/BRANCH_DELETION_MANIFEST_2026-09-23.md")
     checks.require(
         "HISTORICAL EVIDENCE RECORD" in historical_branch_manifest

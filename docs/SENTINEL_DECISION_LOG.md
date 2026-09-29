@@ -81,7 +81,7 @@
 
 **Date:** 2026-08-27  
 **Original decision:** Merge only after exact-head product CI green and explicit Owner accept; agents must not merge.  
-**Status:** **SUPERSEDED by the GPT-only governance adopted 2026-09-06.** Current rule is the exact-SHA merge gate in `docs/GPT_ONLY_AUTONOMOUS_ENGINEERING_OS.md`: GPT may merge when all required checks succeed on the exact PR HEAD SHA and repository protections permit the merge. Protected Owner gates remain unchanged.
+**Status:** **SUPERSEDED.** The GPT-only governance adopted 2026-09-06 was itself retired on 2026-09-28. Current merge authority is defined by `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md`: GPT may merge only after exact-SHA validation and all required repository protections pass. Protected Owner gates remain unchanged.
 
 ## D-016 — Historical branch cleanup groups 1+2 (issue #22)
 
@@ -222,3 +222,13 @@
 **Context decision:** Root/scoped AGENTS.md files become the compact agent context router. The former redundant role/playbook/permissions contracts are superseded to reduce context dilution; Git history preserves them.
 
 **Supersedes:** the strict AI-participation restriction adopted in September and the single-AI rationale in D-025. It does not supersede repository-first truth, exact-SHA merge validation, branch protection, Owner gates, release/security evidence requirements, or user-visible acceptance.
+
+
+## D-033 — GPT-controlled orchestration consolidation
+
+**Date:** 2026-09-29  
+**Decision:** The Human Owner works through GPT/ChatGPT as the sole Owner-facing engineering orchestrator and final technical integrator. Secondary agents, external model families, design studios, and connected services may be used only under GPT supervision for bounded work where verified delivery value exceeds context/cost overhead.  
+**Execution rule:** Prefer one compact delta reconciliation and one coherent vertical pass. Reuse known IDs/SHAs, avoid repeated full audits, parallelize only independent lanes, keep one writer per change set, serialize integration, and preserve exact-SHA merge verification.  
+**Design rule:** The Lovable/design repository may consume safe production context but unfinished design iterations are never imported into production.  
+**Cleanup rule:** Superseded working-tree instruction/tombstone files are removed after their replacement is active; Git history retains provenance.  
+**Security rule:** Owner-only production, signing, branch-protection, permission, irreversible, legal/commercial gates remain unchanged. Raw secrets stay in provider-native secret stores or Owner-controlled secure custody, not plaintext Drive/chat/docs.

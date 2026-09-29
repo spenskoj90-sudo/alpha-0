@@ -9,7 +9,7 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-from sentinel_bridge.state import design_state, project_state, provider_state, release_readiness, runtime_health
+from sentinel_bridge.state import design_state, project_state, provider_state, release_readiness, runtime_health, source_sha
 
 mcp = MCPServer("SENTINEL Control Bridge")
 
@@ -39,7 +39,7 @@ def sentinel_design_state() -> dict:
     return design_state()
 
 async def healthz(request):
-    return JSONResponse({"status":"ok","service":"sentinel-control-bridge","sourceSha":os.getenv("SENTINEL_SOURCE_SHA","UNKNOWN")})
+    return JSONResponse({"status":"ok","service":"sentinel-control-bridge","sourceSha":source_sha()})
 
 class BearerAuthMiddleware:
     def __init__(self, app):

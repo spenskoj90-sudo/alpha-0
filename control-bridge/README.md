@@ -27,7 +27,7 @@ The bridge reduces repeated discovery across providers by returning small, norma
 Required for a remote deployment:
 
 - `SENTINEL_BRIDGE_TOKEN`
-- `SENTINEL_SOURCE_SHA`
+- `SENTINEL_SOURCE_SHA` (optional explicit override; otherwise the bridge resolves Render `RENDER_GIT_COMMIT` or `GITHUB_SHA`)
 - `SENTINEL_ENV`
 - `SENTINEL_CORE_URL`
 - `SENTINEL_WEB_URL`

@@ -599,6 +599,7 @@ def check_governance(checks: Checks) -> None:
         "docs/API_REFERENCE.md",
         "docs/PLATFORM_RC.md",
         "docs/PROJECT_STATE.md",
+        "docs/SENTINEL_AUDIT_2026-09-23.md",
     )
     for retired in retired_docs:
         checks.require(not (ROOT / retired).exists(), f"{retired} is removed from the active working tree")

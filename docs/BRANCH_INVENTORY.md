@@ -57,6 +57,13 @@ Deletion requires full live-tip revalidation. `MERGED_EXACT` additionally requir
 | `feat/email-http-provider-fallback-20260927` | `f10f099a188d002dbd87d82490f2bfb144e462ee` | CONTENT_SUPERSEDED | RECONCILED: PR #368 was intentionally closed after protected main advanced; the reviewed email fallback change set was reapplied from current main and merged as PR #369 |
 | `feat/email-http-provider-fallback-rebased-20260927` | `21cd506cd8a975d62a94e62b7f435cddcef18ac6` | MERGED_EXACT | PR #369 merged; live tip equals exact PR head |
 
+## Reviewed 2026-09-29 cleanup ledger
+
+| Branch | Exact reviewed tip | Classification | Evidence |
+| --- | --- | --- | --- |
+| `fix/remove-duplicate-recommendation-route-20260929` | `146ff38dbab317584f168447a6ba2bd4ecfb5685` | MERGED_EXACT | PR #395 merged to `main`; live unprotected tip equals exact PR head |
+| `docs/design-lab-reconcile-20260929` | `031586fdb773814cdaab9bed79763e0f0809cbd8` | MERGED_EXACT | PR #396 merged to `main`; live unprotected tip equals exact PR head |
+
 The current PR branch that carries this ledger is intentionally omitted from the table: after merge, the workflow's independent same-repository merge-lineage gate handles that exact head automatically.
 
 The older detailed reconciliation history remains preserved in Git history and `BRANCH_DELETION_MANIFEST_2026-09-23.md` as historical evidence; it is not live deletion authority.

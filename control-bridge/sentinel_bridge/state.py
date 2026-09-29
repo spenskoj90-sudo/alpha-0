@@ -66,6 +66,8 @@ def provider_state() -> dict[str, Any]:
     }
     return {
         "schema": "sentinel.control-bridge.provider-state.v1",
+        "sourceSha": source_sha(),
+        "evidenceScope": "bridge-runtime-environment",
         "providers": {
             key: {"configured": any(_configured(name) for name in names)}
             for key, names in checks.items()
@@ -101,16 +103,29 @@ def release_readiness() -> dict[str, Any]:
     task_text = _read_text("docs/TASKS.md")
     issue_ids = sorted({int(value) for value in re.findall(r"- \[ \] \*\*#(\d+)", task_text)})
     surfaces = ux.get("surfaces", [])
+    owner_acceptance_required = bool(ux.get("ownerVisualAcceptanceRequired"))
+    valid_surfaces = isinstance(surfaces, list) and bool(surfaces) and all(
+        isinstance(item, dict)
+        and isinstance(item.get("id"), str)
+        and item.get("ready") is True
+        for item in surfaces
+    )
+    accepted = all(item.get("ownerVisualAccepted") is True for item in surfaces) if valid_surfaces else False
     return {
         "schema": "sentinel.control-bridge.release-readiness.v1",
         "sourceSha": source_sha(),
         "activeAcceptanceIssues": issue_ids,
         "ownerVisualAcceptance": {
-            "required": bool(ux.get("ownerVisualAcceptanceRequired")),
+            "required": owner_acceptance_required,
             "acceptedSurfaces": [item.get("id") for item in surfaces if item.get("ownerVisualAccepted")],
             "pendingSurfaces": [item.get("id") for item in surfaces if not item.get("ownerVisualAccepted")],
         },
-        "releaseReady": not issue_ids and all(bool(item.get("ready")) for item in surfaces),
+        "releaseReady": (
+            source_sha() != "UNKNOWN"
+            and not issue_ids
+            and valid_surfaces
+            and (not owner_acceptance_required or accepted)
+        ),
     }
 
 def design_state() -> dict[str, Any]:
@@ -120,6 +135,8 @@ def design_state() -> dict[str, Any]:
     ux_ref = ux.get("designReference", {})
     return {
         "schema": "sentinel.control-bridge.design-state.v1",
+        "sourceSha": source_sha(),
+        "evidenceScope": "repository-snapshot",
         "direction": design.get("direction"),
         "revision": design.get("revision"),
         "referenceRepository": ref.get("repository"),

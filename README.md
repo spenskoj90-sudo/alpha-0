@@ -46,11 +46,11 @@ Architecture decisions D-001 through D-007 are documented in `docs/ARCHITECTURE.
 
 ## Engineering operating model
 
-**ACTIVE under issue #377:** SENTINEL uses controlled multi-agent engineering.
+**ACTIVE under the 2026-09-29 Owner decision:** SENTINEL uses GPT-controlled engineering orchestration.
 
 - **Human Owner** — ultimate authority for product direction and protected actions.
-- **GPT / ChatGPT** — primary orchestrator and final technical integrator.
-- **Secondary agents / external model families** — permitted only for bounded, explicit work under least privilege and isolated mutable state.
+- **GPT / ChatGPT** — sole Owner-facing orchestrator and final technical integrator.
+- **Secondary agents / external model families / studios** — bounded workers only, selected and supervised by GPT under least privilege and isolated mutable state.
 
 Independent work may run in parallel, but one mutable worktree has one writer and integration is serialized. Secondary agents never merge protected main. GPT may merge only after every required check succeeds on the exact PR HEAD SHA and canonical security/evidence gates remain intact.
 
@@ -169,7 +169,7 @@ See `docs/API.md` for the endpoint contract.
 
 ## Contributing
 
-See `docs/CONTRIBUTING.md` and `docs/WORKFLOW_CONTRACT.md`. Every security-sensitive behavior change requires a regression test and passing CI. Update repository documentation when product or architecture meaning changes; do not create generated HEAD-sync documentation changes for ordinary code commits. The operational workflow is documented in `docs/OPERATING_PLAYBOOK.md`.
+See `docs/CONTRIBUTING.md`, `docs/WORKFLOW_CONTRACT.md`, and `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md`. Every security-sensitive behavior change requires a regression test and passing CI. Update repository documentation when product or architecture meaning changes; do not create generated HEAD-sync documentation changes for ordinary code commits.
 
 ## License
 

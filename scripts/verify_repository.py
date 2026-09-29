@@ -460,7 +460,7 @@ def check_governance(checks: Checks) -> None:
     )
     checks.require(
         "single operational interface" in canonical
-        and "direct GPT + connected tools" in canonical.lower(),
+        and "direct gpt + connected tools" in canonical.lower(),
         "GPT is the Owner-facing orchestrator and direct execution is the default",
     )
     checks.require(

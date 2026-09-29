@@ -1,54 +1,47 @@
 # SENTINEL — Engineering Workflow Contract
 
 **Status:** ACTIVE
-**Effective:** 2026-09-28
-**Canonical governance:** docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md
-**Tracking issue:** #377
+**Effective:** 2026-09-29
+**Canonical governance:** `docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md`
 
 ## Source of truth
 
-Git main at an exact SHA is authoritative for repository facts. Runtime/provider state must be read from the relevant live system. Conversation memory and summaries are orientation only.
+Git `main` at an exact SHA is authoritative for repository facts. Runtime/provider state is read from the relevant live service. Conversation memory and old attachments are orientation only.
 
-## Execution graph
+## Default execution
 
-DISCOVER → BASELINE → ROUTE → EXECUTE → TEST → FIX → REVIEW → PR → CI → EXACT-SHA VERIFY → SERIAL MERGE → POST-MERGE VERIFY
+`DISCOVER → BASELINE → ROUTE → EXECUTE → TEST → FIX → REVIEW → PR → CI → EXACT-SHA VERIFY → SERIAL MERGE → POST-MERGE VERIFY`
 
-ROUTE may create independent parallel lanes. Each lane has isolated mutable state and an explicit owner.
+Use direct GPT + connected tools by default. Route to Work/Codex/secondary workers only when the task shape benefits.
 
-## Parallel-lane contract
+## Vertical-pass rule
 
-Every writing lane defines:
-- base SHA;
-- task/issue;
-- owned subsystem/files;
-- acceptance checks;
-- branch/worktree;
-- dependencies.
+Prefer one coherent pass that includes implementation, relevant tests, security/failure behavior, runtime evidence and semantic documentation. Do not split one fixable block into repeated audit/prompt cycles.
 
-One mutable worktree has one writer. Agents do not silently cross file ownership.
+Reuse evidence tied to an unchanged SHA/artifact. Do not rerun expensive validation without a reason.
 
-## Integration contract
+## Parallel lanes
 
-GPT/ChatGPT is final technical integrator.
+Writing lanes declare base SHA, owned subsystem/files, acceptance checks, isolated branch/worktree, and dependencies.
 
-Parallel results integrate serially. Before each merge, GPT revalidates the branch against current main, reviews the complete diff, and verifies every required check on exact PR HEAD SHA.
+One mutable worktree has one writer. Parallel results integrate serially through GPT.
 
-Secondary agents cannot merge protected main.
+## Integration
+
+GPT/ChatGPT is final technical integrator. Before merge GPT reviews the complete diff against current `main`, verifies exact required-check evidence and ensures no stale or missing result is being reused.
+
+Secondary workers cannot merge protected `main`.
 
 ## Failure loop
 
-Routine CI/test/security/lint/build failures trigger diagnosis, repair, retest, and rerun. They do not require Owner approval.
+Routine CI/test/security/lint/build failures trigger diagnosis, repair, retest and rerun without Owner intervention.
 
 ## Owner gates
 
-Stop for production credentials/secrets, signing material, branch-protection/permission changes, irreversible destructive operations, production/live deployment, release publication, fundamental unresolved product direction, or explicit legal/compliance gates.
+Stop only for production credentials/secrets, signing material, branch-protection/permission changes, irreversible destructive operations, production/live deployment, release publication, unresolved fundamental product direction, or explicit legal/compliance gates.
 
-## Security and user-visible evidence
+## Security and acceptance
 
-Never weaken controls for green CI. Never expose or fabricate secrets/evidence.
+Never weaken controls or expose/fabricate secrets/evidence.
 
-User-facing work additionally follows docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md: build success and screenshots do not establish readiness.
-
-## Context efficiency
-
-Start from root AGENTS.md, then load only scoped instructions and canonical contracts relevant to the task. Do not preload the whole documentation corpus.
+User-facing work additionally follows `docs/USER_VISIBLE_ACCEPTANCE_CONTRACT.md`: source/build/screenshots alone do not establish readiness.

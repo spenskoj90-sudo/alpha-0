@@ -473,12 +473,12 @@ def check_governance(checks: Checks) -> None:
         "multi-agent writes remain isolated and serially integrated",
     )
     checks.require(
-        "Secondary agents receive least-privilege context" in canonical
-        and "production secrets or credentials" in canonical,
-        "secondary-agent context is least-privilege and excludes protected secrets",
+        "Secondary workers receive least-privilege context" in canonical
+        and "never delegated to secondary workers" in canonical,
+        "secondary-agent context is least-privilege and excludes protected authority",
     )
     checks.require(
-        "exact PR HEAD SHA" in canonical and "GPT may merge a PR into main only when" in canonical,
+        "exact PR HEAD is known" in canonical and "GPT may merge a PR into `main` only when" in canonical,
         "canonical governance retains exact-SHA merge authority",
     )
     checks.require(
@@ -495,13 +495,14 @@ def check_governance(checks: Checks) -> None:
         "machine policy keeps one final integrator",
     )
     checks.require(
-        orchestration.get("concurrency", {}).get("oneWriterPerMutableWorktree") is True
+        orchestration.get("concurrency", {}).get("oneWriterPerMutableState") is True
         and orchestration.get("concurrency", {}).get("serialIntegration") is True,
         "machine policy enforces one-writer and serial integration",
     )
     checks.require(
-        orchestration.get("secondaryAgents", {}).get("externalModelFamilies", {}).get("productionSecrets") is False,
-        "external model families cannot receive production secrets",
+        orchestration.get("secondaryWorkers", {}).get("supervisedBy") == "GPT/ChatGPT"
+        and orchestration.get("secondaryWorkers", {}).get("protectedCredentials") is False,
+        "secondary workers remain GPT-supervised and outside protected credentials",
     )
     checks.require(
         "Context routing" in root_agents and "docs/AI_ORCHESTRATION_OPERATING_SYSTEM.md" in root_agents,
@@ -514,13 +515,14 @@ def check_governance(checks: Checks) -> None:
         "ChatGPT Project instructions expose the compact SENTINEL mission",
     )
     checks.require(
-        "Read root `AGENTS.md` first" in project_instructions
-        and "Do not preload the entire documentation corpus" in project_instructions,
-        "ChatGPT Project context is routed rather than monolithic",
+        "Read root `AGENTS.md`, then only scoped instructions" in project_instructions
+        and "one large coherent vertical pass" in project_instructions,
+        "ChatGPT Project context is routed and pass-oriented",
     )
     checks.require(
-        "Tell the Owner to switch the current task to **ChatGPT Work**" in project_instructions,
-        "ChatGPT Project instructions define the browser/Work escalation boundary",
+        "Use **Work** for long multi-step tasks" in project_instructions
+        and "one complete copy-ready block" in project_instructions,
+        "ChatGPT Project instructions define efficient Work escalation",
     )
     checks.require(
         "Generated conversation previews are not product evidence" in working_environment,
@@ -532,9 +534,10 @@ def check_governance(checks: Checks) -> None:
         "working-environment contract names canonical infrastructure control planes",
     )
     checks.require(
-        "ChatGPT Plus cannot directly attach a custom remote MCP server" in working_environment
-        and "OpenAI API billing are separate" in working_environment,
-        "working-environment contract does not overstate Plus custom-MCP/API availability",
+        "Use normal Chat plus connected plugins" in working_environment
+        and "Use ChatGPT Work for long-running" in working_environment
+        and "Owner should not have to coordinate secondary workers" in working_environment,
+        "working-environment contract defines the current GPT-led execution routing",
     )
     staging_workflow = read(".github/workflows/staging-synthetic.yml")
     staging_smoke = read("scripts/staging_surface_smoke.py")

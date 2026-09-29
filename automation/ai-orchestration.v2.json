@@ -1,0 +1,66 @@
+{
+  "schema": "sentinel.ai-orchestration.v2",
+  "status": "ACTIVE",
+  "effective": "2026-09-29",
+  "trackingIssue": 377,
+  "authority": {
+    "humanOwner": "ultimate",
+    "ownerInterface": "GPT/ChatGPT",
+    "primaryOrchestrator": "GPT/ChatGPT",
+    "finalIntegrator": "GPT/ChatGPT"
+  },
+  "routingOrder": [
+    "direct_gpt_connected_tools",
+    "chatgpt_work_for_long_browser_background",
+    "codex_or_same_family_bounded_workers",
+    "external_models_only_for_bounded_measured_value"
+  ],
+  "secondaryWorkers": {
+    "ownerCoordinatesDirectly": false,
+    "supervisedBy": "GPT/ChatGPT",
+    "defaultExternalMode": "read_only",
+    "writeMode": "isolated_branch_worktree_or_design_lab",
+    "protectedMainMerge": false,
+    "protectedCredentials": false,
+    "signingMaterial": false,
+    "repositoryAdministration": false,
+    "liveDeployment": false,
+    "releasePublication": false
+  },
+  "specialSurfaces": {
+    "lovable": "design_lab_only_until_gpt_validated_translation",
+    "replit": "isolated_execution_or_prototype",
+    "figma": "optional_authoring_review",
+    "googleDrive": "non_sensitive_evidence_only"
+  },
+  "concurrency": {
+    "oneWriterPerMutableState": true,
+    "serialIntegration": true,
+    "parallelismRequired": false,
+    "parallelOnlyWhenExpectedBenefitExceedsCoordinationCost": true
+  },
+  "efficiency": {
+    "coherentVerticalPasses": true,
+    "reuseExactShaEvidence": true,
+    "rerunUnchangedExpensiveChecks": false,
+    "auditOfAuditLoops": false,
+    "askOwnerOnlyWhenBlockedByOwnerGateOrMissingDecision": true
+  },
+  "mergeGate": {
+    "finalIntegratorOnly": true,
+    "exactPrHeadSha": true,
+    "allRequiredChecksSuccessful": true,
+    "noPendingFailedMissingStale": true,
+    "branchProtectionBypass": false
+  },
+  "ownerOnly": [
+    "protected_credentials",
+    "signing_material",
+    "branch_protection_or_repository_permissions",
+    "irreversible_destructive_operations",
+    "production_live_deployment",
+    "release_publication",
+    "unresolved_fundamental_product_direction",
+    "legal_compliance_operator_approval"
+  ]
+}

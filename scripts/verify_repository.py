@@ -476,7 +476,7 @@ def check_governance(checks: Checks) -> None:
         "secondary-agent context excludes protected secrets and signing material",
     )
     checks.require(
-        "exact PR HEAD SHA" in canonical and "GPT may merge a PR into main only when" in canonical,
+        "exact PR HEAD SHA" in canonical and "GPT may merge a PR into `main` only when" in canonical,
         "canonical governance retains exact-SHA merge authority",
     )
     checks.require(

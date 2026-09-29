@@ -9,7 +9,7 @@ For each protected-main push, the `Staging Synthetic Runtime` workflow waits for
 
 - Core `/healthz` is UP and reports repository VERSION;
 - authenticated Web root is reachable;
-- Web `/api/session/login` actually reaches Core, using a unique nonexistent `@example.invalid` identity and requiring the authoritative `401 INVALID_CREDENTIALS` response;
+- Web `/api/session/login` actually reaches Core, using a unique nonexistent `@example.invalid` identity and requiring the canonical authoritative `401` error envelope with `code=INVALID_CREDENTIALS` and matching request correlation;
 - Public Website root is reachable;
 - the pre-release robots guard still disallows indexing.
 

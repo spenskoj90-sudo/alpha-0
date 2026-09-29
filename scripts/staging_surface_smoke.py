@@ -120,12 +120,15 @@ def validate_login_probe(result: HttpResult) -> dict[str, Any]:
         error = payload.get("error") or payload.get("detail") or "unknown"
         raise SmokeFailure(f"WEB_CORE_LOGIN_PATH_UNHEALTHY:{result.status}:{error}")
     payload = result.json()
-    if payload.get("detail") != "INVALID_CREDENTIALS":
+    if payload.get("code") != "INVALID_CREDENTIALS":
         raise SmokeFailure(f"WEB_CORE_LOGIN_UNEXPECTED_BODY:{payload}")
     request_id = result.headers.get("x-request-id", "")
     if not _REQUEST_ID.fullmatch(request_id):
         raise SmokeFailure("WEB_CORE_LOGIN_REQUEST_ID_MISSING")
-    return {"status": result.status, "detail": payload["detail"], "requestIdPresent": True}
+    body_request_id = payload.get("request_id")
+    if body_request_id != request_id:
+        raise SmokeFailure("WEB_CORE_LOGIN_REQUEST_ID_MISMATCH")
+    return {"status": result.status, "code": payload["code"], "requestIdPresent": True}
 
 
 def validate_html(result: HttpResult, label: str) -> dict[str, Any]:

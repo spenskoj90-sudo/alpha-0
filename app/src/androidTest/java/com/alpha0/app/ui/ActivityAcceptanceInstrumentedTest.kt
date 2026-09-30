@@ -9,11 +9,13 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.alpha0.app.MainActivity
@@ -102,6 +104,7 @@ class ActivityAcceptanceInstrumentedTest {
     private fun choice(label: String) = composeRule.onNodeWithText(label)
         .performScrollTo()
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+        .assertHeightIsAtLeast(48.dp)
 
     private fun assertPreferences(language: AppLanguage, theme: AppThemeMode) {
         assertEquals(language, AppPreferences(context).language())

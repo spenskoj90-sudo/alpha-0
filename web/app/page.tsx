@@ -4,14 +4,6 @@ import { BrandMark } from './components/brand-mark';
 import { RecommendationPanel } from './components/recommendation-panel';
 import { ProductOverview } from './components/product-overview';
 
-const surfaces = [
-  ['devices', 'Devices', 'Device identity, proof and revocation state are not inferred from local browser state.'],
-  ['subscription', 'Subscription', 'Subscription state comes from Core billing lifecycle data.'],
-  ['billing', 'Billing', 'Billing mutations remain authenticated and provider-authoritative.'],
-  ['settings', 'Settings', 'Presentation preferences never change server authorization semantics.'],
-  ['support', 'Support', 'Support and diagnostics remain evidence-bound and privacy-scoped.'],
-] as const;
-
 export default function Dashboard() {
   return (
     <>
@@ -33,10 +25,10 @@ export default function Dashboard() {
             <a className="nav-item" href="#security">Security</a>
             <a className="nav-item" href="#devices">Devices</a>
             <a className="nav-item" href="#account">Account</a>
-            <a className="nav-item" href="#subscription">Subscription</a>
+            <a className="nav-item" href="#account">Subscription</a>
             <a className="nav-item" href="#settings">Settings</a>
             <a className="nav-item" href="#support">Support</a>
-            <a className="nav-item" href="#billing">Billing</a>
+            <a className="nav-item" href="#account">Billing</a>
           </nav>
           <div className="nav-footer">
             <a className="utility-link" href="/admin">Privileged admin utility</a>
@@ -78,13 +70,21 @@ export default function Dashboard() {
           <ProductOverview />
 
           <section className="surface-grid" aria-label="Control plane surfaces">
-            {surfaces.map(([id, title, description]) => (
-              <article className="card surface-card" id={id} key={id}>
-                <span className="surface-state">AUTHORITATIVE DATA ONLY</span>
-                <h2>{title}</h2>
-                <p className="muted">{description}</p>
-              </article>
-            ))}
+            <article className="card surface-card" id="settings">
+              <h2>Settings</h2>
+              <p className="muted">Choose System, Dark or Light. Your preference is saved on this browser.</p>
+              <AppearanceToggle />
+            </article>
+            <article className="card surface-card" id="support">
+              <h2>Support</h2>
+              <p className="muted">Review service status and privacy guidance, or download the Web build identity when reporting a problem.</p>
+              <ul className="product-list">
+                <li><a href="https://sentinel-public-site-staging.onrender.com/status">Service status</a></li>
+                <li><a href="https://sentinel-public-site-staging.onrender.com/privacy">Privacy and data handling</a></li>
+                <li><a href="/api/health" download="sentinel-web-diagnostics.json">Download Web build diagnostics</a></li>
+              </ul>
+              <p className="microcopy">Build diagnostics contain no account data, cookies or credentials.</p>
+            </article>
           </section>
         </main>
       </div>

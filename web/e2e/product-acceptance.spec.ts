@@ -40,6 +40,20 @@ test('Web layout, focus, navigation, assets and action contrast', async ({ page 
   expect(errors).toEqual([]);
 });
 
+test('Settings persist appearance and Support exposes safe diagnostics', async ({ page }) => {
+  await page.goto('/');
+  const control = page.locator('#settings').getByRole('button', { name: /Switch appearance/ });
+  await control.click();
+  await expect(control).toHaveAccessibleName('Switch appearance. Current mode: Dark');
+  await control.click();
+  await expect(control).toHaveAccessibleName('Switch appearance. Current mode: Light');
+  await page.reload();
+  await expect(page.locator('#settings').getByRole('button', { name: /Switch appearance/ })).toHaveAccessibleName('Switch appearance. Current mode: Light');
+  const download = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download Web build diagnostics' }).click();
+  expect((await download).suggestedFilename()).toBe('sentinel-web-diagnostics.json');
+});
+
 test('Public Site routes, responsive layout, assets and action contrast', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.name));
@@ -86,6 +100,7 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await expect(page.locator('#games')).toContainText('Diablo IV');
   await expect(page.locator('#security')).toContainText('Verification pending');
   await expect(page.locator('#activity')).toContainText('auth:register');
+  await expect(page.locator('#devices')).toContainText('No devices are registered');
   const cookies = (await context.cookies()).filter(cookie => cookie.name.startsWith('sentinel_'));
   // Assert only metadata; never attach cookie values to evidence.
   expect(cookies.length).toBeGreaterThanOrEqual(2);
@@ -163,6 +178,8 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   await page.getByRole('button', { name: 'Verify MFA' }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
   await expect(page.locator('#security')).toContainText('Enabled');
+  await expect(page.locator('#devices')).toContainText('Registered');
+  await expect(page.locator('#devices')).toContainText('android');
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 });

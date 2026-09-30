@@ -36,6 +36,8 @@ class Store(ABC):
     @abstractmethod
     def get_device(self, device_id: str) -> dict[str, Any] | None: ...
     @abstractmethod
+    def list_devices(self, user_id: str) -> list[dict[str, Any]]: ...
+    @abstractmethod
     def touch_device(self, device_id: str) -> bool: ...
     @abstractmethod
     def find_active_device_by_key(self, public_key_b64: str, fingerprint: str) -> dict[str, Any] | None: ...
@@ -163,6 +165,15 @@ class MemoryStore(Store):
 
     def get_device(self, device_id):
         return self.devices.get(device_id)
+
+    def list_devices(self, user_id):
+        with self.lock:
+            summaries = [
+                {"device_id": device_id, "platform": record["platform"], "state": record["state"],
+                 "bound_at": record["created_at"], "last_seen_at": record["last_seen_at"]}
+                for device_id, record in self.devices.items() if record["user_id"] == user_id
+            ]
+            return sorted(summaries, key=lambda item: (item["bound_at"], item["device_id"]), reverse=True)[:101]
 
     def touch_device(self, device_id):
         with self.lock:
@@ -600,6 +611,15 @@ class PostgresStore(Store):
                 {"id": device_id},
             ).mappings().first()
         return dict(row) if row else None
+
+    def list_devices(self, user_id):
+        with self.engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT d.id::text device_id,d.platform,d.state,d.created_at bound_at,d.last_seen_at "
+                "FROM device_bindings d JOIN identities i ON i.id=d.identity_id "
+                "WHERE i.user_handle=:user_id ORDER BY d.created_at DESC,d.id DESC LIMIT 101"
+            ), {"user_id": user_id}).mappings().all()
+        return [dict(row) for row in rows]
 
     def touch_device(self, device_id):
         with self.engine.begin() as conn:

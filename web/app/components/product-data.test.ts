@@ -16,14 +16,26 @@ describe('product data state', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     await expect(loadProductData()).resolves.toMatchObject({ state: 'ERROR' });
   });
+  it('rejects corrupt device metadata instead of displaying an invalid registration', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const payload = String(url).endsWith('/security') ? {
+        email: null, email_verified: false, password_enabled: true,
+        mfa_enabled: false, mfa_recovery_codes_remaining: 0, providers: [],
+      } : String(url).endsWith('/games') ? { games: [] } : {
+        devices: [{ device_id: 'test', platform: 'android', state: 'ACTIVE', bound_at: 'invalid-date', last_seen_at: null }], truncated: false,
+      };
+      return new Response(JSON.stringify(payload));
+    });
+    await expect(loadProductData()).resolves.toMatchObject({ state: 'ERROR' });
+  });
   it('loads bounded server data with empty states preserved', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       const payload = String(url).endsWith('/security') ? {
         email: null, email_verified: false, password_enabled: true,
         mfa_enabled: false, mfa_recovery_codes_remaining: 0, providers: [],
-      } : String(url).endsWith('/games') ? { games: [] } : { events: [] };
+      } : String(url).endsWith('/games') ? { games: [] } : String(url).endsWith('/devices') ? { devices: [], truncated: false } : { events: [] };
       return new Response(JSON.stringify(payload));
     });
-    await expect(loadProductData()).resolves.toMatchObject({ state: 'READY', games: [], events: [] });
+    await expect(loadProductData()).resolves.toMatchObject({ state: 'READY', games: [], events: [], devices: [], devicesTruncated: false });
   });
 });

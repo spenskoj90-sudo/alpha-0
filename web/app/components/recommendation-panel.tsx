@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Recommendation = {
   kind: 'fact' | 'inference' | 'recommendation';
@@ -34,8 +34,23 @@ export function RecommendationPanel() {
   const [view, setView] = useState<ViewState>('IDLE');
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [message, setMessage] = useState('');
+  const generation = useRef(0);
+
+  useEffect(() => {
+    const revisions = generation;
+    const reset = (event: Event) => {
+      revisions.current++;
+      setRecommendation(null);
+      const session = (event as CustomEvent<boolean | null>).detail;
+      setView(session === true ? 'IDLE' : session === false ? 'SIGNED_OUT' : 'ERROR');
+      setMessage(session === true ? '' : session === false ? 'Sign in to request a live Core recommendation.' : 'Account data is unavailable. Check your connection and retry.');
+    };
+    window.addEventListener('sentinel-session-changed', reset);
+    return () => { revisions.current++; window.removeEventListener('sentinel-session-changed', reset); };
+  }, []);
 
   async function loadRecommendation() {
+    const revision = ++generation.current;
     setView('LOADING');
     setMessage('');
     try {
@@ -43,7 +58,9 @@ export function RecommendationPanel() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         cache: 'no-store',
+        signal: AbortSignal.timeout(45_000),
       });
+      if (revision !== generation.current) return;
       if (response.status === 401) {
         setRecommendation(null);
         setMessage('Sign in to request a live Core recommendation.');
@@ -59,7 +76,9 @@ export function RecommendationPanel() {
       let payload: RecommendationPayload;
       try {
         payload = await response.json() as RecommendationPayload;
+        if (revision !== generation.current) return;
       } catch {
+        if (revision !== generation.current) return;
         setRecommendation(null);
         setMessage('Core returned an invalid recommendation response.');
         setView('ERROR');
@@ -75,6 +94,7 @@ export function RecommendationPanel() {
       setRecommendation(first);
       setView('READY');
     } catch {
+      if (revision !== generation.current) return;
       setRecommendation(null);
       setMessage('Live recommendation request failed.');
       setView('ERROR');

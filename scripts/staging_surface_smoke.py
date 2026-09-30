@@ -45,7 +45,7 @@ class HttpResult:
 
 
 def _request(
-    destination: Literal["bridge-health", "core-health", "web-root", "web-login", "site-root", "site-robots"],
+    destination: Literal["bridge-health", "core-health", "web-health", "web-root", "web-login", "site-root", "site-robots"],
     *,
     body: bytes | None = None,
     headers: dict[str, str] | None = None,
@@ -57,6 +57,8 @@ def _request(
         method, url = "GET", _CORE_URL + "/healthz"
     elif destination == "web-root":
         method, url = "GET", _WEB_URL
+    elif destination == "web-health":
+        method, url = "GET", _WEB_URL + "/api/health"
     elif destination == "web-login":
         method, url = "POST", _WEB_URL + "/api/session/login"
     elif destination == "site-root":
@@ -100,7 +102,7 @@ def validate_bridge_health(result: HttpResult, expected_sha: str) -> dict[str, A
     return payload
 
 
-def validate_core_health(result: HttpResult, expected_version: str) -> dict[str, Any]:
+def validate_core_health(result: HttpResult, expected_version: str, expected_sha: str) -> dict[str, Any]:
     if result.status != 200:
         raise SmokeFailure(f"CORE_HEALTH_HTTP_{result.status}")
     payload = result.json()
@@ -108,7 +110,35 @@ def validate_core_health(result: HttpResult, expected_version: str) -> dict[str,
         raise SmokeFailure("CORE_HEALTH_NOT_UP")
     if payload.get("version") != expected_version:
         raise SmokeFailure(f"CORE_VERSION_MISMATCH:{payload.get('version')}")
+    if payload.get("source_sha") != expected_sha:
+        raise SmokeFailure("CORE_SHA_MISMATCH")
     return payload
+
+
+def validate_web_health(result: HttpResult, expected_sha: str) -> dict[str, Any]:
+    payload = result.json()
+    if result.status != 200 or payload.get("service") != "sentinel-web" or payload.get("sourceSha") != expected_sha:
+        raise SmokeFailure("WEB_SHA_MISMATCH")
+    return payload
+
+
+def validate_site_sha(result: HttpResult, expected_sha: str) -> dict[str, Any]:
+    payload = validate_html(result, "PUBLIC_SITE_ROOT")
+    if not re.search(r'<meta\s+name="sentinel-source-sha"\s+content="' + re.escape(expected_sha) + r'"\s*/?>', result.body.decode("utf-8", errors="replace")):
+        raise SmokeFailure("PUBLIC_SITE_SHA_MISMATCH")
+    return {**payload, "sourceSha": expected_sha}
+
+
+def wait_for_surface(destination: Literal["core-health", "web-health", "site-root"], validate, *, timeout_seconds: int, poll_seconds: int) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_seconds
+    last = "not-probed"
+    while time.monotonic() < deadline:
+        try:
+            return validate(_request(destination))
+        except SmokeFailure as exc:
+            last = str(exc)
+        time.sleep(poll_seconds)
+    raise SmokeFailure(f"{destination.upper()}_EXACT_SHA_TIMEOUT:{last}")
 
 
 def validate_login_probe(result: HttpResult) -> dict[str, Any]:
@@ -189,9 +219,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         timeout_seconds=args.deploy_timeout_seconds,
         poll_seconds=args.poll_seconds,
     )
-    evidence["surfaces"]["core"] = validate_core_health(
-        _request("core-health"),
-        args.expected_version,
+    evidence["surfaces"]["core"] = wait_for_surface(
+        "core-health", lambda result: validate_core_health(result, args.expected_version, args.expected_sha),
+        timeout_seconds=args.deploy_timeout_seconds, poll_seconds=args.poll_seconds,
+    )
+    evidence["surfaces"]["webIdentity"] = wait_for_surface(
+        "web-health", lambda result: validate_web_health(result, args.expected_sha),
+        timeout_seconds=args.deploy_timeout_seconds, poll_seconds=args.poll_seconds,
     )
     evidence["surfaces"]["web"] = validate_html(
         _request("web-root"),
@@ -221,9 +255,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     )
     evidence["surfaces"]["webCoreLogin"] = validate_login_probe(login)
 
-    evidence["surfaces"]["publicSite"] = validate_html(
-        _request("site-root"),
-        "PUBLIC_SITE_ROOT",
+    evidence["surfaces"]["publicSite"] = wait_for_surface(
+        "site-root", lambda result: validate_site_sha(result, args.expected_sha),
+        timeout_seconds=args.deploy_timeout_seconds, poll_seconds=args.poll_seconds,
     )
     evidence["surfaces"]["publicRobots"] = validate_robots(
         _request("site-robots")

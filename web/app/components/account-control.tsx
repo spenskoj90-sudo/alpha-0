@@ -84,28 +84,51 @@ function verifiedCheckoutUrl(payload: CheckoutResponse | null): string | null {
   }
 }
 
-async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
-  const plansResponse = await fetch('/api/billing/plans', { cache: 'no-store' });
-  if (plansResponse.status === 401) return { view: 'SIGNED_OUT' };
-  if (!plansResponse.ok) return { view: 'ERROR', message: `Unable to load billing plans (${plansResponse.status}).` };
-  const plansPayload = await responseJson<{ plans: Plan[] }>(plansResponse);
+export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
+  try {
+    const plansResponse = await fetch('/api/billing/plans', { cache: 'no-store', signal: AbortSignal.timeout(45_000) });
+    if (plansResponse.status === 401) return { view: 'SIGNED_OUT' };
+    if (!plansResponse.ok) return { view: 'ERROR', message: `Unable to load billing plans (${plansResponse.status}).` };
+    const plansPayload = await responseJson<{ plans: Plan[] }>(plansResponse);
 
-  const subscriptionsResponse = await fetch('/api/billing/subscriptions', { cache: 'no-store' });
-  if (subscriptionsResponse.status === 401) return { view: 'SIGNED_OUT' };
-  if (!subscriptionsResponse.ok) return { view: 'ERROR', message: `Unable to load subscriptions (${subscriptionsResponse.status}).` };
-  const subscriptionsPayload = await responseJson<{ subscriptions: Subscription[] }>(subscriptionsResponse);
+    const subscriptionsResponse = await fetch('/api/billing/subscriptions', { cache: 'no-store', signal: AbortSignal.timeout(45_000) });
+    if (subscriptionsResponse.status === 401) return { view: 'SIGNED_OUT' };
+    if (!subscriptionsResponse.ok) return { view: 'ERROR', message: `Unable to load subscriptions (${subscriptionsResponse.status}).` };
+    const subscriptionsPayload = await responseJson<{ subscriptions: Subscription[] }>(subscriptionsResponse);
 
-  const entitlementsResponse = await fetch('/api/account/entitlements', { cache: 'no-store' });
-  if (entitlementsResponse.status === 401) return { view: 'SIGNED_OUT' };
-  if (!entitlementsResponse.ok) return { view: 'ERROR', message: `Unable to load entitlements (${entitlementsResponse.status}).` };
-  const entitlementsPayload = await responseJson<{ entitlements: Entitlement[] }>(entitlementsResponse);
+    const entitlementsResponse = await fetch('/api/account/entitlements', { cache: 'no-store', signal: AbortSignal.timeout(45_000) });
+    if (entitlementsResponse.status === 401) return { view: 'SIGNED_OUT' };
+    if (!entitlementsResponse.ok) return { view: 'ERROR', message: `Unable to load entitlements (${entitlementsResponse.status}).` };
+    const entitlementsPayload = await responseJson<{ entitlements: Entitlement[] }>(entitlementsResponse);
 
-  return {
-    view: 'READY',
-    plans: plansPayload?.plans ?? [],
-    subscriptions: subscriptionsPayload?.subscriptions ?? [],
-    entitlements: entitlementsPayload?.entitlements ?? [],
-  };
+    if (!Array.isArray(plansPayload?.plans) || !Array.isArray(subscriptionsPayload?.subscriptions) || !Array.isArray(entitlementsPayload?.entitlements)) {
+      return { view: 'ERROR', message: 'Account data could not be verified. Please retry.' };
+    }
+    const validPlans = plansPayload.plans.every(plan => plan &&
+      typeof plan.code === 'string' && typeof plan.name === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+      Number.isSafeInteger(plan.amount_minor) && plan.amount_minor >= 0 &&
+      Number.isSafeInteger(plan.interval_days) && plan.interval_days > 0 &&
+      Array.isArray(plan.entitlement_codes) && plan.entitlement_codes.every(code => typeof code === 'string'));
+    const validSubscriptions = subscriptionsPayload.subscriptions.every(item => item &&
+      typeof item.id === 'string' && typeof item.plan_code === 'string' && typeof item.provider === 'string' &&
+      ['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'].includes(item.status) &&
+      typeof item.updated_at === 'string' && Number.isFinite(Date.parse(item.updated_at)));
+    const validEntitlements = entitlementsPayload.entitlements.every(item => item &&
+      ['id', 'game_id', 'game_name', 'platform', 'status', 'source', 'valid_until'].every(key => typeof item[key as keyof Entitlement] === 'string') &&
+      Number.isFinite(Date.parse(item.valid_until)));
+    if (!validPlans || !validSubscriptions || !validEntitlements) {
+      return { view: 'ERROR', message: 'Account data could not be verified. Please retry.' };
+    }
+
+    return {
+      view: 'READY',
+      plans: plansPayload?.plans ?? [],
+      subscriptions: subscriptionsPayload?.subscriptions ?? [],
+      entitlements: entitlementsPayload?.entitlements ?? [],
+    };
+  } catch {
+    return { view: 'ERROR', message: 'Connection interrupted. Check your network and retry.' };
+  }
 }
 
 export function AccountControl() {
@@ -130,6 +153,7 @@ export function AccountControl() {
       setMessage('');
       setMessageTone('status');
       setView('READY');
+      window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: true }));
       return;
     }
     setPlans([]);
@@ -138,6 +162,7 @@ export function AccountControl() {
     setMessage(snapshot.message ?? '');
     setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
     setView(snapshot.view);
+    window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: snapshot.view === 'ERROR' ? null : false }));
   }
 
   async function reloadAccount() {
@@ -155,6 +180,7 @@ export function AccountControl() {
         setMessage('');
         setMessageTone('status');
         setView('READY');
+        window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: true }));
         return;
       }
       setPlans([]);
@@ -163,6 +189,7 @@ export function AccountControl() {
       setMessage(snapshot.message ?? '');
       setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
       setView(snapshot.view);
+      window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: snapshot.view === 'ERROR' ? null : false }));
     });
     return () => { active = false; };
   }, []);
@@ -181,6 +208,7 @@ export function AccountControl() {
     try {
       const response = await fetch(`/api/session/${mode}`, {
         method: 'POST',
+        signal: AbortSignal.timeout(45_000),
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
@@ -202,6 +230,9 @@ export function AccountControl() {
       }
       setPassword('');
       await reloadAccount();
+    } catch {
+      setMessage('Connection interrupted. Check your network and retry.');
+      setMessageTone('error');
     } finally {
       setBusy(false);
     }
@@ -215,6 +246,7 @@ export function AccountControl() {
     try {
       const response = await fetch('/api/session/mfa', {
         method: 'POST',
+        signal: AbortSignal.timeout(45_000),
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: mfaCode.trim() }),
       });
@@ -227,6 +259,9 @@ export function AccountControl() {
       setMfaRequired(false);
       setMfaCode('');
       await reloadAccount();
+    } catch {
+      setMessage('Connection interrupted. Check your network and retry.');
+      setMessageTone('error');
     } finally {
       setBusy(false);
     }
@@ -235,15 +270,24 @@ export function AccountControl() {
   async function logout() {
     setBusy(true);
     try {
-      await fetch('/api/session/logout', { method: 'POST' });
+      const response = await fetch('/api/session/logout', { method: 'POST', signal: AbortSignal.timeout(45_000) });
+      if (!response.ok) {
+        setMessage('Sign out could not be confirmed. Please retry.');
+        setMessageTone('error');
+        return;
+      }
       setPlans([]);
       setSubscriptions([]);
       setEntitlements([]);
       setMfaRequired(false);
       setMfaCode('');
       setView('SIGNED_OUT');
+      window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
       setMessage('Session cleared.');
       setMessageTone('status');
+    } catch {
+      setMessage('Connection interrupted. Check your network and retry.');
+      setMessageTone('error');
     } finally {
       setBusy(false);
     }
@@ -257,6 +301,7 @@ export function AccountControl() {
       if (plan.amount_minor > 0) {
         const response = await fetch('/api/billing/checkout-sessions', {
           method: 'POST',
+          signal: AbortSignal.timeout(45_000),
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ plan_code: plan.code }),
         });
@@ -278,6 +323,7 @@ export function AccountControl() {
 
       const response = await fetch('/api/billing/subscriptions', {
         method: 'POST',
+        signal: AbortSignal.timeout(45_000),
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ plan_code: plan.code }),
       });
@@ -290,6 +336,9 @@ export function AccountControl() {
       await reloadAccount();
       setMessage('Free subscription intent recorded. Server policy remains authoritative.');
       setMessageTone('status');
+    } catch {
+      setMessage('Connection interrupted. Check your network and retry.');
+      setMessageTone('error');
     } finally {
       setBusy(false);
     }
@@ -356,7 +405,7 @@ export function AccountControl() {
       <article className="card account-panel" aria-label="SENTINEL account control unavailable" aria-busy={busy}>
         <div className="panel-heading"><div><div className="label">Account</div><h2>Control data unavailable</h2></div><span className="badge">Fail-closed</span></div>
         <p className="status-message" role="alert" aria-live="assertive">{message || 'Core account data could not be verified.'}</p>
-        <div className="button-row"><button className="ghost-btn" onClick={() => void reloadAccount()} disabled={busy}>Retry</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>Clear session</button></div>
+        <div className="button-row"><button className="ghost-btn" onClick={async () => { setBusy(true); await reloadAccount(); setBusy(false); }} disabled={busy}>Retry</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>Clear session</button></div>
       </article>
     );
   }

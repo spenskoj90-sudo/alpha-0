@@ -76,12 +76,19 @@ class ResendConfig:
     api_key: str = field(repr=False)
     from_address: str
     endpoint: str = "https://api.resend.com/emails"
+    allowed_recipients: tuple[str, ...] = field(default=(), repr=False)
 
     def __post_init__(self) -> None:
         if not self.api_key.startswith("re_") or len(self.api_key) < 12:
             raise ValueError("RESEND_API_KEY_INVALID")
         if not _EMAIL.fullmatch(self.from_address):
             raise ValueError("RESEND_FROM_ADDRESS_INVALID")
+        if len(self.allowed_recipients) > 32 or any(
+            not _EMAIL.fullmatch(recipient) for recipient in self.allowed_recipients
+        ):
+            raise ValueError("RESEND_ALLOWED_RECIPIENTS_INVALID")
+        if self.from_address.rsplit("@", 1)[1].lower() == "resend.dev" and not self.allowed_recipients:
+            raise ValueError("RESEND_SANDBOX_RECIPIENTS_REQUIRED")
         parts = urlsplit(self.endpoint)
         if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
             raise ValueError("RESEND_ENDPOINT_INVALID")
@@ -183,6 +190,10 @@ class ResendEmailTransport:
         self._timeout_seconds = timeout_seconds
 
     def send(self, message: EmailMessage) -> str:
+        if self._config.allowed_recipients and message.to_address.lower() not in {
+            recipient.lower() for recipient in self._config.allowed_recipients
+        }:
+            raise EmailProviderUnavailable("RESEND_RECIPIENT_NOT_ALLOWED")
         payload = json.dumps(
             {
                 "from": self._config.from_address,
@@ -244,7 +255,11 @@ def configured_email_transport() -> EmailTransport:
             from_address = os.getenv("SENTINEL_RESEND_FROM_ADDRESS", "")
             if not api_key or not from_address:
                 raise RuntimeError("RESEND_NOT_CONFIGURED")
-            return ResendEmailTransport(ResendConfig(api_key=api_key, from_address=from_address))
+            raw_recipients = os.getenv("SENTINEL_RESEND_ALLOWED_RECIPIENTS", "")
+            allowed_recipients = tuple(recipient.strip() for recipient in raw_recipients.split(",")) if raw_recipients.strip() else ()
+            return ResendEmailTransport(ResendConfig(
+                api_key=api_key, from_address=from_address, allowed_recipients=allowed_recipients,
+            ))
 
         api_key = os.getenv("SENTINEL_BREVO_API_KEY", "")
         from_address = os.getenv("SENTINEL_BREVO_FROM_ADDRESS", "")

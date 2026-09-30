@@ -136,6 +136,21 @@ Recipient, subject and plain-text body are validated and bounded. Provider crede
 
 Account registration/email-verification and password-recovery flows use this shared boundary. Requests remain non-enumerating, raw one-time credentials are never persisted, and provider delivery failure does not roll back account creation or reveal whether an email is registered. Real external delivery still requires one staging provider to be configured and exercised; production email-provider activation remains an external Owner gate.
 
+### Free Resend staging and later owned-domain transition
+
+The pre-release path uses the provider's `onboarding@resend.dev` sender and a delivery-only key named `sentinel-staging-sandbox`. This is a provider test identity, not an owned SENTINEL domain. Its token belongs only in the staging Core's native secret environment as `SENTINEL_RESEND_API_KEY`; it must never appear in Git, chat, Drive or client artifacts.
+
+For any `resend.dev` sender, `SENTINEL_RESEND_ALLOWED_RECIPIENTS` must contain an explicit comma-separated list of at most 32 valid addresses. An absent/empty list fails startup. The transport rejects recipients outside that exact list before any provider request; it never redirects someone else's verification/reset token to a test mailbox. The list also works with an owned sender when a restricted staging rollout is desired. An invalid or partially empty list fails closed.
+
+The free sandbox initially allows only a documented Resend simulator address. Simulator delivery proves network integration, not mailbox ownership or Owner acceptance. Sending to a real mailbox with `resend.dev` requires that mailbox to be the Resend account's own email address and to be explicitly included in the staging allowlist. Other real recipients require an owned, DNS-verified sending domain. Public auth requests preserve their existing non-enumerating behavior; authenticated verification requests still report provider unavailability when blocked.
+
+Buying a domain is deferred until release preparation. Then verify a dedicated sending subdomain (recommended `mail.<owned-domain>`) using Resend's required DNS records and DMARC policy. Create a separate delivery-only key restricted to that verified domain, replace the staging secret and `SENTINEL_RESEND_FROM_ADDRESS` (recommended `accounts@mail.<owned-domain>`), and retain or clear the recipient allowlist according to the staging acceptance scope. The same transport, templates, account tokens and API routes are used; no code or database migration is required for this staging sender transition. Verify real mailbox verification/recovery on the exact candidate before promotion. Production activation remains separately Owner-gated under the staging-only contract; never relax that gate just to change the sender.
+
+Official provider contracts:
+- https://resend.com/docs/knowledge-base/403-error-resend-dev-domain
+- https://resend.com/docs/dashboard/emails/send-test-emails
+- https://resend.com/docs/dashboard/api-keys/introduction
+
 ## 5. Federated authentication boundary
 
 Google, Telegram and VK authentication are disabled by default and become visible to Android only when Core reports a complete provider configuration.

@@ -13,8 +13,8 @@ The Human Owner has chosen to defer paid infrastructure until the product is clo
 | Core API | Render Free + Android readiness preflight + replay-safe alternate ingress reads | **KEEP** | move to always-on compute or another production host after release acceptance |
 | Web Control Plane | Render Free | **KEEP** | choose production CDN/server runtime after final Web acceptance |
 | Independent edge ingress | Cloudflare Workers Free is suitable for a lightweight relay/health edge, not the Python Core | **PREPARE, DO NOT REQUIRE** | production DNS/WAF/edge provider selected at release stage |
-| PostgreSQL | existing external PostgreSQL boundary; Supabase Free is an optional test/recovery target | **DO NOT MIGRATE WITHOUT NEED** | managed production PostgreSQL with backups/availability evidence |
-| Email | Resend Free primary; Brevo Free HTTPS fallback | **USE FIRST VERIFIED PROVIDER** | stay on free tier while limits/reliability fit, otherwise upgrade or switch adapter |
+| PostgreSQL | existing Neon managed PostgreSQL; optional isolated recovery targets | **KEEP NEON; DO NOT MIGRATE WITHOUT NEED** | managed production PostgreSQL with backups/availability evidence |
+| Email | Resend Free with a bounded test sender/recipient allowlist; Brevo Free HTTPS fallback | **USE FREE SANDBOX NOW** | owned sending domain before release; replace sender/key through configuration |
 | Error monitoring | Sentry Developer/Free where a DSN is configured | **OPTIONAL TEST OBSERVABILITY** | production plan selected from measured event volume |
 | Billing | Stripe test/sandbox mode | **USE FOR ACCEPTANCE WITHOUT LIVE MONEY** | live mode only after Owner authorization |
 | Federated auth | provider development/test apps | **USE FREE PROVIDER SANDBOX/DEV CONFIG** | production registrations/redirects at release stage |
@@ -50,6 +50,8 @@ Official references:
 
 Do not move the authoritative database merely because a second provider is free.
 
+Neon is the managed PostgreSQL authority for SENTINEL staging. Its database identity, live migration checksums and runtime connectivity must be verified independently of CI's disposable PostgreSQL integration database. An alternative free service is only an isolated recovery target, not an authority migration.
+
 Supabase Free currently includes two free projects, 500 MB database size per project, 5 GB egress, 50,000 MAU and 500,000 Edge Function invocations; inactive free projects may pause after one week. This is adequate for:
 
 - migration dry-runs;
@@ -65,11 +67,11 @@ Official references:
 
 ## Email testing
 
-Resend Free currently includes 3,000 transactional emails/month and 100/day. It remains the preferred staging path because a Resend connector is already available, but the connected SENTINEL account currently has no verified domain and no API key.
+Resend Free currently includes 3,000 transactional emails/month and 100/day. The Owner has chosen free testing now and an owned domain before release. Use `onboarding@resend.dev` with a sending-only staging key and an explicit `SENTINEL_RESEND_ALLOWED_RECIPIENTS` list. This sender supports documented provider simulators and the provider account's own mailbox; it does not support arbitrary real recipients without an owned, verified domain. Secret custody and current runtime proof belong in provider-native configuration and exact-candidate evidence, not this strategy document.
 
 Brevo Free is now a repository-supported HTTPS fallback. Its current Free plan includes 300 email sends/day and supports transactional email. SENTINEL uses Brevo's `POST https://api.brevo.com/v3/smtp/email` HTTP API rather than SMTP because Render Free blocks outbound SMTP ports 25, 465 and 587. The Brevo adapter pins the official HTTPS endpoint, bounds responses and remains staging-only/fail-closed.
 
-Exactly one external email provider may be enabled at a time. A real mailbox delivery test still requires Owner-managed provider credentials plus a verified sender/domain as required by the selected provider. This is an external credential/DNS action, not a paid-plan blocker.
+Exactly one external email provider may be enabled at a time. A real mailbox delivery test still requires provider-accepted sender/recipient identities. For later owned-domain staging acceptance, verify `mail.<owned-domain>` and replace the sender/API key through environment configuration; the shared transport and auth flows do not change. See `PROVIDER_SANDBOX_INTEGRATION_V1.md` for limits, migration and the separate production activation gate.
 
 Resend test addresses such as `delivered@resend.dev`, `bounced@resend.dev` and `complained@resend.dev` may be used for provider integration tests without affecting domain reputation. Brevo also provides an API sandbox mode that validates requests without sending. Neither substitutes for real mailbox verification acceptance.
 

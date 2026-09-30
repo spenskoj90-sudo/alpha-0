@@ -9,6 +9,7 @@ from app.core.email_provider import (
     EmailMessage,
     EmailProviderUnavailable,
     ResendConfig,
+    ResendEmailTransport,
     TestEmailTransport as InMemoryEmailTransport,
     configured_email_transport,
 )
@@ -109,3 +110,62 @@ def test_brevo_complete_staging_configuration_is_selected(monkeypatch) -> None:
     monkeypatch.setenv("SENTINEL_BREVO_API_KEY", "xkeysib-test-secret-key-123456")
     monkeypatch.setenv("SENTINEL_BREVO_FROM_ADDRESS", "sentinel@example.com")
     assert isinstance(configured_email_transport(), BrevoEmailTransport)
+
+
+def test_resend_test_sender_requires_explicit_recipient_allowlist() -> None:
+    with pytest.raises(ValueError, match="RESEND_SANDBOX_RECIPIENTS_REQUIRED"):
+        ResendConfig(api_key="re_test_secret_key_123", from_address="onboarding@resend.dev")
+
+
+@pytest.mark.parametrize("recipients", [("",), ("invalid",), ("ok@example.com\n",), ("ok@example.com",) * 33])
+def test_resend_recipient_allowlist_rejects_invalid_or_unbounded_configuration(recipients) -> None:
+    with pytest.raises(ValueError, match="RESEND_ALLOWED_RECIPIENTS_INVALID"):
+        ResendConfig(api_key="re_test_secret_key_123", from_address="sentinel@example.com", allowed_recipients=recipients)
+
+
+def test_resend_blocked_recipient_never_reaches_provider(monkeypatch) -> None:
+    def unexpected_network(*args, **kwargs):
+        pytest.fail("blocked recipient reached the email provider")
+
+    monkeypatch.setattr("app.core.email_provider.urlopen", unexpected_network)
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "false")
+    monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_RESEND_API_KEY", "re_test_secret_key_123")
+    monkeypatch.setenv("SENTINEL_RESEND_FROM_ADDRESS", "onboarding@resend.dev")
+    monkeypatch.setenv("SENTINEL_RESEND_ALLOWED_RECIPIENTS", "delivered@resend.dev")
+    with pytest.raises(EmailProviderUnavailable, match="RESEND_RECIPIENT_NOT_ALLOWED"):
+        configured_email_transport().send(EmailMessage("someone@example.com", "Subject", "Body"))
+
+
+def test_resend_domain_transition_uses_same_transport_and_only_configuration(monkeypatch) -> None:
+    import json
+    from io import BytesIO
+
+    payloads = []
+
+    def provider_response(request, *, timeout):
+        assert request.full_url == "https://api.resend.com/emails"
+        payloads.append(json.loads(request.data))
+        return BytesIO(b'{"id":"email-test-123"}')
+
+    monkeypatch.setattr("app.core.email_provider.urlopen", provider_response)
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_BREVO_ENABLED", "false")
+    monkeypatch.setenv("SENTINEL_RESEND_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_RESEND_API_KEY", "re_test_secret_key_123")
+    monkeypatch.setenv("SENTINEL_RESEND_FROM_ADDRESS", "onboarding@resend.dev")
+    monkeypatch.setenv("SENTINEL_RESEND_ALLOWED_RECIPIENTS", " delivered@resend.dev ")
+    sandbox = configured_email_transport()
+    assert isinstance(sandbox, ResendEmailTransport)
+    assert sandbox.send(EmailMessage("delivered@resend.dev", "Subject", "Body")) == "email-test-123"
+
+    monkeypatch.setenv("SENTINEL_RESEND_FROM_ADDRESS", "accounts@mail.example.com")
+    monkeypatch.setenv("SENTINEL_RESEND_ALLOWED_RECIPIENTS", "")
+    owned_domain = configured_email_transport()
+    assert isinstance(owned_domain, ResendEmailTransport)
+    assert owned_domain.send(EmailMessage("someone@example.com", "Subject", "Body")) == "email-test-123"
+    assert payloads == [
+        {"from": "onboarding@resend.dev", "to": ["delivered@resend.dev"], "subject": "Subject", "text": "Body"},
+        {"from": "accounts@mail.example.com", "to": ["someone@example.com"], "subject": "Subject", "text": "Body"},
+    ]

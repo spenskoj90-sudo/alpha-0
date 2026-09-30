@@ -7,8 +7,10 @@ from urllib.parse import urlsplit
 class ExportHandler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         resolved = super().translate_path(path)
-        if not Path(resolved).exists() and not Path(urlsplit(path).path).suffix:
-            resolved = resolved.rstrip("/") + ".html"
+        clean_url = resolved.rstrip("/") + ".html"
+        # Next also exports RSC directories alongside each HTML page.
+        if not Path(urlsplit(path).path).suffix and Path(clean_url).is_file():
+            resolved = clean_url
         return resolved
 
 

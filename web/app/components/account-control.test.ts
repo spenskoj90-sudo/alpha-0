@@ -30,6 +30,13 @@ describe('account loading failure recovery', () => {
     });
   });
 
+  it('rejects corrupt collection entries before rendering plan and subscription fields', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
+      plans: [null], subscriptions: [null], entitlements: [null],
+    })));
+    await expect(fetchAccountSnapshot()).resolves.toMatchObject({ view: 'ERROR' });
+  });
+
   it('keeps an unauthenticated response distinct from network failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }));
     await expect(fetchAccountSnapshot()).resolves.toEqual({ view: 'SIGNED_OUT' });

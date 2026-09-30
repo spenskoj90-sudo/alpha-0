@@ -104,6 +104,21 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
     if (!Array.isArray(plansPayload?.plans) || !Array.isArray(subscriptionsPayload?.subscriptions) || !Array.isArray(entitlementsPayload?.entitlements)) {
       return { view: 'ERROR', message: 'Account data could not be verified. Please retry.' };
     }
+    const validPlans = plansPayload.plans.every(plan => plan &&
+      typeof plan.code === 'string' && typeof plan.name === 'string' && /^[A-Z]{3}$/.test(plan.currency) &&
+      Number.isSafeInteger(plan.amount_minor) && plan.amount_minor >= 0 &&
+      Number.isSafeInteger(plan.interval_days) && plan.interval_days > 0 &&
+      Array.isArray(plan.entitlement_codes) && plan.entitlement_codes.every(code => typeof code === 'string'));
+    const validSubscriptions = subscriptionsPayload.subscriptions.every(item => item &&
+      typeof item.id === 'string' && typeof item.plan_code === 'string' && typeof item.provider === 'string' &&
+      ['PENDING', 'ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED'].includes(item.status) &&
+      typeof item.updated_at === 'string' && Number.isFinite(Date.parse(item.updated_at)));
+    const validEntitlements = entitlementsPayload.entitlements.every(item => item &&
+      ['id', 'game_id', 'game_name', 'platform', 'status', 'source', 'valid_until'].every(key => typeof item[key as keyof Entitlement] === 'string') &&
+      Number.isFinite(Date.parse(item.valid_until)));
+    if (!validPlans || !validSubscriptions || !validEntitlements) {
+      return { view: 'ERROR', message: 'Account data could not be verified. Please retry.' };
+    }
 
     return {
       view: 'READY',

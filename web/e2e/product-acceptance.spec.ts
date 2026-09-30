@@ -66,7 +66,7 @@ test('simulated offline account recovery and malformed successful data', async (
   await page.route('**/api/account/entitlements', route => route.fulfill({ status: 200, json: {} }));
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Control data unavailable' })).toBeVisible();
-  await expect(page.getByRole('alert')).toContainText('Account data could not be verified');
+  await expect(page.locator('#account [role="alert"]')).toContainText('Account data could not be verified');
 });
 
 test('real registration, invalid login, persistent HttpOnly session, product data and logout', async ({ page, context }, info) => {
@@ -78,7 +78,7 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('INVALID_CREDENTIALS');
+  await expect(page.locator('#account [role="alert"]')).toContainText('INVALID_CREDENTIALS');
   await page.getByRole('button', { name: 'Need an account? Register' }).click();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
@@ -93,9 +93,15 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.reload();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
   await expect(page.locator('#games')).toContainText('Diablo IV');
+  await page.route('**/api/intelligence/recommendations', route => route.fulfill({ status: 200, json: {
+    recommendations: [{ kind: 'fact', text: 'Disposable account observation', confidence: 1, provenance: ['browser-test-fixture'], provider_id: null, model_id: null }],
+  } }));
+  await page.getByRole('button', { name: 'Load live', exact: true }).click();
+  await expect(page.getByText('Disposable account observation', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.locator('#security')).toContainText('Sign in to view');
+  await expect(page.getByText('Disposable account observation', { exact: true })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 });
@@ -137,7 +143,7 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   await expect(page.getByLabel('Authenticator or recovery code')).toBeVisible();
   await page.getByLabel('Authenticator or recovery code').fill('invalid-recovery-code');
   await page.getByRole('button', { name: 'Verify MFA' }).click();
-  await expect(page.getByRole('alert')).toContainText('MFA_CODE_INVALID');
+  await expect(page.locator('#account [role="alert"]')).toContainText('MFA_CODE_INVALID');
   await page.getByLabel('Authenticator or recovery code').fill(recoveryCode);
   await page.getByRole('button', { name: 'Verify MFA' }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();

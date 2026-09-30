@@ -350,7 +350,14 @@ export function AccountControl() {
 
   if (view === 'SIGNED_OUT') {
     return (
-      <article className="card account-panel" aria-label="SENTINEL account sign in" aria-busy={busy}>
+      <article className="card account-panel auth-panel" aria-label="SENTINEL account sign in" aria-busy={busy}>
+        <div className="auth-intro">
+          <div className="eyebrow">YOUR SENTINEL ACCOUNT</div>
+          <h3>One secure place.<br />A clearer view.</h3>
+          <p className="muted">Review your security, connected devices and intelligence with access you control.</p>
+          <p className="auth-assurance">Your session stays private. You decide what connects.</p>
+        </div>
+        <div className="auth-form">
         <div className="panel-heading">
           <div><div className="label">Account</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
           <span className="badge">Secure Web session</span>
@@ -395,7 +402,8 @@ export function AccountControl() {
           </>
         )}
         {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
-        <p className="boundary-copy">Credentials are sent only to the same-origin Web control plane. Core access and refresh tokens are never exposed to client-side JavaScript.</p>
+        <p className="boundary-copy">Your session is protected by secure cookies. Access tokens stay on the server.</p>
+        </div>
       </article>
     );
   }

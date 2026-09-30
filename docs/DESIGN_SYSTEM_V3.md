@@ -67,3 +67,14 @@ Voice remains explicit-consent push-to-talk. UI text states that the microphone 
 Visible focus, screen-reader/TalkBack semantics, forced colors, reduced motion, scalable text, non-color state communication and predictable focus order are mandatory.
 
 `design/sentinel-design-system.v3.json` is the machine contract. `scripts/test_design_system.py` enforces drift across Compose, Web, Companion and Overlay. Values are calibrated per native platform rather than mechanically copied from the design prototype.
+
+## Production refinement · 2026-09-30
+
+Owner has assigned GPT responsibility for the production design direction within Calm Precision / Trusted Intelligence. This native pass corrects drift rather than importing unfinished prototype code:
+
+- Web access uses a bounded form beside a calm account introduction on wide screens, with one column on mobile; authentication, MFA and secure cookie boundaries remain intact.
+- Product navigation uses one rounded 24px stroke family, removes duplicate links to the account destination and follows the actual hash through browser history.
+- Web, Public Site and packaged Companion reduced assets now match the approved studio geometry in `design/brand/`; the older uneven S/signal geometry is removed from those production copies.
+- Product surfaces use consistent two-column grids on desktop and one column on mobile; keyboard focus, forced colors, reduced motion and theme contrast remain required.
+
+The imported reference package remains pinned to `a281479677d84de21a24db62b0b13af7ae11c623`. The unfinished laboratory iteration `56e6c9afdff501cc3451352c2b2dcd286b0ecdd1` is not accepted or imported by this refinement. No cross-platform visual parity or Owner optical acceptance is inferred from these changes.

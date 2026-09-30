@@ -57,6 +57,19 @@ export function ProductOverview() {
           <div><dt>Linked providers</dt><dd>{data.security.providers.join(', ') || 'None linked'}</dd></div>
         </dl>}
       </article>
+      <article className="card surface-card" id="devices">
+        <h2>Devices</h2>
+        {status ? <p>{status}</p> : data.state === 'READY' && <>
+          {data.devices.length ? <ul className="product-list">{data.devices.map(device => <li key={device.device_id}>
+            <div className="row-between"><strong>{device.platform}</strong><span className="state">{device.state === 'ACTIVE' ? 'Registered' : device.state === 'SUSPENDED' ? 'Suspended' : 'Revoked'}</span></div>
+            <span className="microcopy">Device ID: {device.device_id}</span>
+            <span className="muted">Registered {new Date(device.bound_at).toLocaleString()}</span>
+            <span className="microcopy">{device.last_seen_at ? `Last seen ${new Date(device.last_seen_at).toLocaleString()}` : 'No activity recorded yet'}</span>
+          </li>)}</ul> : <p>No devices are registered. Sign in on Android and complete device setup to register your device.</p>}
+          {data.devicesTruncated && <p role="status">Showing the 100 most recent registrations.</p>}
+          <p className="microcopy">Registration status does not establish that a device is currently online.</p>
+        </>}
+      </article>
       <article className="card surface-card" id="activity">
         <h2>Activity</h2>
         {status ? <p>{status}</p> : data.state === 'READY' && (

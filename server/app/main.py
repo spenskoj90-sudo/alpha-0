@@ -983,6 +983,13 @@ def recover_device_rotation(
     return DeviceRegisterResponse(device_id=device["device_id"], state="ACTIVE", challenge=challenge)
 
 
+@app.get("/v1/devices")
+def list_owned_devices(authorization_header: str = Header(..., alias="Authorization")):
+    principal = principal_from_token(require_bearer(authorization_header))
+    devices = store.list_devices(principal.user_id)
+    return {"devices": devices[:100], "truncated": len(devices) > 100}
+
+
 @app.get("/v1/devices/{device_id}")
 def get_device(device_id: str, authorization_header: str = Header(..., alias="Authorization")):
     principal = principal_from_token(require_bearer(authorization_header))

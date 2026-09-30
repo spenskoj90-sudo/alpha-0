@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { GET as devices } from './devices/route';
 import { GET as games } from './games/route';
 import { GET as activity } from './activity/route';
 import { GET as security } from './account/security/route';
@@ -7,6 +8,7 @@ import { GET as security } from './account/security/route';
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe.each([
+  ['devices', devices, '/v1/devices'],
   ['games', games, '/v1/games'],
   ['activity', activity, '/v1/audit'],
   ['security', security, '/v1/account/security'],

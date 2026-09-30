@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { coreSetupPost } from './core-setup';
+import { coreSetupPost, redactSensitiveOperation } from './core-setup';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -17,4 +17,12 @@ it('returns only setup status and parsed data on success', async () => {
   const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"secret":"dummy"}'));
   await expect(coreSetupPost('http://127.0.0.1:1', { code: '000000' }, 'dummy')).resolves.toEqual({ status: 200, data: { secret: 'dummy' } });
   expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:1', expect.objectContaining({ method: 'POST', body: '{"code":"000000"}' }));
+});
+
+it('redacts failed fill call logs containing a password or recovery code', async () => {
+  await expect(redactSensitiveOperation(async () => { throw new Error('fill("dummy-password-recovery-code") timed out'); })).rejects.toThrow(/^Sensitive browser operation failed; credential details redacted\.$/);
+});
+
+it('preserves successful sensitive browser operations', async () => {
+  await expect(redactSensitiveOperation(async () => 'completed')).resolves.toBe('completed');
 });

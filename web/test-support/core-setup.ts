@@ -15,3 +15,11 @@ export async function coreSetupPost(url: string, data: object = {}, token?: stri
     throw new Error('Core test setup failed; sensitive request details redacted.');
   }
 }
+
+export async function redactSensitiveOperation<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch {
+    throw new Error('Sensitive browser operation failed; credential details redacted.');
+  }
+}

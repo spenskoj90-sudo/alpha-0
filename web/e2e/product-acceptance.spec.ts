@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { coreSetupPost } from '../test-support/core-setup';
+import { coreSetupPost, redactSensitiveOperation } from '../test-support/core-setup';
 import { randomUUID, generateKeyPairSync, createHash } from 'node:crypto';
 
 const staging = process.env.SENTINEL_BROWSER_TARGET === 'staging';
@@ -76,8 +76,8 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   const password = `Browser-${randomUUID()}-A1!`;
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(password);
+  await redactSensitiveOperation(() => page.getByLabel('Email', { exact: true }).fill(email));
+  await redactSensitiveOperation(() => page.getByLabel('Password', { exact: true }).fill(password));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.locator('#account [role="alert"]')).toContainText('INVALID_CREDENTIALS');
   await page.getByRole('button', { name: 'Need an account? Register' }).click();
@@ -152,14 +152,14 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   const recoveryCode = confirmed.data.recovery_codes![0];
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
-  await page.getByLabel('Email', { exact: true }).fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(password);
+  await redactSensitiveOperation(() => page.getByLabel('Email', { exact: true }).fill(email));
+  await redactSensitiveOperation(() => page.getByLabel('Password', { exact: true }).fill(password));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByLabel('Authenticator or recovery code')).toBeVisible();
-  await page.getByLabel('Authenticator or recovery code').fill('invalid-recovery-code');
+  await redactSensitiveOperation(() => page.getByLabel('Authenticator or recovery code').fill('invalid-recovery-code'));
   await page.getByRole('button', { name: 'Verify MFA' }).click();
   await expect(page.locator('#account [role="alert"]')).toContainText('MFA_INVALID');
-  await page.getByLabel('Authenticator or recovery code').fill(recoveryCode);
+  await redactSensitiveOperation(() => page.getByLabel('Authenticator or recovery code').fill(recoveryCode));
   await page.getByRole('button', { name: 'Verify MFA' }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
   await expect(page.locator('#security')).toContainText('Enabled');

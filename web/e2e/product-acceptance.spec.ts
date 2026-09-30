@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { coreSetupPost } from '../test-support/core-setup';
 import { randomUUID, generateKeyPairSync, createHash } from 'node:crypto';
 
 const staging = process.env.SENTINEL_BROWSER_TARGET === 'staging';
@@ -93,6 +94,18 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.reload();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
   await expect(page.locator('#games')).toContainText('Diablo IV');
+  // A still-valid HttpOnly session must not become a signed-out claim on outage.
+  await page.route('**/api/billing/plans', route => route.fulfill({ status: 503, json: {} }));
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Control data unavailable' })).toBeVisible();
+  await expect(page.locator('#security')).toContainText('Account data is unavailable');
+  await expect(page.getByRole('article', { name: 'SENTINEL recommendation' })).toContainText('Account data is unavailable');
+  await expect(page.locator('#security')).not.toContainText('Sign in to view');
+  expect((await context.cookies()).filter(cookie => cookie.name.startsWith('sentinel_')).length).toBeGreaterThanOrEqual(2);
+  await page.unroute('**/api/billing/plans');
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
+  await expect(page.locator('#games')).toContainText('Diablo IV');
   await page.route('**/api/intelligence/recommendations', route => route.fulfill({ status: 200, json: {
     recommendations: [{ kind: 'fact', text: 'Disposable account observation', confidence: 1, provenance: ['browser-test-fixture'], provider_id: null, model_id: null }],
   } }));
@@ -106,24 +119,25 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 });
 
-test('MFA challenge, invalid code and recovery completion through Web', async ({ page, request }, info) => {
+test('MFA challenge, invalid code and recovery completion through Web', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop-dark', 'One disposable MFA account per run.');
   const core = staging ? 'https://sentinel-core-staging.onrender.com' : 'http://127.0.0.1:8000';
   const email = `browser-mfa-${randomUUID()}@example.invalid`;
   const password = `Browser-${randomUUID()}-A1!`;
-  const registered = await request.post(`${core}/v1/auth/register`, { data: { email, password } });
-  expect(registered.status()).toBe(200);
-  const token = (await registered.json()).session_token;
-  const headers = { Authorization: `Bearer ${token}` };
+  const registered = await coreSetupPost(`${core}/v1/auth/register`, { email, password });
+  expect(registered.status).toBe(200);
+  const token = registered.data.session_token;
+  expect(typeof token).toBe('string');
   const { publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const der = publicKey.export({ type: 'spki', format: 'der' });
-  const bound = await request.post(`${core}/v1/devices/bind`, { headers, data: {
+  const bound = await coreSetupPost(`${core}/v1/devices/bind`, {
     platform: 'android', public_key_der_b64: der.toString('base64'), fingerprint_sha256: createHash('sha256').update(der).digest('hex'),
-  } });
-  expect(bound.status()).toBe(200);
-  const enrolled = await request.post(`${core}/v1/account/mfa/totp/enroll`, { headers });
-  expect(enrolled.status()).toBe(200);
-  const secret: string = (await enrolled.json()).secret;
+  }, token);
+  expect(bound.status).toBe(200);
+  const enrolled = await coreSetupPost(`${core}/v1/account/mfa/totp/enroll`, {}, token);
+  expect(enrolled.status).toBe(200);
+  expect(typeof enrolled.data.secret).toBe('string');
+  const secret = enrolled.data.secret!;
   const { createHmac } = await import('node:crypto');
   let bits = '', key = '';
   for (const char of secret) bits += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(char).toString(2).padStart(5, '0');
@@ -132,9 +146,10 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   const hash = createHmac('sha1', Buffer.from(key, 'latin1')).update(counter).digest();
   const offset = hash[19] & 15;
   const code = ((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).toString().padStart(6, '0');
-  const confirmed = await request.post(`${core}/v1/account/mfa/totp/confirm`, { headers, data: { code } });
-  expect(confirmed.status()).toBe(200);
-  const recoveryCode = (await confirmed.json()).recovery_codes[0];
+  const confirmed = await coreSetupPost(`${core}/v1/account/mfa/totp/confirm`, { code }, token);
+  expect(confirmed.status).toBe(200);
+  expect(Array.isArray(confirmed.data.recovery_codes)).toBe(true);
+  const recoveryCode = confirmed.data.recovery_codes![0];
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
   await page.getByLabel('Email', { exact: true }).fill(email);

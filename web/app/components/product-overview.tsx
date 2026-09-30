@@ -13,8 +13,9 @@ export function ProductOverview() {
     let active = true;
     const update = async (event: Event) => {
       const revision = ++generation.current;
-      if (!(event as CustomEvent<boolean>).detail) {
-        setData({ state: 'SIGNED_OUT' });
+      const session = (event as CustomEvent<boolean | null>).detail;
+      if (session !== true) {
+        setData(session === false ? { state: 'SIGNED_OUT' } : { state: 'ERROR', message: 'Account data is unavailable. Check your connection and retry.' });
         setBusy(false);
         return;
       }

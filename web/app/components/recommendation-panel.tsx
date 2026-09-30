@@ -41,9 +41,9 @@ export function RecommendationPanel() {
     const reset = (event: Event) => {
       revisions.current++;
       setRecommendation(null);
-      const signedIn = (event as CustomEvent<boolean>).detail;
-      setView(signedIn ? 'IDLE' : 'SIGNED_OUT');
-      setMessage(signedIn ? '' : 'Sign in to request a live Core recommendation.');
+      const session = (event as CustomEvent<boolean | null>).detail;
+      setView(session === true ? 'IDLE' : session === false ? 'SIGNED_OUT' : 'ERROR');
+      setMessage(session === true ? '' : session === false ? 'Sign in to request a live Core recommendation.' : 'Account data is unavailable. Check your connection and retry.');
     };
     window.addEventListener('sentinel-session-changed', reset);
     return () => { revisions.current++; window.removeEventListener('sentinel-session-changed', reset); };

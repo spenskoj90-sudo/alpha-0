@@ -162,7 +162,7 @@ export function AccountControl() {
     setMessage(snapshot.message ?? '');
     setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
     setView(snapshot.view);
-    window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+    window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: snapshot.view === 'ERROR' ? null : false }));
   }
 
   async function reloadAccount() {
@@ -189,7 +189,7 @@ export function AccountControl() {
       setMessage(snapshot.message ?? '');
       setMessageTone(snapshot.view === 'ERROR' ? 'error' : 'status');
       setView(snapshot.view);
-      window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+      window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: snapshot.view === 'ERROR' ? null : false }));
     });
     return () => { active = false; };
   }, []);

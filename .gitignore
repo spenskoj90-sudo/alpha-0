@@ -47,3 +47,6 @@ Thumbs.db
 # Generated reports
 reports/
 coverage/
+web/test-results/
+web/playwright-report/
+web/tsconfig.tsbuildinfo

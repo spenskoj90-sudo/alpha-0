@@ -12,6 +12,8 @@ from scripts.staging_surface_smoke import (
     SmokeFailure,
     validate_bridge_health,
     validate_core_health,
+    validate_web_health,
+    validate_site_sha,
     validate_login_probe,
     validate_robots,
 )
@@ -25,10 +27,22 @@ class StagingSurfaceSmokeTests(unittest.TestCase):
             validate_bridge_health(result, "b" * 40)
 
     def test_core_requires_up_and_exact_version(self) -> None:
-        result = HttpResult(200, {}, b'{"status":"UP","version":"1.0.0-rc2"}')
-        self.assertEqual(validate_core_health(result, "1.0.0-rc2")["status"], "UP")
+        result = HttpResult(200, {}, json.dumps({"status": "UP", "version": "1.0.0-rc2", "source_sha": "a" * 40}).encode())
+        self.assertEqual(validate_core_health(result, "1.0.0-rc2", "a" * 40)["status"], "UP")
         with self.assertRaisesRegex(SmokeFailure, "CORE_VERSION_MISMATCH"):
-            validate_core_health(result, "1.0.0")
+            validate_core_health(result, "1.0.0", "a" * 40)
+        with self.assertRaisesRegex(SmokeFailure, "CORE_SHA_MISMATCH"):
+            validate_core_health(result, "1.0.0-rc2", "b" * 40)
+
+    def test_web_and_site_reject_stale_builds(self) -> None:
+        web = HttpResult(200, {}, json.dumps({"service": "sentinel-web", "sourceSha": "a" * 40}).encode())
+        self.assertEqual(validate_web_health(web, "a" * 40)["sourceSha"], "a" * 40)
+        with self.assertRaisesRegex(SmokeFailure, "WEB_SHA_MISMATCH"):
+            validate_web_health(web, "b" * 40)
+        site = HttpResult(200, {}, ('<html>SENTINEL<meta name="sentinel-source-sha" content="' + "a" * 40 + '"/></html>').encode())
+        self.assertEqual(validate_site_sha(site, "a" * 40)["sourceSha"], "a" * 40)
+        with self.assertRaisesRegex(SmokeFailure, "PUBLIC_SITE_SHA_MISMATCH"):
+            validate_site_sha(site, "b" * 40)
 
     def test_login_probe_distinguishes_core_denial_from_proxy_failure(self) -> None:
         good = HttpResult(

@@ -2,11 +2,9 @@ import { AccountControl } from './components/account-control';
 import { AppearanceToggle } from './components/appearance-toggle';
 import { BrandMark } from './components/brand-mark';
 import { RecommendationPanel } from './components/recommendation-panel';
+import { ProductOverview } from './components/product-overview';
 
 const surfaces = [
-  ['games', 'Games', 'Game catalog and capability state remain server-authoritative.'],
-  ['activity', 'Activity', 'Operational and security activity is shown only when authoritative data is available.'],
-  ['security', 'Security', 'MFA, sessions, provider links and recovery state stay inside the existing account-security boundary.'],
   ['devices', 'Devices', 'Device identity, proof and revocation state are not inferred from local browser state.'],
   ['subscription', 'Subscription', 'Subscription state comes from Core billing lifecycle data.'],
   ['billing', 'Billing', 'Billing mutations remain authenticated and provider-authoritative.'],
@@ -76,6 +74,8 @@ export default function Dashboard() {
               <div className="item"><span className="status-dot status-active" aria-hidden="true">●</span> Intelligence output remains observational</div>
             </article>
           </section>
+
+          <ProductOverview />
 
           <section className="surface-grid" aria-label="Control plane surfaces">
             {surfaces.map(([id, title, description]) => (

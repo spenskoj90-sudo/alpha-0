@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import time
 import uuid
@@ -297,7 +298,9 @@ def healthz() -> dict[str, Any]:
                 conn.exec_driver_sql("SELECT 1")
         except Exception as exc:
             raise HTTPException(status_code=503, detail="DATABASE_UNAVAILABLE") from exc
-    return {"status": "UP", "version": APP_VERSION}
+    source_sha = os.getenv("RENDER_GIT_COMMIT", os.getenv("GITHUB_SHA", ""))
+    return {"status": "UP", "version": APP_VERSION,
+            "source_sha": source_sha if re.fullmatch(r"[0-9a-f]{40}", source_sha) else None}
 
 
 @app.post("/v1/auth/register", response_model=SessionResponse)

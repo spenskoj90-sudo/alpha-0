@@ -2,6 +2,10 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
+  other: {
+    'sentinel-source-sha': /^[0-9a-f]{40}$/.test(process.env.RENDER_GIT_COMMIT ?? process.env.GITHUB_SHA ?? '')
+      ? (process.env.RENDER_GIT_COMMIT ?? process.env.GITHUB_SHA)! : 'unavailable',
+  },
   title: {
     default: "SENTINEL — Trusted Intelligence for Players",
     template: "%s · SENTINEL",

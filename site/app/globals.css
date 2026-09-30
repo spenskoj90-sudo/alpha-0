@@ -8,6 +8,7 @@
   --muted: #a6b7c5;
   --dim: #7f95a4;
   --primary: #2dd4ff;
+  --on-primary: #061018;
   --signal: #00e0c2;
   --success: #22c55e;
   --warning: #f59e0b;
@@ -31,6 +32,7 @@
     --muted: #506875;
     --dim: #667e8b;
     --primary: #006c88;
+    --on-primary: #ffffff;
     --signal: #0b6f67;
     --success: #147251;
     --warning: #8a5a00;
@@ -146,7 +148,7 @@ button, a { min-height: 44px; }
   border-radius: var(--radius-module);
   font-weight: 750;
 }
-.button-primary { background: var(--primary); color: #061018; }
+.button-primary { background: var(--primary); color: var(--on-primary); }
 .button-secondary { border-color: var(--line-strong); background: var(--surface); color: var(--foreground); }
 .button-primary:hover { filter: brightness(1.05); }
 .button-secondary:hover { border-color: var(--primary); }

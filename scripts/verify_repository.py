@@ -212,7 +212,9 @@ def check_web(checks: Checks) -> None:
     checks.require(site_root_lock.get("dependencies") == site_package.get("dependencies"), "public-site locked runtime dependency declarations agree")
     checks.require(site_root_lock.get("devDependencies") == site_package.get("devDependencies"), "public-site locked development dependency declarations agree")
     checks.require(site_package.get("dependencies") == package.get("dependencies"), "public site stays on the validated Web runtime dependency line")
-    checks.require(site_package.get("devDependencies") == package.get("devDependencies"), "public site stays on the validated Web tooling dependency line")
+    shared_tooling = {key: value for key, value in package.get("devDependencies", {}).items() if key != "@playwright/test"}
+    checks.require(site_package.get("devDependencies") == shared_tooling, "public site stays on the validated shared Web tooling dependency line")
+    checks.require(package.get("devDependencies", {}).get("@playwright/test") == "1.63.0", "product browser runner is pinned to Playwright 1.63.0")
     checks.require('output: "export"' in read("site/next.config.mjs"), "public site is a static export with no application server boundary")
     checks.require(not (ROOT / "site" / "app" / "api").exists(), "public site exposes no account/session/billing/admin API routes")
 
@@ -560,7 +562,7 @@ def check_governance(checks: Checks) -> None:
         "staging synthetic evidence path is literal and not caller-controlled",
     )
     checks.require(
-        'Literal["bridge-health", "core-health", "web-root", "web-login", "site-root", "site-robots"]' in staging_smoke
+        'Literal["bridge-health", "core-health", "web-health", "web-root", "web-login", "site-root", "site-robots"]' in staging_smoke
         and "NETWORK_DESTINATION_NOT_ALLOWLISTED" in staging_smoke,
         "staging synthetic network helper accepts only a closed destination allowlist",
     )

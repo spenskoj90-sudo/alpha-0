@@ -20,8 +20,16 @@
     "sourceOfCommitInReleaseCandidate": "GITHUB_SHA after workflow assertion GITHUB_SHA == source_sha"
   },
   "environments": {
-    "allowlist": ["development", "ci", "staging", "release-candidate", "production"],
-    "providerNetworkAllowlist": ["staging"],
+    "allowlist": [
+      "development",
+      "ci",
+      "staging",
+      "release-candidate",
+      "production"
+    ],
+    "providerNetworkAllowlist": [
+      "staging"
+    ],
     "androidReleaseCandidateDefault": "release-candidate",
     "productionRequiresExternalActivation": true
   },
@@ -86,7 +94,12 @@
       "enabledSurface": "android-release-only-when-configured",
       "purpose": "technical crash and runtime error diagnosis",
       "credential": "Owner-managed SENTRY_DSN",
-      "requiredCorrelation": ["release", "environment", "sentinel.component", "sentinel.source_sha"],
+      "requiredCorrelation": [
+        "release",
+        "environment",
+        "sentinel.component",
+        "sentinel.source_sha"
+      ],
       "component": "android"
     },
     "posthog": {
@@ -96,15 +109,27 @@
       "purpose": "optional staging aggregate operational telemetry",
       "credential": "Owner-managed SENTINEL_POSTHOG_PROJECT_KEY",
       "regionSelector": "SENTINEL_POSTHOG_REGION: us|eu",
-      "networkDestinations": ["https://us.i.posthog.com/capture/", "https://eu.i.posthog.com/capture/"],
+      "networkDestinations": [
+        "https://us.i.posthog.com/capture/",
+        "https://eu.i.posthog.com/capture/"
+      ],
       "arbitraryHostConfiguration": false,
-      "requiredCorrelation": ["environment", "release", "source_sha"],
+      "requiredCorrelation": [
+        "environment",
+        "release",
+        "source_sha"
+      ],
       "distinctIdPolicy": "constant sentinel-runtime with $process_person_profile=false",
-      "policy": "A bounded HTTPS delivery adapter exists but remains disabled by default. Code permits activation only when SENTINEL_ENV=staging and exact release/source identity is supplied. Network egress is selected only from literal PostHog US/EU ingestion endpoints. Local/PostgreSQL operational telemetry remains canonical and provider delivery is fail-isolated. Production PostHog activation is not permitted by this contract."
+      "policy": "A bounded HTTPS delivery adapter exists but remains disabled by default. Code permits activation only when SENTINEL_ENV=staging and exact release/source identity is supplied. Actual ASGI startup may emit one core.runtime.started event with static identity only; Companion operational events retain their fixed attribute allowlist. Network egress is selected only from literal PostHog US/EU ingestion endpoints. Local/PostgreSQL operational telemetry remains canonical and provider delivery is fail-isolated. Production PostHog activation is not permitted by this contract.",
+      "runtimeLifecycleEvent": "core.runtime.started"
     },
     "githubActions": {
       "purpose": "build/test/security/release-evidence failures",
-      "correlation": ["exact source SHA", "workflow run ID", "job/check name"],
+      "correlation": [
+        "exact source SHA",
+        "workflow run ID",
+        "job/check name"
+      ],
       "mustNotMirrorIntoSentry": true
     }
   },
@@ -112,13 +137,23 @@
     "runtime.crash.unhandled": {
       "externalProvider": "sentry",
       "severity": "P1",
-      "requiredFields": ["release", "environment", "sourceSha", "component"],
+      "requiredFields": [
+        "release",
+        "environment",
+        "sourceSha",
+        "component"
+      ],
       "payloadPolicy": "technical-stack-only"
     },
     "runtime.error.selected": {
       "externalProvider": "sentry",
       "severity": "P2",
-      "requiredFields": ["release", "environment", "sourceSha", "component"],
+      "requiredFields": [
+        "release",
+        "environment",
+        "sourceSha",
+        "component"
+      ],
       "payloadPolicy": "technical-error-only"
     },
     "runtime.operational": {
@@ -147,10 +182,48 @@
     }
   },
   "privacy": {
-    "sentryKeep": ["exception type", "stack trace", "static release identity", "allowlisted environment", "static component", "exact source SHA"],
-    "sentryDrop": ["user object", "request object", "request headers", "request body", "query string", "cookies", "breadcrumbs", "extras", "screenshots", "view hierarchy"],
-    "forbiddenTelemetryDimensions": ["email", "token", "password", "authorization", "user", "user_id", "session", "session_id", "device_id", "fingerprint", "ip", "realm", "character", "transcript", "audio", "payload"],
-    "credentialValuesNeverPersisted": ["SENTRY_DSN", "PostHog API key"]
+    "sentryKeep": [
+      "exception type",
+      "stack trace",
+      "static release identity",
+      "allowlisted environment",
+      "static component",
+      "exact source SHA"
+    ],
+    "sentryDrop": [
+      "user object",
+      "request object",
+      "request headers",
+      "request body",
+      "query string",
+      "cookies",
+      "breadcrumbs",
+      "extras",
+      "screenshots",
+      "view hierarchy"
+    ],
+    "forbiddenTelemetryDimensions": [
+      "email",
+      "token",
+      "password",
+      "authorization",
+      "user",
+      "user_id",
+      "session",
+      "session_id",
+      "device_id",
+      "fingerprint",
+      "ip",
+      "realm",
+      "character",
+      "transcript",
+      "audio",
+      "payload"
+    ],
+    "credentialValuesNeverPersisted": [
+      "SENTRY_DSN",
+      "PostHog API key"
+    ]
   },
   "retention": {
     "repositoryEvidence": "per repository/workflow retention policy",

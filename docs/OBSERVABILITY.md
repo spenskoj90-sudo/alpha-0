@@ -17,7 +17,7 @@ Four channels remain deliberately separated:
 3. **Core/Companion staging operational fanout → optional PostHog HTTPS adapter** only when explicitly configured with `SENTINEL_ENV=staging`, exact release/source identity and an externally injected project key. Network destination is not a free-form URL: `SENTINEL_POSTHOG_REGION` accepts only `us` or `eu`, which map in code to literal PostHog ingestion endpoints. Provider delivery is fail-isolated and disabled by default.
 4. **Build/test/security/release failures → GitHub Actions exact-SHA evidence.** CI failures are not mirrored into Sentry/PostHog and runtime telemetry cannot substitute for required checks.
 
-The PostHog implementation is intentionally narrower than a general product analytics SDK. It exports only Companion operational events with a constant non-person distinct ID, disables person-profile processing and applies a fixed low-cardinality attribute allowlist. It is not enabled for production by this contract.
+The PostHog implementation is intentionally narrower than a general product analytics SDK. It exports Companion operational events and one actual Core startup event with a constant non-person distinct ID, disables person-profile processing and applies a fixed low-cardinality attribute allowlist. It is not enabled for production by this contract.
 
 ## 2. Android Sentry release identity
 
@@ -159,3 +159,11 @@ The repository contract is complete without using production credentials. The fo
 - physical-device runtime trend and crash acceptance on the selected release hardware.
 
 Per current release sequencing, physical Android/host/audio/exact-game-environment tests remain final pre-release acceptance rather than blockers for repository-internal completion.
+
+## 12. Actual staging Core lifecycle delivery
+
+The deployed ASGI entrypoint installs `posthog_runtime.install_posthog_runtime_telemetry` after runtime maintenance. When explicitly enabled for staging, it emits exactly one `core.runtime.started` event per process lifespan entry. This is a Core process observation, not a fabricated Companion connection or user activity.
+
+The event contains only constant `distinct_id=sentinel-runtime`, `$process_person_profile=false`, staging environment, release and exact source SHA. The HTTPS call runs off the ASGI event loop with the existing bounded timeout; delivery failure cannot prevent serving or replace local/PostgreSQL evidence. Existing lifespan state and cleanup are preserved. There is no per-request telemetry, browser SDK, session replay, audio or identity capture.
+
+Use `RENDER_GIT_COMMIT` fallback rather than pinning a manual source SHA in deployment configuration. An HTTP capture acknowledgement is not ingestion acceptance: query the actual Sentinel project for the event and exact deployed SHA before declaring runtime verification.

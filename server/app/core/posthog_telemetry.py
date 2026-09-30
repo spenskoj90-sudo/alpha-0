@@ -4,6 +4,7 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from threading import Lock
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
@@ -122,6 +123,18 @@ class PostHogCompanionTelemetrySink(CompanionTelemetrySink):
             return self._dropped
 
     def record(self, event: CompanionTelemetryEvent) -> None:
+        self._capture_event(event.name, event.observed_at, event.attributes)
+
+    def record_runtime_started(self) -> None:
+        """Report actual Core lifespan entry without inventing a Companion session."""
+        self._capture_event("core.runtime.started", datetime.now(UTC), ())
+
+    def _capture_event(
+        self,
+        name: str,
+        observed_at: datetime,
+        attributes: tuple[tuple[str, str | int | float | bool], ...],
+    ) -> None:
         properties: dict[str, str | int | float | bool] = {
             "distinct_id": "sentinel-runtime",
             "$process_person_profile": False,
@@ -129,13 +142,13 @@ class PostHogCompanionTelemetrySink(CompanionTelemetrySink):
             "release": self.config.release,
             "source_sha": self.config.source_sha,
         }
-        for key, value in event.attributes:
+        for key, value in attributes:
             if key in _ALLOWED_ATTRIBUTES:
                 properties[key] = value
         payload = {
             "api_key": self.config.project_key,
-            "event": event.name,
-            "timestamp": event.observed_at.isoformat(),
+            "event": name,
+            "timestamp": observed_at.isoformat(),
             "properties": properties,
         }
         try:

@@ -218,6 +218,16 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: chmod +x ./gradlew && ./gradlew --no-daemon connectedDebugAndroidTest
+      - name: Retain exact-SHA Android instrumentation results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sentinel-android-emulator-results-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            app/build/reports/androidTests/connected/debug/
+            app/build/outputs/androidTest-results/connected/debug/
+          retention-days: 7
+          if-no-files-found: warn
 
   web:
     name: Web build

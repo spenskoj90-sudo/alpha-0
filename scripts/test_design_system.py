@@ -134,6 +134,17 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn("/brand/icon-192.png", self.web_manifest)
         self.assertIn("/brand/icon-512.png", self.web_manifest)
 
+    def test_production_reduced_assets_match_the_approved_studio_geometry(self) -> None:
+        for canonical, copies in (
+            ("design/brand/sentinel-glyph.svg", ("web/public/brand/glyph.svg", "site/public/brand/glyph.svg", "launcher/assets/sentinel-glyph.svg")),
+            ("design/brand/sentinel-glyph-mono.svg", ("web/public/brand/glyph-mono.svg", "site/public/brand/glyph-mono.svg", "launcher/assets/sentinel-glyph-mono.svg")),
+        ):
+            for copy in copies:
+                with self.subTest(asset=copy):
+                    self.assertEqual(read(copy), read(canonical))
+        self.assertIn("M43 18.5c-3.2-2.2", self.web_brand)
+        self.assertNotIn("M46 18c-7-3.7", self.web_brand)
+
     def test_public_site_v3_and_security_separation(self) -> None:
         self.assertIn("PRE-RELEASE", self.site_page)
         self.assertIn("CALM PRECISION / TRUSTED INTELLIGENCE", self.site_page)

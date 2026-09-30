@@ -37,6 +37,10 @@ test('Web layout, focus, navigation, assets and action contrast', async ({ page 
   await expect(page.locator('#main-content')).toBeFocused();
   await page.getByRole('link', { name: 'Games', exact: true }).click();
   await expect(page.locator('#games')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Games', exact: true })).toHaveAttribute('aria-current', 'location');
+  await expect(page.getByRole('link', { name: 'Overview', exact: true })).not.toHaveAttribute('aria-current', 'location');
+  await page.goBack();
+  await expect(page.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'location');
   expect(errors).toEqual([]);
 });
 

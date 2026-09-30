@@ -5,14 +5,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.AppLanguage
 import com.alpha0.app.ui.AppThemeMode
@@ -34,7 +38,7 @@ fun SettingsScreen(
         item { Text(strings.text("settings_title"), style = MaterialTheme.typography.headlineMedium) }
         item {
             SentinelCard {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(strings.text("language"), style = MaterialTheme.typography.titleLarge)
                     ChoiceRow(strings.text("language_system"), language == AppLanguage.SYSTEM) { onLanguage(AppLanguage.SYSTEM) }
                     ChoiceRow(strings.text("language_ru"), language == AppLanguage.RUSSIAN) { onLanguage(AppLanguage.RUSSIAN) }
@@ -44,7 +48,7 @@ fun SettingsScreen(
         }
         item {
             SentinelCard {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(strings.text("appearance"), style = MaterialTheme.typography.titleLarge)
                     ChoiceRow(strings.text("theme_system"), theme == AppThemeMode.SYSTEM) { onTheme(AppThemeMode.SYSTEM) }
                     ChoiceRow(strings.text("theme_light"), theme == AppThemeMode.LIGHT) { onTheme(AppThemeMode.LIGHT) }
@@ -59,10 +63,11 @@ fun SettingsScreen(
 @Composable
 private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        RadioButton(selected = selected, onClick = null)
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
     }
 }

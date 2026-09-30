@@ -143,7 +143,7 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   await expect(page.getByLabel('Authenticator or recovery code')).toBeVisible();
   await page.getByLabel('Authenticator or recovery code').fill('invalid-recovery-code');
   await page.getByRole('button', { name: 'Verify MFA' }).click();
-  await expect(page.locator('#account [role="alert"]')).toContainText('MFA_CODE_INVALID');
+  await expect(page.locator('#account [role="alert"]')).toContainText('MFA_INVALID');
   await page.getByLabel('Authenticator or recovery code').fill(recoveryCode);
   await page.getByRole('button', { name: 'Verify MFA' }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();

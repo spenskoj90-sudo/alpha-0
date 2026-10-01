@@ -1,7 +1,7 @@
 # SENTINEL Provider Status Matrix
 
 **Status:** ACTIVE  
-**Reconciled:** 2026-09-27  
+**Reconciled:** 2026-10-01
 **Rule:** integration code, deterministic tests, staging network evidence, physical evidence and production activation are separate claims. No cell may be promoted by inference from another column.
 
 The status vocabulary follows the repository product-truth model: `IMPLEMENTED`, `TESTED`, `STAGING-VERIFIED`, `PHYSICAL-VERIFIED`, `ENVIRONMENT-UNVERIFIED`, `MISSING`, `SUPERSEDED`, `HISTORICAL`, `OWNER-GATED`.
@@ -9,9 +9,9 @@ The status vocabulary follows the repository product-truth model: `IMPLEMENTED`,
 | Provider / boundary | CODE | TEST | STAGING | CREDENTIALS | NETWORK | PHYSICAL | PRODUCTION |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Stripe Billing | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
-| Transactional email (Resend / Brevo HTTPS) | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
+| Transactional email (Resend / Brevo HTTPS) | IMPLEMENTED | TESTED | STAGING-VERIFIED | STAGING-VERIFIED | STAGING-VERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
 | Sentry Android | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | HISTORICAL | HISTORICAL | OWNER-GATED |
-| PostHog operational telemetry | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |
+| PostHog operational telemetry | IMPLEMENTED | TESTED | STAGING-VERIFIED | STAGING-VERIFIED | STAGING-VERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |
 | Google federated auth | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
 | Telegram federated auth | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
 | VK federated auth | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | OWNER-GATED |
@@ -26,7 +26,11 @@ Core owns plan-to-price mapping, checkout-session creation, native `Stripe-Signa
 
 ### Transactional email
 
-The provider-neutral mail boundary, deterministic test transport and two bounded staging-only HTTPS adapters are implemented: Resend and Brevo. Exactly one provider may be enabled at a time; conflicting provider activation fails closed. This deliberately avoids SMTP because Render Free blocks outbound ports 25/465/587. Public registration/recovery requests remain non-enumerating, while authenticated account-security verification fails closed with explicit provider-unavailable state instead of claiming delivery. Real current-candidate delivery remains environment-unverified until one Owner-managed account/sender/API key is configured and exercised.
+The provider-neutral mail boundary, deterministic test transport and two bounded staging-only HTTPS adapters are implemented: Resend and Brevo. Exactly one provider may be enabled at a time; conflicting provider activation fails closed. This deliberately avoids SMTP because Render Free blocks outbound ports 25/465/587. Public registration/recovery requests remain non-enumerating, while authenticated account-security verification fails closed with explicit provider-unavailable state instead of claiming delivery.
+
+Resend is configured and network-verified for the free staging sandbox. A sending-only key stays in Render Core secret custody; `onboarding@resend.dev` is restricted by an explicit recipient allowlist. Brevo remains disabled. On 2026-10-01, deployed source `25bb96ca926ae53efd20f253d755c9ac178ef264` completed the real Web recovery path with the approved Resend simulator: neutral request, delivered reset email, one-time code consumption, rejected reuse, login using the new password with HttpOnly cookies, and server-confirmed logout/revocation. This test affected only the disposable simulator account. The 2026-09-30 neutral Owner-mailbox delivery is separate transport evidence, not Owner account acceptance.
+
+Arbitrary real recipients still require an owned, verified sending domain. The Owner has deferred that purchase until before release. Transition through sender/domain/API-key configuration; do not rewrite auth flows or expose keys in documentation. `STAGING-VERIFIED` describes the dated sandbox observations, not physical, production or acceptance of a later frozen release candidate.
 
 ### Sentry
 
@@ -34,7 +38,7 @@ Android release telemetry is fail-closed unless DSN, exact source SHA and an all
 
 ### PostHog
 
-The staging-only low-cardinality non-person sink is implemented, deterministic and destination-pinned. Actual staging account/network ingestion is not currently claimed. Production delivery is `MISSING` **by design** under the current contract: the runtime rejects production PostHog activation rather than silently broadening telemetry authority.
+The staging-only low-cardinality non-person sink is implemented, deterministic and destination-pinned. The actual Sentinel organization and EU project `245803` were verified before activation. Core is configured through Render secret custody, with person profiling disabled and no browser SDK or replay enabled by this integration. PostHog contains the actual `core.runtime.started` event for deployed source `25bb96ca926ae53efd20f253d755c9ac178ef264`, environment `staging`, release `1.0.0-rc2`, timestamp `2026-10-01T06:25:49.493Z`. Earlier ingestion on `88961e844a2f8f96912bbc7ddfea19a0c99a57f4` is separate dated evidence. This verifies Core lifecycle delivery, not Companion host or user activity. Production delivery is `MISSING` **by design** under the current contract: the runtime rejects production PostHog activation rather than silently broadening telemetry authority. Provider-side retention and alert provisioning are not inferred from ingestion.
 
 ### Google / Telegram / VK
 
@@ -49,7 +53,7 @@ The voice runtime has provider-neutral HTTPS contracts, bounded payloads, explic
 Pre-release testing does not require paid provider plans. The active strategy is documented in `docs/FREE_TESTING_INFRASTRUCTURE_STRATEGY.md`.
 
 - Stripe acceptance uses sandbox/test mode; live charges remain Owner-gated.
-- Resend Free remains the simplest connected option once an Owner-managed sending domain/API key exists; Brevo Free is an HTTPS fallback when a verified sender/API key is available.
+- Resend Free is active through the restricted sandbox sender and sending-only staging key; an owned sending domain is deferred until before release. Brevo Free remains an HTTPS fallback when a verified sender/API key is available.
 - Sentry free/developer monitoring is optional; Physical Test remains local-forensic by design.
 - Federated auth uses provider development/test registrations before production credentials.
 - Free hosting/database alternatives are evaluated as testing dependencies only; they are not promoted into production merely because they cost zero.

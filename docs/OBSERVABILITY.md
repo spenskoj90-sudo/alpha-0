@@ -133,7 +133,7 @@ Historical activation evidence from 2026-09-06 remains useful only as proof that
 
 That historical event predates this exact-SHA release-correlation contract and must not be represented as current-release acceptance. Current claims require current release/environment/source identity.
 
-No equivalent claim is made here for live PostHog ingestion. The repository contains a deterministic adapter and tests; actual staging project activation/retention/network evidence remains external until exercised with Owner-managed configuration.
+Actual PostHog staging ingestion was independently exercised after PR #414 bound the sink to Core lifespan. The Sentinel EU project `245803` contains `core.runtime.started` for source `25bb96ca926ae53efd20f253d755c9ac178ef264`, environment `staging`, release `1.0.0-rc2`, at `2026-10-01T06:25:49.493Z`. The project key remains in Render Core secret custody. This is dated Core lifecycle/network evidence; it does not establish Companion host, user activity, physical-device or production acceptance. Provider-side retention and alert configuration remain unverified. See `PROVIDER_STATUS_MATRIX.md` for the current activation boundary.
 
 ## 10. Related implementation
 
@@ -154,7 +154,7 @@ The repository contract is complete without using production credentials. The fo
 
 - Sentry project alert-rule provisioning and account retention settings;
 - explicit Android `production` environment activation;
-- optional PostHog staging project key/region/account retention and observed ingestion evidence;
+- PostHog provider-side account retention and alert provisioning; staging key/region activation and dated Core ingestion are verified separately above;
 - any future decision to permit production PostHog delivery (currently prohibited by code/contract);
 - physical-device runtime trend and crash acceptance on the selected release hardware.
 

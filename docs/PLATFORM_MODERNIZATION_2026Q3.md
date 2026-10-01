@@ -51,7 +51,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Surface | Accepted baseline |
 | --- | --- |
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
-| Web | Next.js 16.3.6, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.1 |
+| Web | Next.js 16.3.6, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.2 |
 | Web lint | ESLint 9.39.5 with eslint-config-next 16.3.6; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
 | Companion | Electron 44.4.5 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
@@ -127,3 +127,7 @@ A second upstream check was performed immediately before the final RC consolidat
 - **setuptools:** 80.9.0 remains intentionally pinned after prior compatibility review; do not jump release-build tooling solely for version freshness.
 
 Any one of these holds may be reopened after the exact RC physical/environment gates without weakening existing security or provenance checks.
+
+## Coordinated Web tooling update — 2026-10-01
+
+Vitest and its V8 coverage provider move together to 5.0.2 in both Web and Public Site. Separate Dependabot updates had violated the exact Vitest peer dependency and the shared tooling contract. The regenerated lockfiles, unchanged coverage thresholds, and coordinated dependency group preserve deterministic validation. Dependabot now monitors both `/web` and `/site` under the same npm update entry.

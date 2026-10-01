@@ -229,7 +229,7 @@ def check_web(checks: Checks) -> None:
     checks.require("npm ci" in p1 and "npm ci" in security, "security/evidence workflows use npm ci")
 
     checks.require(
-        package.get("devDependencies", {}).get("@vitest/coverage-v8") == "5.0.1",
+        package.get("devDependencies", {}).get("@vitest/coverage-v8") == "5.0.2",
         "Web pins the Vitest V8 coverage provider to the Vitest release line",
     )
     checks.require(

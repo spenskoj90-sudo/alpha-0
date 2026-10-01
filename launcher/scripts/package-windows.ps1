@@ -76,6 +76,7 @@ $AppDir = Join-Path $OutputDir "resources/app"
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 $ApplicationSources = @(
   "accessibility-runtime.js",
+  "ui-locale.js",
   "assets/sentinel-glyph.svg",
   "assets/sentinel-glyph-mono.svg",
   "assets/sentinel-icon-64.png",

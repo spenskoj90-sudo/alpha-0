@@ -19,7 +19,7 @@ They are intentionally not the same trust surface.
 **User-visible status: FUNCTIONAL FOUNDATION / PRODUCT UX INCOMPLETE / OWNER-VISUAL-UNACCEPTED.** This document records architecture and implementation scope, not a visual-completion claim.
 
 
-The existing production-side Web application remains under `web/` and uses Next.js 16.3.6 / React 19.3.0.
+The existing production-side Web application remains under `web/` and uses Next.js 16.3.8 / React 19.3.0.
 
 Verified implementation anchors include:
 

@@ -2,7 +2,9 @@
 
 **Status:** ACTIVE  
 **Direction:** CALM PRECISION / TRUSTED INTELLIGENCE  
-**Design-reference:** `spenskoj90-sudo/sentinel-aware-companion@a6fc9d4c513dde9d549e5dd70159b1365a76b95c`
+**Imported design-reference:** `spenskoj90-sudo/sentinel-aware-companion@a281479677d84de21a24db62b0b13af7ae11c623`
+**Reviewed earlier native studies:** `a6fc9d4c513dde9d549e5dd70159b1365a76b95c` (not the imported registry pin)
+**Production design owner:** GPT, within the Owner-approved direction.
 
 ## Reference refresh · 2026-09-27
 

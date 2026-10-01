@@ -291,3 +291,9 @@ section[id], article[id] { scroll-margin-top:24px; }
   .auth-panel { padding:20px; }
   .auth-form .panel-heading { flex-direction:row; gap:8px; }
 }
+
+.language-switch { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+.language-switch select { width:auto; min-width:112px; min-height:44px; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:8px 12px; }
+.language-switch select:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.top-actions { flex-wrap:wrap; }
+@media (forced-colors:active) { .language-switch select { border:1px solid ButtonText; } .language-switch select:focus-visible { outline:2px solid Highlight; } }

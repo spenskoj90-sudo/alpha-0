@@ -1,5 +1,7 @@
 'use strict';
 
+const ui = window.sentinelUi;
+let lastSnapshot;
 const stateNode = document.getElementById('state');
 const listNode = document.getElementById('presentations');
 const panelNode = document.querySelector('.panel');
@@ -21,12 +23,13 @@ function scenarioFor(presentation, companionState) {
 }
 
 function render(snapshot) {
+  lastSnapshot = snapshot;
   const companionState = typeof snapshot?.companion?.state === 'string' ? snapshot.companion.state : 'STOPPED';
   const checkpointState = typeof snapshot?.wow?.state === 'string' ? snapshot.wow.state : null;
   const p95 = Number.isFinite(snapshot?.runtime?.rtt?.p95Ms) ? Math.round(snapshot.runtime.rtt.p95Ms) : null;
   const density = normalizeDensity(snapshot);
-  const parts = [companionState];
-  if (checkpointState) parts.push(checkpointState);
+  const parts = [ui.state(companionState)];
+  if (checkpointState) parts.push(ui.state(checkpointState));
   if (p95 !== null) parts.push(`RTT p95 ${p95}ms`);
   stateNode.textContent = parts.join(' · ');
   panelNode?.setAttribute('data-density', density);
@@ -39,11 +42,11 @@ function render(snapshot) {
   if (!presentation) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = ['OFFLINE', 'LOCAL-ONLY'].includes(companionState)
-      ? `No authoritative overlay presentation · ${companionState}`
+    empty.textContent = ui.t(['OFFLINE', 'LOCAL-ONLY'].includes(companionState)
+      ? 'No authoritative overlay presentation · {state}'
       : companionState === 'DEGRADED'
         ? 'Companion degraded · waiting for authoritative presentation.'
-        : 'Waiting for Companion presentation.';
+        : 'Waiting for Companion presentation.', { state: ui.state(companionState) });
     listNode.appendChild(empty);
     return;
   }
@@ -54,7 +57,7 @@ function render(snapshot) {
 
   const kind = document.createElement('div');
   kind.className = 'kind';
-  kind.textContent = typeof presentation.kind === 'string' ? presentation.kind : 'STATUS';
+  kind.textContent = ui.t(typeof presentation.kind === 'string' ? presentation.kind : 'STATUS');
 
   const text = document.createElement('div');
   text.className = 'text';
@@ -65,7 +68,7 @@ function render(snapshot) {
   if (density !== 'MINIMAL' && Number.isFinite(presentation.confidence)) {
     const confidence = document.createElement('div');
     confidence.className = 'meta';
-    confidence.textContent = `Confidence ${Math.round(presentation.confidence * 100)}%`;
+    confidence.textContent = ui.t('Confidence {percent}%', { percent: Math.round(presentation.confidence * 100) });
     item.appendChild(confidence);
   }
 
@@ -74,8 +77,8 @@ function render(snapshot) {
     provenance.className = 'meta';
     const source = Array.isArray(presentation.provenance) && presentation.provenance.length
       ? presentation.provenance.join(' · ')
-      : 'source unavailable';
-    provenance.textContent = `Source: ${source} · Source time: unavailable`;
+      : ui.t('source unavailable');
+    provenance.textContent = ui.t('Source: {source} · Source time: unavailable', { source });
     item.appendChild(provenance);
   }
 
@@ -83,3 +86,5 @@ function render(snapshot) {
 }
 
 window.sentinelOverlay?.onSnapshot(render);
+
+ui.onChange(() => { if (lastSnapshot) render(lastSnapshot); });

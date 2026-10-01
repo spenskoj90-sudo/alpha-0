@@ -64,8 +64,8 @@ describe('Web accessibility contract', () => {
   });
 
   it('keeps repeated plan actions uniquely named', () => {
-    expect(accountControl).toContain('`Start checkout for ${plan.name}`');
-    expect(accountControl).toContain('`Activate free plan ${plan.name}`');
+    expect(accountControl).toContain("`${t('Start checkout for')} ${plan.name}`");
+    expect(accountControl).toContain("`${t('Activate free plan')} ${plan.name}`");
     expect(accountControl).toContain('aria-label={actionLabel}');
   });
 });

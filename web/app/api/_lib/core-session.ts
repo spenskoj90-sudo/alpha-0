@@ -170,7 +170,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
   try {
     const response = await coreFetch(coreUrl, `/v1/auth/${mode}`, requestId, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'accept-language': request.headers.get('accept-language')?.toLowerCase().startsWith('ru') ? 'ru' : 'en' },
       body: await request.text(),
     });
     if (!response.ok) {
@@ -216,7 +216,7 @@ export async function passwordResetWeb(request: NextRequest, step: string): Prom
   if (step !== 'request' && step !== 'confirm') return reply({ error: 'RECOVERY_ROUTE_DENIED' }, 404);
   const coreUrl = configuredCoreUrl();
   if (!coreUrl) return reply({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, 503);
-  let body: { email: string } | { token: string; password: string };
+  let body: { email: string } | { token: string; password: string; email?: string };
   try {
     const raw = await request.text();
     if (new TextEncoder().encode(raw).byteLength > 2048) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
@@ -225,16 +225,20 @@ export async function passwordResetWeb(request: NextRequest, step: string): Prom
       if (typeof input?.email !== 'string' || input.email.length < 3 || input.email.length > 320) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
       body = { email: input.email };
     } else {
-      if (typeof input?.token !== 'string' || input.token.length < 32 || input.token.length > 512 ||
+      if (typeof input?.token !== 'string' || input.token.length > 512 ||
           typeof input?.password !== 'string' || input.password.length < 12 || input.password.length > 256) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
-      body = { token: input.token, password: input.password };
+      const token = input.token.replace(/\s/g, '');
+      const numeric = /^[0-9]{8}$/.test(token);
+      if (!numeric && !/^[A-Za-z0-9_-]{32,512}$/.test(token)) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+      if ((numeric || input.email !== undefined) && (typeof input.email !== 'string' || input.email.length < 3 || input.email.length > 320 || !input.email.includes('@'))) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+      body = { token, password: input.password, ...(input.email !== undefined ? { email: input.email.trim().toLowerCase() } : {}) };
     }
   } catch {
     return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
   }
   try {
     const upstream = await coreFetch(coreUrl, `/v1/auth/password-reset/${step}`, requestId, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      method: 'POST', headers: { 'content-type': 'application/json', 'accept-language': request.headers.get('accept-language')?.toLowerCase().startsWith('ru') ? 'ru' : 'en' }, body: JSON.stringify(body),
       signal: AbortSignal.timeout(45_000), redirect: 'manual',
     });
     if (!upstream.ok) {

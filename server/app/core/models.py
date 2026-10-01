@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .json_bounds import validate_bounded_json
+from .email_codes import EMAIL_CODE_PATTERN, normalize_action_code
 
 
 class ErrorResponse(BaseModel):
@@ -48,7 +49,20 @@ class EmailActionRequest(BaseModel):
 
 
 class AuthTokenRequest(BaseModel):
-    token: str = Field(min_length=32, max_length=512)
+    token: str = Field(min_length=8, max_length=512)
+    email: str | None = Field(default=None, min_length=3, max_length=320)
+
+    @model_validator(mode="after")
+    def validate_action(self):
+        self.token = normalize_action_code(self.token)
+        if self.email is not None:
+            self.email = EmailActionRequest(email=self.email).email
+        if EMAIL_CODE_PATTERN.fullmatch(self.token):
+            if self.email is None:
+                raise ValueError("AUTH_ACTION_EMAIL_REQUIRED")
+        elif len(self.token) < 32:
+            raise ValueError("AUTH_ACTION_TOKEN_INVALID")
+        return self
 
 
 class PasswordResetConfirmRequest(AuthTokenRequest):

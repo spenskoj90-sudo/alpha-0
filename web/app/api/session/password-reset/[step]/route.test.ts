@@ -81,4 +81,24 @@ describe('Web password recovery boundary', () => {
     fetch.mockResolvedValue(new Response('{"status":"ACCEPTED"}', { status: 200 }));
     expect((await invoke('request', { email: 'user@example.com' })).status).toBe(502);
   });
+  it('binds short codes to email and forwards normalized whole-code paste without authority extras', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"status":"PASSWORD_UPDATED"}'));
+    for (const body of [
+      { token: '00001234', password: 'valid-password-123' },
+      { token: '00001234', email: 'invalid', password: 'valid-password-123' },
+      { token: '１２３４５６７８', email: 'user@example.com', password: 'valid-password-123' },
+    ]) expect((await invoke('confirm', body)).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await invoke('confirm', { token: '0000 1234', email: ' User@Example.com ', password: 'valid-password-123', user_id: 'other', scopes: ['admin:*'] })).status).toBe(200);
+    expect(JSON.parse(fetch.mock.calls[0][1]!.body as string)).toEqual({ token: '00001234', email: 'user@example.com', password: 'valid-password-123' });
+  });
+
+  it('forwards only supported email presentation language', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"status":"ACCEPTED"}', { status: 202 }));
+    await POST(new NextRequest('http://localhost/api/session/password-reset/request', {
+      method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/json', 'accept-language': 'ru-RU,en;q=0.5' }, body: '{"email":"user@example.com"}',
+    }), { params: Promise.resolve({ step: 'request' }) });
+    expect(new Headers(fetch.mock.calls[0][1]!.headers).get('accept-language')).toBe('ru');
+  });
+
 });

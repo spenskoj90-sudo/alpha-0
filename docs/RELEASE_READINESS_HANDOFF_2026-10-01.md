@@ -58,3 +58,11 @@ This record contains no credentials, one-time codes, tokens, signing material or
 - Repository verifier: 445 PASS / 0 FAIL; design contracts: 13 PASS; Companion unit tests: 71 PASS. Final Web coverage/build and full CI pending.
 - Imported design registry remains a281479; a6fc9d4 is reviewed native-study/master artwork provenance, lab56e6c9a remains rejected; current production refinement is GPT-owned.
 - Final protected-main SHA, runtime deployment IDs and artifacts will replace this checkpoint only after exact CI/runtime verification.
+
+## Owner feedback follow-up: verification email
+
+Starting protected main `cf40028f4eb025a5ea6e738b15b12836cfd35b0a`, tree `5da6e569fbe10bd1fcf95aa48220af108eca01c3`. #420 and #426 merged; #427/#428 Node 24 typings maintenance open. All four staging deployments previously verified LIVE at cf40028; provider and design state retained in canonical Drive handoff `1ZzECIfeaULq6Y-3-OD2RjWeMdevGffhR`.
+
+Owner reports phone test and diagnostic upload on October 1. Screenshot proves Owner-observed plaintext English verification email with unwieldy opaque code; no code retained in evidence. Fresh diagnostics were absent from canonical Drive Logs (`1Dmm-xTwNHJZH63-sNt2CgkcAVdC6_mYn`) at follow-up reconciliation; latest present diagnostic was September 27. Report remains Owner-reported, diagnostic correlation unverified.
+
+New authorized branch `fix/email-numeric-code` implements `EMAIL_ACTION_CODES_V1.md`: branded RU/EN HTML plus plaintext, eight-digit copy/paste, 15-minute expiry, per-account/purpose persistent budget and attempt cap, compatible Android/Web input. Independent security review found a retention predicate regression, corrected before CI; PostgreSQL concurrency/retention integration tests added. Follow-up is in progress; final SHA/checks/artifacts must be written to durable evidence after merge. Previous freeze superseded by requested source change; physical observations stay bound to the previous SHA. Imported design pin a281479677d84de21a24db62b0b13af7ae11c623 and reviewed native-study a6fc9d4c513dde9d549e5dd70159b1365a76b95c remain unchanged; unstable lab56e6c9a is not imported.

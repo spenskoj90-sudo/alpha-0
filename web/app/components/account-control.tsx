@@ -213,7 +213,7 @@ export function AccountControl() {
       const response = await fetch(`/api/session/${mode}`, {
         method: 'POST',
         signal: AbortSignal.timeout(45_000),
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'accept-language': locale },
         body: JSON.stringify({ email, password }),
       });
       const payload = await responseJson<{ error?: string; code?: string; mfa_required?: boolean }>(response);

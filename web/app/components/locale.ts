@@ -59,7 +59,7 @@ export const russian: Readonly<Record<string, string>> = {
   'Start checkout for': 'Начать оплату тарифа', 'Activate free plan': 'Активировать бесплатный тариф',
   'Recovery email': 'Email для восстановления', 'Recovery code': 'Код восстановления',
   'New password': 'Новый пароль', 'Confirm new password': 'Повторите новый пароль',
-  'Use the code from your recovery email. It expires after 30 minutes and can be used once.': 'Введите код из письма. Он действует 30 минут и используется один раз.',
+  'Paste the 8-digit code from your email. It expires after 15 minutes and is bound to this email address.': 'Вставьте восьмизначный код из письма. Он действует 15 минут и привязан к этому email.',
   '12–256 characters. Updating your password ends existing sessions. MFA remains enabled if configured.': '12–256 символов. Обновление пароля завершает действующие сессии. Настроенная MFA остаётся включённой.',
   'Send recovery email': 'Отправить письмо', 'Update password': 'Обновить пароль',
   'I already have a recovery code': 'У меня уже есть код восстановления', 'Request a new email': 'Запросить новое письмо', 'Back to sign in': 'Вернуться ко входу',

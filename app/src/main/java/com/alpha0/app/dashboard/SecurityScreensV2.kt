@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.alpha0.app.auth.normalizeEmailActionCode
+import com.alpha0.app.auth.validEmailActionCode
 import com.alpha0.app.auth.AuthApi
 import com.alpha0.app.auth.FederatedAuthCoordinator
 import com.alpha0.app.security.DeviceIdentity
@@ -267,7 +269,7 @@ fun AccountSecurityDetailScreen(
         error = null
         message = null
         scope.launch {
-            when (val result = authApi.requestAccountEmailVerification(accessToken)) {
+            when (val result = authApi.requestAccountEmailVerification(accessToken, if (strings.language == com.alpha0.app.ui.AppLanguage.RUSSIAN) "ru" else "en")) {
                 is AuthApi.ActionResult.Success -> message = strings.text("verification_sent")
                 is AuthApi.ActionResult.Failure -> {
                     error = when (result.message) {
@@ -282,7 +284,7 @@ fun AccountSecurityDetailScreen(
     }
 
     fun confirmVerification() {
-        if (verificationCode.isBlank()) {
+        if (!validEmailActionCode(verificationCode) || account?.email.isNullOrBlank()) {
             error = strings.text("verification_code_required")
             return
         }
@@ -290,7 +292,7 @@ fun AccountSecurityDetailScreen(
         error = null
         message = null
         scope.launch {
-            when (val result = authApi.confirmEmailVerification(verificationCode)) {
+            when (val result = authApi.confirmEmailVerification(verificationCode, account?.email)) {
                 is AuthApi.ActionResult.Success -> {
                     verificationCode = ""
                     message = strings.text("email_verified")
@@ -431,9 +433,10 @@ fun AccountSecurityDetailScreen(
                                     )
                                     OutlinedTextField(
                                         value = verificationCode,
-                                        onValueChange = { verificationCode = it.trim(); error = null },
+                                        onValueChange = { verificationCode = normalizeEmailActionCode(it); error = null },
                                         modifier = Modifier.fillMaxWidth(),
                                         label = { Text(strings.text("auth_code")) },
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                         enabled = !busy,
                                         singleLine = true,
                                     )
@@ -441,7 +444,7 @@ fun AccountSecurityDetailScreen(
                                         strings.text("verify_email"),
                                         ::confirmVerification,
                                         Modifier.fillMaxWidth(),
-                                        !busy && verificationCode.isNotBlank(),
+                                        !busy && validEmailActionCode(verificationCode),
                                     )
                                 }
                             }

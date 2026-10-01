@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -144,6 +145,17 @@ class DesignSystemContractTests(unittest.TestCase):
                     self.assertEqual(read(copy), read(canonical))
         self.assertIn("M43 18.5c-3.2-2.2", self.web_brand)
         self.assertNotIn("M46 18c-7-3.7", self.web_brand)
+
+    def test_rendered_companion_marks_match_the_canonical_glyph(self) -> None:
+        canonical = ET.fromstring(read("design/brand/sentinel-glyph.svg"))
+        expected_shapes = [(node.tag.split("}")[-1], node.attrib) for node in canonical]
+        for surface, css_class in ((self.launcher, "brand-mark"), (self.overlay, "mini-mark")):
+            with self.subTest(mark=css_class):
+                match = re.search(rf'<svg class="{css_class}".*?</svg>', surface)
+                self.assertIsNotNone(match)
+                rendered = ET.fromstring(match.group())
+                self.assertEqual(rendered.attrib["viewBox"], canonical.attrib["viewBox"])
+                self.assertEqual([(node.tag.split("}")[-1], node.attrib) for node in rendered], expected_shapes)
 
     def test_public_site_v3_and_security_separation(self) -> None:
         self.assertIn("PRE-RELEASE", self.site_page)

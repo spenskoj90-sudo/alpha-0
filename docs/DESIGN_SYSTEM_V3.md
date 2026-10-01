@@ -75,6 +75,8 @@ Owner has assigned GPT responsibility for the production design direction within
 - Web access uses a bounded form beside a calm account introduction on wide screens, with one column on mobile; authentication, MFA and secure cookie boundaries remain intact.
 - Product navigation uses one rounded 24px stroke family, removes duplicate links to the account destination and follows the actual hash through browser history.
 - Web, Public Site and packaged Companion reduced assets now match the approved studio geometry in `design/brand/`; the older uneven S/signal geometry is removed from those production copies.
+- Companion and Overlay inline marks use that same canonical geometry. The rendered SVG shapes are checked as well as the copied asset files, so a stale inline mark cannot pass asset-only validation.
+- Companion navigation follows the selected section and browser history through `aria-current="location"`; Overview is the initial selection rather than a permanently highlighted first item.
 - Product surfaces use consistent two-column grids on desktop and one column on mobile; keyboard focus, forced colors, reduced motion and theme contrast remain required.
 
 The imported reference package remains pinned to `a281479677d84de21a24db62b0b13af7ae11c623`. The unfinished laboratory iteration `56e6c9afdff501cc3451352c2b2dcd286b0ecdd1` is not accepted or imported by this refinement. No cross-platform visual parity or Owner optical acceptance is inferred from these changes.

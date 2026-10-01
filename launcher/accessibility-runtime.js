@@ -1,5 +1,18 @@
 'use strict';
 
+const navigationLinks = Array.from(document.querySelectorAll('.nav a[href^="#"]'));
+
+function syncNavigation() {
+  const target = window.location.hash || '#overview';
+  for (const link of navigationLinks) {
+    if (link.getAttribute('href') === target) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  }
+}
+
+window.addEventListener('hashchange', syncNavigation);
+syncNavigation();
+
 const accountPanel = document.getElementById('account-panel');
 const accountStatus = document.getElementById('account-status');
 const statusIds = ['account-status', 'companion-status', 'wow-checkpoint-status', 'connection-status', 'voice-status', 'voice-result'];

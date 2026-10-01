@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useLocale, LanguageSwitch } from '../components/locale-provider';
 import { AppearanceToggle } from '../components/appearance-toggle';
 import { useMemo, useState } from 'react';
 
@@ -72,6 +73,7 @@ async function readJson<T>(response: Response): Promise<T | null> {
 }
 
 export default function AdminPage() {
+  const { t, locale } = useLocale();
   const [token, setToken] = useState('');
   const [totp, setTotp] = useState('');
   const [userId, setUserId] = useState('');
@@ -298,21 +300,22 @@ export default function AdminPage() {
     <main className="shell">
       <header className="top admin-top">
         <div>
-          <div className="eyebrow">OPERATIONS / ADMIN</div>
-          <div className="brand admin-brand">SENTINEL ADMIN</div>
-          <div className="label">SECURITY + QUALITY CONTROL PLANE</div>
+          <div className="eyebrow">{t("OPERATIONS / ADMIN")}</div>
+          <div className="brand admin-brand">{t("SENTINEL ADMIN")}</div>
+          <div className="label">{t("SECURITY + QUALITY CONTROL PLANE")}</div>
         </div>
         <div className="top-actions">
-          <div className="admin-elevated">ELEVATED ACCESS · AUDITED</div>
-          <Link className="badge" href="/">USER CONTROL</Link>
-          <AppearanceToggle />
+          <div className="admin-elevated">{t("ELEVATED ACCESS · AUDITED")}</div>
+          <Link className="badge" href="/">{t("USER CONTROL")}</Link>
+          <LanguageSwitch />
+              <AppearanceToggle />
         </div>
       </header>
 
-      <div className="admin-tabs" role="tablist" aria-label="Admin operation surface">
-        {(['Catalog', 'Entitlements', 'Quality'] as const).map(tab => (
+      <div className="admin-tabs" role="tablist" aria-label={t("Admin operation surface")}>
+          {(['Catalog', 'Entitlements', 'Quality'] as const).map(tab => (
           <button
-            key={tab}
+            key={t(tab)}
             type="button"
             role="tab"
             aria-selected={activeTab === tab}
@@ -320,17 +323,17 @@ export default function AdminPage() {
             data-active={activeTab === tab}
             onClick={() => setActiveTab(tab)}
           >
-            {tab}
+            {t(tab)}
           </button>
         ))}
       </div>
 
       <section className={`section ${activeTab === 'Catalog' ? '' : 'admin-access-only'}`}>
         <article className="card">
-          <div className="label">ADMIN TOKEN</div>
-          <input value={token} onChange={event => setToken(event.target.value)} type="password" autoComplete="off" placeholder="Environment-issued token" />
+          <div className="label">{t("ADMIN TOKEN")}</div>
+          <input value={token} onChange={event => setToken(event.target.value)} type="password" autoComplete="off" placeholder={t("Environment-issued token")} />
 
-          <div className="label field-gap">AUTHENTICATOR CODE</div>
+          <div className="label field-gap">{t("AUTHENTICATOR CODE")}</div>
           <input
             value={totp}
             onChange={event => setTotp(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -338,126 +341,126 @@ export default function AdminPage() {
             inputMode="numeric"
             autoComplete="one-time-code"
             maxLength={6}
-            placeholder="6-digit TOTP"
+            placeholder={t("6-digit TOTP")}
           />
-          <button className="ghost-btn" onClick={() => void loadControlData()} disabled={busy || !token || !totp}>LOAD CORE DATA</button>
+          <button className="ghost-btn" onClick={() => void loadControlData()} disabled={busy || !token || !totp}>{t("LOAD CORE DATA")}</button>
 
-          <div className="label field-gap">USER</div>
-          <input value={userId} onChange={event => setUserId(event.target.value)} placeholder="User ID" />
+          <div className="label field-gap">{t("USER")}</div>
+          <input value={userId} onChange={event => setUserId(event.target.value)} placeholder={t("User ID")} />
 
-          <div className="label field-gap">GAME</div>
+          <div className="label field-gap">{t("GAME")}</div>
           <select value={gameId} onChange={event => setGameId(event.target.value)} disabled={games.length === 0}>
-            {games.length === 0 && <option value="">Load Core catalog first</option>}
+            {games.length === 0 && <option value="">{t("Load Core catalog first")}</option>}
             {games.map(game => <option key={game.id} value={game.id}>{game.name} — {game.platform}</option>)}
           </select>
-          <button className="btn" onClick={() => void grant()} disabled={busy || !token || !totp || !userId || !gameId}>GRANT 30-DAY ENTITLEMENT</button>
-          <div className="status-message" aria-live="polite">STATUS: {status}</div>
-          <p className="boundary-copy">The admin token and current authenticator code stay in this browser session only and are forwarded to the Core control-plane boundary. The Web server does not persist either factor.</p>
+          <button className="btn" onClick={() => void grant()} disabled={busy || !token || !totp || !userId || !gameId}>{t("GRANT 30-DAY ENTITLEMENT")}</button>
+          <div className="status-message" aria-live="polite">{t("STATUS:")}{' '}{t(status)}</div>
+          <p className="boundary-copy">{t("The admin token and current authenticator code stay in this browser session only and are forwarded to the Core control-plane boundary. The Web server does not persist either factor.")}</p>
         </article>
 
         {activeTab === 'Catalog' && <article className="card">
-          <div className="label">CORE GAME CATALOG</div>
-          {games.length === 0 && <p className="muted">No catalog loaded.</p>}
+          <div className="label">{t("CORE GAME CATALOG")}</div>
+          {games.length === 0 && <p className="muted">{t("No catalog loaded.")}</p>}
           {games.map(game => <div className="item" key={game.id}>
             <strong>{game.name}</strong>
             <div className="muted">{game.platform} · {game.id}</div>
-            <div className="microcopy">{game.interaction_mode} · launcher {game.launcher_supported ? 'supported' : 'not supported'}</div>
+            <div className="microcopy">{game.interaction_mode}{' '}{t("· launcher")}{' '}{game.launcher_supported ? t("supported") : t("not supported")}</div>
           </div>)}
         </article>}
       </section>
 
       {activeTab === 'Entitlements' && <article className="card entitlement-card">
-        <div className="label">ENTITLEMENT READBACK</div>
-        {entitlements.length === 0 && <p className="muted">No entitlement records loaded.</p>}
+        <div className="label">{t("ENTITLEMENT READBACK")}</div>
+        {entitlements.length === 0 && <p className="muted">{t("No entitlement records loaded.")}</p>}
         {entitlements.map(item => <div className="item" key={item.id}>
           <div className="row-between"><strong>{item.game_id}</strong><span className="state">{item.status}</span></div>
-          <div className="muted">User: {item.user_id} · Source: {item.source}</div>
-          <div className="microcopy">Valid until {new Date(item.valid_until).toLocaleString()}</div>
+          <div className="muted">{t("User:")}{' '}{item.user_id}{' '}{t("· Source:")}{' '}{item.source}</div>
+          <div className="microcopy">{t("Valid until")}{' '}{new Date(item.valid_until).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
         </div>)}
       </article>}
 
       {activeTab === 'Quality' && <>
       <article className="card entitlement-card">
-        <div className="label">QUALITY PROBLEM GROUPS · PRIORITY QUEUE</div>
-        <p className="boundary-copy">Operational triage happens at the problem-group level. Duplicate reports remain preserved evidence while frequency, user breadth, affected versions and severity drive priority.</p>
+        <div className="label">{t("QUALITY PROBLEM GROUPS · PRIORITY QUEUE")}</div>
+        <p className="boundary-copy">{t("Operational triage happens at the problem-group level. Duplicate reports remain preserved evidence while frequency, user breadth, affected versions and severity drive priority.")}</p>
         <div className="top-actions">
-          <select aria-label="Problem group status filter" value={clusterStatusFilter} onChange={event => setClusterStatusFilter(event.target.value)}>
+          <select aria-label={t("Problem group status filter")} value={clusterStatusFilter} onChange={event => setClusterStatusFilter(event.target.value)}>
             {['ALL', 'RECEIVED', 'TRIAGED', 'IN_PROGRESS', 'RESOLVED', 'WONT_FIX'].map(value => <option key={value} value={value}>{value}</option>)}
           </select>
-          <select aria-label="Problem group severity filter" value={clusterSeverityFilter} onChange={event => setClusterSeverityFilter(event.target.value)}>
+          <select aria-label={t("Problem group severity filter")} value={clusterSeverityFilter} onChange={event => setClusterSeverityFilter(event.target.value)}>
             {['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(value => <option key={value} value={value}>{value}</option>)}
           </select>
-          <select aria-label="Problem group category filter" value={clusterCategoryFilter} onChange={event => setClusterCategoryFilter(event.target.value)}>
+          <select aria-label={t("Problem group category filter")} value={clusterCategoryFilter} onChange={event => setClusterCategoryFilter(event.target.value)}>
             {['ALL', 'DESIGN', 'FUNCTIONALITY', 'GAME_INTEGRATION', 'PERFORMANCE', 'ACCESSIBILITY', 'VOICE_AUDIO', 'SECURITY_PRIVACY', 'OTHER'].map(value => <option key={value} value={value}>{value}</option>)}
           </select>
         </div>
-        {visibleClusters.length === 0 && <p className="muted">No problem groups match the current filters.</p>}
+        {visibleClusters.length === 0 && <p className="muted">{t("No problem groups match the current filters.")}</p>}
         {visibleClusters.map(cluster => <div className="item" key={cluster.id}>
           <div className="row-between">
             <strong>{cluster.canonical_title}</strong>
             <span className="state">P{cluster.priority_score} · {cluster.severity}</span>
           </div>
-          <div className="muted">{cluster.category} · {cluster.status} · {cluster.signature_kind.toLowerCase()} fingerprint</div>
-          <div className="microcopy">{cluster.occurrence_count} reports · {cluster.affected_user_count} users · {cluster.affected_device_count} devices · {cluster.affected_version_count} versions · last seen {new Date(cluster.last_seen_at).toLocaleString()}</div>
-          <button className="ghost-btn" onClick={() => void inspectQualityCluster(cluster.id)} disabled={busy || !token || !totp}>TRIAGE GROUP</button>
+          <div className="muted">{cluster.category} · {cluster.status} · {cluster.signature_kind.toLowerCase()}{' '}{t("fingerprint")}</div>
+          <div className="microcopy">{cluster.occurrence_count}{' '}{t("reports ·")}{' '}{cluster.affected_user_count}{' '}{t("users ·")}{' '}{cluster.affected_device_count}{' '}{t("devices ·")}{' '}{cluster.affected_version_count}{' '}{t("versions · last seen")}{' '}{new Date(cluster.last_seen_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
+          <button className="ghost-btn" onClick={() => void inspectQualityCluster(cluster.id)} disabled={busy || !token || !totp}>{t("TRIAGE GROUP")}</button>
         </div>)}
       </article>
 
       {selectedCluster && <article className="card entitlement-card">
-        <div className="label">PROBLEM GROUP DETAIL</div>
+        <div className="label">{t("PROBLEM GROUP DETAIL")}</div>
         <div className="row-between"><strong>{selectedCluster.canonical_title}</strong><span className="state">P{selectedCluster.priority_score} · {selectedCluster.severity}</span></div>
-        <div className="muted">{selectedCluster.category} · {selectedCluster.status} · fingerprint {selectedCluster.fingerprint.slice(0, 12)}…</div>
-        <div className="microcopy">Frequency: {selectedCluster.occurrence_count} reports · breadth: {selectedCluster.affected_user_count} users / {selectedCluster.affected_device_count} devices · versions: {selectedCluster.affected_version_count} · first {new Date(selectedCluster.first_seen_at).toLocaleString()} · last {new Date(selectedCluster.last_seen_at).toLocaleString()}</div>
+        <div className="muted">{selectedCluster.category} · {selectedCluster.status}{' '}{t("· fingerprint")}{' '}{selectedCluster.fingerprint.slice(0, 12)}…</div>
+        <div className="microcopy">{t("Frequency:")}{' '}{selectedCluster.occurrence_count}{' '}{t("reports · breadth:")}{' '}{selectedCluster.affected_user_count}{' '}{t("users /")}{' '}{selectedCluster.affected_device_count}{' '}{t("devices · versions:")}{' '}{selectedCluster.affected_version_count}{' '}{t("· first")}{' '}{new Date(selectedCluster.first_seen_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}{' '}{t("· last")}{' '}{new Date(selectedCluster.last_seen_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
         <div className="top-actions">
           {(['TRIAGED', 'IN_PROGRESS', 'RESOLVED', 'WONT_FIX'] as const).map(nextStatus =>
             <button className="ghost-btn" key={nextStatus} onClick={() => void updateQualityCluster(selectedCluster.id, { status: nextStatus })} disabled={busy || !token || selectedCluster.status === nextStatus}>{nextStatus}</button>
           )}
         </div>
-        <div className="label field-gap">SEVERITY OVERRIDE</div>
+        <div className="label field-gap">{t("SEVERITY OVERRIDE")}</div>
         <div className="top-actions">
           {(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const).map(nextSeverity =>
             <button className="ghost-btn" key={nextSeverity} onClick={() => void updateQualityCluster(selectedCluster.id, { severity: nextSeverity })} disabled={busy || !token || selectedCluster.severity === nextSeverity}>{nextSeverity}</button>
           )}
         </div>
-        <div className="label field-gap">MERGE CONFIRMED DUPLICATE</div>
-        <p className="boundary-copy">Merge is manual because fuzzy similarity is evidence, not permission to collapse distinct defects. All source reports are reassigned to the target group.</p>
+        <div className="label field-gap">{t("MERGE CONFIRMED DUPLICATE")}</div>
+        <p className="boundary-copy">{t("Merge is manual because fuzzy similarity is evidence, not permission to collapse distinct defects. All source reports are reassigned to the target group.")}</p>
         <select value={mergeTarget} onChange={event => setMergeTarget(event.target.value)}>
-          <option value="">Select target group</option>
+          <option value="">{t("Select target group")}</option>
           {qualityClusters.filter(item => item.id !== selectedCluster.id).map(item =>
             <option key={item.id} value={item.id}>P{item.priority_score} · {item.severity} · {item.canonical_title}</option>
           )}
         </select>
-        <button className="ghost-btn" onClick={() => void mergeQualityCluster(selectedCluster.id, mergeTarget)} disabled={busy || !token || !mergeTarget}>MERGE INTO TARGET</button>
+        <button className="ghost-btn" onClick={() => void mergeQualityCluster(selectedCluster.id, mergeTarget)} disabled={busy || !token || !mergeTarget}>{t("MERGE INTO TARGET")}</button>
         {selectedCluster.reports && selectedCluster.reports.length > 0 && <details>
-          <summary>Member reports ({selectedCluster.reports.length} shown)</summary>
+          <summary>{t("Member reports (")}{selectedCluster.reports.length}{' '}{t("shown)")}</summary>
           {selectedCluster.reports.map(report => <div className="item" key={report.id}>
             <div className="row-between"><strong>{report.title}</strong><span className="state">{report.status}</span></div>
-            <div className="muted">{new Date(report.created_at).toLocaleString()} · {report.inferred_severity ?? 'severity n/a'}</div>
-            <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>INSPECT EVIDENCE</button>
+            <div className="muted">{new Date(report.created_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')} · {report.inferred_severity ?? t("severity n/a")}</div>
+            <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>{t("INSPECT EVIDENCE")}</button>
           </div>)}
         </details>}
       </article>}
 
       <article className="card entitlement-card">
-        <div className="label">INDIVIDUAL QUALITY REPORTS · EVIDENCE QUEUE</div>
-        <p className="boundary-copy">Individual reports stay available for evidence inspection and exceptional per-report handling. Routine prioritization should use problem groups above.</p>
-        {qualityReports.length === 0 && <p className="muted">No quality reports loaded.</p>}
+        <div className="label">{t("INDIVIDUAL QUALITY REPORTS · EVIDENCE QUEUE")}</div>
+        <p className="boundary-copy">{t("Individual reports stay available for evidence inspection and exceptional per-report handling. Routine prioritization should use problem groups above.")}</p>
+        {qualityReports.length === 0 && <p className="muted">{t("No quality reports loaded.")}</p>}
         {qualityReports.map(report => <div className="item" key={report.id}>
           <div className="row-between"><strong>{report.title}</strong><span className="state">{report.status}</span></div>
-          <div className="muted">{report.category} · {report.inferred_severity ?? 'unscored'} · {new Date(report.created_at).toLocaleString()}</div>
-          <div className="microcopy">Group: {report.problem_group_id ?? 'none'} · diagnostics {report.diagnostics_retained ? `${Math.ceil(report.diagnostics_bytes / 1024)} KiB retained` : 'not retained'} · quality program {report.quality_program_opt_in ? 'opt-in' : 'support only'}</div>
-          <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>INSPECT REPORT</button>
+          <div className="muted">{report.category} · {report.inferred_severity ?? 'unscored'} · {new Date(report.created_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
+          <div className="microcopy">{t("Group:")}{' '}{report.problem_group_id ?? 'none'}{' '}{t("· diagnostics")}{' '}{report.diagnostics_retained ? `${Math.ceil(report.diagnostics_bytes / 1024)} KiB retained` : t("not retained")}{' '}{t("· quality program")}{' '}{report.quality_program_opt_in ? 'opt-in' : t("support only")}</div>
+          <button className="ghost-btn" onClick={() => void inspectQualityReport(report.id)} disabled={busy || !token || !totp}>{t("INSPECT REPORT")}</button>
         </div>)}
       </article>
 
       {selectedReport && <article className="card entitlement-card">
-        <div className="label">QUALITY REPORT DETAIL</div>
+        <div className="label">{t("QUALITY REPORT DETAIL")}</div>
         <div className="row-between"><strong>{selectedReport.title}</strong><span className="state">{selectedReport.status}</span></div>
         <p>{selectedReport.description}</p>
-        <div className="muted">Category: {selectedReport.category} · Severity: {selectedReport.inferred_severity ?? 'n/a'} · Group: {selectedReport.problem_group_id ?? 'none'} · User: {selectedReport.user_id ?? 'not exposed'} · Device: {selectedReport.device_id ?? 'none'}</div>
-        <div className="microcopy">Diagnostics consent: {selectedReport.diagnostics_consent ? 'yes' : 'no'} · Quality program: {selectedReport.quality_program_opt_in ? 'opt-in' : 'support only'} · Expires: {selectedReport.diagnostics_expires_at ? new Date(selectedReport.diagnostics_expires_at).toLocaleString() : 'n/a'}</div>
+        <div className="muted">{t("Category:")}{' '}{selectedReport.category}{' '}{t("· Severity:")}{' '}{selectedReport.inferred_severity ?? 'n/a'}{' '}{t("· Group:")}{' '}{selectedReport.problem_group_id ?? 'none'}{' '}{t("· User:")}{' '}{selectedReport.user_id ?? t("not exposed")}{' '}{t("· Device:")}{' '}{selectedReport.device_id ?? 'none'}</div>
+        <div className="microcopy">{t("Diagnostics consent:")}{' '}{selectedReport.diagnostics_consent ? 'yes' : 'no'}{' '}{t("· Quality program:")}{' '}{selectedReport.quality_program_opt_in ? 'opt-in' : t("support only")}{' '}{t("· Expires:")}{' '}{selectedReport.diagnostics_expires_at ? new Date(selectedReport.diagnostics_expires_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US') : 'n/a'}</div>
         {selectedReport.diagnostics !== undefined && selectedReport.diagnostics !== null && <details>
-          <summary>Sanitized diagnostic snapshot</summary>
+          <summary>{t("Sanitized diagnostic snapshot")}</summary>
           <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '28rem', overflow: 'auto' }}>{JSON.stringify(selectedReport.diagnostics, null, 2)}</pre>
         </details>}
         <div className="top-actions">

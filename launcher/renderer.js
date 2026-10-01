@@ -1,5 +1,6 @@
 'use strict';
 
+const ui = window.sentinelUi;
 const $ = id => document.getElementById(id);
 const accountStatus = $('account-status');
 const companionStatus = $('companion-status');
@@ -52,7 +53,7 @@ function refreshButtons() {
   voiceConsent.disabled = !signedIn || !grantedFeatures.includes('companion') || voiceBusy || Boolean(voiceRecorder);
   voiceLocale.disabled = voiceBusy || Boolean(voiceRecorder);
   voicePtt.disabled = voiceRecorder ? false : (!voiceReady || voiceBusy);
-  voicePtt.textContent = voiceRecorder ? 'RELEASE TO SEND' : voiceBusy ? 'PROCESSING…' : 'HOLD TO TALK';
+  ui.text(voicePtt, voiceRecorder ? 'RELEASE TO SEND' : voiceBusy ? 'PROCESSING…' : 'HOLD TO TALK');
 }
 
 function setAccount(status, features = [], mfa = null) {
@@ -60,11 +61,10 @@ function setAccount(status, features = [], mfa = null) {
   mfaRequired = !signedIn && mfa?.required === true;
   grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
   accountStatus.className = 'status ' + (signedIn ? 'ok' : mfaRequired ? 'warn' : '');
-  accountStatus.textContent = signedIn
-    ? 'ACCOUNT: AUTHENTICATED / ' + (grantedFeatures.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED')
-    : mfaRequired
-      ? 'ACCOUNT: FIRST FACTOR VERIFIED / MFA REQUIRED'
-      : 'ACCOUNT: SIGNED OUT';
+  ui.text(accountStatus, signedIn
+    ? 'ACCOUNT: AUTHENTICATED / {entitlement}'
+    : mfaRequired ? 'ACCOUNT: FIRST FACTOR VERIFIED / MFA REQUIRED' : 'ACCOUNT: SIGNED OUT',
+    { entitlement: () => ui.t(grantedFeatures.includes('companion') ? 'COMPANION ENTITLED' : 'COMPANION NOT ENTITLED') });
   refreshButtons();
 }
 
@@ -74,12 +74,12 @@ function setCompanion(status) {
   const warning = ['DEGRADED', 'LOCAL-ONLY', 'CONNECTING'].includes(companionState);
   const failed = companionState === 'OFFLINE';
   companionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : warning ? 'warn' : failed ? 'err' : ''}`;
-  companionStatus.textContent = `COMPANION: ${companionState}${reason}`;
+  ui.text(companionStatus, 'COMPANION: {state}{reason}', { state: () => ui.state(companionState), reason });
 
   const connectionLabel = companionState === 'ACTIVE' ? 'FULL' : companionState;
   if (connectionStatus) {
     connectionStatus.className = `status ${companionState === 'ACTIVE' ? 'ok' : warning ? 'warn' : failed ? 'err' : ''}`;
-    connectionStatus.textContent = `CONNECTION: ${connectionLabel}${reason}`;
+    ui.text(connectionStatus, 'CONNECTION: {state}{reason}', { state: () => ui.state(connectionLabel), reason });
   }
   for (const step of resilienceSteps) {
     step.dataset.current = String(step.dataset.runtimeState === companionState);
@@ -89,12 +89,12 @@ function setCompanion(status) {
 
 function setWowCheckpoint(status) {
   const state = status?.state || 'STOPPED';
-  const depth = Number.isInteger(status?.queueDepth) ? ` / QUEUE ${status.queueDepth}` : '';
+  const depth = () => Number.isInteger(status?.queueDepth) ? ui.t(' / QUEUE {depth}', { depth: status.queueDepth }) : '';
   const reason = status?.reason ? ` / ${status.reason}` : '';
   const healthy = ['READY', 'DELIVERED'].includes(state);
   const warning = ['WAITING_FOR_SAVEDVARIABLES', 'DEFERRED', 'DELIVERING'].includes(state);
   wowCheckpointStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'STOPPED' ? '' : 'err'}`;
-  wowCheckpointStatus.textContent = `WOW CHECKPOINT: ${state}${depth}${reason}`;
+  ui.text(wowCheckpointStatus, 'WOW CHECKPOINT: {state}{depth}{reason}', { state: () => ui.state(state), depth, reason });
 }
 
 function setVoice(status) {
@@ -105,20 +105,20 @@ function setVoice(status) {
   voiceConsent.checked = currentVoice.consentGranted === true;
   const state = String(currentVoice.state || 'UNAVAILABLE');
   const reason = currentVoice.reason ? ` / ${currentVoice.reason}` : '';
-  const provider = currentVoice.sttAvailable ? ` / STT READY${currentVoice.ttsAvailable ? ' / TTS READY' : ' / TTS UNAVAILABLE'}` : '';
+  const sttAvailable = currentVoice.sttAvailable;
+  const ttsAvailable = currentVoice.ttsAvailable;
+  const provider = () => sttAvailable ? ui.t(' / STT READY{tts}', { tts: ui.t(ttsAvailable ? ' / TTS READY' : ' / TTS UNAVAILABLE') }) : '';
   const healthy = state === 'READY';
   const warning = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'ENTITLEMENT_REQUIRED'].includes(state);
   voiceStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'SIGNED_OUT' ? '' : 'err'}`;
-  voiceStatus.textContent = `VOICE: ${state}${provider}${reason}`;
+  ui.text(voiceStatus, 'VOICE: {state}{provider}{reason}', { state: () => ui.state(state), provider, reason });
 
   if (voiceProviderState) {
-    voiceProviderState.textContent = currentVoice.sttAvailable
-      ? `STT READY · ${currentVoice.ttsAvailable ? 'TTS READY' : 'TTS UNAVAILABLE'}`
-      : 'UNAVAILABLE';
+    ui.text(voiceProviderState, sttAvailable ? 'STT READY · {tts}' : 'UNAVAILABLE', { tts: () => ui.t(ttsAvailable ? 'TTS READY' : 'TTS UNAVAILABLE') });
   }
-  if (voiceMicState && !voiceRecorder) voiceMicState.textContent = 'CLOSED';
+  if (voiceMicState && !voiceRecorder) ui.text(voiceMicState, 'CLOSED');
   if (voiceHeadline && voiceDetail && !voiceRecorder && !voiceBusy) {
-    const copy = {
+    const copyByState = {
       READY: ['Hold to talk', 'The microphone opens only while you hold the control. Release to send.'],
       CONSENT_REQUIRED: ['Microphone consent required', 'Voice remains closed until you explicitly allow capture for this launcher session.'],
       PROVIDER_UNAVAILABLE: ['Voice provider unavailable', 'Text and non-voice Companion functions remain available.'],
@@ -126,16 +126,18 @@ function setVoice(status) {
       SIGNED_OUT: ['Voice is signed out', 'Sign in and start Companion to evaluate voice capability.'],
       UNAVAILABLE: ['Voice is unavailable', 'The current runtime cannot establish a voice provider boundary.'],
       DISABLED: ['Voice is off', 'The microphone is closed and no capture is active.'],
-    }[state] || [`Voice · ${state}`, reason ? reason.slice(3) : 'Runtime voice state is authoritative from Core.'];
-    voiceHeadline.textContent = copy[0];
-    voiceDetail.textContent = copy[1];
+    };
+    const copy = Object.hasOwn(copyByState, state) ? copyByState[state] : null;
+    ui.text(voiceHeadline, copy ? copy[0] : 'Voice · {state}', { state });
+    if (copy) ui.text(voiceDetail, copy[1]);
+    else ui.text(voiceDetail, reason ? '{reason}' : 'Runtime voice state is authoritative from Core.', { reason: reason.slice(3) });
   }
   refreshButtons();
 }
 
 function showError(target, error) {
   target.className = 'status err';
-  target.textContent = String(error?.message || error || 'UNKNOWN_ERROR');
+  ui.text(target, '{error}', { error: String(error?.message || error || 'UNKNOWN_ERROR') });
 }
 
 async function refreshVoiceStatus() {
@@ -159,7 +161,7 @@ async function renderGames() {
 
     const button = document.createElement('button');
     button.className = 'btn';
-    button.textContent = game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH';
+    ui.text(button, game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH');
     button.disabled = game.platform === 'android';
     button.onclick = async () => {
       try { await window.sentinel.launch(game.id); } catch (error) { window.alert(String(error?.message || error)); }
@@ -170,7 +172,7 @@ async function renderGames() {
       const configured = document.createElement('div');
       configured.className = 'sub';
       configured.style.marginTop = '12px';
-      configured.textContent = config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED';
+      ui.text(configured, config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED');
       card.appendChild(configured);
     }
     grid.appendChild(card);
@@ -228,12 +230,12 @@ async function submitVoiceBlob(blob) {
   const mode = result.intent?.mode ? ` / ${result.intent.mode}` : '';
   const feedback = response.feedbackReason ? ` / ${response.feedbackReason}` : '';
   voiceResult.className = `status ${result.accepted ? 'ok' : result.reasonCode === 'ACTION_GATEWAY_REQUIRED' ? 'warn' : ''}`;
-  voiceResult.textContent = `VOICE RESULT: ${result.reasonCode}${mode}${feedback}`;
+  ui.text(voiceResult, 'VOICE RESULT: {code}{mode}{feedback}', { code: result.reasonCode, mode, feedback });
   if (voiceHeadline && voiceDetail) {
-    voiceHeadline.textContent = result.accepted ? 'Voice request understood' : 'Voice request not accepted';
-    voiceDetail.textContent = result.accepted
+    ui.text(voiceHeadline, result.accepted ? 'Voice request understood' : 'Voice request not accepted');
+    ui.text(voiceDetail, result.accepted
       ? 'Core accepted the presentation intent. No autonomous game action was performed.'
-      : `Core kept the request fail-closed: ${result.reasonCode}.`;
+      : 'Core kept the request fail-closed: {code}.', { code: result.reasonCode });
   }
   if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio);
 }
@@ -247,15 +249,15 @@ async function finalizeVoiceCapture() {
   voiceRecorder = null;
   stopVoiceTracks();
   voiceBusy = true;
-  if (voiceMicState) voiceMicState.textContent = 'CLOSED';
+  if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
   if (discarded) {
-    if (voiceHeadline) voiceHeadline.textContent = 'Capture canceled';
-    if (voiceDetail) voiceDetail.textContent = 'Nothing was sent. Hold the control again when you are ready.';
+    if (voiceHeadline) ui.text(voiceHeadline, 'Capture canceled');
+    if (voiceDetail) ui.text(voiceDetail, 'Nothing was sent. Hold the control again when you are ready.');
     voiceResult.className = 'status';
-    voiceResult.textContent = 'VOICE RESULT: CANCELED';
+    ui.text(voiceResult, 'VOICE RESULT: CANCELED');
   } else {
-    if (voiceHeadline) voiceHeadline.textContent = 'Understanding request';
-    if (voiceDetail) voiceDetail.textContent = 'Capture ended. SENTINEL is evaluating the bounded voice request.';
+    if (voiceHeadline) ui.text(voiceHeadline, 'Understanding request');
+    if (voiceDetail) ui.text(voiceDetail, 'Capture ended. SENTINEL is evaluating the bounded voice request.');
   }
   refreshButtons();
   try {
@@ -298,9 +300,9 @@ async function startVoiceCapture() {
     voiceCaptureDiscarded = false;
     const recorder = new MediaRecorder(voiceStream, { mimeType, audioBitsPerSecond: 64000 });
     voiceRecorder = recorder;
-    if (voiceMicState) voiceMicState.textContent = 'OPEN · HOLDING';
-    if (voiceHeadline) voiceHeadline.textContent = 'Listening…';
-    if (voiceDetail) voiceDetail.textContent = 'Release to send. Move away from the control to cancel without submitting.';
+    if (voiceMicState) ui.text(voiceMicState, 'OPEN · HOLDING');
+    if (voiceHeadline) ui.text(voiceHeadline, 'Listening…');
+    if (voiceDetail) ui.text(voiceDetail, 'Release to send. Move away from the control to cancel without submitting.');
     recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
     recorder.onerror = () => {
       voiceCaptureDiscarded = true;
@@ -312,7 +314,7 @@ async function startVoiceCapture() {
     const maxMs = Math.min(Math.max(Number(currentVoice.maxCaptureMs || 6000), 1000), 6000);
     voiceCaptureTimer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, maxMs);
     voiceResult.className = 'status warn';
-    voiceResult.textContent = `VOICE RESULT: CAPTURING / MAX ${Math.round(maxMs / 1000)}s`;
+    ui.text(voiceResult, 'VOICE RESULT: CAPTURING / MAX {seconds}s', { seconds: Math.round(maxMs / 1000) });
   } catch (error) {
     if (armed) {
       try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
@@ -348,9 +350,9 @@ function cancelVoiceCapture() {
   }
   voiceRecorder = null;
   stopVoiceTracks();
-  if (voiceMicState) voiceMicState.textContent = 'CLOSED';
-  if (voiceHeadline) voiceHeadline.textContent = 'Capture canceled';
-  if (voiceDetail) voiceDetail.textContent = 'Nothing was sent. Hold the control again when you are ready.';
+  if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
+  if (voiceHeadline) ui.text(voiceHeadline, 'Capture canceled');
+  if (voiceDetail) ui.text(voiceDetail, 'Nothing was sent. Hold the control again when you are ready.');
   voiceBusy = false;
   refreshButtons();
 }
@@ -405,7 +407,7 @@ startButton.onclick = async () => {
   } catch (error) { showError(companionStatus, error); refreshButtons(); }
 };
 stopButton.onclick = async () => {
-  const confirmed = window.confirm('Stop SENTINEL Companion runtime? Active local runtime and presentation state will stop.');
+  const confirmed = window.confirm(ui.t('Stop SENTINEL Companion runtime? Active local runtime and presentation state will stop.'));
   if (!confirmed) return;
   cancelVoiceCapture();
   setWowCheckpoint({ state: 'STOPPED' });
@@ -430,9 +432,9 @@ async function beginVoiceHold() {
   }
   catch (error) {
     showError(voiceResult, error);
-    if (voiceMicState) voiceMicState.textContent = 'CLOSED';
-    if (voiceHeadline) voiceHeadline.textContent = 'Voice capture unavailable';
-    if (voiceDetail) voiceDetail.textContent = String(error?.message || error || 'VOICE_CAPTURE_FAILED');
+    if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
+    if (voiceHeadline) ui.text(voiceHeadline, 'Voice capture unavailable');
+    if (voiceDetail) ui.text(voiceDetail, '{error}', { error: String(error?.message || error || 'VOICE_CAPTURE_FAILED') });
     refreshButtons();
   }
 }

@@ -25,7 +25,12 @@
       "Billing",
       "Resilience",
       "System"
-    ]
+    ],
+    "shaRole": "reviewed native studies and master artwork provenance",
+    "importedRegistrySha": "a281479677d84de21a24db62b0b13af7ae11c623",
+    "latestLabSha": "56e6c9afdff501cc3451352c2b2dcd286b0ecdd1",
+    "latestLabDisposition": "REJECTED_FOR_IMPORT",
+    "productionRefinementOwner": "GPT"
   },
   "predecessor": {
     "schema": "sentinel.design-system.v2.1",
@@ -371,5 +376,41 @@
       "RECONNECTING",
       "RESTORED"
     ]
+  },
+  "surfaceSlots": {
+    "rule": "Design extension points only; never show unimplemented capabilities as working navigation or healthy data.",
+    "primaryAndroid": [
+      "Home",
+      "Games",
+      "Security",
+      "Activity"
+    ],
+    "extensions": [
+      "Intelligence",
+      "Recommendations",
+      "Companion",
+      "Overlay",
+      "Voice",
+      "Adapters",
+      "Devices",
+      "Sessions",
+      "Accounts",
+      "Providers",
+      "Access",
+      "Admin",
+      "Billing",
+      "Updates",
+      "Diagnostics",
+      "Evidence",
+      "Resilience",
+      "Automation",
+      "Action approvals"
+    ],
+    "patterns": {
+      "collections": "loading / verified empty / error / offline / stale / ready",
+      "evidence": "FACT / INFERENCE / RECOMMENDATION + source + freshness + explicit unavailable fields",
+      "actions": "presentation only until server authority supports action; approval/deny/revoke stays explicit",
+      "layout": "native semantic section/card/list primitives, responsive wrapping, visible focus and scalable text"
+    }
   }
 }

@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SENTINEL Overlay</title>
+  <title data-i18n="SENTINEL Overlay">SENTINEL Overlay</title>
   <style>
     :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--primary:#2dd4ff;--signal:#00e0c2;--warning:#f59e0b;--danger:#f43f5e;--text:#e6f1f7;--muted:#a6b7c5;--border:#29485f}
-    *{box-sizing:border-box}body{margin:0;padding:12px;background:transparent;color:var(--text);overflow:hidden;pointer-events:none}.panel{min-height:76px;border:1px solid rgba(41,72,95,.92);border-radius:6px;background:rgba(6,16,24,.94);box-shadow:0 8px 24px rgba(0,0,0,.28);padding:10px 12px;backdrop-filter:blur(8px)}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid rgba(41,72,95,.8)}.brand-wrap{display:flex;align-items:center;gap:8px}.mini-mark{width:22px;height:22px;color:var(--primary)}.brand{font-family:Onest,Inter,sans-serif;font-size:12px;letter-spacing:.1em;font-weight:700}.boundary{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--warning);font-weight:600;margin-left:8px}.state{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted)}.list{display:grid}.item{border-left:2px solid var(--signal);padding:6px 0 6px 10px;background:rgba(13,27,41,.74);border-radius:0 4px 4px 0}.item[data-scenario="WARNING"]{border-left-color:var(--warning)}.item[data-scenario="DEGRADED"]{border-left-color:var(--danger)}.kind{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.04em}.text{margin-top:2px;font-size:13px;line-height:1.35;overflow-wrap:anywhere}.meta{margin-top:5px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted);overflow-wrap:anywhere}.empty{font-size:12px;color:var(--muted)}.panel[data-density="MINIMAL"] .kind,.panel[data-density="MINIMAL"] .meta{display:none}.panel[data-density="MINIMAL"] .top{margin-bottom:6px}.panel[data-density="EXPANDED"]{min-width:420px}
+    *{box-sizing:border-box}body{margin:0;padding:12px;background:transparent;color:var(--text);overflow:hidden;pointer-events:none}.panel{min-height:76px;border:1px solid rgba(41,72,95,.92);border-radius:6px;background:rgba(6,16,24,.94);box-shadow:0 8px 24px rgba(0,0,0,.28);padding:10px 12px;backdrop-filter:blur(8px)}.top{flex-wrap:wrap;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid rgba(41,72,95,.8)}.brand-wrap{display:flex;align-items:center;gap:8px}.mini-mark{width:22px;height:22px;color:var(--primary)}.brand{font-family:Onest,Inter,sans-serif;font-size:12px;letter-spacing:.1em;font-weight:700}.boundary{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--warning);font-weight:600;margin-left:8px}.state{overflow-wrap:anywhere;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted)}.list{display:grid}.item{border-left:2px solid var(--signal);padding:6px 0 6px 10px;background:rgba(13,27,41,.74);border-radius:0 4px 4px 0}.item[data-scenario="WARNING"]{border-left-color:var(--warning)}.item[data-scenario="DEGRADED"]{border-left-color:var(--danger)}.kind{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.04em}.text{margin-top:2px;font-size:13px;line-height:1.35;overflow-wrap:anywhere}.meta{margin-top:5px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:10px;color:var(--muted);overflow-wrap:anywhere}.empty{font-size:12px;color:var(--muted)}.panel[data-density="MINIMAL"] .kind,.panel[data-density="MINIMAL"] .meta{display:none}.panel[data-density="MINIMAL"] .top{margin-bottom:6px}.panel[data-density="EXPANDED"]{min-width:420px}
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}@media(forced-colors:active){.panel,.item{border-color:CanvasText}.mini-mark,.boundary,.state{color:CanvasText}}
   </style>
 </head>
@@ -16,12 +16,13 @@
     <div class="top">
       <div class="brand-wrap">
         <svg class="mini-mark" viewBox="0 0 64 64" aria-hidden="true" fill="none"><path d="M32 4 56 15.5v17.2c0 13.7-9 23-24 28.7C17 55.7 8 46.4 8 32.7V15.5L32 4Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M43 18.5c-3.2-2.2-7.1-3.4-11.2-3.4-7.1 0-11.8 3.2-11.8 7.9 0 4.3 3.5 6.8 10.1 8.5l4.2 1.1c6.5 1.7 9.7 4.2 9.7 8.4 0 5.1-4.8 8.8-12 8.8-4.9 0-9.1-1.5-12.5-4.4" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><circle cx="46.5" cy="29.5" r="2.5" fill="currentColor"/></svg>
-        <div class="brand">SENTINEL <span class="boundary">Presentation only</span></div>
+        <div class="brand">SENTINEL <span class="boundary" data-i18n="Presentation only">Presentation only</span></div>
       </div>
       <div id="state" class="state">STOPPED</div>
     </div>
-    <div id="presentations" class="list"><div class="empty">Waiting for Companion presentation.</div></div>
+    <div id="presentations" class="list"><div class="empty" data-i18n="Waiting for Companion presentation.">Waiting for Companion presentation.</div></div>
   </section>
+  <script src="ui-locale.js"></script>
   <script src="overlay-renderer.js"></script>
 </body>
 </html>

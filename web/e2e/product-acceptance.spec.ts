@@ -44,6 +44,61 @@ test('Web layout, focus, navigation, assets and action contrast', async ({ page 
   expect(errors).toEqual([]);
 });
 
+test('Russian Web navigation, recovery, errors and language preference remain usable', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Interface language' }).selectOption('ru');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  await expect(page.getByRole('heading', { name: 'Войти', exact: true })).toBeVisible();
+  await geometry(page);
+  await page.getByRole('link', { name: 'Игры', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Игры', exact: true })).toHaveAttribute('aria-current', 'location');
+  await page.getByRole('button', { name: 'Забыли пароль?' }).click();
+  await expect(page.getByRole('heading', { name: 'Восстановить доступ' })).toBeVisible();
+  await expect(page.getByLabel('Email для восстановления')).toBeVisible();
+  await page.getByRole('button', { name: 'У меня уже есть код восстановления' }).click();
+  await expect(page.getByLabel('Код восстановления')).toBeVisible();
+  await geometry(page);
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Язык интерфейса' })).toHaveValue('ru');
+  await page.goto('/admin');
+  await expect(page.getByRole('tab', { name: 'Каталог', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Качество', exact: true }).click();
+  await expect(page.getByRole('tab', { name: 'Качество', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await geometry(page);
+});
+
+test('Russian public routes preserve truthful release states and language across navigation', async ({ page }) => {
+  await page.goto(publicSite);
+  await page.getByRole('button', { name: 'Русский', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  await geometry(page);
+  for (const route of ['/security', '/privacy', '/status']) {
+    await page.goto(publicSite + route);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+    await expect(page.getByRole('button', { name: 'Русский', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('main')).toContainText(/[А-Яа-яЁё]/);
+    await geometry(page);
+  }
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('Web language selection works when browser storage is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Storage blocked', 'SecurityError'); } });
+  });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.name));
+  await page.goto('/');
+  await page.getByRole('combobox', { name: 'Interface language' }).selectOption('ru');
+  await expect(page.getByRole('heading', { name: 'Войти', exact: true })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  const appearance = page.locator('#settings').getByRole('button', { name: /Переключить тему/ });
+  await appearance.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  expect(errors).toEqual([]);
+});
+
 test('Settings persist appearance and Support exposes safe diagnostics', async ({ page }) => {
   await page.goto('/');
   const control = page.locator('#settings').getByRole('button', { name: /Switch appearance/ });

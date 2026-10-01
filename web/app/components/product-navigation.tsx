@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocale } from './locale-provider';
 
 const destinations = [
   { id: 'main-content', label: 'Overview', path: 'M3.5 10.5 12 3.5l8.5 7M5.5 9v11h5v-6h3v6h5V9' },
@@ -15,6 +16,7 @@ const destinations = [
 ];
 
 export function ProductNavigation() {
+  const { t } = useLocale();
   const [active, setActive] = useState('main-content');
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function ProductNavigation() {
   }, []);
 
   return (
-    <nav className="nav-list" aria-label="Product sections">
+    <nav className="nav-list" aria-label={t("Product sections")}>
       {destinations.map(destination => (
         <a
           key={destination.id}
@@ -36,7 +38,7 @@ export function ProductNavigation() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="nav-icon">
             <path d={destination.path} />
           </svg>
-          <span>{destination.label}</span>
+          <span>{t(destination.label)}</span>
         </a>
       ))}
     </nav>

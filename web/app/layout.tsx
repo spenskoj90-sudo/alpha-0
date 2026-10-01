@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Onest } from "next/font/google";
+import { LocaleProvider } from './components/locale-provider';
 
 const uiFont = Inter({
   subsets: ["latin", "cyrillic"],
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${uiFont.variable} ${brandFont.variable} ${technicalFont.variable}`}>
-        {children}
+        <LocaleProvider>{children}</LocaleProvider>
       </body>
     </html>
   );

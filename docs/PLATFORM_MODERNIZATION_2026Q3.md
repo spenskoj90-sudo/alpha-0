@@ -51,14 +51,14 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Surface | Accepted baseline |
 | --- | --- |
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
-| Web | Next.js 16.3.6, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.2 |
-| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.6; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
+| Web | Next.js 16.3.8, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.2 |
+| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.8; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
 | Companion | Electron 44.4.5 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.141.1, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.1, websockets 17.1 |
 | Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.1 |
 | PostgreSQL repository baseline | 18 |
-| Android observability/test refresh | Sentry Android 8.57.0, AndroidX Test ext.junit 1.3.0, runner 1.7.0, Espresso 3.7.0 |
+| Android observability/test refresh | Sentry Android 8.58.0, AndroidX Test ext.junit 1.3.0, runner 1.7.0, Espresso 3.7.0 |
 
 Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is regenerated under Node 24.21.0 and is required to remain consistent with `package.json`.
 
@@ -120,7 +120,7 @@ A second upstream check was performed immediately before the final RC consolidat
 
 ### Deliberate compatibility holds
 
-- **Next.js 16.3.7:** upstream has announced a security release for 2026-09-30, but it is not released as of 2026-09-25. Recheck immediately before publication if publication occurs on or after that date; do not fabricate or pre-pin an unreleased version.
+- **Historical Next.js announcement:** the planned version in the 2026-09-25 note was superseded by the actual September 30 security release, 16.3.8. The October 1 reconciliation below is current.
 - **TypeScript 7.0.2:** latest major exists, but SENTINEL stays on validated TypeScript 6.0.3 for this RC. A TypeScript 7 move requires a dedicated compatibility migration proving Next, eslint-config-next, ESLint, Vitest, declarations, build and CI together; a major compiler transition is not folded into the final RC without that evidence.
 - **SQLAlchemy 2.1.0:** released 2026-09-24, one day before this recheck. SENTINEL retains 2.0.54 for the RC because the new minor ORM line requires deliberate migration validation across FORCE-RLS transaction handling, migrations, worker leasing and PostgreSQL recovery behavior. This is a compatibility hold, not a claim that 2.0.54 is numerically latest.
 - **ESLint 10:** remains outside the validated Next toolchain for this RC; ESLint 9.39.5 is retained.
@@ -131,3 +131,15 @@ Any one of these holds may be reopened after the exact RC physical/environment g
 ## Coordinated Web tooling update — 2026-10-01
 
 Vitest and its V8 coverage provider move together to 5.0.2 in both Web and Public Site. Separate Dependabot updates had violated the exact Vitest peer dependency and the shared tooling contract. The regenerated lockfiles, unchanged coverage thresholds, and coordinated dependency group preserve deterministic validation. Dependabot now monitors both `/web` and `/site` under the same npm update entry.
+
+## Release-readiness dependency reconciliation — 2026-10-01
+
+- **Next.js / eslint-config-next 16.3.8:** accepted atomically in Web and Public Site. The actual [September 30 security release](https://nextjs.org/blog/september-2026-security-release) supersedes the earlier planned-version note and fixes seven disclosed vulnerabilities. Deterministic lockfiles and repository version gates move together. Current App Router/Turbopack/static-export configuration limits several advisory paths, but that is not a reason to retain the older framework. Future Next tooling updates are coupled across both surfaces.
+- **Sentry Android 8.58.0:** accepted for the manifest-version-detection resource-handle fix. Existing `sendDefaultPii(false)`, privacy scrubbing and fail-closed deployment identity remain unchanged. Do not partially configure the new `dataCollection` API: opting in changes defaults for unspecified fields. [Upstream release](https://github.com/getsentry/sentry-java/releases/tag/8.58.0).
+- **setup-gradle 6.4.0:** all seven workflow invocations use immutable `3f5f9adaf7d9fecd50b5935e54106014257a94e6`, verified against the signed release tag. Gradle runtime and checksum/bootstrap validation remain unchanged. [Upstream release](https://github.com/gradle/actions/releases/tag/v6.4.0).
+- **Node declarations 26 / PR #405:** rejected; Node runtime remains 24.21.0, with 24.x declarations and matching Web/Public Site tooling. A new declaration major can admit APIs absent from the selected runtime. Dependabot excludes >=25 until a deliberate runtime migration.
+- **Gradle 9.8 / PR #406:** rejected for this candidate. Current PR replaces the verified bootstrap with a script invoking an absent wrapper JAR. Java 27/mirror additions have no demonstrated benefit for JDK 25. Retain 9.7.1 and its checked distribution digest; exclude >=9.8 pending a deliberate validated toolchain migration.
+- **SQLAlchemy 2.1.1 / PR #400:** retains the 2.0.54 RC hold. The 2.1 migration changes autoflush for all `Session.execute` calls, including Core/text statements; FORCE-RLS transaction sequencing/recovery requires deliberate compatibility validation. 2.1.1's packaging fix does not remove that migration. [Migration guide](https://docs.sqlalchemy.org/en/21/changelog/migration_21.html).
+- **Uvicorn 0.54 / PR #401:** retains 0.53.0. New trailers/Early Hints apply to opt-in experimental zttp HTTP/2; Core does not enable that path. No current release benefit. [Release notes](https://uvicorn.dev/release-notes/).
+
+Dependency exclusions are explicit RC compatibility decisions, not claims that retained versions are numerically latest. Revisit Gradle/SQLAlchemy/Uvicorn after the exact physical candidate is accepted; security fixes on retained lines remain actionable. Superseded #402/#403 are covered by merged #420. #419/#404 are reconciled by this coherent security/compatibility pass, rather than independent uncoordinated merges.

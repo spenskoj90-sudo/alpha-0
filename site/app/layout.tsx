@@ -1,4 +1,5 @@
 import "./globals.css";
+import { LocaleProvider } from "./components/locale-provider";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
@@ -35,7 +36,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><LocaleProvider>{children}</LocaleProvider></body>
     </html>
   );
 }

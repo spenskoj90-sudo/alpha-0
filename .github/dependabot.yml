@@ -19,6 +19,12 @@ updates:
     groups:
       vitest-tooling:
         patterns: ["vitest", "@vitest/*"]
+      next-tooling:
+        patterns: ["next", "eslint-config-next", "@next/*"]
+    ignore:
+      # Declarations must match the selected Node 24 runtime.
+      - dependency-name: "@types/node"
+        versions: [">=25"]
 
   - package-ecosystem: "npm"
     directory: "/launcher"
@@ -33,6 +39,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 6
     labels: ["dependencies", "android"]
+    ignore:
+      # Keep the verified JDK 25 / AGP 9.4 / Gradle 9.7 RC toolchain.
+      - dependency-name: "gradle-wrapper"
+        versions: [">=9.8"]
 
   - package-ecosystem: "pip"
     directory: "/server"
@@ -40,3 +50,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 6
     labels: ["dependencies", "server"]
+    ignore:
+      # Revisit after physical acceptance with RLS/autoflush migration tests.
+      - dependency-name: "sqlalchemy"
+        versions: [">=2.1"]
+      # 0.54 adds only opt-in experimental HTTP/2 paths unused by Core.
+      - dependency-name: "uvicorn"
+        versions: [">=0.54"]

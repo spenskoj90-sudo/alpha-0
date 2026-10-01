@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useLocale } from './locale-provider';
 
 type Recommendation = {
   kind: 'fact' | 'inference' | 'recommendation';
@@ -31,6 +32,7 @@ function validRecommendation(value: unknown): value is Recommendation {
 }
 
 export function RecommendationPanel() {
+  const { t } = useLocale();
   const [view, setView] = useState<ViewState>('IDLE');
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [message, setMessage] = useState('');
@@ -107,15 +109,15 @@ export function RecommendationPanel() {
   return (
     <article
       className="card recommendation-panel"
-      aria-label="SENTINEL recommendation"
+      aria-label={t("SENTINEL recommendation")}
       aria-busy={view === 'LOADING'}
     >
       <div className="recommendation-heading">
         <div>
-          <span className="intelligence-kind" data-kind={kind}>{kind}</span>
-          <h2>{recommendation ? (kind === 'FACT' ? 'Observed fact' : kind === 'INFERENCE' ? 'Inference' : 'Recommendation') : 'Trusted intelligence'}</h2>
+          <span className="intelligence-kind" data-kind={kind}>{t(kind)}</span>
+          <h2>{recommendation ? (kind === 'FACT' ? t("Observed fact") : kind === 'INFERENCE' ? t("Inference") : t("Recommendation")) : t("Trusted intelligence")}</h2>
         </div>
-        <span className="confidence" aria-label={`Confidence ${confidence}`}>{confidence}</span>
+        <span className="confidence" aria-label={`${t("Confidence")} ${confidence}`}>{confidence}</span>
       </div>
 
       {view === 'READY' && recommendation ? (
@@ -123,29 +125,29 @@ export function RecommendationPanel() {
           <p className="recommendation-text">{recommendation.text}</p>
           {recommendation.kind === 'fact' && (
             <div className="recommendation-meta">
-              <div><span className="label">Source</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'}</strong></div>
-              <div><span className="label">Freshness</span><strong>UNREPORTED</strong></div>
-              <div><span className="label">Evidence type</span><strong>DIRECTLY OBSERVED</strong></div>
+              <div><span className="label">{t("Source")}</span><strong>{recommendation.provenance.join(' · ') || t("UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Freshness")}</span><strong>{t("UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Evidence type")}</span><strong>{t("DIRECTLY OBSERVED")}</strong></div>
             </div>
           )}
           {recommendation.kind === 'inference' && (
             <div className="recommendation-meta">
-              <div><span className="label">Confidence</span><strong>{confidence}</strong></div>
-              <div><span className="label">Contributing signals</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'}</strong></div>
-              <div><span className="label">Freshness</span><strong>UNREPORTED</strong></div>
+              <div><span className="label">{t("Confidence")}</span><strong>{confidence}</strong></div>
+              <div><span className="label">{t("Contributing signals")}</span><strong>{recommendation.provenance.join(' · ') || t("UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Freshness")}</span><strong>{t("UNREPORTED")}</strong></div>
             </div>
           )}
           {recommendation.kind === 'recommendation' && (
             <div className="recommendation-meta">
-              <div><span className="label">Action</span><strong>{recommendation.text}</strong></div>
-              <div><span className="label">Priority</span><strong>UNREPORTED</strong></div>
-              <div><span className="label">Reason</span><strong>UNREPORTED</strong></div>
-              <div><span className="label">Confidence</span><strong>{confidence}</strong></div>
-              <div><span className="label">Source / time</span><strong>{recommendation.provenance.join(' · ') || 'UNREPORTED'} · time UNREPORTED</strong></div>
-              <div><span className="label">Acknowledgement</span><strong>NOT RECORDED</strong></div>
+              <div><span className="label">{t("Action")}</span><strong>{recommendation.text}</strong></div>
+              <div><span className="label">{t("Priority")}</span><strong>{t("UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Reason")}</span><strong>{t("UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Confidence")}</span><strong>{confidence}</strong></div>
+              <div><span className="label">{t("Source / time")}</span><strong>{recommendation.provenance.join(' · ') || t("UNREPORTED")}{' '}{t("· time UNREPORTED")}</strong></div>
+              <div><span className="label">{t("Acknowledgement")}</span><strong>{t("NOT RECORDED")}</strong></div>
             </div>
           )}
-          <div className="microcopy">Provider {recommendation.provider_id ?? 'unreported'} · model {recommendation.model_id ?? 'unreported'}</div>
+          <div className="microcopy">{t("Provider")}{' '}{recommendation.provider_id ?? t("unreported")}{' '}{t("· model")}{' '}{recommendation.model_id ?? t("unreported")}</div>
         </div>
       ) : (
         <p
@@ -154,21 +156,20 @@ export function RecommendationPanel() {
           aria-live={view === 'ERROR' ? 'assertive' : 'polite'}
           aria-atomic="true"
         >
-          {view === 'LOADING' ? 'Requesting bounded intelligence from Core…' : message || 'Request a live recommendation through the authenticated Core boundary.'}
+          {view === 'LOADING' ? t("Requesting bounded intelligence from Core…") : t(message) || t("Request a live recommendation through the authenticated Core boundary.")}
         </p>
       )}
 
       <div className="button-row">
         <button className="ghost-btn" onClick={() => void loadRecommendation()} disabled={view === 'LOADING'}>
-          {view === 'LOADING' ? 'Requesting…' : view === 'READY' ? 'Refresh' : 'Load live'}
+          {view === 'LOADING' ? t("Requesting…") : view === 'READY' ? t("Refresh") : t("Load live")}
         </button>
-        {view === 'SIGNED_OUT' && <span className="microcopy">Authentication is required.</span>}
-        {view === 'ERROR' && <span className="microcopy">Failure is bounded; no fallback is treated as live evidence.</span>}
+        {view === 'SIGNED_OUT' && <span className="microcopy">{t("Authentication is required.")}</span>}
+        {view === 'ERROR' && <span className="microcopy">{t("Failure is bounded; no fallback is treated as live evidence.")}</span>}
       </div>
 
       <div className="recommendation-boundary">
-        <span className="info" aria-hidden="true">●</span> Observational only · no action execution
-      </div>
+        <span className="info" aria-hidden="true">●</span>{' '}{t("Observational only · no action execution")}{' '}</div>
     </article>
   );
 }

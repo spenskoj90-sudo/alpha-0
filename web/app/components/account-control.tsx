@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useLocale } from './locale-provider';
 import { PasswordRecovery } from './password-recovery';
 
 type Plan = {
@@ -62,8 +63,8 @@ function lifecycleText(status: Subscription['status']) {
   }
 }
 
-function money(plan: Plan) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: plan.currency }).format(plan.amount_minor / 100);
+function money(plan: Plan, locale: string) {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: plan.currency }).format(plan.amount_minor / 100);
 }
 
 async function responseJson<T>(response: Response): Promise<T | null> {
@@ -133,6 +134,7 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
 }
 
 export function AccountControl() {
+  const { t, locale } = useLocale();
   const [view, setView] = useState<ViewState>('CHECKING');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [recovering, setRecovering] = useState(false);
@@ -347,22 +349,22 @@ export function AccountControl() {
   }
 
   if (view === 'CHECKING') {
-    return <article className="card account-panel" aria-busy="true"><div className="label">Account</div><p className="muted" role="status" aria-live="polite">Checking secure Web session…</p></article>;
+    return <article className="card account-panel" aria-busy="true"><div className="label">{t("Account")}</div><p className="muted" role="status" aria-live="polite">{t("Checking secure Web session…")}</p></article>;
   }
 
   if (view === 'SIGNED_OUT') {
     return (
-      <article className="card account-panel auth-panel" aria-label="SENTINEL account sign in" aria-busy={busy}>
+      <article className="card account-panel auth-panel" aria-label={t("SENTINEL account sign in")} aria-busy={busy}>
         <div className="auth-intro">
-          <div className="eyebrow">YOUR SENTINEL ACCOUNT</div>
-          <h3>One secure place.<br />A clearer view.</h3>
-          <p className="muted">Review your security, connected devices and intelligence with access you control.</p>
-          <p className="auth-assurance">Your session stays private. You decide what connects.</p>
+          <div className="eyebrow">{t("YOUR SENTINEL ACCOUNT")}</div>
+          <h3>{t("One secure place.")}<br />{t("A clearer view.")}</h3>
+          <p className="muted">{t("Review your security, connected devices and intelligence with access you control.")}</p>
+          <p className="auth-assurance">{t("Your session stays private. You decide what connects.")}</p>
         </div>
         <div className="auth-form">
         <div className="panel-heading">
-          <div><div className="label">Account</div><h2>{recovering ? 'Recover account' : mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
-          <span className="badge">Secure Web session</span>
+          <div><div className="label">{t("Account")}</div><h2>{recovering ? t("Recover account") : mode === 'login' ? t("Sign in") : t("Create account")}</h2></div>
+          <span className="badge">{t("Secure Web session")}</span>
         </div>
         {recovering ? <PasswordRecovery initialEmail={email} onCancel={() => { setRecovering(false); setMode('login'); setMessage(''); }} onComplete={() => {
           setRecovering(false); setMode('login'); setPassword(''); setMfaRequired(false); setMfaCode('');
@@ -370,9 +372,7 @@ export function AccountControl() {
           window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
         }} /> : mfaRequired ? (
           <form onSubmit={completeMfa}>
-            <label className="field-label">
-              Authenticator or recovery code
-              <input
+            <label className="field-label">{t("Authenticator or recovery code")}{' '}<input
                 type="text"
                 autoComplete="one-time-code"
                 value={mfaCode}
@@ -380,16 +380,14 @@ export function AccountControl() {
                 required
               />
             </label>
-            <div className="microcopy">A session is issued only after this second factor succeeds.</div>
-            <button className="btn" disabled={busy || mfaCode.trim().length < 6}>{busy ? 'Working…' : 'Verify MFA'}</button>
+            <div className="microcopy">{t("A session is issued only after this second factor succeeds.")}</div>
+            <button className="btn" disabled={busy || mfaCode.trim().length < 6}>{busy ? t("Working…") : t("Verify MFA")}</button>
           </form>
         ) : (
           <>
             <form onSubmit={authenticate}>
-              <label className="field-label">Email<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
-              <label className="field-label">
-                Password
-                <input
+              <label className="field-label">{t("Email")}<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required /></label>
+              <label className="field-label">{t("Password")}{' '}<input
                   type="password"
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   minLength={12}
@@ -399,17 +397,17 @@ export function AccountControl() {
                   required
                 />
               </label>
-              <div id="password-requirement" className="microcopy">Minimum 12 characters.</div>
-              <button className="btn" disabled={busy}>{busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Create account'}</button>
+              <div id="password-requirement" className="microcopy">{t("Minimum 12 characters.")}</div>
+              <button className="btn" disabled={busy}>{busy ? t("Working…") : mode === 'login' ? t("Sign in") : t("Create account")}</button>
             </form>
             <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMfaRequired(false); setMfaCode(''); setMessage(''); setMessageTone('status'); }} disabled={busy}>
-              {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
+              {mode === 'login' ? t("Need an account? Register") : t("Already registered? Sign in")}
             </button>
-            {mode === 'login' && <button className="text-btn" disabled={busy} onClick={() => { setRecovering(true); setPassword(''); setMessage(''); }}>Forgot password?</button>}
+            {mode === 'login' && <button className="text-btn" disabled={busy} onClick={() => { setRecovering(true); setPassword(''); setMessage(''); }}>{t("Forgot password?")}</button>}
           </>
         )}
-        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
-        <p className="boundary-copy">Your session is protected by secure cookies. Access tokens stay on the server.</p>
+        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{t(message)}</p>}
+        <p className="boundary-copy">{t("Your session is protected by secure cookies. Access tokens stay on the server.")}</p>
         </div>
       </article>
     );
@@ -417,10 +415,10 @@ export function AccountControl() {
 
   if (view === 'ERROR') {
     return (
-      <article className="card account-panel" aria-label="SENTINEL account control unavailable" aria-busy={busy}>
-        <div className="panel-heading"><div><div className="label">Account</div><h2>Control data unavailable</h2></div><span className="badge">Fail-closed</span></div>
-        <p className="status-message" role="alert" aria-live="assertive">{message || 'Core account data could not be verified.'}</p>
-        <div className="button-row"><button className="ghost-btn" onClick={async () => { setBusy(true); await reloadAccount(); setBusy(false); }} disabled={busy}>Retry</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>Clear session</button></div>
+      <article className="card account-panel" aria-label={t("SENTINEL account control unavailable")} aria-busy={busy}>
+        <div className="panel-heading"><div><div className="label">{t("Account")}</div><h2>{t("Control data unavailable")}</h2></div><span className="badge">{t("Fail-closed")}</span></div>
+        <p className="status-message" role="alert" aria-live="assertive">{t(message) || t("Core account data could not be verified.")}</p>
+        <div className="button-row"><button className="ghost-btn" onClick={async () => { setBusy(true); await reloadAccount(); setBusy(false); }} disabled={busy}>{t("Retry")}</button><button className="text-btn" onClick={() => void logout()} disabled={busy}>{t("Clear session")}</button></div>
       </article>
     );
   }
@@ -429,55 +427,51 @@ export function AccountControl() {
     <div className="account-stack" aria-busy={busy}>
       <article className="card account-panel">
         <div className="panel-heading">
-          <div><div className="label">Account</div><h2>Access</h2></div>
-          <button className="ghost-btn" onClick={logout} disabled={busy}>Sign out</button>
+          <div><div className="label">{t("Account")}</div><h2>{t("Access")}</h2></div>
+          <button className="ghost-btn" onClick={logout} disabled={busy}>{t("Sign out")}</button>
         </div>
-        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}
+        {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{t(message)}</p>}
         <div className="account-metrics">
-          <div><span className="label">Session</span><strong className="ok">AUTHENTICATED</strong></div>
-          <div><span className="label">Subscriptions</span><strong>{subscriptions.length}</strong></div>
-          <div><span className="label">Entitlements</span><strong>{entitlements.length}</strong></div>
+          <div><span className="label">{t("Session")}</span><strong className="ok">{t("AUTHENTICATED")}</strong></div>
+          <div><span className="label">{t("Subscriptions")}</span><strong>{subscriptions.length}</strong></div>
+          <div><span className="label">{t("Entitlements")}</span><strong>{entitlements.length}</strong></div>
         </div>
       </article>
 
       <section id="access" className="section billing-section">
         <article className="card">
-          <div className="label">Plans</div>
-          {plans.length === 0 && <p className="muted">No plans returned by Core.</p>}
+          <div className="label">{t("Plans")}</div>
+          {plans.length === 0 && <p className="muted">{t("No plans returned by Core.")}</p>}
           {plans.map(plan => {
             const hasOpenIntent = activePlanCodes.has(plan.code);
             const paid = plan.amount_minor > 0;
-            const actionLabel = hasOpenIntent
-              ? `${plan.name}: subscription intent exists`
-              : paid
-                ? `Start checkout for ${plan.name}`
-                : `Activate free plan ${plan.name}`;
+            const actionLabel = hasOpenIntent ? `${plan.name}: ${t('Intent exists')}` : paid ? `${t('Start checkout for')} ${plan.name}` : `${t('Activate free plan')} ${plan.name}`;
             return <div className="item plan-row" key={plan.code}>
-              <div><strong>{plan.name}</strong><div className="muted">{money(plan)} / {plan.interval_days} days · {plan.entitlement_codes.join(' + ')}</div></div>
-              <button className="ghost-btn" aria-label={actionLabel} disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? 'Intent exists' : paid ? 'Checkout' : 'Activate free'}</button>
+              <div><strong>{plan.name}</strong><div className="muted">{money(plan, locale)} / {plan.interval_days}{' '}{t("days ·")}{' '}{plan.entitlement_codes.join(' + ')}</div></div>
+              <button className="ghost-btn" aria-label={actionLabel} disabled={busy || hasOpenIntent} onClick={() => void createSubscription(plan)}>{hasOpenIntent ? t("Intent exists") : paid ? t("Checkout") : t("Activate free")}</button>
             </div>;
           })}
-          <p className="boundary-copy">Paid checkout uses a server-created hosted provider session. The browser cannot select price IDs, provider mode, entitlement state, or payment confirmation. Paid features activate only after a verified provider lifecycle event.</p>
+          <p className="boundary-copy">{t("Paid checkout uses a server-created hosted provider session. The browser cannot select price IDs, provider mode, entitlement state, or payment confirmation. Paid features activate only after a verified provider lifecycle event.")}</p>
         </article>
 
         <article className="card">
-          <div className="label">Subscriptions</div>
-          {subscriptions.length === 0 && <p className="muted">No subscription lifecycle records.</p>}
+          <div className="label">{t("Subscriptions")}</div>
+          {subscriptions.length === 0 && <p className="muted">{t("No subscription lifecycle records.")}</p>}
           {subscriptions.map(item => <div className="item" key={item.id}>
             <div className="row-between"><strong>{item.plan_code}</strong><span className={`state state-${item.status.toLowerCase()}`}>{item.status}</span></div>
-            <div className="muted">{lifecycleText(item.status)}</div>
-            <div className="microcopy">Provider: {item.provider} · Updated {new Date(item.updated_at).toLocaleString()}</div>
+            <div className="muted">{t(lifecycleText(item.status))}</div>
+            <div className="microcopy">{t("Provider:")}{' '}{item.provider}{' '}{t("· Updated")}{' '}{new Date(item.updated_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
           </div>)}
         </article>
       </section>
 
       <article className="card entitlement-card">
-        <div className="label">GAME Entitlements</div>
-        {entitlements.length === 0 && <p className="muted">No server-authoritative game entitlements.</p>}
+        <div className="label">{t("GAME Entitlements")}</div>
+        {entitlements.length === 0 && <p className="muted">{t("No server-authoritative game entitlements.")}</p>}
         {entitlements.map(item => <div className="item" key={item.id}>
           <div className="row-between"><strong>{item.game_name}</strong><span className="state">{item.status}</span></div>
           <div className="muted">{item.platform} · {item.game_id}</div>
-          <div className="microcopy">Source: {item.source} · Valid until {new Date(item.valid_until).toLocaleString()}</div>
+          <div className="microcopy">{t("Source:")}{' '}{item.source}{' '}{t("· Valid until")}{' '}{new Date(item.valid_until).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</div>
         </div>)}
       </article>
     </div>

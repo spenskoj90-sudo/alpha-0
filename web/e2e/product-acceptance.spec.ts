@@ -135,7 +135,10 @@ test('password recovery has truthful request, invalid code, retry and completion
   await expect(page.locator('#account [role="alert"]')).toContainText('invalid or expired');
   expect(await page.getByLabel('New password', { exact: true }).inputValue()).toBe('');
   // Whole numeric-code paste and completion UI fixture; no real delivery claim.
+  await page.getByLabel('Recovery code', { exact: true }).fill('123456789');
+  expect(await page.getByLabel('Recovery code', { exact: true }).evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
   await page.getByLabel('Recovery code', { exact: true }).fill('0000 1234');
+  expect(await page.getByLabel('Recovery code', { exact: true }).evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
   await expect(page.getByLabel('Recovery code', { exact: true })).toHaveValue('00001234');
   await expect(page.getByLabel('Recovery code', { exact: true })).toHaveAttribute('inputmode', 'numeric');
   await expect(page.getByLabel('Recovery code', { exact: true })).toHaveAttribute('autocomplete', 'one-time-code');

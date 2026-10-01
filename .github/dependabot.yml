@@ -11,11 +11,14 @@ updates:
         patterns: ["github/codeql-action/*"]
 
   - package-ecosystem: "npm"
-    directory: "/web"
+    directories: ["/web", "/site"]
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 6
     labels: ["dependencies", "web"]
+    groups:
+      vitest-tooling:
+        patterns: ["vitest", "@vitest/*"]
 
   - package-ecosystem: "npm"
     directory: "/launcher"

@@ -6,21 +6,21 @@ import { PublicHeader } from "./components/public-header";
 const capabilities = [
   {
     eyebrow: "INTELLIGENCE",
-    title: "Facts, inference and recommendations stay distinct.",
+    title: "Know what a recommendation is based on.",
     body:
-      "SENTINEL keeps source, freshness and confidence visible so missing or stale information is not presented as certainty.",
+      "See the source, freshness and confidence behind a recommendation. Facts and inference stay distinct, and uncertainty stays visible.",
   },
   {
     eyebrow: "SECURITY",
-    title: "Authority stays server-side.",
+    title: "Your account. Your control.",
     body:
-      "Identity, sessions, device proof, entitlement and privileged operations remain bounded by the trusted Core rather than browser or client assumptions.",
+      "Review account security, connected devices and access in one place. Recommendations remain observational; SENTINEL does not turn them into hidden actions.",
   },
   {
     eyebrow: "PLAYER EXPERIENCE",
     title: "One system across mobile, web and desktop.",
     body:
-      "Android handles immediate context, Web provides account and control-plane workflows, while Companion, Overlay and Voice extend the player experience on the host.",
+      "Check context on your phone, manage your account on the Web, and connect the desktop Companion for overlay, diagnostics and voice workflows.",
   },
 ];
 
@@ -37,23 +37,22 @@ export default function PublicHome() {
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <PublicHeader />
       <main id="main-content">
-        <section className="hero">
+        <section className="hero" data-design-direction="CALM PRECISION / TRUSTED INTELLIGENCE">
           <div className="site-shell hero-grid">
             <div className="hero-copy">
               <div className="eyebrow">PRE-RELEASE · TRUSTED INTELLIGENCE</div>
-              <h1>Clear signals. Bounded intelligence. One calm system.</h1>
+              <h1>A clearer view.<br />You stay in control.</h1>
               <p className="hero-lead">
-                SENTINEL is being built as a trustworthy intelligence layer for players:
-                observe what is known, distinguish what is inferred, and present useful
-                recommendations without hiding uncertainty or crossing authority boundaries.
+                SENTINEL is being built to bring game context, account security and useful
+                recommendations together across your phone, Web and desktop. Understand
+                what is known, see where uncertainty remains, and choose your next step.
               </p>
               <div className="hero-actions">
                 <a className="button-primary" href="#product">Explore the product</a>
                 <Link className="button-secondary" href="/status/">View release status</Link>
               </div>
               <p className="release-note">
-                No public download is offered yet. Signing, publication and production deployment
-                remain explicit final acceptance gates.
+                No public download is offered yet. Release testing is still in progress.
               </p>
             </div>
             <div className="hero-visual" aria-label="SENTINEL brand identity">
@@ -67,9 +66,9 @@ export default function PublicHome() {
                 />
               </div>
               <div className="signal-card">
-                <span className="status status-live">ACTIVE DESIGN SYSTEM</span>
-                <strong>CALM PRECISION / TRUSTED INTELLIGENCE</strong>
-                <span>Design System v3.0 · cross-surface semantic contract</span>
+                <span className="status">BUILT FOR PLAYERS</span>
+                <strong>Clear signals. Informed decisions.</strong>
+                <span>Useful context, visible uncertainty and access you control.</span>
               </div>
             </div>
           </div>
@@ -81,8 +80,8 @@ export default function PublicHome() {
               <div className="eyebrow">PRODUCT PRINCIPLES</div>
               <h2>Useful to the player. Explicit about trust.</h2>
               <p>
-                The product is designed around user value without letting presentation invent
-                security state, entitlement, game evidence or AI confidence.
+                Useful recommendations need a clear foundation. SENTINEL makes the information
+                behind them visible and keeps your account controls within reach.
               </p>
             </div>
             <div className="feature-grid">
@@ -101,7 +100,7 @@ export default function PublicHome() {
           <div className="site-shell">
             <div className="section-heading compact-heading">
               <div className="eyebrow">SURFACES</div>
-              <h2>A coordinated platform, not a single screen.</h2>
+              <h2>Designed for phone, Web and desktop.</h2>
             </div>
             <div className="surface-list">
               {surfaces.map(([name, description, state]) => (
@@ -121,13 +120,13 @@ export default function PublicHome() {
           <div className="site-shell trust-grid">
             <div>
               <div className="eyebrow">WHY SENTINEL</div>
-              <h2>Technology → capability → experience → user value.</h2>
+              <h2>Confidence starts with clarity.</h2>
             </div>
             <div className="trust-copy">
               <p>
-                Security, reliability, correctness and performance are enabling constraints.
-                They exist so the product can deliver useful intelligence and differentiated
-                player experiences without making unsupported claims.
+                You should be able to tell what SENTINEL knows, what it infers and what remains
+                unverified. Its security model keeps account access and recommendations within
+                explicit boundaries, so a clearer view does not cost you control.
               </p>
               <Link className="text-link" href="/security/">Read the security model →</Link>
             </div>

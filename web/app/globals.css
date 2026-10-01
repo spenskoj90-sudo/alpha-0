@@ -99,6 +99,7 @@ input:focus-visible, select:focus-visible { border-color:var(--accent); outline:
 .ghost-btn { margin-top:14px; border:1px solid var(--border-strong); background:var(--panel-2); color:var(--text); }
 .ghost-btn:hover:not(:disabled) { border-color:var(--accent); }
 .text-btn { margin-top:12px; padding-left:0; border:0; background:transparent; color:var(--accent-2); }
+.recovery-actions { display:flex; flex-wrap:wrap; gap:0 20px; }
 .btn:disabled, .ghost-btn:disabled, .text-btn:disabled { cursor:not-allowed; opacity:.46; }
 
 .account-stack { display:grid; gap:18px; }

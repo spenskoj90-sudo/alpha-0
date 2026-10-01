@@ -205,6 +205,58 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
   }
 }
 
+export async function passwordResetWeb(request: NextRequest, step: string): Promise<NextResponse> {
+  const requestId = correlationId(request);
+  const reply = (body: object, status: number, upstream?: Response) => {
+    const result = applyCorrelation(NextResponse.json(body, { status }), requestId, upstream);
+    result.headers.set('cache-control', 'no-store');
+    return result;
+  };
+  if (!sameOriginWrite(request)) return reply({ error: 'CROSS_SITE_REQUEST_DENIED' }, 403);
+  if (step !== 'request' && step !== 'confirm') return reply({ error: 'RECOVERY_ROUTE_DENIED' }, 404);
+  const coreUrl = configuredCoreUrl();
+  if (!coreUrl) return reply({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, 503);
+  let body: { email: string } | { token: string; password: string };
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 2048) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+    const input = JSON.parse(raw);
+    if (step === 'request') {
+      if (typeof input?.email !== 'string' || input.email.length < 3 || input.email.length > 320) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+      body = { email: input.email };
+    } else {
+      if (typeof input?.token !== 'string' || input.token.length < 32 || input.token.length > 512 ||
+          typeof input?.password !== 'string' || input.password.length < 12 || input.password.length > 256) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+      body = { token: input.token, password: input.password };
+    }
+  } catch {
+    return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400);
+  }
+  try {
+    const upstream = await coreFetch(coreUrl, `/v1/auth/password-reset/${step}`, requestId, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45_000), redirect: 'manual',
+    });
+    if (!upstream.ok) {
+      if (upstream.status === 429) return reply({ error: 'RECOVERY_RATE_LIMITED' }, 429, upstream);
+      if (upstream.status === 400 && step === 'confirm') return reply({ error: 'AUTH_ACTION_TOKEN_INVALID' }, 400, upstream);
+      if (upstream.status === 422) return reply({ error: 'RECOVERY_INPUT_INVALID' }, 400, upstream);
+      return reply({ error: 'SENTINEL_CORE_UNAVAILABLE' }, 502, upstream);
+    }
+    const payload = await upstream.json();
+    const expected = step === 'request' ? 'ACCEPTED' : 'PASSWORD_UPDATED';
+    if (payload?.status !== expected || upstream.status !== (step === 'request' ? 202 : 200)) return reply({ error: 'INVALID_CORE_RECOVERY_RESPONSE' }, 502, upstream);
+    const result = reply({ status: expected }, upstream.status, upstream);
+    if (step === 'confirm') {
+      clearSessionCookies(result);
+      clearMfaCookie(result);
+    }
+    return result;
+  } catch {
+    return reply({ error: 'SENTINEL_CORE_UNAVAILABLE' }, 502);
+  }
+}
+
 export async function completeMfaWeb(request: NextRequest): Promise<NextResponse> {
   const requestId = correlationId(request);
   if (!sameOriginWrite(request)) {

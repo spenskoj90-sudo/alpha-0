@@ -5,7 +5,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 8
-    labels: ["dependencies", "ci"]
     groups:
       codeql-actions:
         patterns: ["github/codeql-action/*"]
@@ -15,7 +14,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 6
-    labels: ["dependencies", "web"]
     groups:
       vitest-tooling:
         patterns: ["vitest", "@vitest/*"]
@@ -25,20 +23,23 @@ updates:
       # Declarations must match the selected Node 24 runtime.
       - dependency-name: "@types/node"
         versions: [">=25"]
+      # Current eslint-plugin-react and TypeScript parser peers exclude these majors.
+      - dependency-name: "eslint"
+        versions: [">=10"]
+      - dependency-name: "typescript"
+        versions: [">=7"]
 
   - package-ecosystem: "npm"
     directory: "/launcher"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 6
-    labels: ["dependencies", "companion"]
 
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 6
-    labels: ["dependencies", "android"]
     ignore:
       # Keep the verified JDK 25 / AGP 9.4 / Gradle 9.7 RC toolchain.
       - dependency-name: "gradle-wrapper"
@@ -49,7 +50,6 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 6
-    labels: ["dependencies", "server"]
     ignore:
       # Revisit after physical acceptance with RLS/autoflush migration tests.
       - dependency-name: "sqlalchemy"

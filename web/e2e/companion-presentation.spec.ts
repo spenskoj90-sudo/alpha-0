@@ -10,8 +10,9 @@ test('Companion rendered brand and section selection follow keyboard and history
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.name));
   await page.route('http://companion.test/**', async route => {
-    const filename = new URL(route.request().url()).pathname === '/accessibility-runtime.js'
-      ? 'accessibility-runtime.js' : 'index.html';
+    const pathname = new URL(route.request().url()).pathname;
+    const filename = ['/accessibility-runtime.js', '/ui-locale.js'].includes(pathname)
+      ? pathname.slice(1) : 'index.html';
     const body = readFileSync(resolve(launcher, filename), 'utf8')
       .replace('<script src="renderer.js"></script>', '');
     await route.fulfill({ contentType: filename.endsWith('.js') ? 'text/javascript' : 'text/html', body });
@@ -33,5 +34,10 @@ test('Companion rendered brand and section selection follow keyboard and history
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await links.getByRole('link', { name: 'Games', exact: true }).focus();
   expect(await links.getByRole('link', { name: 'Games', exact: true }).evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe('none');
+  await page.getByRole('combobox', { name: 'Interface language' }).selectOption('ru');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
+  await expect(links.getByRole('link', { name: 'Игры', exact: true })).toHaveAttribute('aria-current', 'location');
+  await expect(page.locator('#voice-ptt')).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   expect(errors).toEqual([]);
 });

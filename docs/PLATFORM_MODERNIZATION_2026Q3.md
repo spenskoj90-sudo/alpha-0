@@ -143,3 +143,11 @@ Vitest and its V8 coverage provider move together to 5.0.2 in both Web and Publi
 - **Uvicorn 0.54 / PR #401:** retains 0.53.0. New trailers/Early Hints apply to opt-in experimental zttp HTTP/2; Core does not enable that path. No current release benefit. [Release notes](https://uvicorn.dev/release-notes/).
 
 Dependency exclusions are explicit RC compatibility decisions, not claims that retained versions are numerically latest. Revisit Gradle/SQLAlchemy/Uvicorn after the exact physical candidate is accepted; security fixes on retained lines remain actionable. Superseded #402/#403 are covered by merged #420. #419/#404 are reconciled by this coherent security/compatibility pass, rather than independent uncoordinated merges.
+
+### New Dependabot delta — 2026-10-01
+
+- #421/#425 TypeScript 7.0.2: hold 6.0.3; the installed `@typescript-eslint/eslint-plugin` 8.70.0 declares TypeScript `>=4.8.4 <6.1.0`.
+- #423/#424 ESLint 10.11.0: hold 9.39.5; the installed `eslint-plugin-react` 7.37.5 declares ESLint through `^9.7`, excluding 10.
+- #422 Node 26 declarations: same runtime-24 mismatch as #405.
+- These specific unsupported majors are excluded until a coordinated supported tooling migration. Security fixes for the retained versions remain actionable.
+- Dependabot labels referencing nonexistent repository labels were removed after live bot warnings; no repository permissions/settings changed.

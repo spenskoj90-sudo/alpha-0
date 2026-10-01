@@ -630,7 +630,7 @@ def check_governance(checks: Checks) -> None:
         "provider status matrix covers every required external provider boundary",
     )
     checks.require(
-        "| PostHog operational telemetry | IMPLEMENTED | TESTED | ENVIRONMENT-UNVERIFIED | OWNER-GATED | ENVIRONMENT-UNVERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |" in provider_matrix
+        "| PostHog operational telemetry | IMPLEMENTED | TESTED | STAGING-VERIFIED | STAGING-VERIFIED | STAGING-VERIFIED | ENVIRONMENT-UNVERIFIED | MISSING |" in provider_matrix
         and "Production delivery is `MISSING` **by design**" in provider_matrix,
         "provider matrix does not misstate production PostHog as an activated or merely credential-gated path",
     )

@@ -15,6 +15,7 @@
 - design authority: `DESIGN_SYSTEM_V3.md` + `../design/sentinel-design-system.v3.json`; the design laboratory is input, not production truth.
 - `CONTROL_BRIDGE_ARCHITECTURE.md` + `../control-bridge/`.
 - `STAGING_SYNTHETIC_GATE.md` + `.github/workflows/staging-synthetic.yml`.
+- `EMAIL_ACTION_CODES_V1.md` — short email-code security, migration and mail/client presentation contract.
 - `OBSERVABILITY.md` + `../observability/telemetry-contract.v1.json`.
 - `SENTINEL_DECISION_LOG.md` and `CHANGELOG.md` are historical ledgers with current metadata.
 

@@ -166,6 +166,26 @@ def test_resend_domain_transition_uses_same_transport_and_only_configuration(mon
     assert isinstance(owned_domain, ResendEmailTransport)
     assert owned_domain.send(EmailMessage("someone@example.com", "Subject", "Body")) == "email-test-123"
     assert payloads == [
-        {"from": "onboarding@resend.dev", "to": ["delivered@resend.dev"], "subject": "Subject", "text": "Body"},
-        {"from": "accounts@mail.example.com", "to": ["someone@example.com"], "subject": "Subject", "text": "Body"},
+        {"from": "SENTINEL <onboarding@resend.dev>", "to": ["delivered@resend.dev"], "subject": "Subject", "text": "Body"},
+        {"from": "SENTINEL <accounts@mail.example.com>", "to": ["someone@example.com"], "subject": "Subject", "text": "Body"},
     ]
+
+
+@pytest.mark.parametrize('provider', ['resend', 'brevo'])
+def test_provider_delivers_html_and_plaintext_and_credentials_stay_out_of_repr(monkeypatch, provider):
+    import json
+    from io import BytesIO
+    from app.core.account_notifications import action_email
+    payloads = []
+    def response(request, *, timeout):
+        payloads.append(json.loads(request.data))
+        return BytesIO(b'{"id":"test-id","messageId":"test-id"}')
+    monkeypatch.setattr('app.core.email_provider.urlopen', response)
+    mail = action_email('delivered@resend.dev', '00001234', language='ru')
+    transport = (ResendEmailTransport(ResendConfig(api_key='re_fixture_secret_123', from_address='sentinel@example.com')) if provider == 'resend' else BrevoEmailTransport(BrevoConfig(api_key='xkeysib-fixture-secret-123456789', from_address='sentinel@example.com')))
+    transport.send(mail)
+    assert payloads[0]['text' if provider == 'resend' else 'textContent'] == mail.text
+    assert payloads[0]['html' if provider == 'resend' else 'htmlContent'] == mail.html
+    assert '00001234' not in repr(mail)
+    with pytest.raises(ValueError, match='EMAIL_HTML_INVALID'):
+        EmailMessage('ok@example.com', 'subject', 'body', 'я' * 32769)

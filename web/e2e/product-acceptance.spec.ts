@@ -134,7 +134,11 @@ test('password recovery has truthful request, invalid code, retry and completion
   await page.getByRole('button', { name: 'Update password' }).click();
   await expect(page.locator('#account [role="alert"]')).toContainText('invalid or expired');
   expect(await page.getByLabel('New password', { exact: true }).inputValue()).toBe('');
-  // Completion UI fixture; this does not claim real email/code delivery.
+  // Whole numeric-code paste and completion UI fixture; no real delivery claim.
+  await page.getByLabel('Recovery code', { exact: true }).fill('0000 1234');
+  await expect(page.getByLabel('Recovery code', { exact: true })).toHaveValue('00001234');
+  await expect(page.getByLabel('Recovery code', { exact: true })).toHaveAttribute('inputmode', 'numeric');
+  await expect(page.getByLabel('Recovery code', { exact: true })).toHaveAttribute('autocomplete', 'one-time-code');
   await page.route('**/api/session/password-reset/confirm', route => route.fulfill({ status: 200, json: { status: 'PASSWORD_UPDATED' } }));
   await redactSensitiveOperation(() => page.getByLabel('New password', { exact: true }).fill('Disposable-test-password-123'));
   await redactSensitiveOperation(() => page.getByLabel('Confirm new password', { exact: true }).fill('Disposable-test-password-123'));

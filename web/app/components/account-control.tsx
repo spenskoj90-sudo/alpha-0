@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { PasswordRecovery } from './password-recovery';
 
 type Plan = {
   code: string;
@@ -134,6 +135,7 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
 export function AccountControl() {
   const [view, setView] = useState<ViewState>('CHECKING');
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [recovering, setRecovering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -359,10 +361,14 @@ export function AccountControl() {
         </div>
         <div className="auth-form">
         <div className="panel-heading">
-          <div><div className="label">Account</div><h2>{mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
+          <div><div className="label">Account</div><h2>{recovering ? 'Recover account' : mode === 'login' ? 'Sign in' : 'Create account'}</h2></div>
           <span className="badge">Secure Web session</span>
         </div>
-        {mfaRequired ? (
+        {recovering ? <PasswordRecovery initialEmail={email} onCancel={() => { setRecovering(false); setMode('login'); setMessage(''); }} onComplete={() => {
+          setRecovering(false); setMode('login'); setPassword(''); setMfaRequired(false); setMfaCode('');
+          setMessage('Password updated. Sign in with your new password.'); setMessageTone('status');
+          window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        }} /> : mfaRequired ? (
           <form onSubmit={completeMfa}>
             <label className="field-label">
               Authenticator or recovery code
@@ -399,6 +405,7 @@ export function AccountControl() {
             <button className="text-btn" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setMfaRequired(false); setMfaCode(''); setMessage(''); setMessageTone('status'); }} disabled={busy}>
               {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
             </button>
+            {mode === 'login' && <button className="text-btn" disabled={busy} onClick={() => { setRecovering(true); setPassword(''); setMessage(''); }}>Forgot password?</button>}
           </>
         )}
         {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{message}</p>}

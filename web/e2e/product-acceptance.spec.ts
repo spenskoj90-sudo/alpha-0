@@ -58,6 +58,39 @@ test('Settings persist appearance and Support exposes safe diagnostics', async (
   expect((await download).suggestedFilename()).toBe('sentinel-web-diagnostics.json');
 });
 
+test('password recovery has truthful request, invalid code, retry and completion states', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await expect(page.getByRole('heading', { name: 'Recover account' })).toBeVisible();
+  await geometry(page);
+  await page.getByLabel('Recovery email', { exact: true }).fill(`unknown-${randomUUID()}@example.invalid`);
+  await page.route('**/api/session/password-reset/request', route => route.abort('failed'));
+  await page.getByRole('button', { name: 'Send recovery email' }).click();
+  await expect(page.locator('#account [role="alert"]')).toContainText('Connection interrupted');
+  await page.unroute('**/api/session/password-reset/request');
+  await page.getByRole('button', { name: 'Send recovery email' }).click();
+  await expect(page.locator('#account [role="status"]')).toContainText('If an eligible account exists');
+  await page.getByLabel('Recovery code', { exact: true }).fill('invalid-' + 'x'.repeat(40));
+  await redactSensitiveOperation(() => page.getByLabel('New password', { exact: true }).fill('Disposable-test-password-123'));
+  await redactSensitiveOperation(() => page.getByLabel('Confirm new password', { exact: true }).fill('Different-test-password-123'));
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.locator('#account [role="alert"]')).toContainText('Passwords do not match');
+  await redactSensitiveOperation(() => page.getByLabel('Confirm new password', { exact: true }).fill('Disposable-test-password-123'));
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.locator('#account [role="alert"]')).toContainText('invalid or expired');
+  expect(await page.getByLabel('New password', { exact: true }).inputValue()).toBe('');
+  // Completion UI fixture; this does not claim real email/code delivery.
+  await page.route('**/api/session/password-reset/confirm', route => route.fulfill({ status: 200, json: { status: 'PASSWORD_UPDATED' } }));
+  await redactSensitiveOperation(() => page.getByLabel('New password', { exact: true }).fill('Disposable-test-password-123'));
+  await redactSensitiveOperation(() => page.getByLabel('Confirm new password', { exact: true }).fill('Disposable-test-password-123'));
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(page.locator('#account [role="status"]')).toContainText('Password updated');
+  expect(await page.getByLabel('Password', { exact: true }).inputValue()).toBe('');
+  expect(new URL(page.url()).search).toBe('');
+  expect(await page.evaluate(() => [...Object.keys(localStorage), ...Object.keys(sessionStorage)].some(key => /token|password|recovery/i.test(key)))).toBe(false);
+});
+
 test('Public Site routes, responsive layout, assets and action contrast', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.name));

@@ -34,6 +34,8 @@ test('Companion rendered brand and section selection follow keyboard and history
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
   await links.getByRole('link', { name: 'Games', exact: true }).focus();
   expect(await links.getByRole('link', { name: 'Games', exact: true }).evaluate(el => getComputedStyle(el).outlineStyle)).not.toBe('none');
+  await page.keyboard.press('Enter');
+  await expect(links.getByRole('link', { name: 'Games', exact: true })).toHaveAttribute('aria-current', 'location');
   await page.getByRole('combobox', { name: 'Interface language' }).selectOption('ru');
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
   await expect(links.getByRole('link', { name: 'Игры', exact: true })).toHaveAttribute('aria-current', 'location');

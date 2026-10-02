@@ -316,6 +316,14 @@ def check_versions(checks: Checks) -> None:
     checks.require(launcher.get("engines", {}).get("node") == "24.x", "Launcher declares Node 24 LTS")
     checks.require(launcher.get("dependencies", {}).get("electron") == "44.4.5", "Launcher pins Electron 44.4.5")
     checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.4.5", "Launcher packaging pins Electron 44.4.5")
+    packaging = launcher["sentinelPackaging"]
+    host_contract = read("docs/PACKAGED_COMPANION_HOST_ACCEPTANCE_V1.md")
+    checks.require(
+        f'- Electron runtime: exactly `{packaging["electronVersion"]}`' in host_contract
+        and f'- official upstream asset: `electron-v{packaging["electronVersion"]}-win32-x64.zip`' in host_contract
+        and f'- expected upstream SHA-256: `{packaging["electronWin32X64Sha256"]}`' in host_contract,
+        "Packaged-host acceptance contract matches executable runtime pins",
+    )
     checks.require('implementation("io.sentry:sentry-android:8.58.0")' in android, "Android pins Sentry 8.58.0")
     checks.require('implementation("androidx.navigation:navigation-compose:2.10.2")' in android, "Android pins Navigation Compose 2.10.2")
     checks.require('"httpx2==2.13.1"' in pyproject, "Core test tooling pins httpx2 2.13.1")

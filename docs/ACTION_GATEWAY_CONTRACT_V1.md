@@ -55,3 +55,7 @@ Policy Engine
 ## Non-goals
 
 This contract does not define a game executor, launcher automation, memory/process access, authentication bypass, anti-cheat/DRM bypass, or production automation policy. Exact environment capabilities remain subject to the adapter and evidence contracts.
+
+The separate [closed offline action contract](GAME_ACTION_OFFLINE_V1.md) defines
+versioned fixture requests and replay plumbing. It adds no gateway endpoint,
+does not migrate old requests and does not remove the AUTOMATIC denial.

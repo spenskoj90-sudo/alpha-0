@@ -72,6 +72,7 @@ def test_actual_lifespan_emits_once_and_provider_failure_does_not_block_serving(
         assert payload["properties"] == {
             "distinct_id": "sentinel-runtime",
             "$process_person_profile": False,
+            "$geoip_disable": True,
             "environment": "staging",
             "release": "1.0.0-rc2",
             "source_sha": "a" * 40,

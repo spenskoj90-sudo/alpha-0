@@ -13,7 +13,7 @@ SELECT r.rolsuper OR r.rolbypassrls OR r.rolcreatedb OR r.rolcreaterole OR r.rol
     OR EXISTS (SELECT 1 FROM pg_auth_members WHERE member = r.oid)
     OR EXISTS (SELECT 1 FROM pg_database WHERE datdba = r.oid)
     OR EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-               WHERE c.relowner = r.oid AND n.nspname NOT LIKE 'pg_%'
+               WHERE c.relowner = r.oid AND left(n.nspname, 3) <> 'pg_'
                  AND n.nspname <> 'information_schema')
     OR has_database_privilege(current_database(), 'CREATE')
     OR has_schema_privilege('public', 'CREATE')

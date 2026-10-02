@@ -107,6 +107,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Final release acceptance invariants' python scripts/test_final_release_acceptance.py
   check 'Physical-test artifact invariants' python scripts/test_physical_test_artifact.py
   check 'Physical-test cross-workflow version allocation' python scripts/test_physical_test_version.py
+  check 'Stock-game numeric calibration bounds' python scripts/test_game_observer_calibration.py
   check 'Staging synthetic gate invariants' python scripts/test_staging_surface_smoke.py
 fi
 

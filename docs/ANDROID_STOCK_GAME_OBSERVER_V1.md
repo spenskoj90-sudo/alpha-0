@@ -77,6 +77,40 @@ No game/version has L3 screen-recognition evidence yet.
 
 ## Validation and progression
 
+### Numeric calibration preparation
+
+`scripts/game_observer_calibration.py` summarizes at most 32 opt-in numeric
+comparisons for one exact source/APK/package/version/signer, installed game
+version, language/HUD and Infinix API34 environment. It accepts only structured
+health ratios and age/sequence metadata; extra fields including pixels or raw
+OCR are rejected. Input is bounded to 32 KiB. Missing and stale observations
+remain in the agreement denominator; fresh mismatches report absolute error.
+The 95% lower bound describes sample agreement uncertainty, not recognizer
+confidence. Synthetic records must be labelled synthetic.
+
+Every output is `PENDING_PHYSICAL_REVIEW`, source `UNVERIFIED`, recognizer
+`UNCALIBRATED`, capability unavailable. A physical label or perfect agreement
+cannot attest the selected app or promote capability. The report records
+asserted source/byte identity and an input digest; these are checked against
+retained artifact/diagnostics evidence during review, not trusted by declaration.
+
+The engineer constructs the bounded input from the exact retained manifest and
+Owner-opted-in numeric ground truth after a real capture campaign; the Owner
+does not need Python or a PC. Record one visible health ratio in the ordinary
+game, then compare SENTINEL's labelled candidate and its age. Keep incorrect,
+missing and stale examples. Do not enable recommendations or input merely to
+collect these records, and do not export full frames/raw OCR by default.
+
+Run in the engineering workspace:
+
+```text
+python scripts/game_observer_calibration.py --input numeric-samples.json --output calibration-summary.json
+```
+
+The runnable three-step offline action fixture and separate v1 migration boundary
+are described in `GAME_ACTION_OFFLINE_V1.md`. They do not change this observer or
+the physical prerequisites below.
+
 JVM tests cover consent/source-state gating, Stop, deadlines without frames,
 prior-session callbacks, freshness/order, resize/hide invalidation, independent
 historical observations, bounded geometry, missing/malformed/ambiguous ratios and

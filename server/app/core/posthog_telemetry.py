@@ -138,6 +138,9 @@ class PostHogCompanionTelemetrySink(CompanionTelemetrySink):
         properties: dict[str, str | int | float | bool] = {
             "distinct_id": "sentinel-runtime",
             "$process_person_profile": False,
+            # Custom HTTPS capture does not inherit the Python SDK's default.
+            # Suppress server-IP location enrichment on every bounded event.
+            "$geoip_disable": True,
             "environment": self.config.environment,
             "release": self.config.release,
             "source_sha": self.config.source_sha,

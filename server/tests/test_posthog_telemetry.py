@@ -60,6 +60,7 @@ def test_posthog_sink_sends_only_bounded_release_correlated_properties() -> None
     assert properties == {
         "distinct_id": "sentinel-runtime",
         "$process_person_profile": False,
+        "$geoip_disable": True,
         "environment": "staging",
         "release": "1.0.0-rc1",
         "source_sha": "a" * 40,

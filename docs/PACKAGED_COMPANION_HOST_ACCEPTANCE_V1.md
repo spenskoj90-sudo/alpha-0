@@ -11,9 +11,9 @@ It does **not** claim signed release readiness, production installation, target-
 ## Target
 
 - platform: Windows x64 (`win32-x64`)
-- Electron runtime: exactly `37.2.0`
-- official upstream asset: `electron-v37.2.0-win32-x64.zip`
-- expected upstream SHA-256: `4d4451179993fa22a1125bbc0130858903bc16e5c87900a969fa7bbac5c8f6a3`
+- Electron runtime: exactly `44.4.5`
+- official upstream asset: `electron-v44.4.5-win32-x64.zip`
+- expected upstream SHA-256: `11c395820a5aaa8ebcc0686b476d0ac98a730274ebfbdc8cf5538a7c2815cb5d`
 - application payload: unpacked `resources/app`
 - executable: `SENTINEL Companion.exe`
 - ordinary CI signing state: unsigned
@@ -47,7 +47,7 @@ The browser/player cannot influence the runtime version, upstream asset URL, exp
 4. requires identical canonical file-content manifests;
 5. verifies both build-evidence documents are bound to the exact PR HEAD SHA (or push SHA on `main`);
 6. starts the staged `SENTINEL Companion.exe` with the packaged smoke entrypoint;
-7. requires the running Electron process to report version `37.2.0`, validate embedded source provenance and resolve the Companion runtime module graph from `resources/app`;
+7. requires the running Electron process to report version `44.4.5`, validate embedded source provenance and resolve the Companion runtime module graph from `resources/app`;
 8. explicitly loads the exact-environment evidence recorder module as part of packaged smoke;
 9. records exact-SHA smoke evidence;
 10. uploads the unsigned Windows package plus manifests and evidence.

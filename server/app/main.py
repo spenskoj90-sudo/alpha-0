@@ -15,7 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.account_notifications import send_password_reset_email, send_verification_email
+from app.core.account_notifications import email_language, send_password_reset_email, send_verification_email
 from app.core.account_mfa import AccountMfaConfigurationError, AccountMfaService
 from app.core.admin import require_admin
 from app.core.billing import BillingService, BillingWebhookEvent
@@ -316,18 +316,18 @@ def register_user(payload: RegisterRequest, request: Request):
     user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
     scopes = ["character:read", "game:read", "audit:read"]
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
-    verification_token = user_store.issue_action_token(payload.email, "EMAIL_VERIFY", 86_400)
+    verification_token = user_store.issue_action_code(payload.email, "EMAIL_VERIFY")
     if verification_token:
-        send_verification_email(email_transport, payload.email, verification_token)
+        send_verification_email(email_transport, payload.email, verification_token, email_language(request.headers.get("accept-language")))
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
 
 
 @app.post("/v1/auth/email-verification/request", response_model=AuthActionResponse, status_code=202)
 def request_email_verification(payload: EmailActionRequest, request: Request) -> AuthActionResponse:
     rate_limit(request, "auth-email-verification-request")
-    token = user_store.issue_action_token(payload.email, "EMAIL_VERIFY", 86_400)
+    token = user_store.issue_action_code(payload.email, "EMAIL_VERIFY")
     if token:
-        send_verification_email(email_transport, payload.email, token)
+        send_verification_email(email_transport, payload.email, token, email_language(request.headers.get("accept-language")))
     return AuthActionResponse(status="ACCEPTED")
 
 
@@ -352,10 +352,10 @@ def request_authenticated_email_verification(
     email = state.get("email")
     if not isinstance(email, str) or not email.strip():
         raise HTTPException(status_code=409, detail="ACCOUNT_EMAIL_UNAVAILABLE")
-    token = user_store.issue_action_token(email, "EMAIL_VERIFY", 86_400)
+    token = user_store.issue_action_code(email, "EMAIL_VERIFY")
     if not token:
-        raise HTTPException(status_code=409, detail="EMAIL_VERIFICATION_UNAVAILABLE")
-    if not send_verification_email(email_transport, email, token):
+        raise HTTPException(status_code=429, detail="RATE_LIMITED")
+    if not send_verification_email(email_transport, email, token, email_language(request.headers.get("accept-language"))):
         raise HTTPException(status_code=503, detail="EMAIL_PROVIDER_UNAVAILABLE")
     return AuthActionResponse(status="ACCEPTED")
 
@@ -363,7 +363,7 @@ def request_authenticated_email_verification(
 @app.post("/v1/auth/email-verification/confirm", response_model=AuthActionResponse)
 def confirm_email_verification(payload: AuthTokenRequest, request: Request) -> AuthActionResponse:
     rate_limit(request, "auth-email-verification-confirm")
-    if not user_store.confirm_email(payload.token):
+    if not user_store.confirm_email(payload.token, payload.email):
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
     return AuthActionResponse(status="VERIFIED")
 
@@ -371,16 +371,16 @@ def confirm_email_verification(payload: AuthTokenRequest, request: Request) -> A
 @app.post("/v1/auth/password-reset/request", response_model=AuthActionResponse, status_code=202)
 def request_password_reset(payload: EmailActionRequest, request: Request) -> AuthActionResponse:
     rate_limit(request, "auth-password-reset-request")
-    token = user_store.issue_action_token(payload.email, "PASSWORD_RESET", 1_800)
+    token = user_store.issue_action_code(payload.email, "PASSWORD_RESET")
     if token:
-        send_password_reset_email(email_transport, payload.email, token)
+        send_password_reset_email(email_transport, payload.email, token, email_language(request.headers.get("accept-language")))
     return AuthActionResponse(status="ACCEPTED")
 
 
 @app.post("/v1/auth/password-reset/confirm", response_model=AuthActionResponse)
 def confirm_password_reset(payload: PasswordResetConfirmRequest, request: Request) -> AuthActionResponse:
     rate_limit(request, "auth-password-reset-confirm")
-    if not user_store.reset_password(payload.token, payload.password, store):
+    if not user_store.reset_password(payload.token, payload.password, store, payload.email):
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
     return AuthActionResponse(status="PASSWORD_UPDATED")
 

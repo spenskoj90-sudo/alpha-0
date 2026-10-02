@@ -94,7 +94,12 @@ def test_email_verification_is_hashed_single_use_and_updates_security_state(monk
     assert registered.status_code == 200
     token = _message_token(transport.snapshot()[0].text, "Verification code")
     assert token not in user_store._action_tokens
-    assert hashlib.sha256(token.encode()).hexdigest() in user_store._action_tokens
+    assert re.fullmatch(r"[0-9]{8}", token)
+    assert hashlib.sha256(token.encode()).hexdigest() not in user_store._action_tokens
+    action = next(a for a in user_store._action_tokens.values() if a["user_id"] == email and a["consumed_at"] is None and a["purpose"] == "EMAIL_VERIFY")
+    assert action["code_hash"].startswith("scrypt$")
+    from app.core.auth import verify_password
+    assert verify_password(token, action["code_hash"])
 
     headers = {"Authorization": f"Bearer {registered.json()['session_token']}"}
     before = client.get("/v1/account/security", headers=headers)
@@ -102,10 +107,10 @@ def test_email_verification_is_hashed_single_use_and_updates_security_state(monk
     assert before.json()["email_verified"] is False
     assert before.json()["providers"] == []
 
-    confirmed = client.post("/v1/auth/email-verification/confirm", json={"token": token})
+    confirmed = client.post("/v1/auth/email-verification/confirm", json={"token": token, "email": email})
     assert confirmed.status_code == 200
     assert confirmed.json() == {"status": "VERIFIED"}
-    assert client.post("/v1/auth/email-verification/confirm", json={"token": token}).status_code == 400
+    assert client.post("/v1/auth/email-verification/confirm", json={"token": token, "email": email}).status_code == 400
     assert client.get("/v1/account/security", headers=headers).json()["email_verified"] is True
 
 
@@ -177,11 +182,16 @@ def test_password_reset_changes_password_revokes_sessions_and_rejects_replay(mon
     assert len(messages) == prior_messages + 1
     token = _message_token(messages[-1].text, "Reset code")
     assert token not in user_store._action_tokens
-    assert hashlib.sha256(token.encode()).hexdigest() in user_store._action_tokens
+    assert re.fullmatch(r"[0-9]{8}", token)
+    assert hashlib.sha256(token.encode()).hexdigest() not in user_store._action_tokens
+    action = next(a for a in user_store._action_tokens.values() if a["user_id"] == email and a["consumed_at"] is None and a["purpose"] == "PASSWORD_RESET")
+    assert action["code_hash"].startswith("scrypt$")
+    from app.core.auth import verify_password
+    assert verify_password(token, action["code_hash"])
 
     confirmed = client.post(
         "/v1/auth/password-reset/confirm",
-        json={"token": token, "password": new_password},
+        json={"token": token, "email": email, "password": new_password},
     )
     assert confirmed.status_code == 200
     assert confirmed.json() == {"status": "PASSWORD_UPDATED"}
@@ -189,7 +199,7 @@ def test_password_reset_changes_password_revokes_sessions_and_rejects_replay(mon
 
     replay = client.post(
         "/v1/auth/password-reset/confirm",
-        json={"token": token, "password": "Account-reset-third-password-45678"},
+        json={"token": token, "email": email, "password": "Account-reset-third-password-45678"},
     )
     assert replay.status_code == 400
     assert client.post("/v1/auth/login", json={"email": email, "password": old_password}).status_code == 401

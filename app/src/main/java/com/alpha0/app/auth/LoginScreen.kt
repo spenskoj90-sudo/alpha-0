@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.R
+import com.alpha0.app.ui.AppLanguage
 import com.alpha0.app.ui.GhostButton
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.SecondaryButton
@@ -59,6 +60,7 @@ fun LoginScreen(
     onAuthenticated: (AuthApi.Session) -> Unit,
 ) {
     val strings = LocalAppStrings.current
+    val emailLanguage = if (strings.language == AppLanguage.RUSSIAN) "ru" else "en"
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -222,7 +224,7 @@ fun LoginScreen(
                         return@launch
                     }
                     val result = if (mode == AuthMode.REGISTER) {
-                        api.register(normalizedEmail, password)
+                        api.register(normalizedEmail, password, emailLanguage)
                     } else {
                         api.login(normalizedEmail, password)
                     }
@@ -305,7 +307,7 @@ fun LoginScreen(
                 busy = false
                 return@launch
             }
-            when (val result = api.requestPasswordReset(normalizedEmail)) {
+            when (val result = api.requestPasswordReset(normalizedEmail, emailLanguage)) {
                 is AuthApi.ActionResult.Success -> {
                     resetCodeRequested = true
                     status = strings.text("reset_sent")
@@ -318,14 +320,14 @@ fun LoginScreen(
 
     fun confirmReset() {
         when {
-            actionCode.trim().length < 32 -> error = strings.text("auth_code_required")
+            !validEmailActionCode(actionCode) -> error = strings.text("auth_code_required")
             password.length < 12 -> error = strings.text("password_length")
             else -> {
                 busy = true
                 error = null
                 status = null
                 scope.launch {
-                    when (val result = api.confirmPasswordReset(actionCode, password)) {
+                    when (val result = api.confirmPasswordReset(actionCode, password, email)) {
                         is AuthApi.ActionResult.Success -> {
                             mode = AuthMode.SIGN_IN
                             resetCodeRequested = false
@@ -342,14 +344,14 @@ fun LoginScreen(
     }
 
     fun confirmVerification() {
-        if (actionCode.trim().length < 32) {
+        if (!validEmailActionCode(actionCode)) {
             error = strings.text("auth_code_required")
             return
         }
         busy = true
         error = null
         scope.launch {
-            when (val result = api.confirmEmailVerification(actionCode)) {
+            when (val result = api.confirmEmailVerification(actionCode, email)) {
                 is AuthApi.ActionResult.Success -> {
                     val session = pendingSession
                     if (session != null) onAuthenticated(session)
@@ -421,11 +423,11 @@ fun LoginScreen(
             if (mode == AuthMode.RESET && resetCodeRequested || mode == AuthMode.VERIFY_EMAIL || mode == AuthMode.MFA) {
                 OutlinedTextField(
                     value = actionCode,
-                    onValueChange = { actionCode = it.trim(); error = null },
+                    onValueChange = { actionCode = if (mode == AuthMode.MFA) it.trim() else normalizeEmailActionCode(it); error = null },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(strings.text(if (mode == AuthMode.MFA) "mfa_or_recovery_code" else "auth_code")) },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    keyboardOptions = KeyboardOptions(keyboardType = if (mode == AuthMode.MFA) KeyboardType.Ascii else KeyboardType.Number),
                     enabled = !busy,
                     shape = RoundedCornerShape(6.dp),
                 )
@@ -582,9 +584,9 @@ fun LoginScreen(
                             scope.launch {
                                 val session = pendingSession
                                 val result = if (session != null) {
-                                    api.requestAccountEmailVerification(session.accessToken)
+                                    api.requestAccountEmailVerification(session.accessToken, emailLanguage)
                                 } else {
-                                    api.requestEmailVerification(email)
+                                    api.requestEmailVerification(email, emailLanguage)
                                 }
                                 when (result) {
                                     is AuthApi.ActionResult.Success -> {

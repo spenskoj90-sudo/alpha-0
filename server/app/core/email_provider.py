@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 _EMAIL = re.compile(r"^[^\s@]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,63}$")
 _SUBJECT = re.compile(r"^[^\r\n]{1,160}$")
 _MAX_TEXT_BYTES = 32_768
+_MAX_HTML_BYTES = 65_536
 _MAX_RESPONSE_BYTES = 65_536
 
 
@@ -24,7 +25,8 @@ class EmailProviderUnavailable(RuntimeError):
 class EmailMessage:
     to_address: str
     subject: str
-    text: str
+    text: str = field(repr=False)
+    html: str | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not _EMAIL.fullmatch(self.to_address):
@@ -34,6 +36,8 @@ class EmailMessage:
         encoded = self.text.encode("utf-8")
         if not encoded or len(encoded) > _MAX_TEXT_BYTES:
             raise ValueError("EMAIL_TEXT_INVALID")
+        if self.html is not None and (not self.html or len(self.html.encode("utf-8")) > _MAX_HTML_BYTES):
+            raise ValueError("EMAIL_HTML_INVALID")
 
 
 class EmailTransport(Protocol):
@@ -140,6 +144,7 @@ class BrevoEmailTransport:
                 "to": [{"email": message.to_address}],
                 "subject": message.subject,
                 "textContent": message.text,
+                **({"htmlContent": message.html} if message.html else {}),
             },
             sort_keys=True,
             separators=(",", ":"),
@@ -196,10 +201,11 @@ class ResendEmailTransport:
             raise EmailProviderUnavailable("RESEND_RECIPIENT_NOT_ALLOWED")
         payload = json.dumps(
             {
-                "from": self._config.from_address,
+                "from": f"SENTINEL <{self._config.from_address}>",
                 "to": [message.to_address],
                 "subject": message.subject,
                 "text": message.text,
+                **({"html": message.html} if message.html else {}),
             },
             sort_keys=True,
             separators=(",", ":"),

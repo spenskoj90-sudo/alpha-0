@@ -12,6 +12,7 @@ from sqlalchemy import text
 from app.core.auth import hash_password, verify_password
 from app.core.database_engine import create_service_role_engine
 from app.core.security import session_hash
+from app.core.email_codes import (DUMMY_CODE_HASH, EMAIL_CODE_MAX_ATTEMPTS, EMAIL_CODE_PATTERN, EMAIL_CODE_REQUESTS_PER_HOUR, EMAIL_CODE_TTL_SECONDS, normalize_action_code)
 
 ActionPurpose = Literal["EMAIL_VERIFY", "PASSWORD_RESET"]
 _EXTERNAL_PROVIDERS = {"google", "vk", "telegram"}
@@ -220,16 +221,81 @@ class UserAccountStore:
             }
         return token
 
-    def confirm_email(self, token: str) -> bool:
+    def issue_action_code(self, email: str, purpose: str, ttl_seconds: int = EMAIL_CODE_TTL_SECONDS) -> str | None:
+        purpose_value = self._validate_purpose(purpose)
+        if not 0 < ttl_seconds <= EMAIL_CODE_TTL_SECONDS:
+            raise ValueError("AUTH_ACTION_TTL_INVALID")
+        email = self.normalize_email(email)
+        code = f"{secrets.randbelow(100_000_000):08d}"
+        code_hash = hash_password(code)
+        selector = self._action_hash(secrets.token_urlsafe(32))
+        now = datetime.now(UTC)
+        if self._engine:
+            with self._engine.begin() as conn:
+                identity = conn.execute(text("SELECT identity_id FROM users WHERE email=:email AND status='ACTIVE' FOR UPDATE"), {"email": email}).scalar_one_or_none()
+                if identity is None:
+                    return None
+                count = conn.execute(text("SELECT count(*) FROM auth_action_tokens WHERE identity_id=:identity AND purpose=:purpose AND code_hash IS NOT NULL AND created_at>:since"), {"identity": identity, "purpose": purpose_value, "since": now - timedelta(hours=1)}).scalar_one()
+                if count >= EMAIL_CODE_REQUESTS_PER_HOUR:
+                    return None
+                conn.execute(text("UPDATE auth_action_tokens SET consumed_at=:now WHERE identity_id=:identity AND purpose=:purpose AND consumed_at IS NULL"), {"identity": identity, "purpose": purpose_value, "now": now})
+                conn.execute(text("INSERT INTO auth_action_tokens(token_hash,identity_id,purpose,expires_at,code_hash,created_at) VALUES (:selector,:identity,:purpose,:expires,:code_hash,:now)"), {"selector": selector, "identity": identity, "purpose": purpose_value, "expires": now + timedelta(seconds=ttl_seconds), "code_hash": code_hash, "now": now})
+            return code
+        with self._lock:
+            user = next((u for u in self._users.values() if u.get("email") == email and u.get("status") == "ACTIVE"), None)
+            if user is None:
+                return None
+            history = [a for a in self._action_tokens.values() if a["user_id"] == user["user_id"] and a["purpose"] == purpose_value]
+            if sum(bool(a.get("code_hash")) and a.get("created_at", now) > now - timedelta(hours=1) for a in history) >= EMAIL_CODE_REQUESTS_PER_HOUR:
+                return None
+            for action in history:
+                if action["consumed_at"] is None:
+                    action["consumed_at"] = now
+            self._action_tokens[selector] = {"user_id": user["user_id"], "purpose": purpose_value, "expires_at": now + timedelta(seconds=ttl_seconds), "created_at": now, "consumed_at": None, "code_hash": code_hash, "failed_attempts": 0}
+        return code
+
+    def _consume_database_code(self, conn: Any, email: str | None, purpose: str, code: str) -> Any:
+        # The users row serializes issue/consume/budget operations across connections and workers.
+        identity = conn.execute(text("SELECT identity_id FROM users WHERE email=:email AND status='ACTIVE' FOR UPDATE"), {"email": self.normalize_email(email or "")}).scalar_one_or_none()
+        action = conn.execute(text("SELECT token_hash,code_hash FROM auth_action_tokens WHERE identity_id=:identity AND purpose=:purpose AND code_hash IS NOT NULL AND consumed_at IS NULL AND expires_at>now() AND failed_attempts<:max_attempts ORDER BY created_at DESC LIMIT 1 FOR UPDATE"), {"identity": identity, "purpose": purpose, "max_attempts": EMAIL_CODE_MAX_ATTEMPTS}).mappings().first() if identity is not None else None
+        valid = verify_password(code, action["code_hash"] if action else DUMMY_CODE_HASH)
+        if not action:
+            return None
+        if not valid:
+            conn.execute(text("UPDATE auth_action_tokens SET failed_attempts=failed_attempts+1,consumed_at=CASE WHEN failed_attempts+1>=:max_attempts THEN now() ELSE consumed_at END WHERE token_hash=:selector"), {"selector": action["token_hash"], "max_attempts": EMAIL_CODE_MAX_ATTEMPTS})
+            return None
+        conn.execute(text("UPDATE auth_action_tokens SET consumed_at=now() WHERE token_hash=:selector"), {"selector": action["token_hash"]})
+        return identity
+
+    def _consume_memory_code(self, email: str | None, purpose: str, code: str) -> dict[str, Any] | None:
+        # Called only while holding self._lock; failed attempts survive resends/process boundaries in DB.
+        now = datetime.now(UTC)
+        user = next((u for u in self._users.values() if u.get("email") == self.normalize_email(email or "") and u.get("status") == "ACTIVE"), None)
+        actions = [a for a in self._action_tokens.values() if user and a["user_id"] == user["user_id"] and a["purpose"] == purpose and a.get("code_hash") and a["consumed_at"] is None and a["expires_at"] > now and a["failed_attempts"] < EMAIL_CODE_MAX_ATTEMPTS]
+        action = max(actions, key=lambda a: a["created_at"]) if actions else None
+        valid = verify_password(code, action["code_hash"] if action else DUMMY_CODE_HASH)
+        if not action:
+            return None
+        if not valid:
+            action["failed_attempts"] += 1
+            if action["failed_attempts"] >= EMAIL_CODE_MAX_ATTEMPTS:
+                action["consumed_at"] = now
+            return None
+        action["consumed_at"] = now
+        return user
+
+    def confirm_email(self, token: str, email: str | None = None) -> bool:
+        token = normalize_action_code(token)
+        numeric = bool(EMAIL_CODE_PATTERN.fullmatch(token))
         token_hash = self._action_hash(token)
         now = datetime.now(UTC)
         if self._engine:
             with self._engine.begin() as conn:
-                identity_id = conn.execute(
+                identity_id = self._consume_database_code(conn, email, "EMAIL_VERIFY", token) if numeric else conn.execute(
                     text(
                         "UPDATE auth_action_tokens SET consumed_at=now() "
                         "WHERE token_hash=:token_hash AND purpose='EMAIL_VERIFY' "
-                        "AND consumed_at IS NULL AND expires_at>now() "
+                        "AND code_hash IS NULL AND consumed_at IS NULL AND expires_at>now() "
                         "RETURNING identity_id"
                     ),
                     {"token_hash": token_hash},
@@ -242,6 +308,12 @@ class UserAccountStore:
                 )
             return True
         with self._lock:
+            if numeric:
+                row = self._consume_memory_code(email, "EMAIL_VERIFY", token)
+                if row is None:
+                    return False
+                row["email_verified_at"] = row.get("email_verified_at") or now
+                return True
             action = self._action_tokens.get(token_hash)
             if (
                 not action
@@ -257,17 +329,19 @@ class UserAccountStore:
             row["email_verified_at"] = row.get("email_verified_at") or now
         return True
 
-    def reset_password(self, token: str, new_password: str, store: Any) -> str | None:
+    def reset_password(self, token: str, new_password: str, store: Any, email: str | None = None) -> str | None:
+        token = normalize_action_code(token)
+        numeric = bool(EMAIL_CODE_PATTERN.fullmatch(token))
         token_hash = self._action_hash(token)
         new_hash = hash_password(new_password)
         now = datetime.now(UTC)
         if self._engine:
             with self._engine.begin() as conn:
-                identity_id = conn.execute(
+                identity_id = self._consume_database_code(conn, email, "PASSWORD_RESET", token) if numeric else conn.execute(
                     text(
                         "UPDATE auth_action_tokens SET consumed_at=now() "
                         "WHERE token_hash=:token_hash AND purpose='PASSWORD_RESET' "
-                        "AND consumed_at IS NULL AND expires_at>now() "
+                        "AND code_hash IS NULL AND consumed_at IS NULL AND expires_at>now() "
                         "RETURNING identity_id"
                     ),
                     {"token_hash": token_hash},
@@ -293,18 +367,18 @@ class UserAccountStore:
                 )
             return str(user_id)
         with self._lock:
-            action = self._action_tokens.get(token_hash)
-            if (
-                not action
-                or action["purpose"] != "PASSWORD_RESET"
-                or action["consumed_at"] is not None
-                or action["expires_at"] <= now
-            ):
-                return None
-            row = self._users.get(str(action["user_id"]))
-            if not row or row.get("status") != "ACTIVE":
-                return None
-            action["consumed_at"] = now
+            if numeric:
+                row = self._consume_memory_code(email, "PASSWORD_RESET", token)
+                if row is None:
+                    return None
+            else:
+                action = self._action_tokens.get(token_hash)
+                if (not action or action["purpose"] != "PASSWORD_RESET" or action["consumed_at"] is not None or action["expires_at"] <= now):
+                    return None
+                row = self._users.get(str(action["user_id"]))
+                if not row or row.get("status") != "ACTIVE":
+                    return None
+                action["consumed_at"] = now
             row["password_hash"] = new_hash
             user_id = str(row["user_id"])
         sessions = getattr(store, "sessions", None)

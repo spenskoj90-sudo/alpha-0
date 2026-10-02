@@ -333,4 +333,20 @@ class AuthApiTransportTest {
         assertTrue(body.contains("code_verifier"))
     }
 
+    @Test
+    fun numericEmailConfirmationIncludesAccountAndPreservesZeroes() = runBlocking {
+        val transport = FakeTransport(HttpResponse(200, "{\"status\":\"EMAIL_VERIFIED\"}"))
+        AuthApi("https://example.test", transport).confirmEmailVerification("0000 1234", " User@Example.TEST ")
+        val body = String(requireNotNull(requireNotNull(transport.request).body))
+        assertTrue(body.contains("00001234"))
+        assertTrue(body.contains("user@example.test"))
+    }
+
+    @Test
+    fun localizedMailRequestUsesExplicitLanguageHeader() = runBlocking {
+        val transport = FakeTransport(HttpResponse(202, "{\"status\":\"ACCEPTED\"}"))
+        AuthApi("https://example.test", transport).requestPasswordReset("user@example.test", "ru")
+        assertEquals("ru", requireNotNull(transport.request).headers["Accept-Language"])
+    }
+
 }

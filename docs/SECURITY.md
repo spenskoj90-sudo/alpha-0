@@ -10,7 +10,7 @@
 - Fresh timestamp and one-time request/challenge replay protection.
 - Opaque access tokens with hashed persistence.
 - One-time refresh-token rotation and replay rejection.
-- Email verification and password recovery use high-entropy single-use credentials; only SHA-256 token digests are persisted.
+- Email verification and password recovery use account/purpose-bound eight-digit CSPRNG codes: salted scrypt digests, 15-minute TTL, five wrong attempts and three issuances per rolling hour. PostgreSQL locks preserve these limits across workers; expiry cleanup preserves the hourly budget. Earlier opaque-token SHA-256 rows remain compatible until expired/replaced. See `EMAIL_ACTION_CODES_V1.md`.
 - Verification/reset requests are deliberately non-enumerating for unknown email addresses.
 - Password reset revokes all existing sessions for the affected identity before a new login can be trusted.
 - Account TOTP MFA is server-authoritative across password and federated first factors: a successful first factor yields only a five-minute hashed one-time challenge, never a session, until MFA succeeds.

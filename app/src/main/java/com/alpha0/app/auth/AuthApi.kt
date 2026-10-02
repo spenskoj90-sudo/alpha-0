@@ -107,8 +107,8 @@ class AuthApi(
         diag = DiagnosticLogger.get(context)
     }
 
-    suspend fun register(email: String, password: String): Result = withContext(Dispatchers.IO) {
-        requestCredentials("/v1/auth/register", email, password, "REGISTER")
+    suspend fun register(email: String, password: String, language: String = "en"): Result = withContext(Dispatchers.IO) {
+        requestCredentials("/v1/auth/register", email, password, "REGISTER", language)
     }
 
     suspend fun login(email: String, password: String): Result = withContext(Dispatchers.IO) {
@@ -134,44 +134,47 @@ class AuthApi(
         )
     }
 
-    suspend fun requestEmailVerification(email: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun requestEmailVerification(email: String, language: String = "en"): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/auth/email-verification/request",
             JSONObject().apply { put("email", email.trim().lowercase()) }.toString(),
             "EMAIL_VERIFY_REQUEST",
+            mapOf("Accept-Language" to language),
         )
     }
 
-    suspend fun requestAccountEmailVerification(accessToken: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun requestAccountEmailVerification(accessToken: String, language: String = "en"): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/account/email-verification/request",
             "{}",
             "ACCOUNT_EMAIL_VERIFY_REQUEST",
-            mapOf("Authorization" to "Bearer $accessToken"),
+            mapOf("Authorization" to "Bearer $accessToken", "Accept-Language" to language),
         )
     }
 
-    suspend fun confirmEmailVerification(token: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun confirmEmailVerification(token: String, email: String? = null): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/auth/email-verification/confirm",
-            JSONObject().apply { put("token", token.trim()) }.toString(),
+            JSONObject().apply { put("token", normalizeEmailActionCode(token)); email?.let { put("email", it.trim().lowercase()) } }.toString(),
             "EMAIL_VERIFY_CONFIRM",
         )
     }
 
-    suspend fun requestPasswordReset(email: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun requestPasswordReset(email: String, language: String = "en"): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/auth/password-reset/request",
             JSONObject().apply { put("email", email.trim().lowercase()) }.toString(),
             "PASSWORD_RESET_REQUEST",
+            mapOf("Accept-Language" to language),
         )
     }
 
-    suspend fun confirmPasswordReset(token: String, password: String): ActionResult = withContext(Dispatchers.IO) {
+    suspend fun confirmPasswordReset(token: String, password: String, email: String? = null): ActionResult = withContext(Dispatchers.IO) {
         requestAction(
             "/v1/auth/password-reset/confirm",
             JSONObject().apply {
-                put("token", token.trim())
+                put("token", normalizeEmailActionCode(token))
+                email?.let { put("email", it.trim().lowercase()) }
                 put("password", password)
             }.toString(),
             "PASSWORD_RESET_CONFIRM",
@@ -517,15 +520,15 @@ class AuthApi(
         )
     }
 
-    private fun requestCredentials(path: String, email: String, password: String, op: String): Result {
+    private fun requestCredentials(path: String, email: String, password: String, op: String, language: String = "en"): Result {
         val payload = JSONObject().apply {
             put("email", email.trim().lowercase())
             put("password", password)
         }.toString()
-        return requestJson(path, payload, op)
+        return requestJson(path, payload, op, mapOf("Accept-Language" to language))
     }
 
-    private fun requestJson(path: String, payload: String, op: String): Result {
+    private fun requestJson(path: String, payload: String, op: String, extraHeaders: Map<String, String> = emptyMap()): Result {
         val t0 = System.currentTimeMillis()
         val normalizedBase = baseUrl.trim().trimEnd('/')
         return try {
@@ -536,7 +539,7 @@ class AuthApi(
                     headers = mapOf(
                         "Content-Type" to "application/json",
                         "Accept" to "application/json",
-                    ),
+                    ) + extraHeaders,
                     body = payload.toByteArray(Charsets.UTF_8),
                 )
             )

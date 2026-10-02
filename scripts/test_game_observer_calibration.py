@@ -55,6 +55,15 @@ class CalibrationTests(unittest.TestCase):
         self.assertEqual(report["status"], "PENDING_PHYSICAL_REVIEW")
         self.assertFalse(report["capabilityAvailable"])
 
+    def test_missing_or_stale_only_data_has_no_measured_numeric_error(self):
+        for mutate in [lambda v: v["samples"][0].update(observed=None),
+                       lambda v: v["samples"][0].update(ageMs=5001)]:
+            value = sample()
+            mutate(value)
+            report = summarize(value)
+            self.assertIsNone(report["maximumAbsoluteError"])
+            self.assertEqual(report["sampleAgreement"], 0.0)
+
     def test_cli_preserves_binding_and_rejects_ambiguous_or_oversized_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)

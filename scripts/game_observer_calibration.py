@@ -85,7 +85,8 @@ def summarize(value: dict) -> dict:
         "status": "PENDING_PHYSICAL_REVIEW", "sourceTrust": "UNVERIFIED", "capabilityAvailable": False,
         "signal": "health_ratio", "samples": n, "exactMatches": matches, "missing": missing, "stale": stale,
         "mismatches": mismatches, "sampleAgreement": agreement, "sampleAgreement95LowerBound": max(0.0, lower),
-        "maximumAbsoluteError": errors, "recognizerConfidence": "UNCALIBRATED"}
+        "maximumAbsoluteError": errors if matches + mismatches else None,
+        "recognizerConfidence": "UNCALIBRATED"}
 
 
 def unique_object(pairs: list[tuple[str, object]]) -> dict:

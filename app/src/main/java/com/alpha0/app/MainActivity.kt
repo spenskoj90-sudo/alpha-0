@@ -63,6 +63,8 @@ import com.alpha0.app.device.DeviceApi
 import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
+import com.alpha0.app.game.GameObservationScreen
+import com.alpha0.app.game.GameObservationService
 import com.alpha0.app.help.HelpScreen
 import com.alpha0.app.net.DnsFailoverHttpTransport
 import com.alpha0.app.net.SessionCredentials
@@ -159,6 +161,7 @@ class MainActivity : ComponentActivity() {
                 sessionSignals.tryEmit(Unit)
             },
             onSessionInvalidated = {
+                GameObservationService.stop(this, "SESSION_CLOSED")
                 sessionStore.clear(this)
                 sessionSignals.tryEmit(Unit)
             },
@@ -278,6 +281,7 @@ private fun SentinelApplicationUi(
             ) {
                 is DeviceApi.Result.Success -> {
                     rotationBoundaryResolved = true
+                    GameObservationService.stop(activity, "SESSION_CLOSED")
                     sessionStore.clear(activity)
                     try {
                         deviceIdentity.commitRotation(pendingRotation)
@@ -359,6 +363,7 @@ private fun SentinelApplicationUi(
         sessionSignals.collect {
             activeSession = sessionStore.load(activity)
             if (activeSession == null && refreshComplete) {
+                GameObservationService.stop(activity, "SESSION_CLOSED")
                 pendingMfaRecoveryCodes = null
                 navController.navigate("login") {
                     popUpTo(navController.graph.id) { inclusive = true }
@@ -574,6 +579,7 @@ private fun SentinelApplicationUi(
                             onGameClick = { navController.navigate("game-details/$it") },
                             onReportProblem = { navController.navigate("quality-report") },
                             onSignedOut = {
+                                GameObservationService.stop(activity, "SESSION_CLOSED")
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }
@@ -583,7 +589,16 @@ private fun SentinelApplicationUi(
                 }
                 composable("games") {
                     AuthenticatedRoute(activeSession, sessionStore, activity, navController) { current ->
-                        GamesScreen(current.accessToken, dashboardApi) { navController.navigate("game-details/$it") }
+                        GamesScreen(
+                            current.accessToken,
+                            dashboardApi,
+                            onLocalGameClick = if (BuildConfig.DEBUG) ({ navController.navigate("game-observer") }) else null,
+                        ) { navController.navigate("game-details/$it") }
+                    }
+                }
+                composable("game-observer") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) {
+                        GameObservationScreen()
                     }
                 }
                 composable("security") {
@@ -630,12 +645,14 @@ private fun SentinelApplicationUi(
                             federatedCallbackUri = null,
                             onFederatedCallbackConsumed = onFederatedCallbackConsumed,
                             onMfaEnabled = { codes ->
+                                GameObservationService.stop(activity, "SESSION_CLOSED")
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 pendingMfaRecoveryCodes = codes
                                 navController.navigate("mfa-recovery-codes") { popUpTo(navController.graph.id) { inclusive = true } }
                             },
                             onSessionBoundary = {
+                                GameObservationService.stop(activity, "SESSION_CLOSED")
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }
@@ -653,6 +670,7 @@ private fun SentinelApplicationUi(
                             federatedCallbackUri = null,
                             onFederatedCallbackConsumed = onFederatedCallbackConsumed,
                             onMfaEnabled = { codes ->
+                                GameObservationService.stop(activity, "SESSION_CLOSED")
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 pendingMfaRecoveryCodes = codes
@@ -685,6 +703,7 @@ private fun SentinelApplicationUi(
                             api = dashboardApi,
                             deviceIdentity = deviceIdentity,
                             onRevoked = {
+                                GameObservationService.stop(activity, "SESSION_CLOSED")
                                 sessionStore.clear(activity)
                                 activeSession = null
                                 navController.navigate("login") { popUpTo(navController.graph.id) { inclusive = true } }

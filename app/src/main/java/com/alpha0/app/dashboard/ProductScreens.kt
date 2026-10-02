@@ -31,7 +31,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun GamesScreen(accessToken: String, api: DashboardApi, onGameClick: (String) -> Unit) {
+fun GamesScreen(accessToken: String, api: DashboardApi, onLocalGameClick: (() -> Unit)? = null, onGameClick: (String) -> Unit) {
     val strings = LocalAppStrings.current
     var games by remember { mutableStateOf<List<DashboardApi.Entitlement>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -53,6 +53,18 @@ fun GamesScreen(accessToken: String, api: DashboardApi, onGameClick: (String) ->
         item {
             Text(strings.text("games_title"), style = MaterialTheme.typography.headlineLarge)
             Text(strings.text("games_description"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        onLocalGameClick?.let { openObserver ->
+            item {
+                SentinelCard(kind = SentinelCardKind.CONTENT) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(strings.text("game_observer_title"), style = MaterialTheme.typography.titleLarge)
+                        Text("Shattered Pixel Dungeon")
+                        Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        PrimaryButton(strings.text("game_observer_open"), openObserver)
+                    }
+                }
+            }
         }
         if (loading) item { SentinelLoadingState(strings.text("loading_status"), Modifier.fillMaxWidth()) }
         error?.let { message ->

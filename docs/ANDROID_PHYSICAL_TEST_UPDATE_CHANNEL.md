@@ -43,9 +43,47 @@ The separate Owner-dispatched `Physical Test Update APK` workflow accepts these 
 
 If these secrets are absent, the routine CI workflow still builds an ephemeral-debug artifact for validation, but its manifest explicitly reports `updateCompatible=false`; it must not be handed to the Owner as an in-place-update candidate. The stable-update workflow fails closed if its dedicated signing material is unavailable.
 
-## One-time migration consequence
+## Owner-controlled signing transition
 
-The already-installed APK was signed by an ephemeral key whose private material is no longer available. The first transition to the stable physical-test signer therefore requires one uninstall/reinstall. After that one-time transition, future physical-test APKs can update in place as long as the dedicated test signer is retained and the versionCode continues to increase.
+Preserve the installed app, its Keystore identity and its device/session binding.
+Different ephemeral certificates do not support update-over-install. Do not assume
+that the old private key is recoverable, and do not prescribe uninstall/reinstall
+as an ordinary engineering fix. A new stable key cannot retroactively establish
+the old certificate's lineage.
+
+The Owner chooses one of these concrete paths after reviewing the installed
+package/version and certificate evidence:
+
+- If the actual old signer remains in approved custody, use it through the
+  dedicated test secret store and verify the certificate plus a higher versionCode.
+- If the old signer is unavailable, approve a separate durable test identity and
+  package/callback migration that preserves the existing installation. A second
+  package starts with its own Keystore/device registration; identity is not copied
+  or silently treated as continuous. Prepare that build only after this decision.
+
+Never request a private key or password in chat. Test custody and production
+release custody are separate. `signerLineageVerified` proves the pinned build
+certificate match, not compatibility with an unidentified installed app. Physical
+update acceptance additionally proves retained identity and session/device recovery.
+
+## Cross-workflow version allocation
+
+GitHub run counters are independent for routine and stable-update workflows.
+`100000000 + GITHUB_RUN_NUMBER` in the update workflow could therefore be lower
+than an already installed diagnostic version (for example 100000525). The stable
+workflow instead requires `previous_version_code`: the highest already distributed
+code for the pinned signer, obtained from the retained manifest. Use zero only for
+an explicitly approved new identity, never as an update baseline.
+
+`scripts/physical_test_version.py` allocates the greater of current UTC epoch
+seconds and that baseline plus one, refusing values above 2100000000. The artifact
+verifier independently requires the APK's actual Gradle versionCode to exceed the
+supplied baseline and records `updateBaselineVersionCode`. Before each dispatch,
+carry forward the highest distributed code from the last manifest; a falsely low
+input cannot prove device compatibility. The routine ephemeral channel keeps its
+independent diagnostic counter and does not claim update compatibility.
+
+Primary versioning contract: https://developer.android.com/studio/publish/versioning
 
 
 ## Signer continuity pin

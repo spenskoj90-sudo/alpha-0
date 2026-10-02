@@ -7,6 +7,10 @@ on:
         description: "Exact protected-main commit SHA to build"
         required: true
         type: string
+      previous_version_code:
+        description: "Highest versionCode already distributed for the pinned test signer; 0 only for an Owner-approved new identity"
+        required: true
+        type: string
       vk_client_id:
         description: "Public VK ID application ID to compile into the callback identity; use 0 when VK is disabled"
         required: false
@@ -25,6 +29,7 @@ env:
   PHYSICAL_TEST_API_FALLBACK_BASE_URL: https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core
   PHYSICAL_TEST_EXPECTED_SIGNER_SHA256: ${{ vars.PHYSICAL_TEST_SIGNER_SHA256 }}
   PHYSICAL_TEST_VK_CLIENT_ID: ${{ inputs.vk_client_id }}
+  PHYSICAL_TEST_PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}
 
 jobs:
   build-update-apk:
@@ -70,9 +75,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Establish monotonic physical-test version code
+        env:
+          PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}
         run: |
           set -euo pipefail
-          value=$((100000000 + GITHUB_RUN_NUMBER))
+          value="$(python scripts/physical_test_version.py --previous-version-code "$PREVIOUS_VERSION_CODE")"
           echo "SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value" >> "$GITHUB_ENV"
 
       - name: Decode dedicated physical-test keystore
@@ -131,7 +138,18 @@ jobs:
       - name: Verify update artifact identity and signer lineage
         run: |
           set -euo pipefail
-          python scripts/physical_test_artifact.py             --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk             --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json             --version-file VERSION             --source-sha "${{ inputs.source_sha }}"             --api-base-url "$PHYSICAL_TEST_API_BASE_URL"             --api-fallback-base-url "$PHYSICAL_TEST_API_FALLBACK_BASE_URL"             --repository "$GITHUB_REPOSITORY"             --run-id "$GITHUB_RUN_ID"             --run-attempt "$GITHUB_RUN_ATTEMPT"             --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"             --vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID"             --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"             --signing-mode stable-test             --workflow-name "Physical Test Update APK"             --output physical-test-manifest.json
+          python scripts/physical_test_artifact.py \
+            --apk app/build/outputs/apk/physicalTest/app-physicalTest.apk \
+            --output-metadata app/build/outputs/apk/physicalTest/output-metadata.json \
+            --version-file VERSION --source-sha "${{ inputs.source_sha }}" \
+            --api-base-url "$PHYSICAL_TEST_API_BASE_URL" \
+            --api-fallback-base-url "$PHYSICAL_TEST_API_FALLBACK_BASE_URL" \
+            --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256" --vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID" \
+            --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256" \
+            --previous-version-code "$PHYSICAL_TEST_PREVIOUS_VERSION_CODE" \
+            --signing-mode stable-test --workflow-name "Physical Test Update APK" \
+            --output physical-test-manifest.json
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["signerLineageVerified"]).lower())')" = "true"
           test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"

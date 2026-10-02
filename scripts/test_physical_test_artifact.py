@@ -114,16 +114,32 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 signer_sha256=SIGNER,
                 vk_client_id=VK_ID,
                 expected_signer_sha256=SIGNER,
+                previous_version_code=10001,
                 signing_mode="stable-test",
                 workflow_name="Physical Test Update APK",
                 generated_at="2026-09-21T15:00:00Z",
             )
         self.assertTrue(manifest["updateCompatible"])
         self.assertTrue(manifest["signerLineageVerified"])
+        self.assertEqual(manifest["updateBaselineVersionCode"], 10001)
         self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
         self.assertEqual(manifest["signingMode"], "stable-test")
         self.assertEqual(manifest["workflow"]["name"], "Physical Test Update APK")
         self.assertEqual(manifest["artifactName"], f"sentinel-physical-test-update-apk-{SHA}")
+
+    def test_stable_update_refuses_missing_or_non_increasing_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            for baseline in (None, 10002, 10003, -1, True):
+                with self.subTest(baseline=baseline), self.assertRaisesRegex(ValueError, "versionCode baseline"):
+                    build_manifest(
+                        apk=apk, output_metadata=metadata, version_file=version,
+                        source_sha=SHA, api_base_url=ORIGIN, api_fallback_base_url=FALLBACK,
+                        repository="spenskoj90-sudo/alpha-0", run_id="12345", run_attempt="2",
+                        signer_sha256=SIGNER, expected_signer_sha256=SIGNER, vk_client_id=VK_ID,
+                        previous_version_code=baseline, signing_mode="stable-test",
+                        workflow_name="Physical Test Update APK",
+                    )
 
     def test_stable_signing_cannot_claim_routine_secret_free_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

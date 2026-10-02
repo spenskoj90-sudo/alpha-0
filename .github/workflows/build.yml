@@ -347,7 +347,17 @@ jobs:
           for i in {1..30}; do pg_isready -h 127.0.0.1 -p 5432 -U sentinel && break; sleep 2; done
       - name: Start API and verify health
         run: |
-          docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel -e PGOPTIONS='-c app.service_role=true' -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
+          docker run --rm --network host -e DATABASE_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel sentinel-core:smoke python migrate.py
+          docker exec -i sentinel-postgres psql -U sentinel -d sentinel -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE sentinel_runtime LOGIN PASSWORD 'testpass' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+          GRANT CONNECT ON DATABASE sentinel TO sentinel_runtime;
+          GRANT USAGE ON SCHEMA public TO sentinel_runtime;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sentinel_runtime;
+          REVOKE ALL ON schema_migrations FROM sentinel_runtime;
+          GRANT SELECT ON schema_migrations TO sentinel_runtime;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO sentinel_runtime;
+          SQL
+          docker run -d --name sentinel-api --network host -e DATABASE_URL=postgresql+psycopg://sentinel_runtime:testpass@127.0.0.1:5432/sentinel -e DATABASE_MIGRATION_URL=postgresql+psycopg://sentinel:testpass@127.0.0.1:5432/sentinel -e SENTINEL_REQUIRE_RESTRICTED_DATABASE_ROLE=true -e SENTINEL_ENV=production -e SENTINEL_ENROLLMENT_TOKEN=smoke:secret -e SENTINEL_REQUIRE_ENROLLMENT=true sentinel-core:smoke
           for i in {1..30}; do curl -fsS http://127.0.0.1:8080/healthz && exit 0; sleep 2; done
           docker logs sentinel-api
           exit 1

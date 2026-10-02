@@ -3,9 +3,15 @@ from __future__ import annotations
 import os
 
 from app.core.database_security import validate_database_url
+from app.core.database_engine import restricted_database_role_required
 from app.core.request_limits import RequestBodyLimitMiddleware, request_body_limit_from_env
 
 _environment = os.getenv("SENTINEL_ENV", "development").lower()
+# The migration subprocess has finished before serving. Its credential must
+# not remain in the application's environment or provider SDK context.
+os.environ.pop("DATABASE_MIGRATION_URL", None)
+if _environment == "production" and not restricted_database_role_required():
+    raise RuntimeError("Production requires SENTINEL_REQUIRE_RESTRICTED_DATABASE_ROLE=true")
 validate_database_url(os.getenv("DATABASE_URL"), _environment)
 
 from app.main import app as core_app, store as core_store  # noqa: E402

@@ -95,3 +95,24 @@ The stable physical-test update workflow is fail-closed against a non-secret rep
 The workflow extracts the actual certificate fingerprint with Android `apksigner` and requires exact equality before `signerLineageVerified=true` and `updateCompatible=true` can be emitted. Replacing or rotating the test keystore without deliberately updating this pin therefore cannot silently produce an in-place-update claim.
 
 The routine secret-free diagnostic Physical Test APK also records its actual signer fingerprint, but remains `signingMode=ephemeral-debug` and `updateCompatible=false`. Production signing material is forbidden for this channel.
+
+## Installed identity in local diagnostics
+
+New builds record the actual package at process start and one asynchronous
+`PACKAGE_SIGNER` event from Android PackageManager. It contains actual installed
+versionCode, current certificate SHA-256 digests and bounded signing-history
+digests; multiple signers are distinct from rotation. No APK bytes, private key,
+Keystore/device identity or automatic upload is involved. Read failures produce
+`PACKAGE_SIGNER_UNAVAILABLE`, never guessed identity. Export may precede this
+asynchronous event; missing evidence remains unknown and must not authorize an
+update. Compare current certificate(s), package and increasing versionCode with
+the retained candidate before installation, then verify identity/session recovery.
+
+History metadata does not itself mark `updateCompatible` or prove preservation of
+an older installation. The historical Infinix `cf40028f` log records code
+`100000517` but has no certificate/package metadata; it cannot establish current
+signer compatibility. Preserve that installation while the Owner decides custody
+or a separate durable test identity. Google OAuth SHA-1 registration additionally
+comes from the retained **stable** signing certificate, not an ephemeral build.
+
+API reference: https://developer.android.com/reference/android/content/pm/SigningInfo

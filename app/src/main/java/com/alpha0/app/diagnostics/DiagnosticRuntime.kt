@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -43,6 +44,7 @@ object DiagnosticRuntime {
                 "version_name" to BuildConfig.VERSION_NAME,
                 "version_code" to BuildConfig.VERSION_CODE,
                 "source_sha" to BuildConfig.SENTINEL_SOURCE_SHA,
+                "package_name" to application.packageName,
                 "runtime_environment" to BuildConfig.SENTINEL_RUNTIME_ENVIRONMENT,
                 "api_origin" to BuildConfig.SENTINEL_API_BASE_URL,
                 "api_fallback_origin" to BuildConfig.SENTINEL_API_FALLBACK_BASE_URL,
@@ -55,12 +57,36 @@ object DiagnosticRuntime {
                 "orientation" to configuration.orientation,
             )
         )
+        captureInstalledSigningIdentity(application, logger)
         installUncaughtExceptionCapture(logger)
         installLifecycleCapture(application, logger)
         installMemoryCapture(application, logger)
         capturePreviousExitReasons(application, logger)
         if (logger.isForensicTest()) installForensicStrictMode(logger)
         return logger
+    }
+
+    private fun captureInstalledSigningIdentity(context: Context, logger: DiagnosticLogger) {
+        // One bounded metadata task per process. No APK file hashing or UI wait.
+        Thread({
+            try {
+                @Suppress("DEPRECATION")
+                val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                val signing = info.signingInfo ?: error("SIGNING_IDENTITY_UNAVAILABLE")
+                logger.info(
+                    "RUNTIME", "PACKAGE_SIGNER", result = "OBSERVED",
+                    details = SigningCertificateEvidence.details(
+                        context.packageName, info.longVersionCode,
+                        signing.apkContentsSigners.orEmpty().map { it.toByteArray() },
+                        if (signing.hasMultipleSigners()) emptyList()
+                        else signing.signingCertificateHistory.orEmpty().map { it.toByteArray() },
+                        signing.hasMultipleSigners(),
+                    ),
+                )
+            } catch (_: Exception) {
+                logger.warn("RUNTIME", "PACKAGE_SIGNER_UNAVAILABLE", errorCode = "SIGNING_IDENTITY_UNAVAILABLE")
+            }
+        }, "sentinel-signing-diagnostics").apply { isDaemon = true }.start()
     }
 
     private fun installUncaughtExceptionCapture(logger: DiagnosticLogger) {

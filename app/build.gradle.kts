@@ -133,6 +133,7 @@ android {
         versionName = rootProject.file("VERSION").readText().trim()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "SENTINEL"
+        manifestPlaceholders["gameObservationEnabled"] = "false"
         manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
         manifestPlaceholders["vkRedirectScheme"] = "vk$vkClientId"
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
@@ -158,6 +159,7 @@ android {
 
     buildTypes {
         debug {
+            manifestPlaceholders["gameObservationEnabled"] = "true"
             buildConfigField("String", "SENTINEL_DIAGNOSTICS_MODE", "\"DEVELOPMENT\"")
             buildConfigField("int", "SENTINEL_DIAGNOSTICS_MAX_BYTES", "2097152")
             buildConfigField("boolean", "SENTINEL_DIAGNOSTICS_EXPORT_ENABLED", "true")
@@ -165,6 +167,7 @@ android {
         }
         create("physicalTest") {
             initWith(getByName("debug"))
+            manifestPlaceholders["gameObservationEnabled"] = "true"
             applicationIdSuffix = ".physicaltest"
             versionNameSuffix = "-physical-test"
             manifestPlaceholders["appLabel"] = "SENTINEL"
@@ -266,6 +269,8 @@ dependencies {
     implementation("com.google.android.play:app-update-ktx:2.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("io.sentry:sentry-android:8.58.0")
+    // Bundled on-device Latin/digit OCR: no first-use model download for the offline pilot.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")

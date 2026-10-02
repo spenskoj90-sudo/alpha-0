@@ -346,7 +346,7 @@ def check_versions(checks: Checks) -> None:
         and "if (physicalTestVersionCode <= 0)" in android,
         "Android physical-test versionCode override rejects missing/non-positive identity",
     )
-    for workflow_name in ("physical-test-apk.yml", "physical-test-update-apk.yml"):
+    for workflow_name in ("physical-test-apk.yml",):
         workflow = read(f".github/workflows/{workflow_name}")
         checks.require(
             "value=$((100000000 + GITHUB_RUN_NUMBER))" in workflow
@@ -356,6 +356,13 @@ def check_versions(checks: Checks) -> None:
 
     physical_routine = read(".github/workflows/physical-test-apk.yml")
     physical_update = read(".github/workflows/physical-test-update-apk.yml")
+    checks.require(
+        "previous_version_code:" in physical_update
+        and "PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}" in physical_update
+        and 'python scripts/physical_test_version.py --previous-version-code "$PREVIOUS_VERSION_CODE"' in physical_update
+        and "100000000 + GITHUB_RUN_NUMBER" not in physical_update,
+        "stable update version allocation advances past a confirmed baseline across workflow counters",
+    )
     checks.require(
         '--signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"' in physical_routine
         and "physical-test-signer.txt" in physical_routine,

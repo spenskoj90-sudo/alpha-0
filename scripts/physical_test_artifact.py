@@ -111,6 +111,7 @@ def build_manifest(
     signer_sha256: str,
     vk_client_id: str = "0",
     expected_signer_sha256: str | None = None,
+    previous_version_code: int | None = None,
     signing_mode: str = "ephemeral-debug",
     workflow_name: str = "Physical Test APK",
     generated_at: str | None = None,
@@ -142,6 +143,13 @@ def build_manifest(
     canonical_version = version_file.read_text(encoding="utf-8").strip()
     require(bool(canonical_version), "canonical VERSION is empty")
     metadata = load_output_metadata(output_metadata, apk, canonical_version)
+    if signing_mode == "stable-test":
+        require(
+            type(previous_version_code) is int and 0 <= previous_version_code < metadata["versionCode"] <= 2_100_000_000,
+            "stable-test versionCode baseline must be explicit and lower than the APK versionCode",
+        )
+    else:
+        require(previous_version_code is None, "ephemeral-debug artifacts must not claim an update versionCode baseline")
     inspect_apk(apk, source_sha, origin, fallback, vk_redirect_uri)
     apk_bytes = apk.read_bytes()
     timestamp = generated_at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -183,6 +191,7 @@ def build_manifest(
         "signerCertificateSha256": signer,
         "signerLineageVerified": signing_mode == "stable-test",
         "updateCompatible": signing_mode == "stable-test",
+        "updateBaselineVersionCode": previous_version_code,
         "httpReadTimeoutMs": EXPECTED_HTTP_READ_TIMEOUT_MS,
         "coldStartAware": True,
         "diagnosticsMode": "FORENSIC_TEST",
@@ -204,6 +213,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--signer-sha256", required=True)
     parser.add_argument("--vk-client-id", default="0")
     parser.add_argument("--expected-signer-sha256")
+    parser.add_argument("--previous-version-code", type=int)
     parser.add_argument("--signing-mode", default="ephemeral-debug")
     parser.add_argument("--workflow-name", default="Physical Test APK")
     parser.add_argument("--generated-at")
@@ -227,6 +237,7 @@ def main() -> int:
             signer_sha256=args.signer_sha256,
             vk_client_id=args.vk_client_id,
             expected_signer_sha256=args.expected_signer_sha256,
+            previous_version_code=args.previous_version_code,
             signing_mode=args.signing_mode,
             workflow_name=args.workflow_name,
             generated_at=args.generated_at,

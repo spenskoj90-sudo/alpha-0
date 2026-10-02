@@ -6,8 +6,13 @@ from pathlib import Path
 
 import psycopg
 
-DATABASE_URL = os.environ["DATABASE_URL"]
 MIGRATIONS = Path(__file__).resolve().parent / "migrations"
+
+
+def migration_database_url() -> str:
+    # Existing single-role development remains supported. Staging/production
+    # custody supplies the separate owner URL only to the migration process.
+    return os.environ.get("DATABASE_MIGRATION_URL") or os.environ["DATABASE_URL"]
 
 
 def psycopg_url(url: str) -> str:
@@ -22,7 +27,7 @@ def _enable_service_role(cur: psycopg.Cursor) -> None:
 
 
 def main() -> None:
-    with psycopg.connect(psycopg_url(DATABASE_URL)) as conn:
+    with psycopg.connect(psycopg_url(migration_database_url())) as conn:
         with conn.transaction():
             with conn.cursor() as cur:
                 _enable_service_role(cur)

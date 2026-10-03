@@ -54,8 +54,13 @@ class StripeConfig:
     max_clock_skew_seconds: int = 300
 
     def __post_init__(self) -> None:
-        expected_key_prefix = "sk_live_" if self.livemode else "sk_test_"
-        if not self.secret_key.startswith(expected_key_prefix) or len(self.secret_key) < len(expected_key_prefix) + 8:
+        mode = "live" if self.livemode else "test"
+        # Restricted server keys retain the same mode boundary and secret custody.
+        expected_key_prefixes = (f"rk_{mode}_", f"sk_{mode}_")
+        if not any(
+            self.secret_key.startswith(prefix) and len(self.secret_key) >= len(prefix) + 8
+            for prefix in expected_key_prefixes
+        ):
             raise ValueError("STRIPE_SECRET_KEY_MODE_MISMATCH")
         if not self.webhook_secret.startswith("whsec_") or len(self.webhook_secret) < 16:
             raise ValueError("STRIPE_WEBHOOK_SECRET_INVALID")

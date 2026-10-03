@@ -91,6 +91,32 @@ def test_stripe_config_rejects_unsafe_or_incomplete_authority(kwargs) -> None:
         _config(**kwargs)
 
 
+@pytest.mark.parametrize("livemode", [False, True])
+def test_restricted_api_key_preserves_mode_and_secret_redaction(livemode) -> None:
+    key = "rk_live_abcdefghijklmnop" if livemode else "rk_test_abcdefghijklmnop"
+    config = _config(livemode=livemode, secret_key=key)
+    assert config.secret_key == key
+    assert config.livemode is livemode
+    assert key not in repr(config)
+    assert config.webhook_secret not in repr(config)
+
+
+@pytest.mark.parametrize(
+    ("livemode", "key"),
+    [
+        (False, "rk_live_abcdefghijklmnop"),
+        (True, "rk_test_abcdefghijklmnop"),
+        (False, "rk_test_short"),
+        (True, "rk_live_short"),
+        (False, "pk_test_abcdefghijklmnop"),
+        (True, "pk_live_abcdefghijklmnop"),
+    ],
+)
+def test_restricted_key_rejects_wrong_mode_short_or_public_credentials(livemode, key) -> None:
+    with pytest.raises(ValueError, match="STRIPE_SECRET_KEY_MODE_MISMATCH"):
+        _config(livemode=livemode, secret_key=key)
+
+
 @pytest.mark.parametrize("timeout", [0, -1, 31])
 def test_http_transport_rejects_invalid_timeout(timeout: float) -> None:
     with pytest.raises(ValueError, match="STRIPE_TIMEOUT_INVALID"):
@@ -365,3 +391,22 @@ def test_configured_stripe_adapter_requires_strict_complete_configuration(monkey
     adapter = configured_stripe_adapter()
     assert adapter is not None
     assert adapter.config.livemode is False
+
+
+def test_configured_restricted_key_keeps_live_activation_gate(monkeypatch) -> None:
+    _clear_stripe_env(monkeypatch)
+    monkeypatch.setenv("SENTINEL_ENV", "staging")
+    monkeypatch.setenv("SENTINEL_STRIPE_ENABLED", "true")
+    monkeypatch.setenv("SENTINEL_STRIPE_SECRET_KEY", "rk_test_abcdefghijklmnop")
+    monkeypatch.setenv("SENTINEL_STRIPE_WEBHOOK_SECRET", "whsec_abcdefghijklmnop")
+    monkeypatch.setenv("SENTINEL_STRIPE_CORE_PLUS_PRICE_ID", "price_1234567890")
+    monkeypatch.setenv("SENTINEL_STRIPE_SUCCESS_URL", "https://example.test/success")
+    monkeypatch.setenv("SENTINEL_STRIPE_CANCEL_URL", "https://example.test/cancel")
+    adapter = configured_stripe_adapter()
+    assert adapter is not None
+    assert adapter.config.livemode is False
+    monkeypatch.setenv("SENTINEL_STRIPE_SECRET_KEY", "rk_live_abcdefghijklmnop")
+    monkeypatch.setenv("SENTINEL_STRIPE_LIVEMODE", "true")
+    monkeypatch.setenv("SENTINEL_STRIPE_ALLOW_LIVE", "true")
+    with pytest.raises(RuntimeError, match="STRIPE_LIVE_MODE_NOT_AUTHORIZED"):
+        configured_stripe_adapter()

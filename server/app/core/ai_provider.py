@@ -14,7 +14,7 @@ class AIProviderResult:
 
     kind: AIResultKind
     text: str
-    confidence: float
+    confidence: float | None
     provenance: tuple[str, ...]
     provider_id: str
     model_id: str
@@ -22,7 +22,7 @@ class AIProviderResult:
     def __post_init__(self) -> None:
         if not self.text or len(self.text) > 2000:
             raise ValueError("AI_RESULT_TEXT_INVALID")
-        if not 0.0 <= self.confidence <= 1.0:
+        if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
             raise ValueError("AI_RESULT_CONFIDENCE_INVALID")
         if not self.provenance or len(self.provenance) > 20:
             raise ValueError("AI_RESULT_PROVENANCE_INVALID")
@@ -95,22 +95,21 @@ class BaselineRecommendationProvider:
     def generate(self, context: Mapping[str, Any]) -> AIProviderResult:
         knowledge = knowledge_context(context)
         items = knowledge["items"]
-        inference = next((item for item in items if item["kind"] == "inference" and item["confidence"] >= 0.50), None)
+        inference = next((item for item in items if item["kind"] == "inference" and "knowledge:insufficient-context" not in item["provenance"]), None)
         if inference is None:
             return AIProviderResult(
                 kind="recommendation",
                 text="Insufficient evidence for a specific progression recommendation; review recent character events first.",
-                confidence=0.40,
+                confidence=None,
                 provenance=tuple(knowledge["provenance"][:19]) + ("recommendation:suppressed-low-evidence",),
                 provider_id=self.provider_id,
                 model_id=self.model_id,
             )
-        confidence = min(0.89, max(0.50, float(inference["confidence"]) - 0.02))
         provenance = tuple(knowledge["provenance"][:19]) + ("recommendation:progression-review",)
         return AIProviderResult(
             kind="recommendation",
             text="Review the most recent character events before making a progression decision.",
-            confidence=confidence,
+            confidence=None,
             provenance=provenance,
             provider_id=self.provider_id,
             model_id=self.model_id,

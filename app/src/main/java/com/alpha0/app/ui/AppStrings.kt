@@ -32,6 +32,17 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 }
 
 internal val ENGLISH = mapOf(
+    "game_calibration_title" to "Numeric calibration",
+    "game_calibration_pending" to "Physical review pending",
+    "game_calibration_disclosure" to "Enter the health you saw in the game. Save records only these numbers and the last OCR candidate to local diagnostics. Missing and stale results are retained; this does not verify recognition. No pixels or raw text are saved.",
+    "game_calibration_current" to "Observed current health",
+    "game_calibration_maximum" to "Observed maximum health",
+    "game_calibration_save" to "Save numeric comparison to diagnostics",
+    "game_calibration_invalid" to "Enter a valid health ratio. At most 32 samples per campaign.",
+    "game_calibration_saved" to "Numeric sample saved locally. Export diagnostics when the test is complete.",
+    "game_calibration_write_failed" to "The sample could not be saved. Check available storage and retry.",
+    "game_calibration_count" to "Samples saved: %d / 32",
+    "game_calibration_action_gate" to "Recommendations and game input remain unavailable until calibration and target binding are verified.",
     "game_observer_title" to "Android game test",
     "game_observer_subtitle" to "Local screen observation · combat automation is not enabled.",
     "game_observer_open" to "Open game observation",
@@ -365,6 +376,17 @@ internal val ENGLISH = mapOf(
 )
 
 internal val RUSSIAN = mapOf(
+    "game_calibration_title" to "Числовая калибровка",
+    "game_calibration_pending" to "Ожидает физической проверки",
+    "game_calibration_disclosure" to "Введите здоровье, которое видели в игре. Кнопка сохраняет только эти числа и последний кандидат OCR в локальную диагностику. Пропуски и устаревшие результаты учитываются; распознавание ещё не подтверждено. Кадры и сырой текст не сохраняются.",
+    "game_calibration_current" to "Текущее здоровье в игре",
+    "game_calibration_maximum" to "Максимальное здоровье в игре",
+    "game_calibration_save" to "Сохранить числовое сравнение в диагностику",
+    "game_calibration_invalid" to "Введите корректное соотношение здоровья. Не более 32 примеров в кампании.",
+    "game_calibration_saved" to "Числовой пример сохранён локально. После теста экспортируйте диагностику.",
+    "game_calibration_write_failed" to "Не удалось сохранить пример. Проверьте свободное место и повторите.",
+    "game_calibration_count" to "Сохранено примеров: %d / 32",
+    "game_calibration_action_gate" to "Рекомендации и ввод в игру недоступны до проверки калибровки и привязки цели.",
     "game_observer_title" to "Тест Android-игры",
     "game_observer_subtitle" to "Локальное наблюдение за экраном · автоматизация боя пока отключена.",
     "game_observer_open" to "Открыть наблюдение за игрой",

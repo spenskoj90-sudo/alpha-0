@@ -62,6 +62,7 @@ function normalizeServerPresentation(message) {
     kind: payload.kind,
     text: payload.text,
     confidence: payload.confidence ?? null,
+    evidenceKind: payload.knowledge_kind == null ? null : typeof payload.knowledge_kind === 'string' ? payload.knowledge_kind.toUpperCase() : 'INVALID',
     provenance: Array.isArray(payload.provenance) ? payload.provenance : [],
   });
 }

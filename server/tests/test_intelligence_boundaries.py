@@ -136,21 +136,21 @@ def test_knowledge_engine_handles_false_player_state_and_filters_invalid_events(
         }
     )
     texts = [item.text for item in snapshot.items]
-    assert "Character is level True." in texts
+    assert "Character is level True." not in texts
     assert "Character is not alive." in texts
     inference = next(item for item in snapshot.items if item.kind == "inference")
-    assert inference.confidence == 0.78
+    assert inference.confidence is None
     assert inference.provenance == ("event:combat",)
 
 
 def test_knowledge_engine_uses_insufficient_context_when_events_have_no_provenance() -> None:
     snapshot = KnowledgeEngine().build({"events": [{}, {"event_type": ""}]})
     assert len(snapshot.items) == 1
-    assert snapshot.items[0].confidence == 0.40
+    assert snapshot.items[0].confidence is None
     assert snapshot.items[0].provenance == ("knowledge:insufficient-context",)
 
 
-def test_baseline_provider_uses_high_quality_inference_and_caps_confidence() -> None:
+def test_baseline_provider_preserves_provenance_without_inventing_confidence() -> None:
     provider = BaselineRecommendationProvider()
     result = provider.generate(
         {
@@ -158,6 +158,6 @@ def test_baseline_provider_uses_high_quality_inference_and_caps_confidence() -> 
             "events": [{"event_type": "combat"}],
         }
     )
-    assert result.confidence == pytest.approx(0.76)
+    assert result.confidence is None
     assert result.provenance[-1] == "recommendation:progression-review"
     assert result.text.startswith("Review the most recent")

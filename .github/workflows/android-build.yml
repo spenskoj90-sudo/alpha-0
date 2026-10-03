@@ -13,7 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   build:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.android == 'true' }}
     name: Build Android APK
     runs-on: ubuntu-latest
     steps:

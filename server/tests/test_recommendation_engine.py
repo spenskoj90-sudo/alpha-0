@@ -28,7 +28,7 @@ def test_default_engine_routes_to_deterministic_baseline_provider() -> None:
 
     assert first == second
     assert first.kind == "recommendation"
-    assert first.confidence == 0.40
+    assert first.confidence is None
     assert first.provenance == (
         "knowledge:insufficient-context",
         "recommendation:suppressed-low-evidence",

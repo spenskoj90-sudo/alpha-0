@@ -14,7 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   supply-chain-evidence:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.supply_chain == 'true' }}
     name: Supply-chain SBOM evidence
     runs-on: ubuntu-latest
     timeout-minutes: 25

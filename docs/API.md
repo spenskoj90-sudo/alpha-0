@@ -118,7 +118,8 @@ These endpoints are not public metrics surfaces and do not expose a production t
 
 ## Recommendations
 
-- `POST /v1/recommendations` — non-authoritative recommendation output with confidence, provenance and provider/model identity where applicable. Explicit unknown provider selection fails closed.
+- `POST /v1/recommendations` — non-authoritative recommendation output with nullable confidence (null means no calibrated estimate), provenance and provider/model identity where applicable. Explicit unknown provider selection fails closed.
+- `GET /v1/game-capabilities` — authenticated research/profile inventory and digest-bound knowledge-pack index. This does not grant entitlements or action capability; unknown environment/freshness/confidence remains explicit.
 
 `docs/ARCHITECTURE_V4.md` and `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` define architecture targets and must not be treated as runtime route inventories.
 

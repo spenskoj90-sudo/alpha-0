@@ -34,3 +34,6 @@ addopts = "-q --strict-markers"
 markers = [
   "postgres: requires a live PostgreSQL database",
 ]
+
+[tool.setuptools.package-data]
+app = ["data/*.json"]

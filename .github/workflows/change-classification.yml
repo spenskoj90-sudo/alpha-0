@@ -1,0 +1,88 @@
+name: Change Classification
+
+on:
+  workflow_call:
+    outputs:
+      core:
+        value: ${{ jobs.classify.outputs.core }}
+      postgres:
+        value: ${{ jobs.classify.outputs.postgres }}
+      android:
+        value: ${{ jobs.classify.outputs.android }}
+      instrumentation:
+        value: ${{ jobs.classify.outputs.instrumentation }}
+      web:
+        value: ${{ jobs.classify.outputs.web }}
+      site:
+        value: ${{ jobs.classify.outputs.site }}
+      companion:
+        value: ${{ jobs.classify.outputs.companion }}
+      bridge:
+        value: ${{ jobs.classify.outputs.bridge }}
+      games:
+        value: ${{ jobs.classify.outputs.games }}
+      design:
+        value: ${{ jobs.classify.outputs.design }}
+      dependencies:
+        value: ${{ jobs.classify.outputs.dependencies }}
+      release:
+        value: ${{ jobs.classify.outputs.release }}
+      container:
+        value: ${{ jobs.classify.outputs.container }}
+      supply_chain:
+        value: ${{ jobs.classify.outputs.supply_chain }}
+      physical:
+        value: ${{ jobs.classify.outputs.physical }}
+      p1:
+        value: ${{ jobs.classify.outputs.p1 }}
+      codeql_python:
+        value: ${{ jobs.classify.outputs.codeql_python }}
+      codeql_javascript:
+        value: ${{ jobs.classify.outputs.codeql_javascript }}
+      audit_python:
+        value: ${{ jobs.classify.outputs.audit_python }}
+      audit_javascript:
+        value: ${{ jobs.classify.outputs.audit_javascript }}
+      codeql_any:
+        value: ${{ jobs.classify.outputs.codeql_any }}
+      codeql_languages:
+        value: ${{ jobs.classify.outputs.codeql_languages }}
+
+permissions:
+  contents: read
+
+jobs:
+  classify:
+    name: Classify exact source changes
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.impact.outputs.core }}
+      postgres: ${{ steps.impact.outputs.postgres }}
+      android: ${{ steps.impact.outputs.android }}
+      instrumentation: ${{ steps.impact.outputs.instrumentation }}
+      web: ${{ steps.impact.outputs.web }}
+      site: ${{ steps.impact.outputs.site }}
+      companion: ${{ steps.impact.outputs.companion }}
+      bridge: ${{ steps.impact.outputs.bridge }}
+      games: ${{ steps.impact.outputs.games }}
+      design: ${{ steps.impact.outputs.design }}
+      dependencies: ${{ steps.impact.outputs.dependencies }}
+      release: ${{ steps.impact.outputs.release }}
+      container: ${{ steps.impact.outputs.container }}
+      supply_chain: ${{ steps.impact.outputs.supply_chain }}
+      physical: ${{ steps.impact.outputs.physical }}
+      p1: ${{ steps.impact.outputs.p1 }}
+      codeql_python: ${{ steps.impact.outputs.codeql_python }}
+      codeql_javascript: ${{ steps.impact.outputs.codeql_javascript }}
+      audit_python: ${{ steps.impact.outputs.audit_python }}
+      audit_javascript: ${{ steps.impact.outputs.audit_javascript }}
+      codeql_any: ${{ steps.impact.outputs.codeql_any }}
+      codeql_languages: ${{ steps.impact.outputs.codeql_languages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: impact
+        run: python scripts/change_classification.py

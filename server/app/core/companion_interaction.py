@@ -27,8 +27,11 @@ class CompanionPresentation:
     provenance: tuple[str, ...] = ()
     confidence: float | None = None
     presentation_id: UUID = field(default_factory=uuid4)
+    knowledge_kind: str | None = None
 
     def __post_init__(self) -> None:
+        if self.knowledge_kind not in {None, "fact", "inference", "recommendation"}:
+            raise ValueError("knowledge kind invalid")
         if not self.text or len(self.text) > 2000:
             raise ValueError("text must be between 1 and 2000 characters")
         if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
@@ -53,4 +56,5 @@ class CompanionPresentation:
             provenance=self.provenance,
             confidence=self.confidence,
             presentation_id=self.presentation_id,
+            knowledge_kind=self.knowledge_kind,
         )

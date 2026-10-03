@@ -89,3 +89,11 @@ test('dedicated overlay renderer is sandboxed, non-actionable and tied to main-w
   assert.match(renderer, /LOCAL-ONLY/);
   assert.match(renderer, /OFFLINE/);
 });
+
+test('overlay preserves fact/inference distinction without granting authority', () => {
+  const value = presentation('fact', { kind: 'RECOMMENDATION', evidenceKind: 'FACT' });
+  assert.equal(sanitizePresentation(value)?.evidenceKind, 'FACT');
+  assert.equal(sanitizePresentation({ ...value, evidenceKind: 'EXECUTE' }), null);
+  const wire = normalizeServerPresentation({ message_type: 'PRESENTATION', payload: { presentation_id: 'p', channel: 'OVERLAY', kind: 'RECOMMENDATION', knowledge_kind: 'inference', text: 'Evidence.', confidence: null, provenance: ['source'] } });
+  assert.equal(wire?.evidenceKind, 'INFERENCE');
+});

@@ -255,6 +255,7 @@ class CompanionExperienceRuntime:
                     "kind": presentation.kind.value,
                     "text": presentation.text,
                     "confidence": presentation.confidence,
+                    **({"knowledge_kind": presentation.knowledge_kind} if presentation.knowledge_kind is not None else {}),
                     "provenance": list(presentation.provenance),
                 },
             )

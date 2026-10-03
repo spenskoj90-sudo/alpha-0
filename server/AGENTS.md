@@ -1,5 +1,9 @@
 # Core scoped agent instructions
 
+Review focus: server-authoritative entitlements, tenant/RLS isolation, migration/runtime role
+separation, exact OAuth callbacks and audience, nonce/PKCE/replay, concurrent idempotency,
+bounded consent and stale-state denial. AI/knowledge/catalog metadata grants no action authority.
+
 Scope: server/ plus migrations and directly required contracts/tests.
 
 - Follow root AGENTS.md.

@@ -16,6 +16,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.alpha0.app.diagnostics.DiagnosticLogger
+import java.util.UUID
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -138,6 +143,13 @@ internal fun GameObservationPanel(
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
+    val context = LocalContext.current
+    val campaign = remember(state.installed ?: installed) { CalibrationCampaign() }
+    val campaignId = remember(state.installed ?: installed) { UUID.randomUUID().toString() }
+    var expectedCurrent by remember { mutableStateOf("") }
+    var expectedMaximum by remember { mutableStateOf("") }
+    var sampleCount by remember(state.installed ?: installed) { mutableStateOf(0) }
+    var calibrationMessage by remember { mutableStateOf("") }
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -207,6 +219,41 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_capture_age", maxOf(0, (now - last.observedAt) / 1000)))
                     Text(strings.text("game_capture_hypothesis"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+            }
+        }
+        SentinelCard(kind = SentinelCardKind.CONTENT) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(strings.text("game_calibration_title"), style = MaterialTheme.typography.titleMedium)
+                StatusBadge(strings.text("game_calibration_pending"), SentinelStatus.PENDING)
+                Text(strings.text("game_calibration_disclosure"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                SecondaryButton(strings.text("game_calibration_save"), {
+                    var writeFailed = false
+                    val sample = campaign.record(expectedCurrent, expectedMaximum, observation.lastHealth, now) { sample ->
+                        val sampleInstall = state.installed ?: installed
+                        val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
+                            "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
+                            "game_package" to ShatteredGameProfile.PACKAGE,
+                            "game_version" to sampleInstall?.versionName, "game_version_code" to sampleInstall?.versionCode,
+                            "age_ms" to sample.ageMs, "recognized_current" to sample.observed?.current,
+                            "recognized_maximum" to sample.observed?.maximum,
+                            "ground_truth_current" to sample.current, "ground_truth_maximum" to sample.maximum,
+                            "source_status" to "UNVERIFIED", "sample_kind" to "user-opt-in",
+                            "device_environment" to "UNVERIFIED",
+                        ))
+                        writeFailed = !saved
+                        saved
+                    }
+                    if (sample == null) calibrationMessage = if (writeFailed) "game_calibration_write_failed" else "game_calibration_invalid"
+                    else {
+                        sampleCount = campaign.count
+                        calibrationMessage = "game_calibration_saved"
+                    }
+                }, Modifier.fillMaxWidth(), enabled = supported && installed != null && (state.installed == null || state.installed == installed) && sampleCount < 32)
+                Text(strings.text("game_calibration_count", sampleCount))
+                if (calibrationMessage.isNotBlank()) Text(strings.text(calibrationMessage))
+                Text(strings.text("game_calibration_action_gate"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Text(strings.text("game_capture_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)

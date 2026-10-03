@@ -13,7 +13,7 @@ class DeliveredRecommendation:
 
     kind: str
     text: str
-    confidence: float
+    confidence: float | None
     provenance: tuple[str, ...]
     provider_id: str
     model_id: str

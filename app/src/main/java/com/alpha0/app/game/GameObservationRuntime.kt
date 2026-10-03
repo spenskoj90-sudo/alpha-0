@@ -8,7 +8,9 @@ data class GameObservationViewState(
     val installed: StockGameInstall? = null,
 )
 
-/** Process-local state. Pixels, OCR text and health are never persisted or queued to Core. */
+/** Process-local state. Pixels/raw OCR are never persisted or queued to Core.
+ * Numeric calibration pairs require a separate explicit user Save in the diagnostics panel.
+ */
 object GameObservationRuntime {
     internal val session = ObservationSession()
     private val mutableState = MutableStateFlow(GameObservationViewState())

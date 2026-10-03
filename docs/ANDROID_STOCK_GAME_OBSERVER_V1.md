@@ -142,3 +142,7 @@ SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED remai
 - [ML Kit Android text recognition](https://developers.google.com/ml-kit/vision/text-recognition/v2/android)
 - [Stock game source](https://github.com/00-Evan/shattered-pixel-dungeon)
 - [Game integration and automation research](https://drive.google.com/file/d/110Cj16l3vR6HGd-Qz8s1At8VfznEGc5B/view)
+
+## Phone-only numeric calibration collection — 2026-10-03
+
+The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity disables comparisons against old candidate identity. Export uses existing Owner-initiated diagnostics. Engineer reconciles exact manifest/signer/device/game/HUD and constructs the bounded calibration input; UI labels/user entries are not physical or app-source attestations. Recommendations, semantic input and ARM stay unavailable until the prerequisite physical calibration and target/session binding are proven.

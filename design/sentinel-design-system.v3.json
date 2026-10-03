@@ -30,7 +30,8 @@
     "importedRegistrySha": "a281479677d84de21a24db62b0b13af7ae11c623",
     "latestLabSha": "56e6c9afdff501cc3451352c2b2dcd286b0ecdd1",
     "latestLabDisposition": "REJECTED_FOR_IMPORT",
-    "productionRefinementOwner": "GPT"
+    "productionRefinementOwner": "GPT",
+    "role": "REFERENCE_ONLY_NO_AUTOMATIC_IMPORT"
   },
   "predecessor": {
     "schema": "sentinel.design-system.v2.1",
@@ -325,8 +326,14 @@
     },
     "reducedGlyph": {
       "path": "design/brand/sentinel-glyph.svg",
-      "source": "sentinel-aware-companion/public/brand/glyph.svg",
-      "geometry": "shield + S + signal"
+      "source": "alpha-0 production-owned vector",
+      "geometry": "shield + angular ribbon",
+      "reviewSizes": [
+        16,
+        20,
+        24
+      ],
+      "ownerVisualAcceptance": "PENDING"
     },
     "monochrome": "design/brand/sentinel-glyph-mono.svg",
     "domainIcons": [
@@ -339,7 +346,13 @@
       "Overlay",
       "Signal"
     ],
-    "rule": "full-color master is never reconstructed as a primitive VectorDrawable"
+    "rule": "full-color master is never reconstructed as a primitive VectorDrawable",
+    "domainIconGeometry": {
+      "viewport": 24,
+      "stroke": 2,
+      "grid": "integer",
+      "ownerVisualAcceptance": "PENDING"
+    }
   },
   "accessibility": {
     "talkBack": true,

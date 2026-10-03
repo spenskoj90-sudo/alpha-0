@@ -91,11 +91,11 @@ class DesignSystemContractTests(unittest.TestCase):
         home_icon = read("app/src/main/res/drawable/ic_domain_home.xml")
         activity_icon = read("app/src/main/res/drawable/ic_domain_activity.xml")
         reduced_glyph = read("design/brand/sentinel-glyph.svg")
-        self.assertIn("M3.5,10.5 L12,3.5 L20.5,10.5", home_icon)
-        self.assertIn("M3,12 H7 L9.7,6.5", activity_icon)
+        self.assertIn("M4,10 L12,4 L20,10", home_icon)
+        self.assertIn("M8,15 V11 M13,15 V7 M18,15 V4", activity_icon)
         self.assertNotIn("M12,3.2 L20,7.1", home_icon)
         self.assertNotIn("M46 18c-7-3.7", reduced_glyph)
-        self.assertIn("M43 18.5c-3.2-2.2", reduced_glyph)
+        self.assertIn("M43 19H27l-7 8 23 10-7 8H21", reduced_glyph)
         self.assertIn("heightIn(min = 60.dp)", self.chrome)
         self.assertIn("PhysicalTestIdentityStrip", self.chrome)
         self.assertIn("PhysicalTestIdentityStrip(", self.main_activity)
@@ -128,14 +128,14 @@ class DesignSystemContractTests(unittest.TestCase):
         self.assertIn('viewBox="0 0 64 64"', self.web_brand)
         self.assertIn("intelligence-kind", self.web_intelligence)
         self.assertIn("Freshness", self.web_intelligence)
-        self.assertIn("UNREPORTED", self.web_intelligence)
-        self.assertIn("Source / time", self.web_intelligence)
-        self.assertIn("Acknowledgement", self.web_intelligence)
+        self.assertIn("Unknown", self.web_intelligence)
+        self.assertIn("observed_at_ms", self.web_intelligence)
+        self.assertIn("aria-pressed={acknowledged}", self.web_intelligence)
         self.assertNotIn("background-image:", self.web)
         self.assertIn("/brand/icon-192.png", self.web_manifest)
         self.assertIn("/brand/icon-512.png", self.web_manifest)
 
-    def test_production_reduced_assets_match_the_approved_studio_geometry(self) -> None:
+    def test_production_reduced_assets_match_production_owned_geometry(self) -> None:
         for canonical, copies in (
             ("design/brand/sentinel-glyph.svg", ("web/public/brand/glyph.svg", "site/public/brand/glyph.svg", "launcher/assets/sentinel-glyph.svg")),
             ("design/brand/sentinel-glyph-mono.svg", ("web/public/brand/glyph-mono.svg", "site/public/brand/glyph-mono.svg", "launcher/assets/sentinel-glyph-mono.svg")),
@@ -143,7 +143,7 @@ class DesignSystemContractTests(unittest.TestCase):
             for copy in copies:
                 with self.subTest(asset=copy):
                     self.assertEqual(read(copy), read(canonical))
-        self.assertIn("M43 18.5c-3.2-2.2", self.web_brand)
+        self.assertIn("M43 19H27l-7 8 23 10-7 8H21", self.web_brand)
         self.assertNotIn("M46 18c-7-3.7", self.web_brand)
 
     def test_rendered_companion_marks_match_the_canonical_glyph(self) -> None:

@@ -50,7 +50,8 @@ describe('Web accessibility contract', () => {
     expect(recommendation).toContain('role={view === \'ERROR\' ? \'alert\' : \'status\'}');
     expect(recommendation).toContain("aria-live={view === 'ERROR' ? 'assertive' : 'polite'}");
     expect(recommendation).toContain('<div role="status" aria-live="polite" aria-atomic="true">');
-    expect(recommendation).toContain('Observational only · no action execution');
+    expect(recommendation).toContain('Recommendations guide you. You decide what happens next.');
+    expect(recommendation).toContain('aria-pressed={acknowledged}');
   });
 
   it('exposes account busy, failure and password requirement semantics', () => {

@@ -213,7 +213,7 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Control data unavailable' })).toBeVisible();
   await expect(page.locator('#security')).toContainText('Account data is unavailable');
-  await expect(page.getByRole('article', { name: 'SENTINEL recommendation' })).toContainText('Account data is unavailable');
+  await expect(page.getByRole('article', { name: 'SENTINEL recommendation' })).toContainText('Intelligence is unavailable');
   await expect(page.locator('#security')).not.toContainText('Sign in to view');
   expect((await context.cookies()).filter(cookie => cookie.name.startsWith('sentinel_')).length).toBeGreaterThanOrEqual(2);
   await page.unroute('**/api/billing/plans');
@@ -223,7 +223,7 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.route('**/api/intelligence/recommendations', route => route.fulfill({ status: 200, json: {
     recommendations: [{ kind: 'fact', text: 'Disposable account observation', confidence: 1, provenance: ['browser-test-fixture'], provider_id: null, model_id: null }],
   } }));
-  await page.getByRole('button', { name: 'Load live', exact: true }).click();
+  await page.getByRole('button', { name: 'Load intelligence', exact: true }).click();
   await expect(page.getByText('Disposable account observation', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();

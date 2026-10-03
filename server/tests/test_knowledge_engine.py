@@ -19,19 +19,19 @@ def test_knowledge_engine_derives_fact_and_inference_with_provenance() -> None:
     )
 
     assert snapshot.items[0].kind == "fact"
-    assert snapshot.items[0].confidence == 1.0
+    assert snapshot.items[0].confidence is None
     assert "character:level:27" in snapshot.provenance
     assert any(item.kind == "inference" for item in snapshot.items)
     assert "event:mission_completed" in snapshot.provenance
 
 
-def test_knowledge_engine_degrades_confidence_for_weak_context() -> None:
+def test_knowledge_engine_keeps_uncalibrated_confidence_unknown() -> None:
     snapshot = KnowledgeEngine().build(
         {"data_quality": "low", "events": [{"event_type": "combat", "sequence": 1}]}
     )
 
     inference = next(item for item in snapshot.items if item.kind == "inference")
-    assert inference.confidence == 0.64
+    assert inference.confidence is None
 
 
 def test_knowledge_context_is_bounded_and_does_not_copy_raw_payload() -> None:

@@ -21,7 +21,12 @@ env:
   PHYSICAL_TEST_VK_CLIENT_ID: ${{ vars.SENTINEL_VK_CLIENT_ID || '0' }}
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   physical-test-apk:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.physical == 'true' }}
     name: Build physical test APK
     runs-on: ubuntu-latest
     timeout-minutes: 30

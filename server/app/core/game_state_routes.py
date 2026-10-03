@@ -52,6 +52,18 @@ def install_game_state_routes(
             raise HTTPException(status_code=403, detail="CHARACTER_SCOPE_MISMATCH")
         return item
 
+    @app.get("/v1/game-capabilities")
+    def game_capabilities(
+        request: Request,
+        authorization_header: str = Header(..., alias="Authorization"),
+        x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    ) -> dict[str, Any]:
+        from app.core.game_capability_catalog import catalog, knowledge_index
+        rid = request_id(request, x_request_id)
+        principal = principal_from_token(require_bearer(authorization_header))
+        authorize_request(principal, "game:read", "game:*", rid)
+        return {**catalog(), "knowledge_packs": knowledge_index()["packs"]}
+
     @app.get("/v1/games")
     def list_games(
         request: Request,

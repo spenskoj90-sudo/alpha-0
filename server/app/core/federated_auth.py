@@ -89,7 +89,11 @@ def _configured_redirect_uris(provider: str) -> tuple[str, ...]:
         for item in (os.getenv(env_name) or "").split(",")
         if item.strip()
     )
-    safe = tuple(item for item in values if _safe_redirect_uri(item))
+    # A partially invalid allowlist is a configuration error, not permission to
+    # silently activate with a different subset than the Owner configured.
+    if any(not _safe_redirect_uri(item) for item in values):
+        return ()
+    safe = values
     if normalized == "vk":
         return tuple(item for item in safe if urlparse(item).scheme.startswith("vk"))
     if normalized == "telegram":
@@ -104,10 +108,15 @@ def provider_statuses() -> list[ProviderStatus]:
     telegram_redirects = _configured_redirect_uris("telegram")
     vk_id = (os.getenv("SENTINEL_VK_CLIENT_ID") or "").strip()
     vk_redirects = _configured_redirect_uris("vk")
+    google_valid = re.fullmatch(r"[A-Za-z0-9-]+\.apps\.googleusercontent\.com", google_id) is not None
+    telegram_valid = re.fullmatch(r"[1-9][0-9]{0,19}", telegram_id) is not None
+    vk_valid = re.fullmatch(r"[1-9][0-9]{0,19}", vk_id) is not None
+    secret_configured = bool(telegram_secret) and not telegram_secret.upper().startswith(("CHANGE_ME", "REPLACE_ME", "<"))
+    vk_binding_valid = bool(vk_redirects) and all(uri == f"vk{vk_id}://vk.ru/blank.html" for uri in vk_redirects)
     return [
         ProviderStatus(
             provider="google",
-            enabled=_enabled("SENTINEL_GOOGLE_AUTH_ENABLED") and bool(google_id),
+            enabled=_enabled("SENTINEL_GOOGLE_AUTH_ENABLED") and google_valid,
             flow="credential-manager",
             client_id=google_id or None,
         ),
@@ -115,8 +124,8 @@ def provider_statuses() -> list[ProviderStatus]:
             provider="telegram",
             enabled=(
                 _enabled("SENTINEL_TELEGRAM_AUTH_ENABLED")
-                and bool(telegram_id)
-                and bool(telegram_secret)
+                and telegram_valid
+                and secret_configured
                 and bool(telegram_redirects)
             ),
             flow="oidc-pkce",
@@ -126,8 +135,8 @@ def provider_statuses() -> list[ProviderStatus]:
             provider="vk",
             enabled=(
                 _enabled("SENTINEL_VK_AUTH_ENABLED")
-                and bool(vk_id)
-                and bool(vk_redirects)
+                and vk_valid
+                and vk_binding_valid
             ),
             flow="oauth-pkce",
             client_id=vk_id or None,

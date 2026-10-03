@@ -5,6 +5,28 @@ export function resolveLocale(saved: string | null, languages: readonly string[]
 }
 
 export const russian: Readonly<Record<string, string>> = {
+  "Unknown": "Неизвестно",
+  "INTELLIGENCE": "АНАЛИТИКА",
+  "Deterministic": "По проверяемым правилам",
+  "AI enhanced": "С помощью ИИ",
+  "Evidence based": "На основе данных",
+  "Load intelligence": "Получить аналитику",
+  "Load intelligence when you need a clearer view.": "Получите аналитику, когда нужна более ясная картина.",
+  "Reviewing available evidence…": "Анализ доступных данных…",
+  "Sign in to view your intelligence.": "Войдите, чтобы просмотреть аналитику.",
+  "No recommendation is available for this context.": "Для этого контекста нет рекомендаций.",
+  "You are offline. Reconnect to request updated intelligence.": "Нет сети. Подключитесь, чтобы обновить аналитику.",
+  "Intelligence is unavailable. Please retry.": "Аналитика недоступна. Повторите попытку.",
+  "Your session does not permit this request.": "Сессия не разрешает этот запрос.",
+  "Source evidence is stale. Request an update before acting.": "Исходные данные устарели. Обновите их перед решением.",
+  "Stale": "Устарели",
+  "Fresh": "Свежие",
+  "View evidence and explanation": "Показать источники и объяснение",
+  "Unknown confidence means no calibrated estimate is available.": "Уверенность неизвестна: калиброванной оценки пока нет.",
+  "Acknowledged on this view": "Отмечено в этом окне",
+  "Acknowledge": "Отметить",
+  "Recommendations guide you. You decide what happens next.": "Рекомендации помогают ориентироваться. Решение остаётся за вами.",
+
   'Skip to main content': 'Перейти к содержимому',
   'SENTINEL navigation': 'Навигация SENTINEL',
   'Product sections': 'Разделы продукта',

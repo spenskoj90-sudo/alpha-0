@@ -14,7 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   packaged-companion:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.companion == 'true' }}
     name: Packaged Companion host evidence
     runs-on: windows-latest
     timeout-minutes: 20

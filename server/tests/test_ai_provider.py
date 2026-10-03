@@ -34,7 +34,7 @@ def test_baseline_provider_uses_knowledge_evidence() -> None:
         }
     )
 
-    assert result.confidence == 0.76
+    assert result.confidence is None
     assert "character:level:27" in result.provenance
     assert "event:mission_completed" in result.provenance
     assert "recommendation:progression-review" in result.provenance

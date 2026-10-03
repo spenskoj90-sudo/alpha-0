@@ -90,6 +90,16 @@ def test_games_catalog_and_access():
 
 def test_unauthenticated_game_state_rejected():
     reset_store()
-    for path in ("/v1/characters", "/v1/games", "/v1/games/diablo-4-pc", "/v1/games/diablo-4-pc/access"):
+    for path in ("/v1/characters", "/v1/games", "/v1/game-capabilities", "/v1/games/diablo-4-pc", "/v1/games/diablo-4-pc/access"):
         response = client.get(path)
         assert response.status_code in (401, 422)
+
+
+def test_authenticated_research_catalog_grants_no_entitlement():
+    _, _, session = provision()
+    headers={"Authorization": f"Bearer {session['session_token']}"}
+    response=client.get('/v1/game-capabilities', headers=headers)
+    assert response.status_code == 200
+    assert len(response.json()['profiles']) == 26
+    assert all(not p['deterministic_automation'] for p in response.json()['profiles'])
+    assert client.get('/v1/games/shattered-pixel-dungeon/access', headers=headers).status_code == 404

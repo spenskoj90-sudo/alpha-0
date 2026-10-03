@@ -57,7 +57,7 @@ function render(snapshot) {
 
   const kind = document.createElement('div');
   kind.className = 'kind';
-  kind.textContent = ui.t(typeof presentation.kind === 'string' ? presentation.kind : 'STATUS');
+  kind.textContent = ui.t(presentation.evidenceKind || (typeof presentation.kind === 'string' ? presentation.kind : 'STATUS'));
 
   const text = document.createElement('div');
   text.className = 'text';
@@ -70,6 +70,13 @@ function render(snapshot) {
     confidence.className = 'meta';
     confidence.textContent = ui.t('Confidence {percent}%', { percent: Math.round(presentation.confidence * 100) });
     item.appendChild(confidence);
+  }
+
+  if (density !== 'MINIMAL' && presentation.kind === 'RECOMMENDATION' && !Number.isFinite(presentation.confidence)) {
+    const unknown = document.createElement('div');
+    unknown.className = 'meta';
+    unknown.textContent = ui.t('Confidence unknown · no calibrated estimate');
+    item.appendChild(unknown);
   }
 
   if (density === 'EXPANDED') {

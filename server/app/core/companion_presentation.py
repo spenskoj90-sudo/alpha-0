@@ -55,6 +55,7 @@ def recommendation_presentations(
                 correlation_id=uuid4(),
                 provenance=metadata.provenance,
                 confidence=metadata.confidence,
+                knowledge_kind=item.kind,
             )
         )
     return tuple(presentations)

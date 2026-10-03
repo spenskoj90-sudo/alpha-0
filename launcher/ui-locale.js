@@ -4,6 +4,8 @@
 (() => {
   const storageKey = 'sentinel.ui.locale';
   const ru = {
+    'FACT': 'ФАКТ', 'INFERENCE': 'ВЫВОД',
+    'Confidence unknown · no calibrated estimate': 'Уверенность неизвестна · калиброванной оценки нет',
     'Skip to main content': 'Перейти к основному содержимому',
     'Companion navigation': 'Навигация Companion',
     'Overview': 'Обзор', 'Account': 'Аккаунт', 'Runtime': 'Среда выполнения',

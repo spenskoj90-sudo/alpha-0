@@ -8,7 +8,7 @@ def test_delivery_preserves_provider_and_knowledge_evidence() -> None:
     item = delivered[0]
     assert item.kind == "recommendation"
     assert item.text
-    assert item.confidence == 0.40
+    assert item.confidence is None
     assert item.provenance == (
         "knowledge:insufficient-context",
         "recommendation:suppressed-low-evidence",

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "source_pr": 437,
+  "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91",
+  "measurement": "GitHub jobs started_at to completed_at; runner seconds excluding queue",
+  "jobs": [
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747173,
+      "name": "PostgreSQL integration and recovery",
+      "seconds": 57,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747345,
+      "name": "Repository verification",
+      "seconds": 6,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747354,
+      "name": "Web build",
+      "seconds": 64,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747363,
+      "name": "Launcher runtime tests",
+      "seconds": 5,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747378,
+      "name": "Control Bridge MCP tests",
+      "seconds": 25,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747400,
+      "name": "Block D operational evidence",
+      "seconds": 21,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747401,
+      "name": "Core tests and coverage",
+      "seconds": 40,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747495,
+      "name": "Product browser acceptance",
+      "seconds": 97,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110947747678,
+      "name": "Android build and tests",
+      "seconds": 107,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110948119958,
+      "name": "Container build",
+      "seconds": 30,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110948119961,
+      "name": "Reproducible container build comparison",
+      "seconds": 79,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110948318698,
+      "name": "Deployment smoke and health",
+      "seconds": 51,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933959,
+      "job_id": 110948434575,
+      "name": "Android instrumentation (GitHub Emulator)",
+      "seconds": 291,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933841,
+      "job_id": 110947802667,
+      "name": "Release evidence preflight",
+      "seconds": 415,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933835,
+      "job_id": 110947277391,
+      "name": "Packaged Companion host evidence",
+      "seconds": 45,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933909,
+      "job_id": 110947277678,
+      "name": "Secret and image scan",
+      "seconds": 8,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933909,
+      "job_id": 110947277943,
+      "name": "CodeQL (javascript)",
+      "seconds": 61,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933909,
+      "job_id": 110947277961,
+      "name": "Dependency audit",
+      "seconds": 58,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933909,
+      "job_id": 110947278201,
+      "name": "CodeQL (python)",
+      "seconds": 58,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933911,
+      "job_id": 110947277634,
+      "name": "Supply-chain SBOM evidence",
+      "seconds": 104,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933873,
+      "job_id": 110947277496,
+      "name": "Build Android APK",
+      "seconds": 93,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933894,
+      "job_id": 110947277938,
+      "name": "Build physical test APK",
+      "seconds": 146,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    },
+    {
+      "run_id": 37039933944,
+      "job_id": 110947278037,
+      "name": "P1 evidence artifacts",
+      "seconds": 139,
+      "head_sha": "b9a573bc3077452727d3d76804f230ff73e02c91"
+    }
+  ],
+  "total_runner_seconds": 2000
+}

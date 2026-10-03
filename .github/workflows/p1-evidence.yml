@@ -15,7 +15,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   p1-evidence:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.p1 == 'true' }}
     name: P1 evidence artifacts
     runs-on: ubuntu-latest
     steps:

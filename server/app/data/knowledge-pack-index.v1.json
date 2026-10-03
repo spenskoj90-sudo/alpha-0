@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "packs": [
+    {
+      "id": "wow-wotlk-335a-foundation",
+      "file": "wow-wotlk-335a-foundation.v1.json",
+      "sha256": "0308e80fdf4e57556f9aa9284a68454a8238b88035e188d0bde914e8658bc4d4",
+      "status": "draft",
+      "execution_authority": false
+    }
+  ]
+}

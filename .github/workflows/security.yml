@@ -17,7 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    uses: ./.github/workflows/change-classification.yml
+
   codeql:
+    # Required CodeQL context belongs to app 57789; keep analysis until skip compatibility is proven.
     name: CodeQL
     runs-on: ubuntu-latest
     permissions:
@@ -38,6 +42,8 @@ jobs:
       - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
 
   dependencies:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.audit_python == 'true' || needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true' }}
     name: Dependency audit
     runs-on: ubuntu-latest
     permissions:
@@ -47,15 +53,18 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - if: needs.changes.outputs.audit_python == 'true' || needs.changes.outputs.dependencies == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14.7"
-      - working-directory: server
+      - if: needs.changes.outputs.audit_python == 'true' || needs.changes.outputs.dependencies == 'true'
+        working-directory: server
         run: |
           python -m pip install --upgrade pip pip-audit
           python -m pip install .
           pip-audit
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - if: needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24.21.0"
           cache: npm
@@ -63,15 +72,19 @@ jobs:
             web/package-lock.json
             site/package-lock.json
       - name: Install web dependencies without executing lifecycle scripts
+        if: needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true'
         working-directory: web
         run: npm ci --ignore-scripts --no-audit
       - name: Audit web dependencies
+        if: needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true'
         working-directory: web
         run: npm audit --audit-level=high
       - name: Install public-site dependencies without executing lifecycle scripts
+        if: needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true'
         working-directory: site
         run: npm ci --ignore-scripts --no-audit
       - name: Audit public-site dependencies
+        if: needs.changes.outputs.audit_javascript == 'true' || needs.changes.outputs.dependencies == 'true'
         working-directory: site
         run: npm audit --audit-level=high
       - name: Audit repository dependency manifests with OSV

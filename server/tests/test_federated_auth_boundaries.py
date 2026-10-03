@@ -218,7 +218,7 @@ def test_multi_audience_token_requires_authorized_party(rsa_material) -> None:
 
 def test_browser_flow_and_provider_completion_reject_mismatched_configuration(monkeypatch) -> None:
     monkeypatch.setenv("SENTINEL_GOOGLE_AUTH_ENABLED", "true")
-    monkeypatch.setenv("SENTINEL_GOOGLE_WEB_CLIENT_ID", "client")
+    monkeypatch.setenv("SENTINEL_GOOGLE_WEB_CLIENT_ID", "test.apps.googleusercontent.com")
     with pytest.raises(FederatedAuthError, match="AUTH_PROVIDER_FLOW_INVALID"):
         federated.start_browser_flow("google", "state", "https://example.test/callback")
 

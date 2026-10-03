@@ -11,7 +11,7 @@ _MAX_TEXT = 2000
 class KnowledgeItem:
     kind: str
     text: str
-    confidence: float
+    confidence: float | None
     provenance: tuple[str, ...]
 
     def __post_init__(self) -> None:
@@ -19,7 +19,7 @@ class KnowledgeItem:
             raise ValueError("KNOWLEDGE_KIND_INVALID")
         if not self.text or len(self.text) > _MAX_TEXT:
             raise ValueError("KNOWLEDGE_TEXT_INVALID")
-        if not 0.0 <= self.confidence <= 1.0:
+        if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
             raise ValueError("KNOWLEDGE_CONFIDENCE_INVALID")
         if not self.provenance or len(self.provenance) > 20:
             raise ValueError("KNOWLEDGE_PROVENANCE_INVALID")
@@ -51,12 +51,12 @@ class KnowledgeEngine:
         player = context.get("player")
         if isinstance(player, Mapping):
             level = player.get("level")
-            if isinstance(level, int):
+            if type(level) is int and 0 <= level <= 500:
                 items.append(
                     KnowledgeItem(
                         kind="fact",
                         text=f"Character is level {level}.",
-                        confidence=1.0,
+                        confidence=None,
                         provenance=(f"character:level:{level}",),
                     )
                 )
@@ -67,7 +67,7 @@ class KnowledgeEngine:
                     KnowledgeItem(
                         kind="fact",
                         text="Character is alive." if alive else "Character is not alive.",
-                        confidence=1.0,
+                        confidence=None,
                         provenance=(f"character:alive:{str(alive).lower()}",),
                     )
                 )
@@ -76,8 +76,6 @@ class KnowledgeEngine:
         if isinstance(events, list) and events:
             valid_events = [event for event in events if isinstance(event, Mapping)]
             if valid_events:
-                quality = str(context.get("data_quality", "UNKNOWN")).lower()
-                confidence = 0.78 if quality in {"high", "complete", "good"} else 0.64
                 provenance = tuple(
                     str(event.get("event_type"))
                     for event in valid_events[:4]
@@ -88,7 +86,7 @@ class KnowledgeEngine:
                         KnowledgeItem(
                             kind="inference",
                             text="Recent activity provides progression context.",
-                            confidence=confidence,
+                            confidence=None,
                             provenance=tuple(f"event:{value}" for value in provenance),
                         )
                     )
@@ -98,7 +96,7 @@ class KnowledgeEngine:
                 KnowledgeItem(
                     kind="inference",
                     text="Insufficient normalized game evidence is available for a specific conclusion.",
-                    confidence=0.40,
+                    confidence=None,
                     provenance=("knowledge:insufficient-context",),
                 )
             )

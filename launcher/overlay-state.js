@@ -12,6 +12,7 @@ function sanitizePresentation(value) {
   if (typeof value.text !== 'string' || !value.text.trim() || value.text.length > MAX_TEXT_CHARS) return null;
   if (value.confidence != null && (typeof value.confidence !== 'number' || !Number.isFinite(value.confidence) || value.confidence < 0 || value.confidence > 1)) return null;
   if (!Array.isArray(value.provenance) || value.provenance.length > MAX_PROVENANCE_ITEMS) return null;
+  if (value.evidenceKind != null && !['FACT', 'INFERENCE', 'RECOMMENDATION'].includes(value.evidenceKind)) return null;
   const provenance = [];
   for (const item of value.provenance) {
     if (typeof item !== 'string' || !item || item.length > MAX_PROVENANCE_CHARS) return null;
@@ -22,6 +23,7 @@ function sanitizePresentation(value) {
     channel: 'OVERLAY',
     kind: value.kind,
     text: value.text.trim(),
+    ...(value.evidenceKind == null ? {} : { evidenceKind: value.evidenceKind }),
     confidence: value.confidence == null ? null : value.confidence,
     provenance: Object.freeze(provenance),
   });

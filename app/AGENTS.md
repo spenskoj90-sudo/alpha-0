@@ -1,5 +1,9 @@
 # Android scoped agent instructions
 
+Review focus: Keystore/session identity, exact provider/package/signing bindings, capture revocation,
+foreground/window/session changes, stale observations, immediate Stop and no blind retries.
+Calibration observations never prove action readiness or physical acceptance on their own.
+
 Scope: app/ plus directly required shared contracts/tests.
 
 - Follow root AGENTS.md.

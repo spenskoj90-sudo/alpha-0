@@ -1,0 +1,893 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "world-of-warcraft-windows",
+      "game": "world-of-warcraft",
+      "name": "World of Warcraft",
+      "platform": "windows",
+      "patch": "3.3.5a",
+      "environment": "wowcircle-private",
+      "observation_sources": [
+        {
+          "type": "saved_variables",
+          "status": "implemented_l3_pending",
+          "provenance": [
+            "docs/EXACT_ENVIRONMENT_L3_EVIDENCE_V1.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [
+        "normalized_events"
+      ],
+      "recommendation_capability": "presentation_only",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "adapter_foundation"
+    },
+    {
+      "id": "albion-online-windows",
+      "game": "albion-online",
+      "name": "Albion Online",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "path-of-exile-windows",
+      "game": "path-of-exile",
+      "name": "Path of Exile",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "path-of-exile-2-windows",
+      "game": "path-of-exile-2",
+      "name": "Path of Exile 2",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "dayz-windows",
+      "game": "dayz",
+      "name": "DayZ",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "stalcraft-windows",
+      "game": "stalcraft",
+      "name": "STALCRAFT",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "rust-windows",
+      "game": "rust",
+      "name": "Rust",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "arena-breakout-infinite-windows",
+      "game": "arena-breakout-infinite",
+      "name": "Arena Breakout Infinite",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "marvel-rivals-windows",
+      "game": "marvel-rivals",
+      "name": "Marvel Rivals",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "wardogs-windows",
+      "game": "wardogs",
+      "name": "WARDOGS",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "mistfall-hunter-windows",
+      "game": "mistfall-hunter",
+      "name": "Mistfall Hunter",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "hunt-showdown-windows",
+      "game": "hunt-showdown",
+      "name": "Hunt: Showdown",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "stay-out-windows",
+      "game": "stay-out",
+      "name": "Stay Out",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "overwatch-windows",
+      "game": "overwatch",
+      "name": "Overwatch",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "deadlock-windows",
+      "game": "deadlock",
+      "name": "Deadlock",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "scum-windows",
+      "game": "scum",
+      "name": "SCUM",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "squad-windows",
+      "game": "squad",
+      "name": "Squad",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "last-epoch-windows",
+      "game": "last-epoch",
+      "name": "Last Epoch",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "apex-legends-windows",
+      "game": "apex-legends",
+      "name": "Apex Legends",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "deadside-windows",
+      "game": "deadside",
+      "name": "Deadside",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "dead-by-daylight-windows",
+      "game": "dead-by-daylight",
+      "name": "Dead by Daylight",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "mindustry-android",
+      "game": "mindustry",
+      "name": "Mindustry",
+      "platform": "android",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "mindustry-windows",
+      "game": "mindustry",
+      "name": "Mindustry",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "luanti-android",
+      "game": "luanti",
+      "name": "Luanti",
+      "platform": "android",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "luanti-windows",
+      "game": "luanti",
+      "name": "Luanti",
+      "platform": "windows",
+      "patch": null,
+      "environment": "unverified-target",
+      "observation_sources": [
+        {
+          "type": "unverified",
+          "status": "research_only",
+          "provenance": [
+            "docs/GAME_CATALOG_RESEARCH_DELTA_2026_10_02.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [],
+      "recommendation_capability": "unavailable",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "exact_environment_operator_permission"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "research_only"
+    },
+    {
+      "id": "shattered-pixel-dungeon-android",
+      "game": "shattered-pixel-dungeon",
+      "name": "Shattered Pixel Dungeon",
+      "platform": "android",
+      "patch": null,
+      "environment": "stock-offline-pilot",
+      "observation_sources": [
+        {
+          "type": "media_projection_hud_ocr",
+          "status": "implemented_uncalibrated",
+          "provenance": [
+            "docs/ANDROID_STOCK_GAME_OBSERVER_V1.md"
+          ]
+        }
+      ],
+      "freshness_ms": null,
+      "latency_ms": null,
+      "confidence": null,
+      "supported_state": [
+        "health_candidate"
+      ],
+      "recommendation_capability": "calibration_pending",
+      "user_confirmed_actions": [],
+      "deterministic_automation": false,
+      "publisher_permission": "unverified_exact_environment",
+      "restrictions": [
+        "No capability promotion without exact installed version and permitted environment.",
+        "Global AUTOMATIC_EXECUTION_DISABLED remains active."
+      ],
+      "required_permissions": [
+        "explicit_capture_consent"
+      ],
+      "exact_environment_status": "l3_pending",
+      "implementation_status": "observer_pilot"
+    }
+  ]
+}

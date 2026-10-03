@@ -48,3 +48,18 @@ Use secondary workers only for independent bounded lanes where speed/coverage be
 ## Final evidence
 
 Report exact SHA, PR/check evidence, runtime/visual evidence when applicable, unresolved external gates, and only the remaining unavoidable Owner action.
+
+## Controlled integration review
+
+One daily integration PR; request one Codex review on a practically final HEAD.
+Prioritize actionable correctness/security regressions: privilege/auth bypass, RLS/ownership,
+credential leakage, unsafe game-action authority, replay/idempotency/concurrency,
+stale-state execution, provenance drift, release/signing boundaries and destructive data behavior.
+Do not spend review on naming, formatting or style already covered by automated linters.
+Missing physical/environment evidence is an explicit gate; never infer acceptance from a build.
+
+## Production design ownership
+
+GPT owns production design in alpha-0 under Design System v3. The companion design laboratory
+is reference/history only. No automatic imports or lab parity requirement. Owner visual acceptance
+is separate from implementation and automated contracts.

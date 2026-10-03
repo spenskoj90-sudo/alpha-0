@@ -102,3 +102,27 @@ def test_pack_preserves_all_sources_within_shared_presentation_bound():
     data['rules'][0]['provenance']=data['rules'][0]['provenance'][:4]
     result=evaluate(loaded(data), observation(), now_ms=1500, session_id='s')
     assert len(result.items[0]['provenance']) == 20
+
+
+def test_retained_cache_handle_cannot_evaluate_after_revocation(tmp_path):
+    raw=json.dumps(pack_data()).encode(); digest=hashlib.sha256(raw).hexdigest()
+    registry=PackRegistry(tmp_path, allowed_digests={digest}); registry.put(raw,digest)
+    retained=registry.get(digest)
+    assert evaluate(retained, observation(), now_ms=1500, session_id='s').status == 'ready'
+    registry.revoke(digest)
+    assert evaluate(retained, observation(), now_ms=1500, session_id='s').status == 'revoked'
+
+
+def test_external_and_inflight_revocation_invalidates_cached_fallback(tmp_path, monkeypatch):
+    from app.core import knowledge_packs
+    raw=json.dumps(pack_data()).encode(); digest=hashlib.sha256(raw).hexdigest()
+    registry=PackRegistry(tmp_path, allowed_digests={digest}); registry.put(raw,digest)
+    retained=registry.get(digest)
+    original=knowledge_packs.matches
+    def revoking_match(condition, signals):
+        result=original(condition, signals)
+        PackRegistry(tmp_path, allowed_digests={digest}).revoke(digest)
+        return result
+    monkeypatch.setattr(knowledge_packs, 'matches', revoking_match)
+    result=evaluate(retained, observation(), now_ms=1500, session_id='s')
+    assert result.status == 'revoked' and result.items == ()

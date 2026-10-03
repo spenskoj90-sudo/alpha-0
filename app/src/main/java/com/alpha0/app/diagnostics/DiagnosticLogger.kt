@@ -134,7 +134,7 @@ class DiagnosticLogger private constructor(private val context: Context) {
         durationMs: Long? = null,
         details: Map<String, Any?>? = null,
         throwable: Throwable? = null
-    ) {
+    ): Boolean {
         try {
             val obj = JSONObject().apply {
                 put("ts", Instant.now().toString())
@@ -162,8 +162,10 @@ class DiagnosticLogger private constructor(private val context: Context) {
                 "DEBUG" -> if (isForensicTest()) Log.d(TAG, "${component}/${event} $result")
                 else -> Log.i(TAG, "${component}/${event} $result")
             }
+            return true
         } catch (e: Exception) {
             Log.w(TAG, "diag write failed: ${e.javaClass.simpleName}")
+            return false
         }
     }
 

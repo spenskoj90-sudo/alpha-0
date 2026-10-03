@@ -25,4 +25,12 @@ class CalibrationCampaignTest {
     @Test fun `future timestamps cannot produce a measurement`() {
         assertNull(CalibrationCampaign().record("4", "20", HealthObservation(HealthCandidate(4, 20, 0), 200), 100))
     }
+    @Test fun `failed writes do not increment saved count or consume sequence`() {
+        val campaign = CalibrationCampaign()
+        assertNull(campaign.record("4", "20", null, 100) { false })
+        assertNull(campaign.record("4", "20", null, 100) { throw IllegalStateException("storage unavailable") })
+        assertEquals(0, campaign.count)
+        assertEquals(1, campaign.record("4", "20", null, 100) { true }!!.sequence)
+        assertEquals(1, campaign.count)
+    }
 }

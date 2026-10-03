@@ -10,7 +10,7 @@ def test_enabled_flag_does_not_activate_placeholder_or_invalid_public_id(monkeyp
     monkeypatch.setenv('SENTINEL_VK_REDIRECT_URIS','vk123://vk.ru/blank.html')
     assert not provider_status(provider).enabled
 
-@pytest.mark.parametrize('secret,redirects', [('CHANGE_ME_OWNER_MANAGED_SECRET','com.alpha0.app.physicaltest.auth://callback'),('test-secret','com.alpha0.app.physicaltest.auth://callback,https://example.test/callback?next=untrusted')])
+@pytest.mark.parametrize('secret,redirects', [('CHANGEME','com.alpha0.app.physicaltest.auth://callback'),('REPLACEME','com.alpha0.app.physicaltest.auth://callback'),('change-me-owner-secret','com.alpha0.app.physicaltest.auth://callback'),('CHANGE_ME_OWNER_MANAGED_SECRET','com.alpha0.app.physicaltest.auth://callback'),('test-secret','com.alpha0.app.physicaltest.auth://callback,https://example.test/callback?next=untrusted')])
 def test_telegram_placeholder_secret_or_partially_invalid_callbacks_fail_closed(monkeypatch, secret, redirects):
     monkeypatch.setenv('SENTINEL_TELEGRAM_AUTH_ENABLED','true')
     monkeypatch.setenv('SENTINEL_TELEGRAM_CLIENT_ID','123')

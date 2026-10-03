@@ -24,7 +24,7 @@ def classify(paths: list[str], event: str = 'pull_request') -> dict[str, bool]:
         if not path or path.startswith('/') or '..' in Path(path).parts:
             return dict.fromkeys(KEYS, True)
         name = Path(path).name
-        if path.startswith(('.github/', 'gradle/', 'scripts/')) or path in BUILD_FILES or name in {'AGENTS.md', 'pyproject.toml', 'requirements.txt', 'package.json', 'package-lock.json'} or name.endswith(('.gradle', '.gradle.kts', '.lock', '.lockfile')):
+        if path.startswith(('.github/', 'gradle/', 'scripts/')) or path in BUILD_FILES or name.startswith('Dockerfile') or name in {'AGENTS.md', 'pyproject.toml', 'requirements.txt', 'package.json', 'package-lock.json'} or name.endswith(('.gradle', '.gradle.kts', '.lock', '.lockfile')):
             selected |= ALL
         elif path.startswith('docs/'):
             if SECURITY.search(name): selected |= ALL

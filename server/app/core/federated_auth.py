@@ -111,7 +111,8 @@ def provider_statuses() -> list[ProviderStatus]:
     google_valid = re.fullmatch(r"[A-Za-z0-9-]+\.apps\.googleusercontent\.com", google_id) is not None
     telegram_valid = re.fullmatch(r"[1-9][0-9]{0,19}", telegram_id) is not None
     vk_valid = re.fullmatch(r"[1-9][0-9]{0,19}", vk_id) is not None
-    secret_configured = bool(telegram_secret) and not telegram_secret.upper().startswith(("CHANGE_ME", "REPLACE_ME", "<"))
+    normalized_secret = re.sub(r"[\s_-]", "", telegram_secret).upper()
+    secret_configured = bool(telegram_secret) and not normalized_secret.startswith(("CHANGEME", "REPLACEME", "<"))
     vk_binding_valid = bool(vk_redirects) and all(uri == f"vk{vk_id}://vk.ru/blank.html" for uri in vk_redirects)
     return [
         ProviderStatus(

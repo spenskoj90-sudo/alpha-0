@@ -229,20 +229,24 @@ internal fun GameObservationPanel(
                 OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 SecondaryButton(strings.text("game_calibration_save"), {
-                    val sample = campaign.record(expectedCurrent, expectedMaximum, observation.lastHealth, now)
-                    if (sample == null) calibrationMessage = "game_calibration_invalid"
-                    else {
+                    var writeFailed = false
+                    val sample = campaign.record(expectedCurrent, expectedMaximum, observation.lastHealth, now) { sample ->
                         val sampleInstall = state.installed ?: installed
-                        DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
+                        val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
                             "game_package" to ShatteredGameProfile.PACKAGE,
                             "game_version" to sampleInstall?.versionName, "game_version_code" to sampleInstall?.versionCode,
                             "age_ms" to sample.ageMs, "recognized_current" to sample.observed?.current,
                             "recognized_maximum" to sample.observed?.maximum,
                             "ground_truth_current" to sample.current, "ground_truth_maximum" to sample.maximum,
-                                "source_status" to "UNVERIFIED", "sample_kind" to "user-opt-in",
-                                "device_environment" to "UNVERIFIED",
+                            "source_status" to "UNVERIFIED", "sample_kind" to "user-opt-in",
+                            "device_environment" to "UNVERIFIED",
                         ))
+                        writeFailed = !saved
+                        saved
+                    }
+                    if (sample == null) calibrationMessage = if (writeFailed) "game_calibration_write_failed" else "game_calibration_invalid"
+                    else {
                         sampleCount = campaign.count
                         calibrationMessage = "game_calibration_saved"
                     }

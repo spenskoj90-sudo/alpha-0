@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import RLock
 from typing import Literal, Mapping
@@ -65,6 +65,7 @@ class KnowledgePack(DataModel):
 class LoadedPack:
     pack: KnowledgePack
     digest: str
+    registry: PackRegistry | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,6 +109,13 @@ def matches(condition: Condition, signals: Mapping) -> bool | None:
 
 
 def evaluate(loaded: LoadedPack, observation: Mapping, *, now_ms: int, session_id: str, locale: str = 'en') -> Evaluation:
+    # Retained cache handles must re-enter their revocation authority on every use.
+    if loaded.registry is not None:
+        return loaded.registry.evaluate(loaded.digest, observation, now_ms=now_ms, session_id=session_id, locale=locale)
+    return _evaluate_data(loaded, observation, now_ms=now_ms, session_id=session_id, locale=locale)
+
+
+def _evaluate_data(loaded: LoadedPack, observation: Mapping, *, now_ms: int, session_id: str, locale: str = 'en') -> Evaluation:
     pack = loaded.pack
     if type(now_ms) is not int or now_ms <= 0: return Evaluation('stale_state')
     if pack.revoked: return Evaluation('revoked')
@@ -166,7 +174,7 @@ class PackRegistry:
             self._remember(digest, loaded)
 
     def _remember(self, digest: str, loaded: LoadedPack) -> None:
-        self._cache[digest] = loaded
+        self._cache[digest] = LoadedPack(loaded.pack, loaded.digest, self)
         self._cache.move_to_end(digest)
         while len(self._cache) > self.capacity: self._cache.popitem(last=False)
 
@@ -181,7 +189,17 @@ class PackRegistry:
                 loaded = load_pack(path.read_bytes(), digest)
             except (OSError, ValueError): return None
             self._remember(digest, loaded)
-            return loaded
+            return self._cache[digest]
+
+    def evaluate(self, digest: str, observation: Mapping, *, now_ms: int, session_id: str, locale: str = 'en') -> Evaluation:
+        # Serialize same-registry revocation and evaluation. Re-read durable markers
+        # before returning, including revocations applied by another registry/process.
+        with self._lock:
+            if not self._allowed(digest): return Evaluation('revoked')
+            loaded = self.get(digest)
+            if loaded is None: return Evaluation('unavailable_pack')
+            result = _evaluate_data(loaded, observation, now_ms=now_ms, session_id=session_id, locale=locale)
+            return result if self._allowed(digest) else Evaluation('revoked')
 
     def revoke(self, digest: str) -> None:
         with self._lock:

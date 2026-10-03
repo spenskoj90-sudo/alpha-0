@@ -32,7 +32,7 @@ class ChangeClassificationTests(unittest.TestCase):
             self.assertTrue(r[key], key)
 
     def test_build_release_and_workflows_run_everything(self):
-        for path in (".github/workflows/build.yml", "scripts/change_classification.py", "VERSION", "gradle/wrapper/gradle-wrapper.properties", "server/pyproject.toml", "docs/RELEASE_GATES.md"):
+        for path in ("server/Dockerfile", "Dockerfile", "server/Dockerfile.staging", ".github/workflows/build.yml", "scripts/change_classification.py", "VERSION", "gradle/wrapper/gradle-wrapper.properties", "server/pyproject.toml", "docs/RELEASE_GATES.md"):
             self.assertTrue(all(classify([path]).values()), path)
 
     def test_python_and_js_codeql_route_separately(self):

@@ -28,7 +28,7 @@ test('Companion rendered brand and section selection follow keyboard and history
   await expect(links.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'location');
   await page.goto('http://companion.test/#account');
   await expect(links.getByRole('link', { name: 'Account', exact: true })).toHaveAttribute('aria-current', 'location');
-  expect(await page.locator('.brand-mark path').nth(1).getAttribute('d')).toContain('M43 18.5');
+  expect(await page.locator('.brand-mark path').nth(1).getAttribute('d')).toBe('M43 19H27l-7 8 23 10-7 8H21');
   expect(await page.locator('.brand-mark').evaluate(el => el.getBoundingClientRect().width)).toBeGreaterThan(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });

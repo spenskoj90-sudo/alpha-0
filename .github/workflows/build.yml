@@ -273,6 +273,9 @@ jobs:
       - name: Test Control Plane
         if: needs.changes.outputs.web == 'true'
         run: npm test
+      - name: Check Control Plane lint glob compatibility
+        if: needs.changes.outputs.web == 'true'
+        run: node ../scripts/test_next_lint_glob.cjs web
       - name: Enforce Control Plane coverage
         if: needs.changes.outputs.web == 'true'
         run: npm run test:coverage
@@ -287,6 +290,10 @@ jobs:
         working-directory: site
         run: npm ci
       - name: Lint public site
+        if: needs.changes.outputs.site == 'true'
+        working-directory: site
+        run: node ../scripts/test_next_lint_glob.cjs site
+      - name: Lint public-site source
         if: needs.changes.outputs.site == 'true'
         working-directory: site
         run: npm run lint

@@ -48,8 +48,8 @@ Never put the password, tokens, private keys or exported diagnostics in a public
 
 ## 3. Install and establish build identity
 
-1. If an older `SENTINEL` is installed, export any evidence that must be preserved, then uninstall it for the fresh-install pass.
-2. Open `app-physicalTest.apk` and allow installation from the selected source when Android asks.
+1. If an older physical-test installation exists, preserve it, its Keystore identity and device/session binding. Compare the installed package, current signer certificate and versionCode with the candidate manifest using [the update-channel contract](ANDROID_PHYSICAL_TEST_UPDATE_CHANNEL.md). Missing signer evidence is an unresolved gate. Never uninstall the existing application as a routine workaround for incompatible signing.
+2. Open `app-physicalTest.apk` only on a fresh test device/profile without that package, or after the stable-test manifest and installed certificate/version establish update compatibility. An `ephemeral-debug` artifact with `updateCompatible=false` is CI diagnostic evidence, not an in-place-update candidate. If the old signer is unavailable, the Owner must choose a separate durable test identity/package transition before a new installation is prepared; exporting diagnostics does not preserve Keystore identity.
 3. Launch **SENTINEL**.
 4. Confirm the permanent compact PHYSICAL TEST identity strip clearly identifies `PHYSICAL TEST`, `STAGING`, the expected version and SHA prefix while leaving normal screen content usable.
 5. Confirm the normal release package, if installed, remains separate. The physical-test package is `com.alpha0.app.physicaltest`.

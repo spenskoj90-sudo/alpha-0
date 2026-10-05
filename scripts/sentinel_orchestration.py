@@ -6,6 +6,7 @@ import concurrent.futures
 import hashlib
 import json
 import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Any
@@ -60,10 +61,25 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             if worktree in worktrees:
                 raise ManifestError("write lanes cannot share a mutable worktree")
             worktrees.add(worktree)
+    graph: dict[str, set[str]] = {}
     for lane in lanes:
         deps = set(lane.get("dependencies", []))
         if lane["id"] in deps or not deps.issubset(ids):
             raise ManifestError(f"lane {lane['id']} has invalid dependencies")
+        graph[lane["id"]] = deps
+    visiting, visited = set(), set()
+    def visit(lane_id: str) -> None:
+        if lane_id in visiting:
+            raise ManifestError("lane dependencies must form an acyclic graph")
+        if lane_id in visited:
+            return
+        visiting.add(lane_id)
+        for dep in graph[lane_id]:
+            visit(dep)
+        visiting.remove(lane_id)
+        visited.add(lane_id)
+    for lane_id in graph:
+        visit(lane_id)
     return lanes
 
 def _digests(paths: list[str]) -> dict[str, str]:
@@ -86,8 +102,19 @@ def _run_lane(lane: dict[str, Any]) -> dict[str, Any]:
     return {"id": lane["id"], "mode": "read_only", "status": "SUCCESS",
             "durationMs": round((time.monotonic() - started) * 1000, 3), "result": result}
 
+def _repository_head() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip().lower()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ManifestError("unable to resolve repository HEAD") from exc
+
 def run(manifest: dict[str, Any]) -> dict[str, Any]:
     lanes = validate_manifest(manifest)
+    if _repository_head() != manifest["baseSha"]:
+        raise ManifestError("repository HEAD must equal manifest baseSha")
     if any(lane["mode"] == "write" for lane in lanes):
         raise ManifestError("local harness refuses write-lane execution; supervised isolated workers are required")
     started = time.monotonic()

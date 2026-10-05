@@ -19,7 +19,7 @@ repository evidence without granting a secondary worker integration authority.
 - dependencies;
 - for write lanes, an isolated worktree and non-`main` branch.
 
-Duplicate mutable worktrees, base-SHA drift, unknown dependencies and arbitrary
+Duplicate mutable worktrees, repository/base-SHA drift, unknown or cyclic dependencies and arbitrary
 readers fail validation. The local v1 runner deliberately refuses to execute
 write lanes. Write workers remain the responsibility of the supervised
 orchestrator and must integrate serially through the existing exact-SHA merge gate.

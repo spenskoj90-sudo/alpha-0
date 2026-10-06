@@ -96,6 +96,7 @@ if command -v python >/dev/null 2>&1; then
     scripts/staging_surface_smoke.py scripts/test_staging_surface_smoke.py
   check 'Android product shell invariants' python scripts/test_android_product_shell.py
   check 'Change classification invariants' python scripts/test_change_classification.py
+  check 'Exact-SHA orchestration harness invariants' python scripts/test_sentinel_orchestration.py
   check 'Repository policy invariants' python scripts/verify_repository.py
   check 'Branch hygiene safety invariants' python scripts/test_branch_hygiene.py
   check 'Release evidence invariants' python scripts/test_release_evidence.py

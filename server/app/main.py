@@ -267,6 +267,15 @@ def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str
     return principal.device_id == device_id or device.get("user_id") == principal.user_id
 
 
+from app.core.knowledge_distribution import KnowledgeDistribution
+from app.core.knowledge_distribution_routes import install_knowledge_distribution_routes
+
+knowledge_distribution = KnowledgeDistribution(getattr(store, "engine", None))
+install_knowledge_distribution_routes(
+    app, distribution=knowledge_distribution, principal_from_token=principal_from_token,
+    require_bearer=require_bearer, authorize_request=authorize_request, request_id=request_id,
+)
+
 # Phase 1 characters/game-state domain (issue #107)
 install_game_state_routes(
     app,

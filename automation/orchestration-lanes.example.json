@@ -1,0 +1,8 @@
+{
+  "schema": "sentinel.orchestration-lanes.v1",
+  "baseSha": "b50d086839a14568244b8538ad4b95ca53bddeef",
+  "lanes": [
+    {"id":"governance-contract","baseSha":"b50d086839a14568244b8538ad4b95ca53bddeef","mode":"read_only","reader":"repository_contract","ownedPaths":["AGENTS.md","automation/ai-orchestration.v1.json"],"acceptanceChecks":["exact repository digests"],"dependencies":[]},
+    {"id":"acceptance-contract","baseSha":"b50d086839a14568244b8538ad4b95ca53bddeef","mode":"read_only","reader":"acceptance_contract","ownedPaths":["docs/TASKS.md","design/user-visible-acceptance.v1.json"],"acceptanceChecks":["canonical acceptance queue"],"dependencies":[]}
+  ]
+}

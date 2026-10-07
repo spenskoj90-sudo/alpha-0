@@ -50,3 +50,7 @@ coverage/
 web/test-results/
 web/playwright-report/
 web/tsconfig.tsbuildinfo
+
+# Isolated engineering workspaces
+.worktrees/
+.superpowers/

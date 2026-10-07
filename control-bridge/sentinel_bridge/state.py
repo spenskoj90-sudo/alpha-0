@@ -56,11 +56,12 @@ def project_state() -> dict[str, Any]:
 def provider_state() -> dict[str, Any]:
     checks = {
         "openai": ("OPENAI_API_KEY",),
-        "resend": ("RESEND_API_KEY",),
-        "stripe": ("STRIPE_SECRET_KEY",),
-        "posthog": ("POSTHOG_API_KEY", "NEXT_PUBLIC_POSTHOG_KEY"),
+        "resend": ("SENTINEL_RESEND_API_KEY",),
+        "brevo": ("SENTINEL_BREVO_API_KEY",),
+        "stripe": ("SENTINEL_STRIPE_SECRET_KEY",),
+        "posthog": ("SENTINEL_POSTHOG_PROJECT_KEY",),
         "sentry": ("SENTRY_DSN", "SENTRY_AUTH_TOKEN"),
-        "googleOidc": ("SENTINEL_GOOGLE_CLIENT_ID",),
+        "googleOidc": ("SENTINEL_GOOGLE_WEB_CLIENT_ID",),
         "telegramOidc": ("SENTINEL_TELEGRAM_CLIENT_ID",),
         "vkOidc": ("SENTINEL_VK_CLIENT_ID",),
     }
@@ -68,6 +69,7 @@ def provider_state() -> dict[str, Any]:
         "schema": "sentinel.control-bridge.provider-state.v1",
         "sourceSha": source_sha(),
         "evidenceScope": "bridge-runtime-environment",
+        "providerEnablementVerified": False,
         "providers": {
             key: {"configured": any(_configured(name) for name in names)}
             for key, names in checks.items()
@@ -101,10 +103,12 @@ def runtime_health() -> dict[str, Any]:
 def release_readiness() -> dict[str, Any]:
     ux = _read_json("design/user-visible-acceptance.v1.json")
     task_text = _read_text("docs/TASKS.md")
-    issue_ids = sorted({int(value) for value in re.findall(r"- \[ \] \*\*#(\d+)", task_text)})
-    surfaces = ux.get("surfaces", [])
+    acceptance_text = task_text.split("## Canonical acceptance queue", 1)[-1].split("\n## ", 1)[0]
+    issue_ids = sorted({int(value) for value in re.findall(r"- \[ \] \*\*#(\d+)", acceptance_text)})
+    raw_surfaces = ux.get("surfaces", [])
+    surfaces = [item for item in raw_surfaces if isinstance(item, dict) and isinstance(item.get("id"), str)] if isinstance(raw_surfaces, list) else []
     owner_acceptance_required = bool(ux.get("ownerVisualAcceptanceRequired"))
-    valid_surfaces = isinstance(surfaces, list) and bool(surfaces) and all(
+    valid_surfaces = bool(surfaces) and len(surfaces) == len(raw_surfaces) and all(
         isinstance(item, dict)
         and isinstance(item.get("id"), str)
         and item.get("ready") is True
@@ -114,18 +118,27 @@ def release_readiness() -> dict[str, Any]:
     return {
         "schema": "sentinel.control-bridge.release-readiness.v1",
         "sourceSha": source_sha(),
+        "evidenceScope": "repository-checklist-summary",
         "activeAcceptanceIssues": issue_ids,
         "ownerVisualAcceptance": {
             "required": owner_acceptance_required,
             "acceptedSurfaces": [item.get("id") for item in surfaces if item.get("ownerVisualAccepted")],
             "pendingSurfaces": [item.get("id") for item in surfaces if not item.get("ownerVisualAccepted")],
         },
-        "releaseReady": (
+        "checklistSatisfied": (
             source_sha() != "UNKNOWN"
             and not issue_ids
             and valid_surfaces
             and (not owner_acceptance_required or accepted)
         ),
+        # This adapter does not verify candidate bytes or protected-main
+        # attestations. A metadata summary can never assert release acceptance.
+        "releaseReady": False,
+        "releaseEvidence": {
+            "status": "UNVERIFIED",
+            "reason": "EXACT_CANDIDATE_ATTESTATION_NOT_VERIFIED",
+            "validator": "scripts/verify_final_release_acceptance_live.sh",
+        },
     }
 
 def design_state() -> dict[str, Any]:

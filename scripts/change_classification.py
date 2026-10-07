@@ -14,6 +14,13 @@ DESIGN = {'android', 'instrumentation', 'web', 'site', 'companion', 'design', 'p
 CONTRACT = re.compile(r'(API|AUTH|ENTITLEMENT|SESSION|ACTION|GAME[_-]|UNIFIED_|CONTROL_BRIDGE|PROVIDER|RUNTIME|KNOWLEDGE|INTELLIGENCE|COMPANION|RECOMMENDATION|ACCOUNT|DEVICE|BILLING|ROUTES|INTERACTION|POLICY|SECURITY)', re.I)
 SECURITY = re.compile(r'(SECURITY|RELEASE|SIGNING|SUPPLY_CHAIN|ATTESTATION|EVIDENCE|ACCEPTANCE|RLS|DATABASE)', re.I)
 BUILD_FILES = {'VERSION', '.node-version', '.python-version', 'settings.gradle.kts', 'build.gradle.kts', 'gradle.properties', 'gradlew', 'gradlew.bat', 'docker-compose.yml', 'render.yaml', 'verify.sh', 'AGENTS.md', '.env.example', '.dockerignore', '.gitattributes'}
+DEPENDENCY_EVIDENCE = {'dependencies', 'release', 'supply_chain', 'p1'}
+SCOPED_DEPENDENCIES = {
+    f'{surface}/{file}': {flag, 'audit_javascript', 'codeql_javascript'} | DEPENDENCY_EVIDENCE | ({'games'} if surface == 'launcher' else set())
+    for surface, flag in (('web', 'web'), ('site', 'site'), ('launcher', 'companion'))
+    for file in ('package.json', 'package-lock.json')
+}
+SCOPED_DEPENDENCIES['server/pyproject.toml'] = PROTOCOL | DEPENDENCY_EVIDENCE | {'container', 'audit_python', 'codeql_python'}
 
 
 def classify(paths: list[str], event: str = 'pull_request') -> dict[str, bool]:
@@ -24,7 +31,9 @@ def classify(paths: list[str], event: str = 'pull_request') -> dict[str, bool]:
         if not path or path.startswith('/') or '..' in Path(path).parts:
             return dict.fromkeys(KEYS, True)
         name = Path(path).name
-        if path.startswith(('.github/', 'gradle/', 'scripts/')) or path in BUILD_FILES or name.startswith('Dockerfile') or name in {'AGENTS.md', 'pyproject.toml', 'requirements.txt', 'package.json', 'package-lock.json'} or name.endswith(('.gradle', '.gradle.kts', '.lock', '.lockfile')):
+        if path in SCOPED_DEPENDENCIES:
+            selected |= SCOPED_DEPENDENCIES[path]
+        elif path.startswith(('.github/', 'gradle/', 'scripts/')) or path in BUILD_FILES or name.startswith('Dockerfile') or name in {'AGENTS.md', 'pyproject.toml', 'requirements.txt', 'package.json', 'package-lock.json'} or name.endswith(('.gradle', '.gradle.kts', '.lock', '.lockfile')):
             selected |= ALL
         elif path.startswith('docs/'):
             if SECURITY.search(name): selected |= ALL

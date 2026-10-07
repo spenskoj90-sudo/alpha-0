@@ -7,13 +7,15 @@
     "productionPinned": "a281479677d84de21a24db62b0b13af7ae11c623",
     "labPass": "REJECTED_INCOMPLETE",
     "productionParityClaimed": false,
-    "nextAction": "COMPLETE_AND_VALIDATE_LAB_BEFORE_IMPORT",
+    "nextAction": "GPT_NATIVE_PRODUCTION_DESIGN_AND_OWNER_ACCEPTANCE",
     "reviewedLabSha": "aac34743fb0e50109979f4fc8723b76965dc5083",
     "blockers": [
       "DataViz and i18n are not connected to the application.",
       "TypeScript fails with three errors; lint has 451 errors and six warnings.",
       "DataViz shared scales, confidence bands and heatmap normalization require correction."
-    ]
+    ],
+    "authority": "GPT_NATIVE_PRODUCTION",
+    "labRole": "REFERENCE_HISTORY_ONLY"
   },
   "surfaces": [
     {
@@ -27,18 +29,32 @@
     {
       "id": "web-control-plane",
       "engineeringState": "FUNCTIONAL_FOUNDATION",
-      "runnableEvidence": "CI_BUILD",
+      "runnableEvidence": "STAGING_BROWSER_VERIFIED_CHECKPOINT",
       "ownerVisible": "NO",
       "ownerVisualAccepted": false,
-      "ready": false
+      "ready": false,
+      "runnableCheckpoint": {
+        "sourceSha": "77f5c742412d5c394e9143ad3bf7188e4edee85a",
+        "observedAt": "2026-10-06",
+        "workflowRunId": 37449079729,
+        "url": "https://sentinel-web-staging-fxhn.onrender.com",
+        "scope": "dated synthetic/browser and health evidence; not Owner acceptance"
+      }
     },
     {
       "id": "public-site",
       "engineeringState": "FOUNDATION_ONLY",
-      "runnableEvidence": "CI_STATIC_BUILD",
+      "runnableEvidence": "STAGING_BROWSER_VERIFIED_CHECKPOINT",
       "ownerVisible": "NO",
       "ownerVisualAccepted": false,
-      "ready": false
+      "ready": false,
+      "runnableCheckpoint": {
+        "sourceSha": "77f5c742412d5c394e9143ad3bf7188e4edee85a",
+        "observedAt": "2026-10-06",
+        "workflowRunId": 37449079729,
+        "url": "https://sentinel-public-site-staging.onrender.com",
+        "scope": "dated synthetic/browser and health evidence; not Owner acceptance"
+      }
     },
     {
       "id": "companion",

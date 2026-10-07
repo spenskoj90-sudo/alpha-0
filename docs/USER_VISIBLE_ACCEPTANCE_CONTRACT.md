@@ -55,9 +55,11 @@ For Android, Web Control Plane, Public Website, Companion, Overlay and Voice:
 
 `RUNNABLE` requires the exact packaged host build on the intended Windows environment. `OWNER-VISIBLE` requires Owner review on that host. CI packaging/smoke evidence remains engineering evidence, not visual acceptance.
 
-## Design-reference synchronization
+## Production design authority and optional reference synchronization
 
-Production design parity is claimable only when:
+GPT owns native production design in `alpha-0`; the laboratory is reference/history only. Production work does not wait for a final lab pass and has no automatic lab parity requirement. The adopted asset pin remains provenance. Owner visual acceptance still applies to every actual runnable surface.
+
+If an optional laboratory import/parity claim is proposed, that claim requires:
 
 1. the design-laboratory pass has a declared final SHA;
 2. production records that exact SHA as the adopted reference;
@@ -82,7 +84,7 @@ Examples:
 
 The final `publication` profile includes the `product-visual` gate. It is all-PASS only after exact-candidate Owner review includes:
 
-- final design-reference reconciliation;
+- final production design reconciliation, including the adopted asset provenance (no mandatory new laboratory import);
 - Android;
 - Web Control Plane;
 - Public Website;

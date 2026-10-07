@@ -216,7 +216,7 @@ describe('Web Core session boundary', () => {
     expect(cookie).toContain(`${REFRESH_COOKIE}=new-refresh`);
   });
 
-  it('clears stale refresh state when refresh cannot establish a session', async () => {
+  it('denies stale refresh without clearing potentially newer browser state', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"error":"INVALID_REFRESH"}', {
       status: 401,
@@ -228,11 +228,10 @@ describe('Web Core session boundary', () => {
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'WEB_SESSION_REQUIRED' });
     const cookie = response.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`${ACCESS_COOKIE}=`);
-    expect(cookie).toContain(`${REFRESH_COOKIE}=`);
+    expect(cookie).toBe('');
   });
 
-  it('retries one 401 with refresh and clears cookies when rotation fails', async () => {
+  it('retries one 401 with refresh without clearing cookies when rotation fails', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response('{"error":"INVALID_SESSION"}', {
@@ -250,7 +249,7 @@ describe('Web Core session boundary', () => {
 
     expect(response.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(response.headers.get('set-cookie') ?? '').toContain('Max-Age=0');
+    expect(response.headers.has('set-cookie')).toBe(false);
   });
 
   it('enforces same-origin proxy writes and handles missing/unavailable Core', async () => {

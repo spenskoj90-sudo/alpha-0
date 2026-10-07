@@ -53,8 +53,8 @@ describe('/api/billing/subscriptions', () => {
     const retryHeaders = new Headers(fetchMock.mock.calls[2][1]?.headers);
     expect(retryHeaders.get('authorization')).toBe('Bearer new-access');
     const setCookie = response.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('sentinel_access=new-access');
-    expect(setCookie).toContain('sentinel_refresh=new-refresh');
+    expect(setCookie).toMatch(/sentinel_access_[0-9a-f]{16}_2=new-access/);
+    expect(setCookie).toMatch(/sentinel_refresh_[0-9a-f]{16}_2=new-refresh/);
   });
 
   it('denies cross-site subscription writes and forces the browser provider boundary to manual', async () => {

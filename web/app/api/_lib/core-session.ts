@@ -38,19 +38,75 @@ const sessionGlobal = globalThis as typeof globalThis & {
 const pendingRefreshes = sessionGlobal.sentinelPendingRefreshes ??= new Map();
 const webGenerations = sessionGlobal.sentinelWebGenerations ??= new Map();
 
-type WebSessionContext = { family: string; generation: number };
+type WebSessionContext = { family: string; generation: number; versioned: boolean };
+
+function familyCookieKey(family: string): string {
+  return createHash('sha256').update(family).digest('hex').slice(0, 16);
+}
+
+function versionedCookieName(base: string, family: string, generation: number): string {
+  return `${base}_${familyCookieKey(family)}_${generation}`;
+}
+
+function versionedGeneration(request: NextRequest, family: string): number | null {
+  const prefix = `${WEB_GENERATION_COOKIE}_${familyCookieKey(family)}_`;
+  let latest: number | null = null;
+  for (const cookie of request.cookies.getAll()) {
+    if (!cookie.name.startsWith(prefix) || cookie.value !== '1') continue;
+    const generation = Number(cookie.name.slice(prefix.length));
+    if (Number.isSafeInteger(generation) && generation >= 0 && (latest === null || generation > latest)) {
+      latest = generation;
+    }
+  }
+  return latest;
+}
 
 function webSessionContext(request: NextRequest): WebSessionContext | null {
   const family = request.cookies.get(WEB_SESSION_COOKIE)?.value ?? '';
-  const rawGeneration = request.cookies.get(WEB_GENERATION_COOKIE)?.value ?? '0';
+  if (!WEB_SESSION_PATTERN.test(family)) return null;
+  const durableGeneration = versionedGeneration(request, family);
+  const rawGeneration = durableGeneration === null
+    ? request.cookies.get(WEB_GENERATION_COOKIE)?.value ?? '0'
+    : String(durableGeneration);
   const generation = Number(rawGeneration);
-  if (!WEB_SESSION_PATTERN.test(family) || !Number.isSafeInteger(generation) || generation < 0) return null;
-  return { family, generation };
+  if (!Number.isSafeInteger(generation) || generation < 0) return null;
+  return { family, generation, versioned: durableGeneration !== null };
+}
+
+function applyGenerationMarker(response: NextResponse, family: string, generation: number): void {
+  response.cookies.set(versionedCookieName(WEB_GENERATION_COOKIE, family, generation), '1', {
+    ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds(),
+  });
+}
+
+function retireOlderGenerationCookies(
+  request: NextRequest,
+  response: NextResponse,
+  family: string,
+  generation: number,
+): void {
+  const key = familyCookieKey(family);
+  for (const cookie of request.cookies.getAll()) {
+    const base = [ACCESS_COOKIE, REFRESH_COOKIE, MFA_COOKIE, WEB_GENERATION_COOKIE]
+      .find(candidate => cookie.name.startsWith(`${candidate}_${key}_`));
+    if (!base) continue;
+    const prior = Number(cookie.name.slice(`${base}_${key}_`.length));
+    if (Number.isSafeInteger(prior) && prior >= 0 && prior < generation) {
+      response.cookies.set(cookie.name, '', { ...cookieBaseOptions(), maxAge: 0 });
+    }
+  }
 }
 
 function applyWebSessionContext(response: NextResponse, family: string, generation: number): void {
   response.cookies.set(WEB_SESSION_COOKIE, family, { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
   response.cookies.set(WEB_GENERATION_COOKIE, String(generation), { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
+  applyGenerationMarker(response, family, generation);
+}
+
+function credentialCookie(request: NextRequest, base: string, context: WebSessionContext): string | undefined {
+  return request.cookies.get(
+    context.versioned ? versionedCookieName(base, context.family, context.generation) : base,
+  )?.value;
 }
 
 function contextRequired(requestId: string): NextResponse {
@@ -127,17 +183,28 @@ export function sameOriginWrite(request: NextRequest): boolean {
   return origin.replace(/\/$/, '') === expected;
 }
 
-export function applySessionCookies(response: NextResponse, session: SessionPayload, generation?: number): void {
+export function applySessionCookies(
+  response: NextResponse,
+  session: SessionPayload,
+  generation?: number,
+  family?: string,
+): void {
+  const accessCookie = generation !== undefined && family
+    ? versionedCookieName(ACCESS_COOKIE, family, generation) : ACCESS_COOKIE;
+  const refreshCookie = generation !== undefined && family
+    ? versionedCookieName(REFRESH_COOKIE, family, generation) : REFRESH_COOKIE;
   const expires = new Date(session.expires_at);
-  response.cookies.set(ACCESS_COOKIE, session.session_token, {
+  response.cookies.set(accessCookie, session.session_token, {
     ...cookieBaseOptions(),
     expires: Number.isNaN(expires.getTime()) ? undefined : expires,
   });
-  response.cookies.set(REFRESH_COOKIE, session.refresh_token, {
+  response.cookies.set(refreshCookie, session.refresh_token, {
     ...cookieBaseOptions(),
     maxAge: refreshMaxAgeSeconds(),
   });
-  if (generation !== undefined) {
+  if (generation !== undefined && family) {
+    applyGenerationMarker(response, family, generation);
+  } else if (generation !== undefined) {
     response.cookies.set(WEB_GENERATION_COOKIE, String(generation), { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
   }
 }
@@ -151,9 +218,16 @@ export function clearMfaCookie(response: NextResponse): void {
   response.cookies.set(MFA_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
 }
 
-function applyMfaCookie(response: NextResponse, challenge: MfaChallengePayload): void {
+function applyMfaCookie(
+  response: NextResponse,
+  challenge: MfaChallengePayload,
+  generation?: number,
+  family?: string,
+): void {
   const expires = new Date(challenge.expires_at);
-  response.cookies.set(MFA_COOKIE, challenge.challenge_token, {
+  const cookie = generation !== undefined && family
+    ? versionedCookieName(MFA_COOKIE, family, generation) : MFA_COOKIE;
+  response.cookies.set(cookie, challenge.challenge_token, {
     ...cookieBaseOptions(),
     maxAge: Number.isNaN(expires.getTime()) ? DEFAULT_MFA_MAX_AGE_SECONDS : undefined,
     expires: Number.isNaN(expires.getTime()) ? undefined : expires,
@@ -296,8 +370,9 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
         mfa_required: true,
         expires_at: mfa.expires_at,
       }), requestId, response);
+      retireOlderGenerationCookies(request, result, context.family, generation);
       clearSessionCookies(result);
-      applyMfaCookie(result, mfa);
+      applyMfaCookie(result, mfa, generation, context.family);
       applyWebSessionContext(result, context.family, generation);
       return result;
     }
@@ -314,8 +389,9 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       expires_at: session.expires_at,
       scopes: session.scopes,
     }), requestId, response);
+    retireOlderGenerationCookies(request, result, context.family, generation);
     clearMfaCookie(result);
-    applySessionCookies(result, session, generation);
+    applySessionCookies(result, session, generation, context.family);
     return result;
   } catch {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);
@@ -379,6 +455,7 @@ export async function passwordResetWeb(request: NextRequest, step: string): Prom
       if (!context || !generation || !acceptGeneration(coreUrl, context.family, generation)) {
         return reply({ error: 'WEB_SESSION_SUPERSEDED' }, 409, upstream);
       }
+      retireOlderGenerationCookies(request, result, context.family, generation);
       clearSessionCookies(result);
       clearMfaCookie(result);
       applyWebSessionContext(result, context.family, generation);
@@ -398,12 +475,15 @@ export async function completeMfaWeb(request: NextRequest): Promise<NextResponse
   if (!coreUrl) {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
   }
-  const challengeToken = request.cookies.get(MFA_COOKIE)?.value;
+  const context = webSessionContext(request);
+  if (!context && !request.cookies.get(MFA_COOKIE)?.value) {
+    return applyCorrelation(NextResponse.json({ error: 'WEB_MFA_CHALLENGE_REQUIRED' }, { status: 401 }), requestId);
+  }
+  if (!context || context.generation < 1) return contextRequired(requestId);
+  const challengeToken = credentialCookie(request, MFA_COOKIE, context);
   if (!challengeToken) {
     return applyCorrelation(NextResponse.json({ error: 'WEB_MFA_CHALLENGE_REQUIRED' }, { status: 401 }), requestId);
   }
-  const context = webSessionContext(request);
-  if (!context || context.generation < 1) return contextRequired(requestId);
   let code: string;
   try {
     const payload = await request.json() as { code?: unknown };
@@ -438,8 +518,9 @@ export async function completeMfaWeb(request: NextRequest): Promise<NextResponse
       expires_at: session.expires_at,
       scopes: session.scopes,
     }), requestId, response);
+    retireOlderGenerationCookies(request, result, context.family, generation);
     clearMfaCookie(result);
-    applySessionCookies(result, session, generation);
+    applySessionCookies(result, session, generation, context.family);
     return result;
   } catch {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);
@@ -461,19 +542,21 @@ export async function proxyAuthenticated(
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
   }
 
-  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
-  let accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   let context = webSessionContext(request);
   let initializedContext = false;
   if (!context) {
-    if (refreshToken) {
+    if (request.cookies.get(REFRESH_COOKIE)?.value) {
       const result = applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_CONTEXT_REQUIRED' }, { status: 409 }), requestId);
       applyWebSessionContext(result, randomBytes(32).toString('base64url'), 0);
       return result;
     }
-    context = { family: randomBytes(32).toString('base64url'), generation: 0 };
+    // One bounded migration request may still carry a pre-family access cookie.
+    // It has no refresh authority and the response establishes versioned state.
+    context = { family: randomBytes(32).toString('base64url'), generation: 0, versioned: false };
     initializedContext = true;
   }
+  const refreshToken = credentialCookie(request, REFRESH_COOKIE, context);
+  let accessToken = credentialCookie(request, ACCESS_COOKIE, context);
   let refreshed: { session: SessionPayload; generation: number } | null = null;
 
   try {
@@ -506,9 +589,10 @@ export async function proxyAuthenticated(
 
     const result = await copyUpstream(upstream, requestId);
     if (refreshed && upstream.status !== 401 && acceptGeneration(coreUrl, context.family, refreshed.generation)) {
-      applySessionCookies(result, refreshed.session, refreshed.generation);
+      applySessionCookies(result, refreshed.session, refreshed.generation, context.family);
     }
     if (initializedContext) applyWebSessionContext(result, context.family, context.generation);
+    retireOlderGenerationCookies(request, result, context.family, refreshed?.generation ?? context.generation);
     // Never erase cookies on a passive 401 that may arrive after a newer login.
     return result;
   } catch {
@@ -527,8 +611,8 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
   }
   const context = webSessionContext(request);
   if (!context) return contextRequired(requestId);
-  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
-  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+  const accessToken = credentialCookie(request, ACCESS_COOKIE, context);
+  const refreshToken = credentialCookie(request, REFRESH_COOKIE, context);
   let serverRevoked = false;
   let upstream: Response | undefined;
 
@@ -552,6 +636,7 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
     return applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_SUPERSEDED' }, { status: 409 }), requestId, upstream);
   }
   const result = applyCorrelation(NextResponse.json({ authenticated: false, server_revoked: serverRevoked }), requestId, upstream);
+  retireOlderGenerationCookies(request, result, context.family, generation);
   clearSessionCookies(result);
   clearMfaCookie(result);
   applyWebSessionContext(result, context.family, generation);

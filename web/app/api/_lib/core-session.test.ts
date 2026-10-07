@@ -216,8 +216,8 @@ describe('Web Core session boundary', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://core.example/v1/sessions/refresh');
     expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('authorization')).toBe('Bearer new-access');
     const cookie = response.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`${ACCESS_COOKIE}=new-access`);
-    expect(cookie).toContain(`${REFRESH_COOKIE}=new-refresh`);
+    expect(cookie).toMatch(new RegExp(`${ACCESS_COOKIE}_[0-9a-f]{16}_2=new-access`));
+    expect(cookie).toMatch(new RegExp(`${REFRESH_COOKIE}_[0-9a-f]{16}_2=new-refresh`));
   });
 
   it('denies stale refresh without clearing potentially newer browser state', async () => {

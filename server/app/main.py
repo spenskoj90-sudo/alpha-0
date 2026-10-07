@@ -381,11 +381,12 @@ def register_user(
 ):
     rate_limit(request, "auth-register")
     web_session = validated_web_session(web_session_header)
-    web_operation = store.begin_web_session_operation(web_session) if web_session else None
+    web_operation = None
     try:
         with claimed_web_registration(web_session) as claimed:
             if not claimed:
                 raise HTTPException(status_code=409, detail="REGISTRATION_IN_PROGRESS")
+            web_operation = store.begin_web_session_operation(web_session) if web_session else None
             user_id = user_store.register(payload.email, payload.password)
             issued = (
                 store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
@@ -1248,14 +1249,21 @@ def refresh_session(
 ):
     web_session = validated_web_session(web_session_header)
     web_operation = store.begin_web_session_operation(web_session) if web_session else None
-    result = (
-        store.rotate_web_refresh(
-            payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation
+    try:
+        result = (
+            store.rotate_web_refresh(
+                payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation
+            )
+            if web_session and web_operation is not None
+            else store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
         )
-        if web_session and web_operation is not None
-        else store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    )
+    except Exception:
+        if web_session and web_operation is not None:
+            store.cancel_web_session_operation(web_session, web_operation)
+        raise
     if not result:
+        if web_session and web_operation is not None:
+            store.cancel_web_session_operation(web_session, web_operation)
         raise HTTPException(status_code=401, detail="INVALID_REFRESH")
     access, refresh, expires_at, scopes, previous = result
     if previous.get("device_id") is None:

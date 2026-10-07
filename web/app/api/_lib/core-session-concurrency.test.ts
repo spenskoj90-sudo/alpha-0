@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { authenticateWeb, proxyAuthenticated, WEB_GENERATION_COOKIE, WEB_SESSION_COOKIE } from './core-session';
@@ -28,7 +29,7 @@ it('joins concurrent refreshes without replaying a settled rotation', async () =
   finish();
   const responses = await Promise.all([first, second]);
   expect(responses.map(r => r.status)).toEqual([200, 200]);
-  for (const result of responses) expect(result.headers.get('set-cookie')).toContain('sentinel_refresh=rotated-refresh');
+  for (const result of responses) expect(result.headers.get('set-cookie')).toMatch(/sentinel_refresh_[0-9a-f]{16}_2=rotated-refresh/);
   expect(refresh.mock.calls.filter(([url]) => String(url).endsWith('/sessions/refresh'))).toHaveLength(1);
   const replay = await proxyAuthenticated(request('one-use-token'), '/v1/account');
   expect(replay.status).toBe(401);
@@ -107,7 +108,33 @@ it('suppresses a late successful login response after a newer generation complet
   const staleResponse = await stale;
 
   expect(current.status).toBe(200);
-  expect(current.headers.get('set-cookie')).toContain('sentinel_refresh=current-refresh');
+  expect(current.headers.get('set-cookie')).toMatch(/sentinel_refresh_[0-9a-f]{16}_2=current-refresh/);
   expect(staleResponse.status).toBe(409);
   expect(staleResponse.headers.get('set-cookie')).toBeNull();
+});
+
+it('selects the highest family generation across out-of-order worker cookies', async () => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+  const family = `cross-worker-family-${'w'.repeat(40)}`;
+  const key = createHash('sha256').update(family).digest('hex').slice(0, 16);
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ ok: true }));
+  const response = await proxyAuthenticated(new NextRequest('https://app.example/api/account', {
+    headers: {
+      cookie: [
+        `${WEB_SESSION_COOKIE}=${family}`,
+        `${WEB_GENERATION_COOKIE}=1`,
+        `sentinel_access=stale-fixed-access`,
+        `${WEB_GENERATION_COOKIE}_${key}_2=1`,
+        `sentinel_access_${key}_2=current-access`,
+        `sentinel_refresh_${key}_2=current-refresh`,
+        `${WEB_GENERATION_COOKIE}_${key}_1=1`,
+        `sentinel_access_${key}_1=stale-delayed-access`,
+        `sentinel_refresh_${key}_1=stale-delayed-refresh`,
+      ].join('; '),
+    },
+  }), '/v1/account');
+
+  expect(response.status).toBe(200);
+  expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get('authorization')).toBe('Bearer current-access');
+  expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/sessions/refresh'))).toBe(false);
 });

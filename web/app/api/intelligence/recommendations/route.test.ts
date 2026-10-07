@@ -92,7 +92,7 @@ describe('POST /api/intelligence/recommendations', () => {
     }
     expect(new Headers(fetchMock.mock.calls[2][1]?.headers).get('authorization')).toBe('Bearer new-access');
     const setCookie = response.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('sentinel_access=new-access');
-    expect(setCookie).toContain('sentinel_refresh=new-refresh');
+    expect(setCookie).toMatch(/sentinel_access_[0-9a-f]{16}_2=new-access/);
+    expect(setCookie).toMatch(/sentinel_refresh_[0-9a-f]{16}_2=new-refresh/);
   });
 });

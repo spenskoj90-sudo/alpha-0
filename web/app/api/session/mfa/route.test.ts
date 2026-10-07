@@ -35,7 +35,7 @@ describe('POST /api/session/mfa', () => {
     expect(body).not.toContain('refresh-secret');
     expect(body).not.toContain(challenge);
     const cookie = response.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain('sentinel_access=access-secret');
+    expect(cookie).toMatch(/sentinel_access_[0-9a-f]{16}_1=access-secret/);
     expect(cookie).toContain('sentinel_mfa=');
     expect(cookie.toLowerCase()).toContain('httponly');
     const upstreamBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? '{}'));

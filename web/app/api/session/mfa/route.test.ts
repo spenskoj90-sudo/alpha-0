@@ -16,14 +16,14 @@ describe('POST /api/session/mfa', () => {
       refresh_token: 'refresh-secret',
       expires_at: '2030-01-01T00:00:00Z',
       scopes: ['game:read'],
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/session/mfa', {
       method: 'POST',
       headers: {
         origin: 'http://localhost',
         'content-type': 'application/json',
-        cookie: `sentinel_mfa=${challenge}`,
+        cookie: `sentinel_mfa=${challenge}; sentinel_web_session=mfa-complete-${'c'.repeat(40)}; sentinel_web_generation=1`,
       },
       body: JSON.stringify({ code: '123456' }),
     }));

@@ -81,7 +81,7 @@ This is the authoritative **external acceptance queue**; the engineering queue d
 
 Base checkpoint: `77f5c742412d5c394e9143ad3bf7188e4edee85a`. Plan: `docs/superpowers/plans/2026-10-07-audit-remediation.md`. Reconcile status with the active integration PR; do not check an item until tests/review/CI verify it.
 
-- [ ] **F01–F03 — security/session:** patched sharp Web/Site locks, concurrent refresh cookie safety and bounded Web→Core transport.
+- [ ] **F01–F03 — security/session:** PR #450 integrated the sharp and bounded transport/failed-response cookie fixes. F02 durable browser-family generation is implemented on the current continuation branch with local Web/Core GREEN; exact-HEAD PostgreSQL 18/RLS CI, review, merge and staging verification remain required before checking this item.
 - [ ] **F04/F05 — evidence truth:** Bridge checklist cannot assert release readiness; canonical provider names and process-local scope.
 - [ ] **F11/F13 — CI/orientation:** scoped dependency classification; engineering queue, knowledge API, migration inventory and GPT-native design authority.
 - [ ] **F12 — maintenance:** reconcile Dependabot updates with coupled Electron version/runtime hash and version contracts; exact-HEAD CI before integration.

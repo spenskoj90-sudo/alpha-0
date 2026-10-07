@@ -45,6 +45,7 @@ See [Email action codes v1](EMAIL_ACTION_CODES_V1.md) for digest, account/purpos
 
 - `POST /v1/sessions/refresh` — one-time refresh-token rotation.
 - `POST /v1/sessions/revoke` — revoke the current access session.
+- `POST /v1/sessions/web/revoke` — BFF-only revocation of an opaque Web session family. The family value is hashed at rest, grants no positive authority, and advances a durable generation tombstone even when the current access token is absent or stale.
 
 ## Authorization and events
 
@@ -134,3 +135,5 @@ All replies are `Cache-Control: no-store`; missing/unavailable distribution or d
 ## Authentication notes
 
 Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures, provider secrets and raw private-key material are not returned in logs or audit metadata.
+
+The Web BFF supplies `X-Sentinel-Web-Session` only on its server-to-Core hop for browser login/register, MFA, password-reset confirmation, refresh and family revocation. Core serializes those mutations with a PostgreSQL-backed operation/generation check and returns `X-Sentinel-Web-Generation`; browser JavaScript never receives the opaque family cookie or Core tokens. Direct device and non-Web session flows retain the existing one-use refresh contract.

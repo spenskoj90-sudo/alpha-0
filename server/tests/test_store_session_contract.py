@@ -28,6 +28,33 @@ def test_memory_store_refresh_rotation_revokes_previous_access_session():
     assert store.rotate_refresh(old_refresh, 3600, 7200) is None
 
 
+def test_memory_web_session_generation_rejects_superseded_success_and_logout_resurrection():
+    store = MemoryStore()
+    family = "browser-family-" + "a" * 48
+
+    stale_operation = store.begin_web_session_operation(family)
+    current_operation = store.begin_web_session_operation(family)
+
+    assert store.issue_web_session(
+        None, "user-1", 3600, 7200, family, stale_operation
+    ) is None
+    current = store.issue_web_session(
+        None, "user-1", 3600, 7200, family, current_operation
+    )
+    assert current is not None
+    current_access, current_refresh, _, _ = current
+    assert store.get_session(current_access) is not None
+
+    refresh_operation = store.begin_web_session_operation(family)
+    logout_operation = store.begin_web_session_operation(family)
+    assert store.revoke_web_session_family(family, logout_operation) is True
+
+    assert store.rotate_web_refresh(
+        current_refresh, 3600, 7200, family, refresh_operation
+    ) is None
+    assert store.get_session(current_access) is None
+
+
 def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():
     store = MemoryStore()
     device_id = store.register_device("user-1", "android", "memory-race-key", "2" * 64, "challenge")
@@ -290,4 +317,3 @@ def test_postgres_revoke_is_atomic_and_stale_device_sessions_fail_closed():
     assert store.get_device(suspended_device)["state"] == "REVOKED"
     assert store.revoke_device(suspended_device) is False
     store.engine.dispose()
-

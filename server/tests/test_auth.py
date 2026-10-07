@@ -78,6 +78,36 @@ def test_user_session_can_refresh_and_revoke_without_scope_escalation():
     assert client.post("/v1/sessions/revoke", headers={"Authorization": f"Bearer {new_token}"}).status_code == 401
 
 
+def test_web_session_family_makes_prior_login_and_refresh_generations_stale():
+    email = f"web-generation-{uuid.uuid4().hex}@example.com"
+    password = "Web-session-generation-password-123"
+    family = "web-family-" + "c" * 48
+    headers = {"X-Sentinel-Web-Session": family}
+    assert client.post("/v1/auth/register", json={"email": email, "password": password}).status_code == 200
+
+    first = client.post("/v1/auth/login", headers=headers, json={"email": email, "password": password})
+    second = client.post("/v1/auth/login", headers=headers, json={"email": email, "password": password})
+    assert first.status_code == second.status_code == 200
+    assert first.headers["x-sentinel-web-generation"] == "1"
+    assert second.headers["x-sentinel-web-generation"] == "2"
+    assert store.get_session(first.json()["session_token"]) is None
+    assert store.get_session(second.json()["session_token"]) is not None
+
+    refreshed = client.post(
+        "/v1/sessions/refresh",
+        headers=headers,
+        json={"refresh_token": second.json()["refresh_token"]},
+    )
+    assert refreshed.status_code == 200
+    assert refreshed.headers["x-sentinel-web-generation"] == "3"
+    assert store.get_session(second.json()["session_token"]) is None
+
+    logged_out = client.post("/v1/sessions/web/revoke", headers=headers)
+    assert logged_out.status_code == 200
+    assert logged_out.headers["x-sentinel-web-generation"] == "4"
+    assert store.get_session(refreshed.json()["session_token"]) is None
+
+
 def _message_token(text: str, label: str) -> str:
     match = re.search(rf"{label}: ([A-Za-z0-9_-]+)", text)
     assert match is not None

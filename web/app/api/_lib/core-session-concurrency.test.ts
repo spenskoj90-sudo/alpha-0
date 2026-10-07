@@ -1,11 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { proxyAuthenticated } from './core-session';
+import { authenticateWeb, proxyAuthenticated, WEB_GENERATION_COOKIE, WEB_SESSION_COOKIE } from './core-session';
 
 const session = { session_token: 'rotated-access', refresh_token: 'rotated-refresh', expires_at: '2030-01-01T00:00:00Z', scopes: ['game:read'] };
 const request = (token: string) => new NextRequest('https://app.example/api/account', {
-  headers: { cookie: `sentinel_refresh=${token}` },
+  headers: { cookie: `sentinel_refresh=${token}; ${WEB_SESSION_COOKIE}=family-${'x'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
 });
+const rotation = () => Response.json(session, { headers: { 'x-sentinel-web-generation': '2' } });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 it('joins concurrent refreshes without replaying a settled rotation', async () => {
@@ -18,7 +19,7 @@ it('joins concurrent refreshes without replaying a settled rotation', async () =
       const denied = used;
       used = true;
       await pending;
-      return Response.json(denied ? { error: 'INVALID_REFRESH' } : session, { status: denied ? 401 : 200 });
+      return denied ? Response.json({ error: 'INVALID_REFRESH' }, { status: 401 }) : rotation();
     }
     return Response.json({ ok: true });
   });
@@ -47,7 +48,7 @@ it('a successful rotation followed by delayed 401 cannot overwrite a newer login
   let finish!: () => void;
   const pending = new Promise<void>(resolve => { finish = resolve; });
   vi.spyOn(globalThis, 'fetch').mockImplementation(async url => {
-    if (String(url).endsWith('/sessions/refresh')) return Response.json(session);
+    if (String(url).endsWith('/sessions/refresh')) return rotation();
     await pending;
     return Response.json({ error: 'SESSION_REVOKED' }, { status: 401 });
   });
@@ -63,7 +64,7 @@ it('does not join refresh tokens across configured Core origins', async () => {
   let finish!: () => void;
   const pending = new Promise<void>(resolve => { finish = resolve; });
   const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async url => {
-    if (String(url).endsWith('/sessions/refresh')) { await pending; return Response.json(session); }
+    if (String(url).endsWith('/sessions/refresh')) { await pending; return rotation(); }
     return Response.json({ ok: true });
   });
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core-a.example');
@@ -73,4 +74,40 @@ it('does not join refresh tokens across configured Core origins', async () => {
   finish();
   expect((await Promise.all([a, b])).map(r => r.status)).toEqual([200, 200]);
   expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/sessions/refresh'))).toHaveLength(2);
+});
+
+it('suppresses a late successful login response after a newer generation completed', async () => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+  const family = `late-family-${'z'.repeat(40)}`;
+  const authRequest = () => new NextRequest('https://app.example/api/session/login', {
+    method: 'POST',
+    headers: {
+      origin: 'https://app.example',
+      cookie: `${WEB_SESSION_COOKIE}=${family}; ${WEB_GENERATION_COOKIE}=0`,
+    },
+    body: '{}',
+  });
+  let finish!: () => void;
+  const pending = new Promise<void>(resolve => { finish = resolve; });
+  let calls = 0;
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+    calls++;
+    if (calls === 1) {
+      await pending;
+      return Response.json(session, { headers: { 'x-sentinel-web-generation': '1' } });
+    }
+    return Response.json({ ...session, session_token: 'current-access', refresh_token: 'current-refresh' }, {
+      headers: { 'x-sentinel-web-generation': '2' },
+    });
+  });
+
+  const stale = authenticateWeb(authRequest(), 'login');
+  const current = await authenticateWeb(authRequest(), 'login');
+  finish();
+  const staleResponse = await stale;
+
+  expect(current.status).toBe(200);
+  expect(current.headers.get('set-cookie')).toContain('sentinel_refresh=current-refresh');
+  expect(staleResponse.status).toBe(409);
+  expect(staleResponse.headers.get('set-cookie')).toBeNull();
 });

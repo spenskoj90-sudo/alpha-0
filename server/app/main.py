@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from threading import Lock
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -94,6 +94,7 @@ SENTINEL_ENV = os.getenv("SENTINEL_ENV", "development").lower()
 ENROLLMENT_TOKEN = os.getenv("SENTINEL_ENROLLMENT_TOKEN")
 REQUIRE_ENROLLMENT = os.getenv("SENTINEL_REQUIRE_ENROLLMENT", "true").lower() == "true"
 CORS_ORIGINS = [item.strip() for item in os.getenv("CORS_ORIGINS", "").split(",") if item.strip()]
+WEB_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
 
 if SENTINEL_ENV == "production" and not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required in production")
@@ -312,16 +313,40 @@ def healthz() -> dict[str, Any]:
             "source_sha": source_sha if re.fullmatch(r"[0-9a-f]{40}", source_sha) else None}
 
 
+def validated_web_session(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if not WEB_SESSION_PATTERN.fullmatch(value):
+        raise HTTPException(status_code=400, detail="WEB_SESSION_INVALID")
+    return value
+
+
 @app.post("/v1/auth/register", response_model=SessionResponse)
-def register_user(payload: RegisterRequest, request: Request):
+def register_user(
+    payload: RegisterRequest,
+    request: Request,
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+):
     rate_limit(request, "auth-register")
+    web_session = validated_web_session(web_session_header)
+    web_operation = store.begin_web_session_operation(web_session) if web_session else None
     try:
         user_id = user_store.register(payload.email, payload.password)
     except Exception as exc:
         if "EMAIL_ALREADY_REGISTERED" in str(exc) or "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
         raise
-    access, refresh, expires_at, scopes = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    issued = (
+        store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
+        if web_session and web_operation is not None
+        else store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    )
+    if issued is None:
+        raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
+    access, refresh, expires_at, scopes = issued
+    if web_operation is not None:
+        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     user_store.restrict_session_scopes(store, access, {"character:read", "game:read", "audit:read"})
     scopes = ["character:read", "game:read", "audit:read"]
     store.add_audit({"actor_user_id": user_id, "actor_device_id": None, "action": "auth:register", "resource": "account", "decision": "ALLOW", "reason_code": "ACCOUNT_CREATED", "request_id": request_id(request)})
@@ -387,10 +412,21 @@ def request_password_reset(payload: EmailActionRequest, request: Request) -> Aut
 
 
 @app.post("/v1/auth/password-reset/confirm", response_model=AuthActionResponse)
-def confirm_password_reset(payload: PasswordResetConfirmRequest, request: Request) -> AuthActionResponse:
+def confirm_password_reset(
+    payload: PasswordResetConfirmRequest,
+    request: Request,
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+) -> AuthActionResponse:
     rate_limit(request, "auth-password-reset-confirm")
+    web_session = validated_web_session(web_session_header)
+    web_operation = store.begin_web_session_operation(web_session) if web_session else None
     if not user_store.reset_password(payload.token, payload.password, store, payload.email):
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
+    if web_session and web_operation is not None:
+        if not store.revoke_web_session_family(web_session, web_operation):
+            raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
+        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     return AuthActionResponse(status="PASSWORD_UPDATED")
 
 
@@ -441,13 +477,17 @@ def _issue_account_session(
     action: str,
     reason_code: str,
     resource: str = "session",
+    web_session: str | None = None,
+    web_operation: int | None = None,
 ) -> SessionResponse:
-    access, refresh, expires_at, _ = store.issue_session(
-        None,
-        user_id,
-        SESSION_TTL_SECONDS,
-        REFRESH_TTL_SECONDS,
+    issued = (
+        store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
+        if web_session and web_operation is not None
+        else store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
     )
+    if issued is None:
+        raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
+    access, refresh, expires_at, _ = issued
     scopes = ["character:read", "game:read", "audit:read"]
     user_store.restrict_session_scopes(store, access, scopes)
     store.add_audit(
@@ -476,6 +516,8 @@ def _session_or_mfa(
     action: str,
     first_factor_reason: str,
     resource: str = "session",
+    web_session: str | None = None,
+    web_operation: int | None = None,
 ) -> SessionResponse | MfaChallengeResponse:
     challenge = account_mfa.issue_login_challenge(user_id)
     if challenge is not None:
@@ -501,6 +543,8 @@ def _session_or_mfa(
         action=action,
         reason_code=first_factor_reason,
         resource=resource,
+        web_session=web_session,
+        web_operation=web_operation,
     )
 
 
@@ -723,8 +767,12 @@ def browser_provider_link(
 def login_user(
     payload: LoginRequest,
     request: Request,
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
 ) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, "auth-login")
+    web_session = validated_web_session(web_session_header)
+    web_operation = store.begin_web_session_operation(web_session) if web_session else None
     subject = payload.email.strip().lower()
     threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
     if subject and store.security_failure_count(subject) >= threshold:
@@ -734,29 +782,48 @@ def login_user(
         if subject:
             store.record_security_failure(subject, "auth-login")
         raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
-    return _session_or_mfa(
+    result = _session_or_mfa(
         user_id,
         request,
         action="auth:login",
         first_factor_reason="CREDENTIALS_VALID",
+        web_session=web_session,
+        web_operation=web_operation,
     )
+    if web_operation is not None:
+        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
+    return result
 
 
 @app.post("/v1/auth/mfa/complete", response_model=SessionResponse)
-def complete_mfa_login(payload: MfaCompleteRequest, request: Request) -> SessionResponse:
+def complete_mfa_login(
+    payload: MfaCompleteRequest,
+    request: Request,
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+    web_generation: int | None = Header(None, alias="X-Sentinel-Web-Generation"),
+) -> SessionResponse:
     rate_limit(request, "auth-mfa-complete")
+    web_session = validated_web_session(web_session_header)
+    if (web_session is None) != (web_generation is None) or (web_generation is not None and web_generation < 1):
+        raise HTTPException(status_code=400, detail="WEB_SESSION_GENERATION_INVALID")
     try:
         user_id = account_mfa.complete_login_challenge(payload.challenge_token, payload.code)
     except AccountMfaConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not user_id:
         raise HTTPException(status_code=401, detail="MFA_INVALID")
-    return _issue_account_session(
+    result = _issue_account_session(
         user_id,
         request,
         action="auth:mfa-complete",
         reason_code="MFA_VALID",
+        web_session=web_session,
+        web_operation=web_generation,
     )
+    if web_generation is not None:
+        response.headers["X-Sentinel-Web-Generation"] = str(web_generation)
+    return result
 
 
 @app.post("/v1/account/mfa/totp/enroll", response_model=TotpEnrollmentResponse)
@@ -1115,8 +1182,20 @@ def prove_device(device_id: str, payload: DeviceProofRequest, request: Request):
 
 
 @app.post("/v1/sessions/refresh", response_model=SessionResponse)
-def refresh_session(payload: RefreshRequest):
-    result = store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+def refresh_session(
+    payload: RefreshRequest,
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+):
+    web_session = validated_web_session(web_session_header)
+    web_operation = store.begin_web_session_operation(web_session) if web_session else None
+    result = (
+        store.rotate_web_refresh(
+            payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation
+        )
+        if web_session and web_operation is not None
+        else store.rotate_refresh(payload.refresh_token, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+    )
     if not result:
         raise HTTPException(status_code=401, detail="INVALID_REFRESH")
     access, refresh, expires_at, scopes, previous = result
@@ -1124,7 +1203,30 @@ def refresh_session(payload: RefreshRequest):
         user_scopes = {"character:read", "game:read", "audit:read"}
         user_store.restrict_session_scopes(store, access, user_scopes)
         scopes = sorted(user_scopes)
+    if web_operation is not None:
+        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     return SessionResponse(session_token=access, refresh_token=refresh, expires_at=expires_at, scopes=scopes)
+
+
+@app.post("/v1/sessions/web/revoke")
+def revoke_web_session(
+    response: Response,
+    web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+    authorization_header: str | None = Header(None, alias="Authorization"),
+):
+    web_session = validated_web_session(web_session_header)
+    if not web_session:
+        raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
+    operation = store.begin_web_session_operation(web_session)
+    if not store.revoke_web_session_family(web_session, operation):
+        raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
+    if authorization_header:
+        try:
+            store.revoke_session(require_bearer(authorization_header))
+        except HTTPException:
+            pass
+    response.headers["X-Sentinel-Web-Generation"] = str(operation)
+    return {"revoked": True}
 
 
 @app.post("/v1/sessions/revoke")

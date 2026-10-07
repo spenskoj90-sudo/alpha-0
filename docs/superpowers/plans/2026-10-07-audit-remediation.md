@@ -4,7 +4,7 @@
 
 **Goal:** Remove the reproduced security/session/evidence defects and establish a truthful continuation queue for unfinished product work.
 
-**Architecture:** Keep Core authoritative and one-use refresh unchanged. Web joins only currently pending refresh requests in a process; denied requests cannot erase newer browser cookies. All upstream responses are buffered within explicit time and byte limits. Bridge remains a read-only summary, never a release verifier.
+**Architecture:** Keep Core authoritative and one-use refresh unchanged. Web joins only currently pending refresh requests in a process; denied requests cannot erase newer browser cookies. A durable browser-family operation/generation row serializes credential mutations across BFF processes and makes late tokens fail closed without replay grace. All upstream responses are buffered within explicit time and byte limits. Bridge remains a read-only summary, never a release verifier.
 
 **Tech Stack:** Node 24 / Next / Vitest; Python / pytest; repository CI and Render staging.
 
@@ -61,3 +61,13 @@
 - [ ] Whole-branch correctness/security review, regressions for material findings, exact-HEAD CI, protected merge and post-merge staging checks.
 - [ ] Continue WIP Companion lifecycle only after a trusted exact-profile seam is available; then Android consumer, product catalog and Web security/device workflows as independently testable increments. Physical/source verification cannot be fabricated.
 - [ ] Keep remaining program tasks unchecked with concrete next steps until implemented and verified; scheduling is continuation, not completion evidence.
+
+### Task 5: F02 durable browser-session generation
+
+**Files:** `server/migrations/017_web_session_generation.sql`, Core store/session routes, Web Core-session BFF, session concurrency/auth/PostgreSQL tests.
+**Interfaces:** opaque browser-family cookie remains HttpOnly; BFF forwards it only to Core. Core returns a monotonic generation header. Access/refresh tokens remain opaque and one-use refresh remains strict.
+
+- [x] Reproduce the late successful response and superseded store-operation cases with failing Web/MemoryStore regressions.
+- [x] Implement atomic begin/commit generation checks for login/register, MFA, password-reset confirmation, refresh and logout; validate active generation on every Core session lookup.
+- [x] Add migration FORCE RLS policy and PostgreSQL concurrency/logout regression; run local Web test/lint/build and non-PostgreSQL Core suite.
+- [ ] Require exact-HEAD PostgreSQL 18/RLS CI, independent final review, protected merge and post-merge staging verification before marking F02 integration-verified.

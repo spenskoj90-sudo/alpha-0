@@ -27,11 +27,11 @@ describe('POST /api/session/login', () => {
       refresh_token: 'refresh-secret',
       expires_at: '2030-01-01T00:00:00Z',
       scopes: ['game:read'],
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/session/login', {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: `sentinel_web_session=test-family-${'a'.repeat(40)}; sentinel_web_generation=0` },
       body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
     }));
 
@@ -55,11 +55,11 @@ describe('POST /api/session/login', () => {
       mfa_required: true,
       challenge_token: challenge,
       expires_at: '2030-01-01T00:00:00Z',
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/session/login', {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: `sentinel_web_session=mfa-family-${'b'.repeat(40)}; sentinel_web_generation=0` },
       body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
     }));
 

@@ -70,6 +70,14 @@ class Store(ABC):
     @abstractmethod
     def revoke_session(self, access_token: str) -> bool: ...
     @abstractmethod
+    def begin_web_session_operation(self, family_token: str) -> int: ...
+    @abstractmethod
+    def issue_web_session(self, device_id: str | None, user_id: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str]] | None: ...
+    @abstractmethod
+    def rotate_web_refresh(self, refresh_token: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str], dict[str, Any]] | None: ...
+    @abstractmethod
+    def revoke_web_session_family(self, family_token: str, operation: int) -> bool: ...
+    @abstractmethod
     def save_event_batch(self, principal: dict[str, Any], events: list[dict[str, Any]], idempotency_key: str | None) -> dict[str, int]: ...
     @abstractmethod
     def add_audit(self, item: dict[str, Any]) -> None: ...
@@ -114,6 +122,7 @@ class MemoryStore(Store):
         self.devices: dict[str, dict[str, Any]] = {}
         self.challenges: dict[str, dict[str, Any]] = {}
         self.sessions: dict[str, dict[str, Any]] = {}
+        self.web_session_families: dict[str, dict[str, int]] = {}
         self.events: dict[str, dict[str, Any]] = {}
         self.idempotency: dict[tuple[str, str], dict[str, Any]] = {}
         self.proof_requests: set[tuple[str, str]] = set()
@@ -310,6 +319,11 @@ class MemoryStore(Store):
         record = self.sessions.get(session_hash(access_token))
         if not record or record["expires_at"] <= time.time() or record.get("revoked"):
             return None
+        family_hash = record.get("web_session_family_hash")
+        if family_hash:
+            family = self.web_session_families.get(family_hash)
+            if not family or family["active_generation"] != record.get("web_session_generation"):
+                return None
         device_id = record.get("device_id")
         if device_id:
             device = self.devices.get(device_id)
@@ -354,6 +368,77 @@ class MemoryStore(Store):
             if not record or record.get("revoked"):
                 return False
             record["revoked"] = True
+            return True
+
+    def begin_web_session_operation(self, family_token):
+        family_hash = session_hash(family_token)
+        with self.lock:
+            family = self.web_session_families.setdefault(
+                family_hash, {"latest_operation": 0, "active_generation": 0}
+            )
+            family["latest_operation"] += 1
+            return family["latest_operation"]
+
+    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
+        family_hash = session_hash(family_token)
+        access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=access_ttl)
+        with self.lock:
+            family = self.web_session_families.get(family_hash)
+            if not family or family["latest_operation"] != operation:
+                return None
+            for record in self.sessions.values():
+                if record.get("web_session_family_hash") == family_hash:
+                    record["revoked"] = True
+            family["active_generation"] = operation
+            self.sessions[session_hash(access)] = {
+                "user_id": user_id, "device_id": device_id, "scopes": SCOPES,
+                "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
+                "refresh_hash": session_hash(refresh),
+                "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
+                "refresh_used": False, "revoked": False,
+                "web_session_family_hash": family_hash, "web_session_generation": operation,
+            }
+        return access, refresh, exp, SCOPES
+
+    def rotate_web_refresh(self, refresh_token, access_ttl, refresh_ttl, family_token, operation):
+        family_hash = session_hash(family_token)
+        with self.lock:
+            family = self.web_session_families.get(family_hash)
+            if not family or family["latest_operation"] != operation:
+                return None
+            record = next((r for r in self.sessions.values() if r.get("refresh_hash") == session_hash(refresh_token)), None)
+            if (not record or record.get("revoked") or record.get("refresh_used")
+                    or record.get("refresh_expires_at", 0) <= time.time()
+                    or record.get("web_session_family_hash") != family_hash
+                    or record.get("web_session_generation") != family["active_generation"]):
+                return None
+            record["refresh_used"] = True
+            record["revoked"] = True
+            old = record.copy()
+            access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+            now = datetime.now(UTC)
+            exp = now + timedelta(seconds=access_ttl)
+            family["active_generation"] = operation
+            self.sessions[session_hash(access)] = {
+                **old, "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
+                "refresh_hash": session_hash(refresh),
+                "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
+                "refresh_used": False, "revoked": False, "web_session_generation": operation,
+            }
+        return access, refresh, exp, SCOPES, old
+
+    def revoke_web_session_family(self, family_token, operation):
+        family_hash = session_hash(family_token)
+        with self.lock:
+            family = self.web_session_families.get(family_hash)
+            if not family or family["latest_operation"] != operation:
+                return False
+            family["active_generation"] = operation
+            for record in self.sessions.values():
+                if record.get("web_session_family_hash") == family_hash:
+                    record["revoked"] = True
             return True
 
     def save_event_batch(self, principal, events, idempotency_key):
@@ -788,7 +873,9 @@ class PostgresStore(Store):
                     "SELECT s.identity_id::text identity_id,s.device_id::text device_id,s.scopes_json,s.expires_at,i.user_handle "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
+                    "LEFT JOIN web_session_families w ON w.family_hash=s.web_session_family_hash "
                     "WHERE s.session_hash=:sh AND s.expires_at>now() AND s.revoked_at IS NULL "
+                    "AND (s.web_session_family_hash IS NULL OR w.active_generation=s.web_session_generation) "
                     "AND (s.device_id IS NULL OR d.state='ACTIVE')"
                 ),
                 {"sh": session_hash(access_token)},
@@ -853,6 +940,111 @@ class PostgresStore(Store):
         with self.engine.begin() as conn:
             result = conn.execute(text("UPDATE sessions SET revoked_at=now() WHERE session_hash=:sh AND revoked_at IS NULL"), {"sh": session_hash(access_token)})
             return result.rowcount == 1
+
+    def begin_web_session_operation(self, family_token):
+        with self.engine.begin() as conn:
+            return int(conn.execute(
+                text(
+                    "INSERT INTO web_session_families(family_hash,latest_operation,active_generation) "
+                    "VALUES (:family,1,0) ON CONFLICT (family_hash) DO UPDATE SET "
+                    "latest_operation=web_session_families.latest_operation+1,updated_at=now() "
+                    "RETURNING latest_operation"
+                ),
+                {"family": session_hash(family_token)},
+            ).scalar_one())
+
+    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
+        family_hash = session_hash(family_token)
+        access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=access_ttl)
+        refexp = now + timedelta(seconds=refresh_ttl)
+        with self.engine.begin() as conn:
+            family = conn.execute(
+                text("SELECT latest_operation FROM web_session_families WHERE family_hash=:family FOR UPDATE"),
+                {"family": family_hash},
+            ).scalar_one_or_none()
+            if family != operation:
+                return None
+            identity_id = conn.execute(
+                text("SELECT id FROM identities WHERE user_handle=:user"), {"user": user_id}
+            ).scalar_one()
+            conn.execute(text(
+                "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()) "
+                "WHERE web_session_family_hash=:family"
+            ), {"family": family_hash})
+            conn.execute(text(
+                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() "
+                "WHERE family_hash=:family"
+            ), {"family": family_hash, "operation": operation})
+            conn.execute(text(
+                "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
+                "refresh_token_hash,refresh_expires_at,web_session_family_hash,web_session_generation) "
+                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,:refresh,:refresh_expires,:family,:operation)"
+            ), {
+                "identity": identity_id, "device": device_id, "session": session_hash(access),
+                "scopes": json.dumps(SCOPES), "expires": exp, "refresh": session_hash(refresh),
+                "refresh_expires": refexp, "family": family_hash, "operation": operation,
+            })
+        return access, refresh, exp, SCOPES
+
+    def rotate_web_refresh(self, refresh_token, access_ttl, refresh_ttl, family_token, operation):
+        family_hash = session_hash(family_token)
+        access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        now = datetime.now(UTC)
+        exp = now + timedelta(seconds=access_ttl)
+        refexp = now + timedelta(seconds=refresh_ttl)
+        with self.engine.begin() as conn:
+            family = conn.execute(text(
+                "SELECT latest_operation,active_generation FROM web_session_families "
+                "WHERE family_hash=:family FOR UPDATE"
+            ), {"family": family_hash}).mappings().first()
+            if not family or family["latest_operation"] != operation:
+                return None
+            row = conn.execute(text(
+                "SELECT s.id::text session_id,s.identity_id,i.user_handle user_id,s.device_id::text device_id,"
+                "s.scopes_json,s.refresh_expires_at,s.refresh_used_at,s.revoked_at,s.web_session_generation "
+                "FROM sessions s JOIN identities i ON i.id=s.identity_id "
+                "WHERE s.refresh_token_hash=:refresh AND s.web_session_family_hash=:family FOR UPDATE OF s"
+            ), {"refresh": session_hash(refresh_token), "family": family_hash}).mappings().first()
+            if (not row or row["revoked_at"] or row["refresh_used_at"] or not row["refresh_expires_at"]
+                    or row["refresh_expires_at"] <= datetime.now(UTC)
+                    or row["web_session_generation"] != family["active_generation"]):
+                return None
+            conn.execute(text(
+                "UPDATE sessions SET refresh_used_at=CASE WHEN id=:id THEN now() ELSE refresh_used_at END,"
+                "revoked_at=COALESCE(revoked_at,now()) WHERE web_session_family_hash=:family"
+            ), {"id": row["session_id"], "family": family_hash})
+            conn.execute(text(
+                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() WHERE family_hash=:family"
+            ), {"operation": operation, "family": family_hash})
+            conn.execute(text(
+                "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
+                "refresh_token_hash,refresh_expires_at,web_session_family_hash,web_session_generation) "
+                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,:refresh,:refresh_expires,:family,:operation)"
+            ), {
+                "identity": row["identity_id"], "device": row["device_id"], "session": session_hash(access),
+                "scopes": json.dumps(SCOPES), "expires": exp, "refresh": session_hash(refresh),
+                "refresh_expires": refexp, "family": family_hash, "operation": operation,
+            })
+        scopes = row["scopes_json"] if isinstance(row["scopes_json"], list) else json.loads(row["scopes_json"])
+        return access, refresh, exp, scopes, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": scopes}
+
+    def revoke_web_session_family(self, family_token, operation):
+        family_hash = session_hash(family_token)
+        with self.engine.begin() as conn:
+            family = conn.execute(text(
+                "SELECT latest_operation FROM web_session_families WHERE family_hash=:family FOR UPDATE"
+            ), {"family": family_hash}).scalar_one_or_none()
+            if family != operation:
+                return False
+            conn.execute(text(
+                "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE web_session_family_hash=:family"
+            ), {"family": family_hash})
+            conn.execute(text(
+                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() WHERE family_hash=:family"
+            ), {"operation": operation, "family": family_hash})
+            return True
 
     def save_event_batch(self, principal, events, idempotency_key):
         request_hash = event_hash_payload(events)

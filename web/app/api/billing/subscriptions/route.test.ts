@@ -38,11 +38,11 @@ describe('/api/billing/subscriptions', () => {
         refresh_token: 'new-refresh',
         expires_at: '2030-01-01T00:00:00Z',
         scopes: ['game:read'],
-      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '2' } }))
       .mockResolvedValueOnce(new Response('{"subscriptions":[{"id":"s1"}]}', { status: 200, headers: { 'content-type': 'application/json' } }));
 
     const response = await GET(new NextRequest('http://localhost/api/billing/subscriptions', {
-      headers: { cookie: 'sentinel_access=expired; sentinel_refresh=refresh-secret' },
+      headers: { cookie: `sentinel_access=expired; sentinel_refresh=refresh-secret; sentinel_web_session=subscription-${'s'.repeat(40)}; sentinel_web_generation=1` },
     }));
 
     expect(response.status).toBe(200);

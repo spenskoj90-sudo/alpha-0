@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,7 +76,10 @@ def main() -> int:
     require("zero-cost" in provider_matrix.lower(), "provider matrix records zero-cost pre-release posture")
     require("artifact" in provider_matrix.lower() and "VK application identity" in provider_matrix, "provider matrix records Android provider identity binding")
     require("## Canonical acceptance queue" in tasks and "#371" in tasks and "#314" in tasks and "#375" in tasks and "#277" in tasks and "#315" in tasks and "#316" in tasks and "#317" in tasks, "task board exposes one issue-linked acceptance queue")
-    require(tasks.count("- [ ]") == 7, "task board has exactly seven non-duplicated active acceptance gates")
+    acceptance = tasks.split("## Canonical acceptance queue", 1)[-1].split("\n## ", 1)[0]
+    acceptance_ids = re.findall(r"^- \[ \] \*\*#(\d+)\b", acceptance, re.M)
+    require(sorted(acceptance_ids) == sorted(('371', '314', '375', '277', '315', '316', '317')),
+            "acceptance section has exactly seven non-duplicated active issue gates; engineering queue is independent")
     require("Render Free" in free_strategy and "Stripe test/sandbox mode" in free_strategy, "free strategy keeps test infrastructure distinct from production")
 
     print(f"\nPROVIDER_STATE_PASSED={passed} PROVIDER_STATE_FAILED={len(failures)}")

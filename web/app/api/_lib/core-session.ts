@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const ACCESS_COOKIE = 'sentinel_access';
@@ -8,6 +8,9 @@ const DEFAULT_REFRESH_MAX_AGE_SECONDS = 2_592_000;
 const DEFAULT_MFA_MAX_AGE_SECONDS = 300;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const TRACE_ID_PATTERN = /^[0-9a-f]{32}$/;
+const CORE_TIMEOUT_MS = 45_000;
+const MAX_CORE_RESPONSE_BYTES = 1_048_576;
+const MAX_PENDING_REFRESHES = 256;
 
 type SessionPayload = {
   session_token: string;
@@ -22,11 +25,21 @@ type MfaChallengePayload = {
   expires_at: string;
 };
 
+// Share pending work across route modules in one server process. Never retain a
+// completed rotation: the Core refresh token remains one-use, with no grace cache.
+const sessionGlobal = globalThis as typeof globalThis & {
+  sentinelPendingRefreshes?: Map<string, Promise<SessionPayload | null>>;
+};
+const pendingRefreshes = sessionGlobal.sentinelPendingRefreshes ??= new Map();
+
 function configuredCoreUrl(): string | null {
   const value = process.env.SENTINEL_CORE_URL?.trim();
   if (!value) return null;
   try {
-    return new URL(value).toString().replace(/\/$/, '');
+    const url = new URL(value);
+    if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password ||
+        url.pathname !== '/' || url.search || url.hash) return null;
+    return url.origin;
   } catch {
     return null;
   }
@@ -105,7 +118,40 @@ async function coreFetch(coreUrl: string, path: string, requestId: string, init:
   const headers = new Headers(init.headers);
   headers.set('accept', 'application/json');
   headers.set('x-request-id', requestId);
-  return fetch(`${coreUrl}${path}`, { ...init, headers, cache: 'no-store' });
+  const deadline = AbortSignal.timeout(CORE_TIMEOUT_MS);
+  const signal = init.signal ? AbortSignal.any([init.signal, deadline]) : deadline;
+  const response = await fetch(`${coreUrl}${path}`, { ...init, headers, signal, redirect: 'manual', cache: 'no-store' });
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
+    throw new Error('CORE_REDIRECT_DENIED');
+  }
+  if (!response.body) return response;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const abort = () => { void reader.cancel().catch(() => {}); };
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    signal.throwIfAborted();
+    while (true) {
+      const { done, value } = await reader.read();
+      signal.throwIfAborted();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_CORE_RESPONSE_BYTES) throw new Error('CORE_RESPONSE_TOO_LARGE');
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    return new Response(bytes, { status: response.status, headers: response.headers });
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', abort);
+    reader.releaseLock();
+  }
 }
 
 async function parseSession(response: Response): Promise<SessionPayload | null> {
@@ -139,13 +185,22 @@ async function parseMfaChallenge(response: Response): Promise<MfaChallengePayloa
 }
 
 async function refreshSession(coreUrl: string, refreshToken: string, requestId: string): Promise<SessionPayload | null> {
-  const response = await coreFetch(coreUrl, '/v1/sessions/refresh', requestId, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!response.ok) return null;
-  return parseSession(response);
+  const key = createHash('sha256').update(coreUrl).update('\0').update(refreshToken).digest('hex');
+  const pending = pendingRefreshes.get(key);
+  if (pending) return pending;
+  if (pendingRefreshes.size >= MAX_PENDING_REFRESHES) throw new Error('REFRESH_CAPACITY_EXCEEDED');
+  const rotation = (async () => {
+    const response = await coreFetch(coreUrl, '/v1/sessions/refresh', requestId, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!response.ok) return null;
+    return parseSession(response);
+  })();
+  pendingRefreshes.set(key, rotation);
+  try { return await rotation; }
+  finally { pendingRefreshes.delete(key); }
 }
 
 async function copyUpstream(response: Response, requestId: string): Promise<NextResponse> {
@@ -334,7 +389,8 @@ export async function proxyAuthenticated(
     }
     if (!accessToken) {
       const denied = applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_REQUIRED' }, { status: 401 }), requestId);
-      if (refreshToken) clearSessionCookies(denied);
+      // A competing process may already have rotated this browser's cookies.
+      // Passive denial cannot safely mutate them; explicit logout clears them.
       return denied;
     }
 
@@ -354,8 +410,8 @@ export async function proxyAuthenticated(
     }
 
     const result = await copyUpstream(upstream, requestId);
-    if (refreshed) applySessionCookies(result, refreshed);
-    if (upstream.status === 401) clearSessionCookies(result);
+    if (refreshed && upstream.status !== 401) applySessionCookies(result, refreshed);
+    // Never erase cookies on a passive 401 that may arrive after a newer login.
     return result;
   } catch {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);

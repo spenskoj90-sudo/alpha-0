@@ -17,6 +17,12 @@ The bridge does not replace GitHub, Render, Neon, PostHog, Google Drive or other
 - initial tools are read-only;
 - production deployment remains Owner-gated.
 
+## Summary evidence limits
+
+`provider_state` reports only whether canonical configuration names are present in the **Bridge process environment**. It does not prove that Core has credentials, that a provider is enabled, or that delivery works. `providerEnablementVerified=false` is explicit; query Core/provider-native evidence for those claims. No credential copying into Bridge is required. Resend/Brevo/Stripe/PostHog/Google use the same names as Core; values are never serialized.
+
+`release_readiness` is a repository checklist summary. `checklistSatisfied` describes metadata only; `releaseReady=false` and `releaseEvidence.status=UNVERIFIED` remain until a separate exact-candidate canonical validator verifies signed bytes and protected-main attestations. Use `scripts/verify_final_release_acceptance_live.sh` and the final acceptance workflow for release evidence. Editing TASKS or UX flags cannot establish release acceptance.
+
 ## OpenAI integration
 
 OpenAI Agents/Responses can consume a remote MCP server. The bridge itself does not need an OpenAI API key. The consuming orchestrator owns API credentials, model routing, approvals, tracing and caching.

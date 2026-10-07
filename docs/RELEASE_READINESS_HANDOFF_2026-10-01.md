@@ -1,5 +1,7 @@
 # SENTINEL release-readiness handoff — 2026-10-01
 
+> **HISTORICAL CHECKPOINT.** Describes 2026-10-01 evidence only; old PRs, SHAs, logs and next steps are not the current work queue. Read live main and docs/TASKS.md.
+
 ## Reconciliation checkpoint
 
 State: execution in progress; no frozen final candidate or release acceptance.

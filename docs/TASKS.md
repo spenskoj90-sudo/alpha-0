@@ -40,7 +40,7 @@ Physical optical/host/game acceptance is tracked once in the canonical acceptanc
 - [x] **IMPLEMENTED:** dependency automation restored without auto-merge; PostgreSQL 18.6 image exact-patch/digest pin; Core warning cleanup and additional event-runtime/request-limit failure-path tests.
 - [x] **DOCUMENTED:** physical StrictMode finding classified as framework/platform-observed from the available stack evidence; warning remains visible.
 - [x] **DOCUMENTED:** branch inventory and cleanup policy are evidence-gated; dated manifests are evidence records, while live Git state and revalidation control deletion.
-Remaining physical/provider/release acceptance is tracked once in the canonical acceptance queue below. Repository-internal implementation stays complete unless exact external evidence exposes a new defect.
+Remaining physical/provider/release acceptance is tracked once in the canonical acceptance queue below. Foundations do not complete the internal product: the engineering queue records reproduced defects and missing integration separately.
 
 ## Active internal completion program
 
@@ -66,16 +66,31 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 
 ## Canonical acceptance queue
 
-This is the **only authoritative unchecked queue** in this file. Completed repository work is not reopened merely because an external acceptance item remains. Each item maps to one active GitHub acceptance issue.
+This is the authoritative **external acceptance queue**; the engineering queue does not replace or weaken these seven gates. Completed repository work is not reopened merely because an external acceptance item remains. Each item maps to one active GitHub acceptance issue.
 
 - [x] **Neon pre-release PostgreSQL 18 cutover.** On 2026-09-21 the staging Core was intentionally reset onto the prepared PostgreSQL 18.6 `sentinel-pre-release` database instead of importing the historical PG17 application dataset. The exact migration/FORCE-RLS baseline is preserved, the Render deployment reached `live`, and the former PG17 project is retained as `sentinel-pre-release-pg17-rollback` for rollback/evidence. Historical pre-release identities/users/devices/sessions are intentionally not part of the new baseline.
-- [ ] **#371 — ZERO-COST STAGING PROVIDERS:** activate one real transactional-email sender (Resend or Brevo HTTPS) and any selected Google/Telegram/VK development registration, then capture exact-candidate staging/physical evidence. Repository adapters and fail-closed provider discovery are already implemented/tested.
+- [ ] **#371 — ZERO-COST STAGING PROVIDERS:** preserve dated Resend sandbox transport evidence, verify the current email candidate lifecycle, and complete selected Google/Telegram/VK configuration and staging/physical evidence. Do not repeat already completed BotFather identity setup. Repository adapters and fail-closed provider discovery are already implemented/tested.
 - [ ] **#314 — PHYSICAL ANDROID / COMPANION:** verify the post-PR #367 Android optical correction, accessibility/latency/recovery behavior and intended packaged Companion host on one exact candidate.
 - [ ] **#375 — OWNER-VISIBLE PRODUCT UX:** require real runnable/preview evidence and explicit Owner visual acceptance for Android, Web Control Plane, Public Website, Companion, Overlay and Voice before any of those surfaces can be called ready or release-ready. A screenshot or CI-green build alone is not acceptance.
 - [ ] **#277 — EXACT GAME ENVIRONMENT:** execute the real WoW 3.3.5a/private-server L3 run; capabilities remain `ENVIRONMENT-UNVERIFIED` until that environment is exercised.
 - [ ] **#315 — VOICE ENVIRONMENT:** validate selected STT/TTS provider network behavior plus real microphone/driver/acoustic quality on the release host.
 - [ ] **#316 — PRODUCTION ACTIVATION (OWNER GATE):** production Stripe/database/ingress/email/federated-provider credentials and network acceptance for the requested profile. Production PostHog remains prohibited by the current telemetry contract rather than waiting for credentials.
 - [ ] **#317 — SIGN / PUBLISH / DEPLOY (OWNER GATE):** signed exact release-candidate execution, final acceptance manifest, release/tag publication and live deployment after all applicable prerequisite gates pass.
+
+## Current engineering queue — audit 2026-10-06, execution authorized 2026-10-07
+
+Base checkpoint: `77f5c742412d5c394e9143ad3bf7188e4edee85a`. Plan: `docs/superpowers/plans/2026-10-07-audit-remediation.md`. Reconcile status with the active integration PR; do not check an item until tests/review/CI verify it.
+
+- [ ] **F01–F03 — security/session:** patched sharp Web/Site locks, concurrent refresh cookie safety and bounded Web→Core transport.
+- [ ] **F04/F05 — evidence truth:** Bridge checklist cannot assert release readiness; canonical provider names and process-local scope.
+- [ ] **F11/F13 — CI/orientation:** scoped dependency classification; engineering queue, knowledge API, migration inventory and GPT-native design authority.
+- [ ] **F12 — maintenance:** reconcile Dependabot updates with coupled Electron version/runtime hash and version contracts; exact-HEAD CI before integration.
+- [ ] **F06 — knowledge consumers:** preserve `feat/companion-knowledge-consumer-v1@ad51886eefa6bd223586a257f6ee08904f517db6`; review and wire trusted exact-profile/session lifecycle, Stop/logout/rollback/revocation. Then Android consumer. Unit tests do not establish host/game acceptance.
+- [ ] **F09 — game presentation:** reconcile six-game product catalog and research inventory with truthful research/foundation/observer/verified states; no entitlement/action grants.
+- [ ] **F10 / #375 — Web workflows:** email verification, MFA enrollment/disable/recovery rotation, explicit provider linking, device suspend/revoke and complete failure/loading/offline states with browser evidence.
+- [ ] **F07/F08 / #430 — game vertical:** reviewed non-draft strategies and source-bound physical calibration before recommendations; executor/outcome/ARM separately gated. Never invent exact-game evidence.
+- [ ] **#379 — orchestration:** bounded supervised write adapters and measured benefit; reader success is not write execution.
+- [ ] **#381 — benchmark:** justified measured model/review comparison; existing samples with unknown costs are not a full benchmark.
 
 ## Rules
 

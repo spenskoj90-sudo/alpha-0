@@ -629,7 +629,10 @@ def check_governance(checks: Checks) -> None:
     checks.require(ux_state.get("ownerVisualAcceptanceRequired") is True, "Owner visual acceptance is required for user-facing readiness")
     checks.require(all(surface.get("ready") is False for surface in ux_state.get("surfaces", [])), "no currently unaccepted user-facing surface is marked ready")
     checks.require(ux_state.get("designReference", {}).get("productionParityClaimed") is False, "production does not claim parity with the in-progress design-lab pass")
-    checks.require("#375" in tasks and tasks.count("- [ ]") == 7, "task board includes the Owner-visible UX acceptance gate")
+    acceptance_section = tasks.split("## Canonical acceptance queue", 1)[-1].split("\n## ", 1)[0]
+    acceptance_ids = re.findall(r"^- \[ \] \*\*#(\d+)\b", acceptance_section, re.M)
+    checks.require(sorted(acceptance_ids) == sorted(('371', '314', '375', '277', '315', '316', '317')),
+                   "task board retains every non-duplicated external acceptance gate independently of engineering work")
     provider_matrix = read("docs/PROVIDER_STATUS_MATRIX.md")
     checks.require(
         "**Status:** ACTIVE" in provider_matrix

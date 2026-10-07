@@ -32,7 +32,7 @@ class ChangeClassificationTests(unittest.TestCase):
             self.assertTrue(r[key], key)
 
     def test_build_release_and_workflows_run_everything(self):
-        for path in ("server/Dockerfile", "Dockerfile", "server/Dockerfile.staging", ".github/workflows/build.yml", "scripts/change_classification.py", "VERSION", "gradle/wrapper/gradle-wrapper.properties", "server/pyproject.toml", "docs/RELEASE_GATES.md"):
+        for path in ("server/Dockerfile", "Dockerfile", "server/Dockerfile.staging", ".github/workflows/build.yml", "scripts/change_classification.py", "VERSION", "gradle/wrapper/gradle-wrapper.properties", "docs/RELEASE_GATES.md"):
             self.assertTrue(all(classify([path]).values()), path)
 
     def test_python_and_js_codeql_route_separately(self):
@@ -49,6 +49,30 @@ class ChangeClassificationTests(unittest.TestCase):
             result=classify([path])
             for key in ('android','instrumentation','web','companion','bridge'):
                 self.assertTrue(result[key], (path,key))
+
+    def test_known_node_dependency_metadata_preserves_security_without_unrelated_hosts(self):
+        for surface, flag in [('web', 'web'), ('site', 'site'), ('launcher', 'companion')]:
+            for file in ('package.json', 'package-lock.json'):
+                result = classify([f'{surface}/{file}'])
+                for key in (flag, 'dependencies', 'audit_javascript', 'codeql_javascript', 'supply_chain', 'p1', 'release'):
+                    self.assertTrue(result[key], (surface, file, key))
+                for key in ('android', 'instrumentation', 'physical', 'postgres', 'core', 'bridge'):
+                    self.assertFalse(result[key], (surface, file, key))
+                for other in ('web', 'site', 'companion'):
+                    if other != flag: self.assertFalse(result[other], (surface, other))
+
+    def test_core_dependencies_retain_wire_consumers_but_not_unrelated_public_site(self):
+        result = classify(['server/pyproject.toml'])
+        for key in ('core', 'postgres', 'android', 'instrumentation', 'web', 'companion', 'bridge', 'p1', 'container', 'supply_chain', 'dependencies', 'audit_python', 'codeql_python'):
+            self.assertTrue(result[key], key)
+        self.assertFalse(result['site'])
+
+    def test_shared_unknown_and_mixed_metadata_fail_closed(self):
+        for path in ('package.json', 'new-service/package-lock.json', 'server/nested/pyproject.toml', 'app/build.gradle.kts'):
+            self.assertTrue(all(classify([path]).values()), path)
+        result = classify(['web/package-lock.json', 'site/package.json'])
+        self.assertTrue(result['web']); self.assertTrue(result['site'])
+        self.assertFalse(result['android'])
 
 
 class ExactGitDiffTests(unittest.TestCase):

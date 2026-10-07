@@ -254,3 +254,7 @@ Repository tests for this contract use synthetic fixtures only. They do **not** 
 - production has been deployed or traffic enabled.
 
 Those claims become valid only after the corresponding real evidence exists and the Owner records the appropriate exact-candidate acceptance profile.
+
+## Release scope clarification — 2026-10-07
+
+The current machine `publication` profile is full-suite: Android physical, Windows Companion, exact WoW environment, voice/acoustic, accessibility and all product visual surfaces are mandatory. Conditional prose about a target does not remove a `PUBLICATION_GATES` entry. An Android-only release would require an explicit Owner product-scope decision and a versioned machine contract; routine engineering must not skip the present gates. Final design-reference reconciliation means reconciliation of native production v3 design and adopted asset provenance, not waiting for a new laboratory import.

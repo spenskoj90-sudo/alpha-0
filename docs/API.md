@@ -123,6 +123,14 @@ These endpoints are not public metrics surfaces and do not expose a production t
 
 `docs/ARCHITECTURE_V4.md` and `docs/SENTINEL_MASTER_ARCHITECTURE_v0.3.md` define architecture targets and must not be treated as runtime route inventories.
 
+## Reviewed knowledge distribution (data-only)
+
+- `GET /v1/knowledge/manifest` — authenticated `game:read`; required query `game`, `platform`, `patch`, `environment`, `profile`; optional `known_digest` is a cache hint. Returns reviewed current digest, monotonic revision, server time and presentation lease (at most 60 seconds, bounded by expiry), `execution_authority=false`.
+- `GET /v1/knowledge/packs/{digest}` — same session/profile, SHA-256 content-addressed full bytes; validates current pointer, review/status, expiry and revocation independently.
+- `GET /v1/knowledge/deltas/{digest}` — same session/profile plus `base_digest`; bounded `byte-splice-v1` envelope, independently trusted destination digest and complete reconstruction validation (262144-byte cap).
+
+All replies are `Cache-Control: no-store`; missing/unavailable distribution or database errors fail closed (safe 503), unavailable full/delta returns 404, expired/revoked/invalid/profile-mismatched packs are never served as permitted content. A consumer may fall back from unavailable delta to full bytes within its remaining trusted lease. Core authentication errors remain 401/403. A lease/digest/schema never supplies verified-source evidence, entitlement, strategy quality or action authority. See `GAME_KNOWLEDGE_RUNTIME_V1.md` for exact error and consumer semantics.
+
 ## Authentication notes
 
 Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures, provider secrets and raw private-key material are not returned in logs or audit metadata.

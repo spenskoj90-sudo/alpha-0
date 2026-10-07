@@ -364,7 +364,8 @@ export default function AdminPage() {
           {games.map(game => <div className="item" key={game.id}>
             <strong>{game.name}</strong>
             <div className="muted">{game.platform} · {game.id}</div>
-            <div className="microcopy">{game.interaction_mode}{' '}{t("· launcher")}{' '}{game.launcher_supported ? t("supported") : t("not supported")}</div>
+            <div className="microcopy">{t("Catalog foundation · environment unverified")}</div>
+            <div className="microcopy">{t("Launcher metadata:")}{' '}{game.launcher_supported ? t("Configured") : t("Not configured")}</div>
           </div>)}
         </article>}
       </section>

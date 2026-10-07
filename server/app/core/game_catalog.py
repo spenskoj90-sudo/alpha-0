@@ -32,3 +32,18 @@ DIABLO_CATALOG: tuple[GameDefinition, ...] = (
 
 def get_game(game_id: str) -> GameDefinition | None:
     return next((game for game in DIABLO_CATALOG if game.id == game_id), None)
+
+
+def game_metadata(game: GameDefinition) -> dict:
+    """Product identifiers describe catalog plumbing, not verified game support.
+
+    Keep entitlement identifiers stable. Research profiles are a separate read-only
+    inventory, and neither this metadata nor launcher flags grant execution.
+    """
+    return {
+        **game.__dict__,
+        "implementation_status": "catalog_foundation",
+        "exact_environment_status": "unverified",
+        "recommendation_capability": "unavailable",
+        "execution_authority": False,
+    }

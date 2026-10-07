@@ -50,6 +50,7 @@ def test_bound_tcp_factory_preserves_tls_requirement_by_default() -> None:
 
 def test_bound_tcp_factory_accepts_explicit_tls_context() -> None:
     context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     binding = build_companion_tcp_binding(
         "127.0.0.1",
         65535,

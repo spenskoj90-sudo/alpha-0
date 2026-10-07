@@ -136,7 +136,6 @@ def test_failed_duplicate_registration_does_not_supersede_account_creator(monkey
 
     def register_with_duplicate(candidate_email, candidate_password):
         nonlocal nested
-        result = original_register(candidate_email, candidate_password)
         if not nested:
             nested = True
             duplicate = client.post(
@@ -145,7 +144,8 @@ def test_failed_duplicate_registration_does_not_supersede_account_creator(monkey
                 json={"email": email, "password": password},
             )
             assert duplicate.status_code == 409
-        return result
+            assert duplicate.json()["code"] == "REGISTRATION_IN_PROGRESS"
+        return original_register(candidate_email, candidate_password)
 
     monkeypatch.setattr(user_store, "register", register_with_duplicate)
     created = client.post(
@@ -156,6 +156,38 @@ def test_failed_duplicate_registration_does_not_supersede_account_creator(monkey
 
     assert created.status_code == 200
     assert created.headers["x-sentinel-web-generation"] == "1"
+
+
+def test_failed_later_login_cancels_reservation_before_earlier_login_commits(monkeypatch):
+    email = f"login-race-{uuid.uuid4().hex}@example.com"
+    password = "Login-race-password-123"
+    family = "web-login-race-" + "q" * 48
+    headers = {"X-Sentinel-Web-Session": family}
+    assert client.post("/v1/auth/register", json={"email": email, "password": password}).status_code == 200
+    original_authenticate = user_store.authenticate
+    nested = False
+
+    def authenticate_with_rejected_later(candidate_email, candidate_password):
+        nonlocal nested
+        if candidate_password == password and not nested:
+            nested = True
+            denied = client.post(
+                "/v1/auth/login",
+                headers=headers,
+                json={"email": email, "password": "Definitely-wrong-password-456"},
+            )
+            assert denied.status_code == 401
+        return original_authenticate(candidate_email, candidate_password)
+
+    monkeypatch.setattr(user_store, "authenticate", authenticate_with_rejected_later)
+    accepted = client.post(
+        "/v1/auth/login",
+        headers=headers,
+        json={"email": email, "password": password},
+    )
+
+    assert accepted.status_code == 200
+    assert accepted.headers["x-sentinel-web-generation"] == "1"
 
 
 def _message_token(text: str, label: str) -> str:

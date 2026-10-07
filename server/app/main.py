@@ -6,6 +6,7 @@ import secrets
 import time
 import uuid
 from collections import deque
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from threading import Lock
 from typing import Any
@@ -95,6 +96,8 @@ ENROLLMENT_TOKEN = os.getenv("SENTINEL_ENROLLMENT_TOKEN")
 REQUIRE_ENROLLMENT = os.getenv("SENTINEL_REQUIRE_ENROLLMENT", "true").lower() == "true"
 CORS_ORIGINS = [item.strip() for item in os.getenv("CORS_ORIGINS", "").split(",") if item.strip()]
 WEB_SESSION_PATTERN = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+_web_registration_claims: set[str] = set()
+_web_registration_claims_lock = Lock()
 
 if SENTINEL_ENV == "production" and not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required in production")
@@ -321,6 +324,54 @@ def validated_web_session(value: str | None) -> str | None:
     return value
 
 
+@contextmanager
+def claimed_web_registration(family_token: str | None):
+    """Fail-fast claim for one registration mutation per browser family.
+
+    The PostgreSQL advisory lock is session-scoped so the account insert and
+    family-session commit can use their existing transactions without a
+    cross-connection row-lock deadlock. A rejected overlapping registration
+    cancels its generation reservation before the creator attempts to commit.
+    """
+    if family_token is None:
+        yield True
+        return
+    family_hash = session_hash(family_token)
+    if isinstance(store, MemoryStore):
+        with _web_registration_claims_lock:
+            acquired = family_hash not in _web_registration_claims
+            if acquired:
+                _web_registration_claims.add(family_hash)
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                with _web_registration_claims_lock:
+                    _web_registration_claims.discard(family_hash)
+        return
+
+    lock_key = int.from_bytes(bytes.fromhex(family_hash)[:8], "big", signed=True)
+    connection = store.engine.connect()
+    acquired = False
+    try:
+        acquired = bool(
+            connection.execute(
+                __import__("sqlalchemy").text("SELECT pg_try_advisory_lock(:lock_key)"),
+                {"lock_key": lock_key},
+            ).scalar_one()
+        )
+        yield acquired
+    finally:
+        try:
+            if acquired:
+                connection.execute(
+                    __import__("sqlalchemy").text("SELECT pg_advisory_unlock(:lock_key)"),
+                    {"lock_key": lock_key},
+                )
+        finally:
+            connection.close()
+
+
 @app.post("/v1/auth/register", response_model=SessionResponse)
 def register_user(
     payload: RegisterRequest,
@@ -332,20 +383,23 @@ def register_user(
     web_session = validated_web_session(web_session_header)
     web_operation = store.begin_web_session_operation(web_session) if web_session else None
     try:
-        user_id = user_store.register(payload.email, payload.password)
+        with claimed_web_registration(web_session) as claimed:
+            if not claimed:
+                raise HTTPException(status_code=409, detail="REGISTRATION_IN_PROGRESS")
+            user_id = user_store.register(payload.email, payload.password)
+            issued = (
+                store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
+                if web_session and web_operation is not None
+                else store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
+            )
+            if issued is None:
+                raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
     except Exception as exc:
         if web_session and web_operation is not None:
             store.cancel_web_session_operation(web_session, web_operation)
         if "EMAIL_ALREADY_REGISTERED" in str(exc) or "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
         raise
-    issued = (
-        store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
-        if web_session and web_operation is not None
-        else store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-    )
-    if issued is None:
-        raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
     access, refresh, expires_at, scopes = issued
     if web_operation is not None:
         response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
@@ -773,23 +827,28 @@ def login_user(
     rate_limit(request, "auth-login")
     web_session = validated_web_session(web_session_header)
     web_operation = store.begin_web_session_operation(web_session) if web_session else None
-    subject = payload.email.strip().lower()
-    threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
-    if subject and store.security_failure_count(subject) >= threshold:
-        raise HTTPException(status_code=429, detail="AUTH_LOCKOUT")
-    user_id = user_store.authenticate(payload.email, payload.password)
-    if not user_id:
-        if subject:
-            store.record_security_failure(subject, "auth-login")
-        raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
-    result = _session_or_mfa(
-        user_id,
-        request,
-        action="auth:login",
-        first_factor_reason="CREDENTIALS_VALID",
-        web_session=web_session,
-        web_operation=web_operation,
-    )
+    try:
+        subject = payload.email.strip().lower()
+        threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
+        if subject and store.security_failure_count(subject) >= threshold:
+            raise HTTPException(status_code=429, detail="AUTH_LOCKOUT")
+        user_id = user_store.authenticate(payload.email, payload.password)
+        if not user_id:
+            if subject:
+                store.record_security_failure(subject, "auth-login")
+            raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+        result = _session_or_mfa(
+            user_id,
+            request,
+            action="auth:login",
+            first_factor_reason="CREDENTIALS_VALID",
+            web_session=web_session,
+            web_operation=web_operation,
+        )
+    except Exception:
+        if web_session and web_operation is not None:
+            store.cancel_web_session_operation(web_session, web_operation)
+        raise
     if web_operation is not None:
         response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     return result

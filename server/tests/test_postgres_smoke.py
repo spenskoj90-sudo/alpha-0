@@ -253,6 +253,23 @@ def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revoca
     ).status_code == 200
 
 
+def test_postgres_web_registration_claim_is_cross_worker_and_fail_fast():
+    from app.main import claimed_web_registration
+
+    family = "pg-registration-claim-" + uuid.uuid4().hex + "z" * 24
+
+    def claim_once():
+        with claimed_web_registration(family) as claimed:
+            return claimed
+
+    with claimed_web_registration(family) as creator_claimed:
+        assert creator_claimed is True
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            assert pool.submit(claim_once).result() is False
+
+    assert claim_once() is True
+
+
 def test_postgres_legacy_refresh_rotation_cannot_escape_concurrent_logout():
     from app.main import app, store
     from app.core.store import PostgresStore

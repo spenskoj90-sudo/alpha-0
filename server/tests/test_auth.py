@@ -108,6 +108,56 @@ def test_web_session_family_makes_prior_login_and_refresh_generations_stale():
     assert store.get_session(refreshed.json()["session_token"]) is None
 
 
+def test_web_logout_revokes_presented_legacy_refresh_without_access_cookie():
+    family = "web-legacy-logout-" + "l" * 48
+    legacy_access, legacy_refresh, _, _ = store.issue_session(
+        None, f"legacy-{uuid.uuid4().hex}@example.com", 3600, 7200
+    )
+
+    logged_out = client.post(
+        "/v1/sessions/web/revoke",
+        headers={"X-Sentinel-Web-Session": family},
+        json={"refresh_token": legacy_refresh},
+    )
+
+    assert logged_out.status_code == 200
+    assert store.get_session(legacy_access) is None
+    assert client.post(
+        "/v1/sessions/refresh", json={"refresh_token": legacy_refresh}
+    ).status_code == 401
+
+
+def test_failed_duplicate_registration_does_not_supersede_account_creator(monkeypatch):
+    email = f"register-race-{uuid.uuid4().hex}@example.com"
+    password = "Registration-race-password-123"
+    family = "web-registration-race-" + "r" * 48
+    original_register = user_store.register
+    nested = False
+
+    def register_with_duplicate(candidate_email, candidate_password):
+        nonlocal nested
+        result = original_register(candidate_email, candidate_password)
+        if not nested:
+            nested = True
+            duplicate = client.post(
+                "/v1/auth/register",
+                headers={"X-Sentinel-Web-Session": family},
+                json={"email": email, "password": password},
+            )
+            assert duplicate.status_code == 409
+        return result
+
+    monkeypatch.setattr(user_store, "register", register_with_duplicate)
+    created = client.post(
+        "/v1/auth/register",
+        headers={"X-Sentinel-Web-Session": family},
+        json={"email": email, "password": password},
+    )
+
+    assert created.status_code == 200
+    assert created.headers["x-sentinel-web-generation"] == "1"
+
+
 def _message_token(text: str, label: str) -> str:
     match = re.search(rf"{label}: ([A-Za-z0-9_-]+)", text)
     assert match is not None
@@ -234,3 +284,32 @@ def test_password_reset_changes_password_revokes_sessions_and_rejects_replay(mon
     assert replay.status_code == 400
     assert client.post("/v1/auth/login", json={"email": email, "password": old_password}).status_code == 401
     assert client.post("/v1/auth/login", json={"email": email, "password": new_password}).status_code == 200
+
+
+def test_password_reset_commits_family_tombstone_after_password_mutation(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    email = f"reset-family-race-{uuid.uuid4().hex}@example.com"
+    old_password = "Reset-family-old-password-123"
+    new_password = "Reset-family-new-password-456"
+    family = "web-reset-family-" + "p" * 48
+    assert client.post("/v1/auth/register", json={"email": email, "password": old_password}).status_code == 200
+    assert client.post("/v1/auth/password-reset/request", json={"email": email}).status_code == 202
+    token = _message_token(transport.snapshot()[-1].text, "Reset code")
+    original_reset = user_store.reset_password
+
+    def reset_with_interleaved_operation(*args, **kwargs):
+        result = original_reset(*args, **kwargs)
+        store.begin_web_session_operation(family)
+        return result
+
+    monkeypatch.setattr(user_store, "reset_password", reset_with_interleaved_operation)
+    confirmed = client.post(
+        "/v1/auth/password-reset/confirm",
+        headers={"X-Sentinel-Web-Session": family},
+        json={"token": token, "email": email, "password": new_password},
+    )
+
+    assert confirmed.status_code == 200
+    assert confirmed.json() == {"status": "PASSWORD_UPDATED"}
+    assert int(confirmed.headers["x-sentinel-web-generation"]) >= 2

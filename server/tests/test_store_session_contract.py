@@ -55,6 +55,38 @@ def test_memory_web_session_generation_rejects_superseded_success_and_logout_res
     assert store.get_session(current_access) is None
 
 
+def test_memory_cancelled_later_web_operation_does_not_supersede_pending_success():
+    store = MemoryStore()
+    family = "browser-family-cancel-" + "b" * 48
+
+    pending_success = store.begin_web_session_operation(family)
+    failed_duplicate = store.begin_web_session_operation(family)
+    assert store.cancel_web_session_operation(family, failed_duplicate) is True
+
+    issued = store.issue_web_session(
+        None, "user-1", 3600, 7200, family, pending_success
+    )
+    assert issued is not None
+    assert store.get_session(issued[0]) is not None
+
+
+def test_memory_atomic_web_tombstone_revokes_family_and_legacy_refresh():
+    store = MemoryStore()
+    family = "browser-family-tombstone-" + "c" * 48
+    operation = store.begin_web_session_operation(family)
+    current = store.issue_web_session(None, "user-1", 3600, 7200, family, operation)
+    assert current is not None
+    legacy_access, legacy_refresh, _, _ = store.issue_session(None, "user-1", 3600, 7200)
+
+    logout_operation = store.begin_web_session_operation(family)
+    assert store.revoke_web_session_family(family, logout_operation, legacy_refresh) is True
+    tombstone = store.revoke_web_session_family_latest(family)
+    assert tombstone > logout_operation
+    assert store.get_session(current[0]) is None
+    assert store.get_session(legacy_access) is None
+    assert store.rotate_refresh(legacy_refresh, 3600, 7200) is None
+
+
 def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():
     store = MemoryStore()
     device_id = store.register_device("user-1", "android", "memory-race-key", "2" * 64, "challenge")

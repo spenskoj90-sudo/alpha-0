@@ -4,6 +4,7 @@ CREATE TABLE web_session_families (
     family_hash TEXT PRIMARY KEY,
     latest_operation BIGINT NOT NULL DEFAULT 0 CHECK (latest_operation >= 0),
     active_generation BIGINT NOT NULL DEFAULT 0 CHECK (active_generation >= 0),
+    cancelled_operations BIGINT[] NOT NULL DEFAULT ARRAY[]::BIGINT[],
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (active_generation <= latest_operation)
 );

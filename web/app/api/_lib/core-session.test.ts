@@ -295,6 +295,9 @@ describe('Web Core session boundary', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ authenticated: false, server_revoked: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const revokeInit = fetchMock.mock.calls[0]?.[1];
+    expect(new Headers(revokeInit?.headers).get('content-type')).toBe('application/json');
+    expect(JSON.parse(String(revokeInit?.body))).toEqual({ refresh_token: 'refresh-secret' });
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(cookie).toContain(`${ACCESS_COOKIE}=`);
     expect(cookie).toContain(`${REFRESH_COOKIE}=`);

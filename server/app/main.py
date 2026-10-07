@@ -334,6 +334,8 @@ def register_user(
     try:
         user_id = user_store.register(payload.email, payload.password)
     except Exception as exc:
+        if web_session and web_operation is not None:
+            store.cancel_web_session_operation(web_session, web_operation)
         if "EMAIL_ALREADY_REGISTERED" in str(exc) or "unique" in str(exc).lower() or "duplicate" in str(exc).lower():
             raise HTTPException(status_code=409, detail="EMAIL_ALREADY_REGISTERED") from exc
         raise
@@ -420,12 +422,10 @@ def confirm_password_reset(
 ) -> AuthActionResponse:
     rate_limit(request, "auth-password-reset-confirm")
     web_session = validated_web_session(web_session_header)
-    web_operation = store.begin_web_session_operation(web_session) if web_session else None
     if not user_store.reset_password(payload.token, payload.password, store, payload.email):
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
-    if web_session and web_operation is not None:
-        if not store.revoke_web_session_family(web_session, web_operation):
-            raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
+    if web_session:
+        web_operation = store.revoke_web_session_family_latest(web_session)
         response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     return AuthActionResponse(status="PASSWORD_UPDATED")
 
@@ -1211,6 +1211,7 @@ def refresh_session(
 @app.post("/v1/sessions/web/revoke")
 def revoke_web_session(
     response: Response,
+    payload: RefreshRequest | None = None,
     web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
     authorization_header: str | None = Header(None, alias="Authorization"),
 ):
@@ -1218,7 +1219,9 @@ def revoke_web_session(
     if not web_session:
         raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
     operation = store.begin_web_session_operation(web_session)
-    if not store.revoke_web_session_family(web_session, operation):
+    if not store.revoke_web_session_family(
+        web_session, operation, payload.refresh_token if payload is not None else None
+    ):
         raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
     if authorization_header:
         try:

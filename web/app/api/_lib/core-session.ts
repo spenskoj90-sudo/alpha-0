@@ -528,6 +528,7 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
   const context = webSessionContext(request);
   if (!context) return contextRequired(requestId);
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
   let serverRevoked = false;
   let upstream: Response | undefined;
 
@@ -535,9 +536,11 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
       upstream = await coreFetch(coreUrl, '/v1/sessions/web/revoke', requestId, {
         method: 'POST',
         headers: {
+          ...(refreshToken ? { 'content-type': 'application/json' } : {}),
           'x-sentinel-web-session': context.family,
           ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         },
+        ...(refreshToken ? { body: JSON.stringify({ refresh_token: refreshToken }) } : {}),
       });
       serverRevoked = upstream.ok;
   } catch {

@@ -72,11 +72,17 @@ class Store(ABC):
     @abstractmethod
     def begin_web_session_operation(self, family_token: str) -> int: ...
     @abstractmethod
+    def cancel_web_session_operation(self, family_token: str, operation: int) -> bool: ...
+    @abstractmethod
     def issue_web_session(self, device_id: str | None, user_id: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str]] | None: ...
     @abstractmethod
     def rotate_web_refresh(self, refresh_token: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str], dict[str, Any]] | None: ...
     @abstractmethod
-    def revoke_web_session_family(self, family_token: str, operation: int) -> bool: ...
+    def revoke_web_session_family(
+        self, family_token: str, operation: int, refresh_token: str | None = None
+    ) -> bool: ...
+    @abstractmethod
+    def revoke_web_session_family_latest(self, family_token: str) -> int: ...
     @abstractmethod
     def save_event_batch(self, principal: dict[str, Any], events: list[dict[str, Any]], idempotency_key: str | None) -> dict[str, int]: ...
     @abstractmethod
@@ -122,7 +128,7 @@ class MemoryStore(Store):
         self.devices: dict[str, dict[str, Any]] = {}
         self.challenges: dict[str, dict[str, Any]] = {}
         self.sessions: dict[str, dict[str, Any]] = {}
-        self.web_session_families: dict[str, dict[str, int]] = {}
+        self.web_session_families: dict[str, dict[str, Any]] = {}
         self.events: dict[str, dict[str, Any]] = {}
         self.idempotency: dict[tuple[str, str], dict[str, Any]] = {}
         self.proof_requests: set[tuple[str, str]] = set()
@@ -370,14 +376,32 @@ class MemoryStore(Store):
             record["revoked"] = True
             return True
 
+    @staticmethod
+    def _latest_effective_web_operation(family):
+        operation = int(family["latest_operation"])
+        cancelled = family.get("cancelled_operations", set())
+        while operation > int(family["active_generation"]) and operation in cancelled:
+            operation -= 1
+        return operation
+
     def begin_web_session_operation(self, family_token):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.setdefault(
-                family_hash, {"latest_operation": 0, "active_generation": 0}
+                family_hash, {"latest_operation": 0, "active_generation": 0, "cancelled_operations": set()}
             )
             family["latest_operation"] += 1
             return family["latest_operation"]
+
+    def cancel_web_session_operation(self, family_token, operation):
+        family_hash = session_hash(family_token)
+        with self.lock:
+            family = self.web_session_families.get(family_hash)
+            if (not family or operation <= family["active_generation"]
+                    or operation > family["latest_operation"]):
+                return False
+            family.setdefault("cancelled_operations", set()).add(operation)
+            return True
 
     def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
         family_hash = session_hash(family_token)
@@ -386,12 +410,13 @@ class MemoryStore(Store):
         exp = now + timedelta(seconds=access_ttl)
         with self.lock:
             family = self.web_session_families.get(family_hash)
-            if not family or family["latest_operation"] != operation:
+            if not family or self._latest_effective_web_operation(family) != operation:
                 return None
             for record in self.sessions.values():
                 if record.get("web_session_family_hash") == family_hash:
                     record["revoked"] = True
             family["active_generation"] = operation
+            family["cancelled_operations"] = set()
             self.sessions[session_hash(access)] = {
                 "user_id": user_id, "device_id": device_id, "scopes": SCOPES,
                 "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
@@ -406,7 +431,7 @@ class MemoryStore(Store):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.get(family_hash)
-            if not family or family["latest_operation"] != operation:
+            if not family or self._latest_effective_web_operation(family) != operation:
                 return None
             record = next((r for r in self.sessions.values() if r.get("refresh_hash") == session_hash(refresh_token)), None)
             if (not record or record.get("revoked") or record.get("refresh_used")
@@ -421,6 +446,7 @@ class MemoryStore(Store):
             now = datetime.now(UTC)
             exp = now + timedelta(seconds=access_ttl)
             family["active_generation"] = operation
+            family["cancelled_operations"] = set()
             self.sessions[session_hash(access)] = {
                 **old, "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
                 "refresh_hash": session_hash(refresh),
@@ -429,17 +455,49 @@ class MemoryStore(Store):
             }
         return access, refresh, exp, SCOPES, old
 
-    def revoke_web_session_family(self, family_token, operation):
+    def revoke_web_session_family(self, family_token, operation, refresh_token=None):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.get(family_hash)
-            if not family or family["latest_operation"] != operation:
+            if not family or self._latest_effective_web_operation(family) != operation:
                 return False
             family["active_generation"] = operation
+            family["cancelled_operations"] = set()
             for record in self.sessions.values():
                 if record.get("web_session_family_hash") == family_hash:
                     record["revoked"] = True
+            if refresh_token:
+                presented = next(
+                    (record for record in self.sessions.values()
+                     if record.get("refresh_hash") == session_hash(refresh_token)),
+                    None,
+                )
+                if presented and not presented.get("web_session_family_hash") and presented.get("device_id") is None:
+                    for record in self.sessions.values():
+                        if (record.get("user_id") == presented.get("user_id")
+                                and record.get("device_id") is None
+                                and not record.get("web_session_family_hash")):
+                            record["refresh_used"] = True
+                            record["revoked"] = True
+                elif presented:
+                    presented["refresh_used"] = True
+                    presented["revoked"] = True
             return True
+
+    def revoke_web_session_family_latest(self, family_token):
+        family_hash = session_hash(family_token)
+        with self.lock:
+            family = self.web_session_families.setdefault(
+                family_hash, {"latest_operation": 0, "active_generation": 0, "cancelled_operations": set()}
+            )
+            family["latest_operation"] += 1
+            operation = family["latest_operation"]
+            family["active_generation"] = operation
+            family["cancelled_operations"] = set()
+            for record in self.sessions.values():
+                if record.get("web_session_family_hash") == family_hash:
+                    record["revoked"] = True
+            return operation
 
     def save_event_batch(self, principal, events, idempotency_key):
         request_hash = event_hash_payload(events)
@@ -941,6 +999,15 @@ class PostgresStore(Store):
             result = conn.execute(text("UPDATE sessions SET revoked_at=now() WHERE session_hash=:sh AND revoked_at IS NULL"), {"sh": session_hash(access_token)})
             return result.rowcount == 1
 
+    @staticmethod
+    def _latest_effective_postgres_operation(family):
+        operation = int(family["latest_operation"])
+        active = int(family["active_generation"])
+        cancelled = {int(item) for item in (family["cancelled_operations"] or [])}
+        while operation > active and operation in cancelled:
+            operation -= 1
+        return operation
+
     def begin_web_session_operation(self, family_token):
         with self.engine.begin() as conn:
             return int(conn.execute(
@@ -953,6 +1020,16 @@ class PostgresStore(Store):
                 {"family": session_hash(family_token)},
             ).scalar_one())
 
+    def cancel_web_session_operation(self, family_token, operation):
+        with self.engine.begin() as conn:
+            result = conn.execute(text(
+                "UPDATE web_session_families SET "
+                "cancelled_operations=array_append(cancelled_operations,:operation),updated_at=now() "
+                "WHERE family_hash=:family AND active_generation<:operation "
+                "AND latest_operation>=:operation AND NOT (:operation=ANY(cancelled_operations))"
+            ), {"family": session_hash(family_token), "operation": operation})
+            return result.rowcount == 1
+
     def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
         family_hash = session_hash(family_token)
         access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
@@ -961,10 +1038,11 @@ class PostgresStore(Store):
         refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
             family = conn.execute(
-                text("SELECT latest_operation FROM web_session_families WHERE family_hash=:family FOR UPDATE"),
+                text("SELECT latest_operation,active_generation,cancelled_operations "
+                     "FROM web_session_families WHERE family_hash=:family FOR UPDATE"),
                 {"family": family_hash},
-            ).scalar_one_or_none()
-            if family != operation:
+            ).mappings().first()
+            if not family or self._latest_effective_postgres_operation(family) != operation:
                 return None
             identity_id = conn.execute(
                 text("SELECT id FROM identities WHERE user_handle=:user"), {"user": user_id}
@@ -974,7 +1052,8 @@ class PostgresStore(Store):
                 "WHERE web_session_family_hash=:family"
             ), {"family": family_hash})
             conn.execute(text(
-                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() "
+                "UPDATE web_session_families SET active_generation=:operation,"
+                "cancelled_operations=ARRAY[]::BIGINT[],updated_at=now() "
                 "WHERE family_hash=:family"
             ), {"family": family_hash, "operation": operation})
             conn.execute(text(
@@ -996,10 +1075,10 @@ class PostgresStore(Store):
         refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
             family = conn.execute(text(
-                "SELECT latest_operation,active_generation FROM web_session_families "
+                "SELECT latest_operation,active_generation,cancelled_operations FROM web_session_families "
                 "WHERE family_hash=:family FOR UPDATE"
             ), {"family": family_hash}).mappings().first()
-            if not family or family["latest_operation"] != operation:
+            if not family or self._latest_effective_postgres_operation(family) != operation:
                 return None
             row = conn.execute(text(
                 "SELECT s.id::text session_id,s.identity_id,i.user_handle user_id,s.device_id::text device_id,"
@@ -1016,7 +1095,8 @@ class PostgresStore(Store):
                 "revoked_at=COALESCE(revoked_at,now()) WHERE web_session_family_hash=:family"
             ), {"id": row["session_id"], "family": family_hash})
             conn.execute(text(
-                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() WHERE family_hash=:family"
+                "UPDATE web_session_families SET active_generation=:operation,"
+                "cancelled_operations=ARRAY[]::BIGINT[],updated_at=now() WHERE family_hash=:family"
             ), {"operation": operation, "family": family_hash})
             conn.execute(text(
                 "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
@@ -1030,21 +1110,56 @@ class PostgresStore(Store):
         scopes = row["scopes_json"] if isinstance(row["scopes_json"], list) else json.loads(row["scopes_json"])
         return access, refresh, exp, scopes, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": scopes}
 
-    def revoke_web_session_family(self, family_token, operation):
+    def revoke_web_session_family(self, family_token, operation, refresh_token=None):
         family_hash = session_hash(family_token)
         with self.engine.begin() as conn:
             family = conn.execute(text(
-                "SELECT latest_operation FROM web_session_families WHERE family_hash=:family FOR UPDATE"
-            ), {"family": family_hash}).scalar_one_or_none()
-            if family != operation:
+                "SELECT latest_operation,active_generation,cancelled_operations "
+                "FROM web_session_families WHERE family_hash=:family FOR UPDATE"
+            ), {"family": family_hash}).mappings().first()
+            if not family or self._latest_effective_postgres_operation(family) != operation:
                 return False
             conn.execute(text(
                 "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE web_session_family_hash=:family"
             ), {"family": family_hash})
+            if refresh_token:
+                presented = conn.execute(text(
+                    "SELECT identity_id,device_id,web_session_family_hash FROM sessions "
+                    "WHERE refresh_token_hash=:refresh FOR UPDATE"
+                ), {"refresh": session_hash(refresh_token)}).mappings().first()
+                if presented and presented["web_session_family_hash"] is None and presented["device_id"] is None:
+                    conn.execute(text(
+                        "UPDATE sessions SET refresh_used_at=COALESCE(refresh_used_at,now()),"
+                        "revoked_at=COALESCE(revoked_at,now()) WHERE identity_id=:identity "
+                        "AND device_id IS NULL AND web_session_family_hash IS NULL"
+                    ), {"identity": presented["identity_id"]})
+                elif presented:
+                    conn.execute(text(
+                        "UPDATE sessions SET refresh_used_at=COALESCE(refresh_used_at,now()),"
+                        "revoked_at=COALESCE(revoked_at,now()) WHERE refresh_token_hash=:refresh"
+                    ), {"refresh": session_hash(refresh_token)})
             conn.execute(text(
-                "UPDATE web_session_families SET active_generation=:operation,updated_at=now() WHERE family_hash=:family"
+                "UPDATE web_session_families SET active_generation=:operation,"
+                "cancelled_operations=ARRAY[]::BIGINT[],updated_at=now() WHERE family_hash=:family"
             ), {"operation": operation, "family": family_hash})
             return True
+
+    def revoke_web_session_family_latest(self, family_token):
+        family_hash = session_hash(family_token)
+        with self.engine.begin() as conn:
+            operation = int(conn.execute(text(
+                "INSERT INTO web_session_families(family_hash,latest_operation,active_generation) "
+                "VALUES (:family,1,1) ON CONFLICT (family_hash) DO UPDATE SET "
+                "latest_operation=web_session_families.latest_operation+1,"
+                "active_generation=web_session_families.latest_operation+1,"
+                "cancelled_operations=ARRAY[]::BIGINT[],updated_at=now() "
+                "RETURNING active_generation"
+            ), {"family": family_hash}).scalar_one())
+            conn.execute(text(
+                "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()) "
+                "WHERE web_session_family_hash=:family"
+            ), {"family": family_hash})
+            return operation
 
     def save_event_batch(self, principal, events, idempotency_key):
         request_hash = event_hash_payload(events)

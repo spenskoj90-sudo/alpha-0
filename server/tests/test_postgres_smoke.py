@@ -88,6 +88,7 @@ def test_postgres_auth_event_and_audit_flow():
 
     refreshed = client.post("/v1/sessions/refresh", json={"refresh_token": session["refresh_token"]})
     assert refreshed.status_code == 200
+
     audit = client.get(
         "/v1/audit",
         headers={"Authorization": "Bearer " + refreshed.json()["session_token"]},
@@ -201,6 +202,41 @@ def test_postgres_auth_event_and_audit_flow():
     assert revoked_state == "REVOKED"
     assert revoked_sessions >= 1
     assert still_active == 0
+
+
+def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revocation():
+    from app.main import app, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    client = TestClient(app)
+    suffix = uuid.uuid4().hex
+    email = f"pg-web-generation-{suffix}@example.com"
+    password = "Postgres-web-generation-password-123"
+    family = "pg-web-family-" + suffix + "x" * 32
+    registered = client.post("/v1/auth/register", json={"email": email, "password": password})
+    assert registered.status_code == 200
+
+    pending = store.begin_web_session_operation(family)
+    failed = store.begin_web_session_operation(family)
+    assert store.cancel_web_session_operation(family, failed) is True
+    issued = store.issue_web_session(None, email, 3600, 7200, family, pending)
+    assert issued is not None
+
+    tombstone = store.revoke_web_session_family_latest(family)
+    assert tombstone > failed
+    assert store.get_session(issued[0]) is None
+
+    legacy_refresh = registered.json()["refresh_token"]
+    logout = client.post(
+        "/v1/sessions/web/revoke",
+        headers={"X-Sentinel-Web-Session": family},
+        json={"refresh_token": legacy_refresh},
+    )
+    assert logout.status_code == 200
+    assert client.post(
+        "/v1/sessions/refresh", json={"refresh_token": legacy_refresh}
+    ).status_code == 401
 
 
 def test_postgres_entitlement_listing_supports_scoped_and_admin_reads():

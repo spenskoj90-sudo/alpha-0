@@ -29,21 +29,24 @@ def test_memory_store_refresh_rotation_revokes_previous_access_session():
     assert store.rotate_refresh(old_refresh, 3600, 7200) is None
 
 
-def test_memory_web_session_generation_rejects_superseded_success_and_logout_resurrection():
+def test_memory_web_session_generation_allows_pending_predecessor_then_revokes_it():
     store = MemoryStore()
     family = "browser-family-" + "a" * 48
 
     stale_operation = store.begin_web_session_operation(family)
     current_operation = store.begin_web_session_operation(family)
 
-    assert store.issue_web_session(
+    stale = store.issue_web_session(
         None, "user-1", 3600, 7200, family, stale_operation
-    ) is None
+    )
+    assert stale is not None
+    assert store.get_session(stale[0]) is not None
     current = store.issue_web_session(
         None, "user-1", 3600, 7200, family, current_operation
     )
     assert current is not None
     current_access, current_refresh, _, _ = current
+    assert store.get_session(stale[0]) is None
     assert store.get_session(current_access) is not None
 
     refresh_operation = store.begin_web_session_operation(family)
@@ -62,12 +65,30 @@ def test_memory_cancelled_later_web_operation_does_not_supersede_pending_success
 
     pending_success = store.begin_web_session_operation(family)
     failed_duplicate = store.begin_web_session_operation(family)
-    assert store.cancel_web_session_operation(family, failed_duplicate) is True
 
     issued = store.issue_web_session(
         None, "user-1", 3600, 7200, family, pending_success
     )
     assert issued is not None
+    assert store.cancel_web_session_operation(family, failed_duplicate) is True
+    assert store.get_session(issued[0]) is not None
+
+
+def test_memory_earlier_commit_preserves_later_operation_cancellation():
+    store = MemoryStore()
+    family = "browser-family-cancelled-high-" + "c" * 48
+
+    pending_success = store.begin_web_session_operation(family)
+    cancelled_successor = store.begin_web_session_operation(family)
+    assert store.cancel_web_session_operation(family, cancelled_successor) is True
+
+    issued = store.issue_web_session(
+        None, "user-1", 3600, 7200, family, pending_success
+    )
+    assert issued is not None
+    assert store.issue_web_session(
+        None, "user-1", 3600, 7200, family, cancelled_successor
+    ) is None
     assert store.get_session(issued[0]) is not None
 
 

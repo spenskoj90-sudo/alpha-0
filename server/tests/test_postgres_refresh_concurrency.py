@@ -57,14 +57,17 @@ def test_postgres_web_session_generation_serializes_workers_and_logout():
 
     stale_operation = store.begin_web_session_operation(family)
     winner_operation = store.begin_web_session_operation(family)
-    assert store.issue_web_session(
+    stale = store.issue_web_session(
         None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, family, stale_operation
-    ) is None
+    )
+    assert stale is not None
+    assert store.get_session(stale[0]) is not None
     issued = store.issue_web_session(
         None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, family, winner_operation
     )
     assert issued is not None
     access, refresh, _, _ = issued
+    assert store.get_session(stale[0]) is None
 
     refresh_operation = store.begin_web_session_operation(family)
     logout_operation = store.begin_web_session_operation(family)

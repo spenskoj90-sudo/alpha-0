@@ -255,6 +255,8 @@ def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revoca
 
 def test_postgres_web_registration_claim_is_cross_worker_and_fail_fast():
     from app.main import claimed_web_registration
+    from app.core.security import session_hash
+    from app.main import store
 
     family = "pg-registration-claim-" + uuid.uuid4().hex + "z" * 24
 
@@ -264,9 +266,25 @@ def test_postgres_web_registration_claim_is_cross_worker_and_fail_fast():
 
     with claimed_web_registration(family) as creator_claimed:
         assert creator_claimed is True
+        assert store.engine.pool.checkedout() == 0
         with ThreadPoolExecutor(max_workers=1) as pool:
             assert pool.submit(claim_once).result() is False
 
+    with store.engine.connect() as conn:
+        assert conn.execute(
+            text("SELECT COUNT(*) FROM web_registration_claims WHERE family_hash=:family"),
+            {"family": session_hash(family)},
+        ).scalar_one() == 0
+    assert claim_once() is True
+
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO web_registration_claims(family_hash,claim_token_hash,expires_at) "
+                "VALUES (:family,'expired-test-claim',now()-interval '1 second')"
+            ),
+            {"family": session_hash(family)},
+        )
     assert claim_once() is True
 
 

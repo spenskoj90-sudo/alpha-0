@@ -328,10 +328,10 @@ def validated_web_session(value: str | None) -> str | None:
 def claimed_web_registration(family_token: str | None):
     """Fail-fast claim for one registration mutation per browser family.
 
-    The PostgreSQL advisory lock is session-scoped so the account insert and
-    family-session commit can use their existing transactions without a
-    cross-connection row-lock deadlock. A rejected overlapping registration
-    cancels its generation reservation before the creator attempts to commit.
+    PostgreSQL persists a bounded lease in short transactions, so password
+    hashing and the account/session transactions do not occupy an extra pooled
+    connection. A rejected overlapping registration cancels its generation
+    reservation before the creator attempts to commit.
     """
     if family_token is None:
         yield True
@@ -350,26 +350,39 @@ def claimed_web_registration(family_token: str | None):
                     _web_registration_claims.discard(family_hash)
         return
 
-    lock_key = int.from_bytes(bytes.fromhex(family_hash)[:8], "big", signed=True)
-    connection = store.engine.connect()
+    claim_token_hash = session_hash(secrets.token_urlsafe(32))
     acquired = False
     try:
-        acquired = bool(
+        with store.engine.begin() as connection:
             connection.execute(
-                __import__("sqlalchemy").text("SELECT pg_try_advisory_lock(:lock_key)"),
-                {"lock_key": lock_key},
-            ).scalar_one()
-        )
+                __import__("sqlalchemy").text(
+                    "INSERT INTO web_session_families(family_hash) VALUES (:family) "
+                    "ON CONFLICT (family_hash) DO NOTHING"
+                ),
+                {"family": family_hash},
+            )
+            returned = connection.execute(
+                __import__("sqlalchemy").text(
+                    "INSERT INTO web_registration_claims(family_hash,claim_token_hash,expires_at) "
+                    "VALUES (:family,:claim,now()+interval '2 minutes') "
+                    "ON CONFLICT (family_hash) DO UPDATE SET "
+                    "claim_token_hash=EXCLUDED.claim_token_hash,expires_at=EXCLUDED.expires_at,updated_at=now() "
+                    "WHERE web_registration_claims.expires_at<=now() RETURNING claim_token_hash"
+                ),
+                {"family": family_hash, "claim": claim_token_hash},
+            ).scalar_one_or_none()
+            acquired = returned == claim_token_hash
         yield acquired
     finally:
-        try:
-            if acquired:
+        if acquired:
+            with store.engine.begin() as connection:
                 connection.execute(
-                    __import__("sqlalchemy").text("SELECT pg_advisory_unlock(:lock_key)"),
-                    {"lock_key": lock_key},
+                    __import__("sqlalchemy").text(
+                        "DELETE FROM web_registration_claims "
+                        "WHERE family_hash=:family AND claim_token_hash=:claim"
+                    ),
+                    {"family": family_hash, "claim": claim_token_hash},
                 )
-        finally:
-            connection.close()
 
 
 @app.post("/v1/auth/register", response_model=SessionResponse)

@@ -1,4 +1,5 @@
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import time
@@ -216,6 +217,16 @@ def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revoca
     family = "pg-web-family-" + suffix + "x" * 32
     registered = client.post("/v1/auth/register", json={"email": email, "password": password})
     assert registered.status_code == 200
+    second_browser = client.post("/v1/auth/login", json={"email": email, "password": password})
+    assert second_browser.status_code == 200
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE sessions SET refresh_lineage_hash=NULL WHERE identity_id=("
+                "SELECT id FROM identities WHERE user_handle=:user) AND device_id IS NULL"
+            ),
+            {"user": email},
+        )
 
     pending = store.begin_web_session_operation(family)
     failed = store.begin_web_session_operation(family)
@@ -237,6 +248,46 @@ def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revoca
     assert client.post(
         "/v1/sessions/refresh", json={"refresh_token": legacy_refresh}
     ).status_code == 401
+    assert client.post(
+        "/v1/sessions/refresh", json={"refresh_token": second_browser.json()["refresh_token"]}
+    ).status_code == 200
+
+
+def test_postgres_legacy_refresh_rotation_cannot_escape_concurrent_logout():
+    from app.main import app, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    client = TestClient(app)
+    suffix = uuid.uuid4().hex
+    email = f"pg-legacy-lineage-race-{suffix}@example.com"
+    registered = client.post(
+        "/v1/auth/register",
+        json={"email": email, "password": "Postgres-legacy-lineage-race-123"},
+    )
+    assert registered.status_code == 200
+    refresh = registered.json()["refresh_token"]
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE sessions SET refresh_lineage_hash=NULL WHERE identity_id=("
+                "SELECT id FROM identities WHERE user_handle=:user)"
+            ),
+            {"user": email},
+        )
+    family = "pg-legacy-race-family-" + suffix + "y" * 24
+    operation = store.begin_web_session_operation(family)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        rotate_future = pool.submit(store.rotate_refresh, refresh, 3600, 7200)
+        logout_future = pool.submit(store.revoke_web_session_family, family, operation, refresh)
+        rotated = rotate_future.result()
+        assert logout_future.result() is True
+
+    assert store.rotate_refresh(refresh, 3600, 7200) is None
+    if rotated is not None:
+        assert store.get_session(rotated[0]) is None
+        assert store.rotate_refresh(rotated[1], 3600, 7200) is None
 
 
 def test_postgres_entitlement_listing_supports_scoped_and_admin_reads():

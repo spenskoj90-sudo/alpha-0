@@ -45,7 +45,7 @@ See [Email action codes v1](EMAIL_ACTION_CODES_V1.md) for digest, account/purpos
 
 - `POST /v1/sessions/refresh` — one-time refresh-token rotation.
 - `POST /v1/sessions/revoke` — revoke the current access session.
-- `POST /v1/sessions/web/revoke` — BFF-only revocation of an opaque Web session family. The family value is hashed at rest, grants no positive authority, and advances a durable generation tombstone even when the current access token is absent or stale. The BFF also presents its HttpOnly refresh credential in the request body so a pre-family legacy Web session is revoked atomically; no refresh token is accepted from browser JavaScript.
+- `POST /v1/sessions/web/revoke` — BFF-only revocation of an opaque Web session family. The family value is hashed at rest, grants no positive authority, and advances a durable generation tombstone even when the current access token is absent or stale. The BFF also presents its HttpOnly refresh credential in the request body so a pre-family legacy Web refresh lineage is revoked atomically without revoking independent browser sessions; no refresh token is accepted from browser JavaScript.
 
 ## Authorization and events
 

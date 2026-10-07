@@ -259,6 +259,7 @@ class MemoryStore(Store):
                 "consumed": False,
             }
             access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+            refresh_hash = session_hash(refresh)
             now = datetime.now(UTC)
             exp = now + timedelta(seconds=access_ttl)
             self.sessions[session_hash(access)] = {
@@ -268,7 +269,8 @@ class MemoryStore(Store):
                 "roles": ["user"],
                 "issued_at": now.timestamp(),
                 "expires_at": exp.timestamp(),
-                "refresh_hash": session_hash(refresh),
+                "refresh_hash": refresh_hash,
+                "refresh_lineage_hash": refresh_hash,
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False,
                 "revoked": False,
@@ -314,9 +316,10 @@ class MemoryStore(Store):
 
     def issue_session(self, device_id, user_id, access_ttl, refresh_ttl):
         access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
+        refresh_hash = session_hash(refresh)
         now = datetime.now(UTC)
         exp = now + timedelta(seconds=access_ttl)
-        record = {"user_id": user_id, "device_id": device_id, "scopes": SCOPES, "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(), "refresh_hash": session_hash(refresh), "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(), "refresh_used": False, "revoked": False}
+        record = {"user_id": user_id, "device_id": device_id, "scopes": SCOPES, "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(), "refresh_hash": refresh_hash, "refresh_lineage_hash": refresh_hash, "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(), "refresh_used": False, "revoked": False}
         with self.lock:
             self.sessions[session_hash(access)] = record
         return access, refresh, exp, SCOPES
@@ -347,6 +350,8 @@ class MemoryStore(Store):
                 device = self.devices.get(device_id)
                 if not device or device.get("state") != "ACTIVE":
                     return None
+            lineage_hash = record.get("refresh_lineage_hash") or record["refresh_hash"]
+            record["refresh_lineage_hash"] = lineage_hash
             record["refresh_used"] = True
             record["revoked"] = True
             old = record.copy()
@@ -361,6 +366,7 @@ class MemoryStore(Store):
                 "issued_at": now.timestamp(),
                 "expires_at": exp.timestamp(),
                 "refresh_hash": session_hash(refresh),
+                "refresh_lineage_hash": lineage_hash,
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False,
                 "revoked": False,
@@ -421,6 +427,7 @@ class MemoryStore(Store):
                 "user_id": user_id, "device_id": device_id, "scopes": SCOPES,
                 "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
                 "refresh_hash": session_hash(refresh),
+                "refresh_lineage_hash": session_hash(refresh),
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False, "revoked": False,
                 "web_session_family_hash": family_hash, "web_session_generation": operation,
@@ -447,9 +454,12 @@ class MemoryStore(Store):
             exp = now + timedelta(seconds=access_ttl)
             family["active_generation"] = operation
             family["cancelled_operations"] = set()
+            lineage_hash = old.get("refresh_lineage_hash") or old["refresh_hash"]
+            record["refresh_lineage_hash"] = lineage_hash
             self.sessions[session_hash(access)] = {
                 **old, "issued_at": now.timestamp(), "expires_at": exp.timestamp(),
                 "refresh_hash": session_hash(refresh),
+                "refresh_lineage_hash": lineage_hash,
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False, "revoked": False, "web_session_generation": operation,
             }
@@ -473,10 +483,10 @@ class MemoryStore(Store):
                     None,
                 )
                 if presented and not presented.get("web_session_family_hash") and presented.get("device_id") is None:
+                    lineage_hash = presented.get("refresh_lineage_hash") or presented["refresh_hash"]
+                    presented["refresh_lineage_hash"] = lineage_hash
                     for record in self.sessions.values():
-                        if (record.get("user_id") == presented.get("user_id")
-                                and record.get("device_id") is None
-                                and not record.get("web_session_family_hash")):
+                        if record is presented or record.get("refresh_lineage_hash") == lineage_hash:
                             record["refresh_used"] = True
                             record["revoked"] = True
                 elif presented:
@@ -859,8 +869,8 @@ class PostgresStore(Store):
                 text(
                     "INSERT INTO sessions("
                     "identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                    "refresh_token_hash,refresh_expires_at"
-                    ") VALUES (:uid,:device,:sh,:scopes,now(),:exp,:rh,:rexp)"
+                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash"
+                    ") VALUES (:uid,:device,:sh,:scopes,now(),:exp,:rh,:rexp,:rh)"
                 ),
                 {
                     "uid": old["identity_id"],
@@ -921,7 +931,7 @@ class PostgresStore(Store):
         exp = now + timedelta(seconds=access_ttl)
         refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
-            conn.execute(text("INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,refresh_token_hash,refresh_expires_at) VALUES ((SELECT id FROM identities WHERE user_handle=:u),(SELECT id FROM device_bindings WHERE id=:d),:sh,:scopes,now(),:exp,:rh,:rexp)"), {"u": user_id, "d": device_id, "sh": session_hash(access), "scopes": json.dumps(SCOPES), "exp": exp, "rh": session_hash(refresh), "rexp": refexp})
+            conn.execute(text("INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,refresh_token_hash,refresh_expires_at,refresh_lineage_hash) VALUES ((SELECT id FROM identities WHERE user_handle=:u),(SELECT id FROM device_bindings WHERE id=:d),:sh,:scopes,now(),:exp,:rh,:rexp,:rh)"), {"u": user_id, "d": device_id, "sh": session_hash(access), "scopes": json.dumps(SCOPES), "exp": exp, "rh": session_hash(refresh), "rexp": refexp})
         return access, refresh, exp, SCOPES
 
     def get_session(self, access_token):
@@ -953,7 +963,8 @@ class PostgresStore(Store):
             row = conn.execute(
                 text(
                     "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"
-                    "s.refresh_expires_at,s.refresh_used_at,s.revoked_at,i.id identity_id,d.state device_state "
+                    "s.refresh_token_hash,s.refresh_lineage_hash,s.refresh_expires_at,"
+                    "s.refresh_used_at,s.revoked_at,i.id identity_id,d.state device_state "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
                     "WHERE s.refresh_token_hash=:rh FOR UPDATE OF s"
@@ -969,18 +980,22 @@ class PostgresStore(Store):
                 or (row["device_id"] is not None and row["device_state"] != "ACTIVE")
             ):
                 return None
+            lineage_hash = row["refresh_lineage_hash"] or row["refresh_token_hash"]
             conn.execute(
-                text("UPDATE sessions SET refresh_used_at=now(),revoked_at=now() WHERE id=:id"),
-                {"id": row["session_id"]},
+                text(
+                    "UPDATE sessions SET refresh_lineage_hash=COALESCE(refresh_lineage_hash,:lineage),"
+                    "refresh_used_at=now(),revoked_at=now() WHERE id=:id"
+                ),
+                {"id": row["session_id"], "lineage": lineage_hash},
             )
             device_id = row["device_id"]
             conn.execute(
                 text(
                     "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                    "refresh_token_hash,refresh_expires_at) VALUES ("
+                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash) VALUES ("
                     ":identity_id,"
                     "CAST(:device_id AS uuid),"
-                    ":sh,:scopes,now(),:exp,:rh,:rexp)"
+                    ":sh,:scopes,now(),:exp,:rh,:rexp,:lineage)"
                 ),
                 {
                     "identity_id": row["identity_id"],
@@ -990,6 +1005,7 @@ class PostgresStore(Store):
                     "exp": exp,
                     "rh": session_hash(refresh),
                     "rexp": refexp,
+                    "lineage": lineage_hash,
                 },
             )
         return access, refresh, exp, SCOPES, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": SCOPES}
@@ -1058,8 +1074,10 @@ class PostgresStore(Store):
             ), {"family": family_hash, "operation": operation})
             conn.execute(text(
                 "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                "refresh_token_hash,refresh_expires_at,web_session_family_hash,web_session_generation) "
-                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,:refresh,:refresh_expires,:family,:operation)"
+                "refresh_token_hash,refresh_expires_at,refresh_lineage_hash,"
+                "web_session_family_hash,web_session_generation) "
+                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,"
+                ":refresh,:refresh_expires,:refresh,:family,:operation)"
             ), {
                 "identity": identity_id, "device": device_id, "session": session_hash(access),
                 "scopes": json.dumps(SCOPES), "expires": exp, "refresh": session_hash(refresh),
@@ -1082,7 +1100,8 @@ class PostgresStore(Store):
                 return None
             row = conn.execute(text(
                 "SELECT s.id::text session_id,s.identity_id,i.user_handle user_id,s.device_id::text device_id,"
-                "s.scopes_json,s.refresh_expires_at,s.refresh_used_at,s.revoked_at,s.web_session_generation "
+                "s.scopes_json,s.refresh_token_hash,s.refresh_lineage_hash,s.refresh_expires_at,"
+                "s.refresh_used_at,s.revoked_at,s.web_session_generation "
                 "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                 "WHERE s.refresh_token_hash=:refresh AND s.web_session_family_hash=:family FOR UPDATE OF s"
             ), {"refresh": session_hash(refresh_token), "family": family_hash}).mappings().first()
@@ -1090,22 +1109,28 @@ class PostgresStore(Store):
                     or row["refresh_expires_at"] <= datetime.now(UTC)
                     or row["web_session_generation"] != family["active_generation"]):
                 return None
+            lineage_hash = row["refresh_lineage_hash"] or row["refresh_token_hash"]
             conn.execute(text(
-                "UPDATE sessions SET refresh_used_at=CASE WHEN id=:id THEN now() ELSE refresh_used_at END,"
+                "UPDATE sessions SET refresh_lineage_hash=CASE WHEN id=:id THEN "
+                "COALESCE(refresh_lineage_hash,:lineage) ELSE refresh_lineage_hash END,"
+                "refresh_used_at=CASE WHEN id=:id THEN now() ELSE refresh_used_at END,"
                 "revoked_at=COALESCE(revoked_at,now()) WHERE web_session_family_hash=:family"
-            ), {"id": row["session_id"], "family": family_hash})
+            ), {"id": row["session_id"], "family": family_hash, "lineage": lineage_hash})
             conn.execute(text(
                 "UPDATE web_session_families SET active_generation=:operation,"
                 "cancelled_operations=ARRAY[]::BIGINT[],updated_at=now() WHERE family_hash=:family"
             ), {"operation": operation, "family": family_hash})
             conn.execute(text(
                 "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                "refresh_token_hash,refresh_expires_at,web_session_family_hash,web_session_generation) "
-                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,:refresh,:refresh_expires,:family,:operation)"
+                "refresh_token_hash,refresh_expires_at,refresh_lineage_hash,"
+                "web_session_family_hash,web_session_generation) "
+                "VALUES (:identity,CAST(:device AS uuid),:session,:scopes,now(),:expires,"
+                ":refresh,:refresh_expires,:lineage,:family,:operation)"
             ), {
                 "identity": row["identity_id"], "device": row["device_id"], "session": session_hash(access),
                 "scopes": json.dumps(SCOPES), "expires": exp, "refresh": session_hash(refresh),
                 "refresh_expires": refexp, "family": family_hash, "operation": operation,
+                "lineage": lineage_hash,
             })
         scopes = row["scopes_json"] if isinstance(row["scopes_json"], list) else json.loads(row["scopes_json"])
         return access, refresh, exp, scopes, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": scopes}
@@ -1124,15 +1149,18 @@ class PostgresStore(Store):
             ), {"family": family_hash})
             if refresh_token:
                 presented = conn.execute(text(
-                    "SELECT identity_id,device_id,web_session_family_hash FROM sessions "
+                    "SELECT id,device_id,web_session_family_hash,refresh_token_hash,refresh_lineage_hash "
+                    "FROM sessions "
                     "WHERE refresh_token_hash=:refresh FOR UPDATE"
                 ), {"refresh": session_hash(refresh_token)}).mappings().first()
                 if presented and presented["web_session_family_hash"] is None and presented["device_id"] is None:
+                    lineage_hash = presented["refresh_lineage_hash"] or presented["refresh_token_hash"]
                     conn.execute(text(
-                        "UPDATE sessions SET refresh_used_at=COALESCE(refresh_used_at,now()),"
-                        "revoked_at=COALESCE(revoked_at,now()) WHERE identity_id=:identity "
-                        "AND device_id IS NULL AND web_session_family_hash IS NULL"
-                    ), {"identity": presented["identity_id"]})
+                        "UPDATE sessions SET refresh_lineage_hash=COALESCE(refresh_lineage_hash,:lineage),"
+                        "refresh_used_at=COALESCE(refresh_used_at,now()),"
+                        "revoked_at=COALESCE(revoked_at,now()) "
+                        "WHERE id=:id OR refresh_lineage_hash=:lineage"
+                    ), {"id": presented["id"], "lineage": lineage_hash})
                 elif presented:
                     conn.execute(text(
                         "UPDATE sessions SET refresh_used_at=COALESCE(refresh_used_at,now()),"

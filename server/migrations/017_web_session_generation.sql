@@ -13,12 +13,16 @@ ALTER TABLE sessions ADD COLUMN web_session_family_hash TEXT
     REFERENCES web_session_families(family_hash) ON DELETE RESTRICT;
 ALTER TABLE sessions ADD COLUMN web_session_generation BIGINT
     CHECK (web_session_generation > 0);
+ALTER TABLE sessions ADD COLUMN refresh_lineage_hash TEXT;
 ALTER TABLE sessions ADD CONSTRAINT sessions_web_generation_pair CHECK (
     (web_session_family_hash IS NULL) = (web_session_generation IS NULL)
 );
 CREATE INDEX sessions_web_generation_idx
     ON sessions(web_session_family_hash, web_session_generation)
     WHERE web_session_family_hash IS NOT NULL;
+CREATE INDEX sessions_refresh_lineage_idx
+    ON sessions(refresh_lineage_hash)
+    WHERE refresh_lineage_hash IS NOT NULL;
 
 ALTER TABLE web_session_families ENABLE ROW LEVEL SECURITY;
 ALTER TABLE web_session_families FORCE ROW LEVEL SECURITY;

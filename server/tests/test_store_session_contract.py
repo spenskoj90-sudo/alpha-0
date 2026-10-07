@@ -5,6 +5,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
+from app.core.security import session_hash
 from app.core.store import MemoryStore, PostgresStore
 
 
@@ -85,6 +86,24 @@ def test_memory_atomic_web_tombstone_revokes_family_and_legacy_refresh():
     assert store.get_session(current[0]) is None
     assert store.get_session(legacy_access) is None
     assert store.rotate_refresh(legacy_refresh, 3600, 7200) is None
+
+
+def test_memory_legacy_logout_revokes_only_presented_refresh_lineage():
+    store = MemoryStore()
+    user_id = "legacy-multi-browser-user"
+    first_access, first_refresh, _, _ = store.issue_session(None, user_id, 3600, 7200)
+    second_access, second_refresh, _, _ = store.issue_session(None, user_id, 3600, 7200)
+    # Simulate rows created before migration 017 introduced explicit lineage.
+    store.sessions[next(key for key, value in store.sessions.items() if value["refresh_hash"] == session_hash(first_refresh))].pop("refresh_lineage_hash", None)
+    store.sessions[next(key for key, value in store.sessions.items() if value["refresh_hash"] == session_hash(second_refresh))].pop("refresh_lineage_hash", None)
+    family = "legacy-lineage-family-" + "d" * 48
+    operation = store.begin_web_session_operation(family)
+
+    assert store.revoke_web_session_family(family, operation, first_refresh) is True
+    assert store.get_session(first_access) is None
+    assert store.rotate_refresh(first_refresh, 3600, 7200) is None
+    assert store.get_session(second_access) is not None
+    assert store.rotate_refresh(second_refresh, 3600, 7200) is not None
 
 
 def test_concurrent_refresh_does_not_issue_multiple_valid_pairs():

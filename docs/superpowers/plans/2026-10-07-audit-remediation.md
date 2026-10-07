@@ -71,4 +71,5 @@
 - [x] Implement atomic begin/commit generation checks for login/register, MFA, password-reset confirmation, refresh and logout; validate active generation on every Core session lookup.
 - [x] Add migration FORCE RLS policy and PostgreSQL concurrency/logout regression; run local Web test/lint/build and non-PostgreSQL Core suite.
 - [x] Resolve review races for legacy-refresh logout, failed duplicate registration reservations and post-mutation password-reset tombstones with RED/GREEN regressions.
+- [x] Preserve independent pre-family browser sessions with an inherited hashed refresh-lineage identifier and concurrent rotate-vs-logout regressions.
 - [ ] Require exact-HEAD PostgreSQL 18/RLS CI, independent final review, protected merge and post-merge staging verification before marking F02 integration-verified.

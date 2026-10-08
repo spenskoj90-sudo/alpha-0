@@ -11,6 +11,31 @@ from app.core.user_store import UserAccountStore
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+def test_generic_refresh_cannot_escape_web_family_or_consume_its_one_use_proof(backend):
+    store = backend(os.environ['DATABASE_URL']) if backend is PostgresStore else backend()
+    suffix = uuid.uuid4().hex
+    family = 'bound-refresh-' + suffix + 'x' * 24
+    user = 'bound-refresh-' + suffix
+    try:
+        store.register_device(user, 'android', 'bound-key-' + suffix, (suffix * 2)[:64], 'bound-challenge-' + suffix)
+        operation = store.begin_web_session_operation(family)
+        access, refresh, _, _ = store.issue_web_session(None, user, 3600, 7200, family, operation)
+        assert store.rotate_refresh(refresh, 3600, 7200) is None
+        assert store.get_session(access) is not None
+        next_operation = store.begin_web_session_operation(family, create=False, refresh_token=refresh)
+        rotated = store.rotate_web_refresh(refresh, 3600, 7200, family, next_operation)
+        assert rotated is not None
+        assert store.rotate_refresh(rotated[1], 3600, 7200) is None
+        logout = store.begin_web_session_operation(family, create=False, revocation=True)
+        assert store.revoke_web_session_family(family, logout)
+        assert store.get_session(rotated[0]) is None
+        assert store.rotate_refresh(rotated[1], 3600, 7200) is None
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
 def test_atomic_reset_fences_a_login_authenticated_before_reset_even_after_a_failed_attempt(backend):
     database = os.environ['DATABASE_URL'] if backend is PostgresStore else None
     store = backend(database) if database else backend()

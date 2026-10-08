@@ -349,7 +349,7 @@ class MemoryStore(Store):
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
         with self.lock:
             record = next((r for r in self.sessions.values() if r.get("refresh_hash") == session_hash(refresh_token)), None)
-            if not record or record.get("revoked") or record["refresh_expires_at"] <= time.time() or record.get("refresh_used"):
+            if not record or record.get("web_session_family_hash") or record.get("revoked") or record["refresh_expires_at"] <= time.time() or record.get("refresh_used"):
                 return None
             device_id = record.get("device_id")
             if device_id:
@@ -1012,7 +1012,7 @@ class PostgresStore(Store):
                 text(
                     "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"
                     "s.refresh_token_hash,s.refresh_lineage_hash,s.refresh_expires_at,"
-                    "s.refresh_used_at,s.revoked_at,i.id identity_id,d.state device_state "
+                    "s.refresh_used_at,s.revoked_at,s.web_session_family_hash,i.id identity_id,d.state device_state "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
                     "WHERE s.refresh_token_hash=:rh FOR UPDATE OF s"
@@ -1021,6 +1021,7 @@ class PostgresStore(Store):
             ).mappings().first()
             if (
                 not row
+                or row["web_session_family_hash"] is not None
                 or row["revoked_at"]
                 or row["refresh_used_at"]
                 or not row["refresh_expires_at"]

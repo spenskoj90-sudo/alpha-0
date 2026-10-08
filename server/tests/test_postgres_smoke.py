@@ -38,13 +38,14 @@ def test_postgres_reset_transaction_rolls_back_on_tombstone_write_failure(monkey
     def fail_tombstone(conn, cursor, statement, parameters, context, executemany):
         if statement.lstrip().startswith('INSERT INTO web_session_families('):
             raise RuntimeError('TOMBSTONE_WRITE_UNAVAILABLE')
-    event.listen(store.engine, 'before_cursor_execute', fail_tombstone)
+    # Reset owns the transaction; the family write reuses its account connection.
+    event.listen(user_store._engine, 'before_cursor_execute', fail_tombstone)
     try:
         response = client.post('/v1/auth/password-reset/confirm',
             headers={'X-Sentinel-Web-Session': 'pg-reset-family-' + uuid.uuid4().hex + 'x' * 24},
             json={'email': email, 'token': code, 'password': new_password})
     finally:
-        event.remove(store.engine, 'before_cursor_execute', fail_tombstone)
+        event.remove(user_store._engine, 'before_cursor_execute', fail_tombstone)
     assert response.status_code == 503
     assert response.json()['code'] == 'PASSWORD_RESET_UNAVAILABLE'
     assert 'x-sentinel-web-generation' not in response.headers

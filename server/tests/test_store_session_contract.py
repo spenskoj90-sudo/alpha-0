@@ -10,6 +10,31 @@ from app.core.store import MemoryStore, PostgresStore
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+def test_migration_reservation_is_fenced_by_the_acknowledged_retirement_generation(backend):
+    store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
+    family = "migration-fence-" + uuid.uuid4().hex + "x" * 24
+    try:
+        with pytest.raises(ValueError, match="WEB_SESSION_SUPERSEDED"):
+            store.begin_web_session_operation(family, expected_generation=1)
+        retired = store.begin_web_session_operation(family)
+        assert store.revoke_web_session_family(family, retired)
+        continuation = store.begin_web_session_operation(family, expected_generation=retired)
+        assert continuation == retired + 1
+        store.cancel_web_session_operation(family, continuation)
+        # Even an intervening uncommitted/cancelled request supersedes the old
+        # continuation. A successful logout must also survive its delayed retry.
+        with pytest.raises(ValueError, match="WEB_SESSION_SUPERSEDED"):
+            store.begin_web_session_operation(family, expected_generation=retired)
+        logout = store.begin_web_session_operation(family, create=False, revocation=True)
+        assert store.revoke_web_session_family(family, logout)
+        with pytest.raises(ValueError, match="WEB_SESSION_SUPERSEDED"):
+            store.begin_web_session_operation(family, expected_generation=retired)
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
 @pytest.mark.parametrize("proof_state", ["missing", "expired", "revoked", "device", "other-family"])
 def test_unknown_web_family_rejects_unusable_or_device_bound_revocation_proof(backend, proof_state):
     store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()

@@ -12,6 +12,23 @@ from app.main import app, store, user_store
 client = TestClient(app)
 
 
+def test_legacy_auth_continuation_cannot_overwrite_a_logout_or_create_an_account(monkeypatch):
+    family = "migration-auth-" + uuid.uuid4().hex + "x" * 24
+    headers = {"X-Sentinel-Web-Session": family}
+    retired = store.begin_web_session_operation(family)
+    assert store.revoke_web_session_family(family, retired)
+    assert client.post("/v1/sessions/web/revoke", headers=headers).status_code == 200
+    def unexpected(*args):
+        raise AssertionError("superseded auth must fail before identity mutation")
+    monkeypatch.setattr(user_store, "authenticate", unexpected)
+    monkeypatch.setattr(user_store, "register", unexpected)
+    for mode in ("login", "register"):
+        denied = client.post(f"/v1/auth/{mode}", headers={**headers, "X-Sentinel-Web-Expected-Generation": str(retired)},
+                             json={"email": f"{uuid.uuid4().hex}@example.com", "password": "Migration-password-123"})
+        assert denied.status_code == 409
+        assert denied.json()["code"] == "WEB_SESSION_SUPERSEDED"
+
+
 def test_unknown_web_revoke_and_invalid_refresh_do_not_allocate_families():
     family = "unknown-web-" + uuid.uuid4().hex + "x" * 24
     before = dict(store.web_session_families)

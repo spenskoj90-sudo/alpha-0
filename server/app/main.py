@@ -328,6 +328,8 @@ def reserve_web_operation(family_token: str, **options) -> int | None:
     try:
         return store.begin_web_session_operation(family_token, **options)
     except ValueError as exc:
+        if str(exc) == "WEB_SESSION_SUPERSEDED":
+            raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED") from exc
         if str(exc) == "WEB_SESSION_OPERATION_LIMIT":
             raise HTTPException(status_code=429, detail="WEB_SESSION_OPERATION_LIMIT") from exc
         raise
@@ -405,15 +407,18 @@ def register_user(
     request: Request,
     response: Response,
     web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+    expected_generation: int | None = Header(None, alias="X-Sentinel-Web-Expected-Generation", ge=1, le=9007199254740991),
 ):
     rate_limit(request, "auth-register")
     web_session = validated_web_session(web_session_header)
+    if expected_generation is not None and not web_session:
+        raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
     web_operation = None
     try:
         with claimed_web_registration(web_session) as claimed:
             if not claimed:
                 raise HTTPException(status_code=409, detail="REGISTRATION_IN_PROGRESS")
-            web_operation = reserve_web_operation(web_session) if web_session else None
+            web_operation = reserve_web_operation(web_session, expected_generation=expected_generation) if web_session else None
             user_id = user_store.register(payload.email, payload.password)
             issued = (
                 store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
@@ -851,12 +856,15 @@ def login_user(
     request: Request,
     response: Response,
     web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
+    expected_generation: int | None = Header(None, alias="X-Sentinel-Web-Expected-Generation", ge=1, le=9007199254740991),
 ) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, "auth-login")
     web_session = validated_web_session(web_session_header)
+    if expected_generation is not None and not web_session:
+        raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
     # Reserve known families before password verification so a concurrent
     # logout still supersedes this in-flight login. New families require proof.
-    web_operation = reserve_web_operation(web_session, create=False) if web_session else None
+    web_operation = reserve_web_operation(web_session, create=False, expected_generation=expected_generation) if web_session else None
     try:
         subject = payload.email.strip().lower()
         threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))

@@ -72,7 +72,8 @@ class Store(ABC):
     def revoke_session(self, access_token: str) -> bool: ...
     @abstractmethod
     def begin_web_session_operation(self, family_token: str, *, create: bool = True,
-                                    refresh_token: str | None = None, revocation: bool = False) -> int | None: ...
+                                    refresh_token: str | None = None, revocation: bool = False,
+                                    expected_generation: int | None = None) -> int | None: ...
     @abstractmethod
     def cancel_web_session_operation(self, family_token: str, operation: int) -> bool: ...
     @abstractmethod
@@ -391,10 +392,13 @@ class MemoryStore(Store):
             and operation not in family.get("cancelled_operations", set())
         )
 
-    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.get(family_hash)
+            if expected_generation is not None and (not family or family["latest_operation"] != expected_generation
+                                                    or family["active_generation"] != expected_generation):
+                raise ValueError("WEB_SESSION_SUPERSEDED")
             if not create and (not family or (refresh_token is not None and not revocation)):
                 record = next((r for r in self.sessions.values()
                                if r.get("refresh_hash") == session_hash(refresh_token)), None) if refresh_token else None
@@ -1057,13 +1061,16 @@ class PostgresStore(Store):
             and operation not in cancelled
         )
 
-    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None):
         family_hash = session_hash(family_token)
         with self.engine.begin() as conn:
             family = conn.execute(text(
                 "SELECT latest_operation,active_generation FROM web_session_families "
                 "WHERE family_hash=:family FOR UPDATE"
             ), {"family": family_hash}).mappings().first()
+            if expected_generation is not None and (not family or family["latest_operation"] != expected_generation
+                                                    or family["active_generation"] != expected_generation):
+                raise ValueError("WEB_SESSION_SUPERSEDED")
             if not create and (not family or (refresh_token is not None and not revocation)):
                 record = conn.execute(text(
                     "SELECT id,device_id,web_session_family_hash,web_session_generation,"

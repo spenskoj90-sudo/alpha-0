@@ -118,9 +118,13 @@ function applyWebSessionContext(response: NextResponse, family: string, generati
 }
 
 function credentialCookie(request: NextRequest, base: string, context: WebSessionContext): string | undefined {
-  return request.cookies.get(
+  const selected = request.cookies.get(
     context.versioned ? versionedCookieName(base, context.family, context.generation) : base,
   )?.value;
+  // Keep the pre-family refresh proof available for explicit retirement during
+  // bootstrap. Never restore legacy access/MFA authority or a positive generation.
+  return selected ?? (base === REFRESH_COOKIE && context.generation === 0
+    ? request.cookies.get(REFRESH_COOKIE)?.value : undefined);
 }
 
 function contextRequired(requestId: string): NextResponse {
@@ -367,12 +371,37 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
     return result;
   };
   try {
+    let expectedGeneration: number | undefined;
+    const legacyRefresh = context.generation === 0 ? request.cookies.get(REFRESH_COOKIE)?.value : undefined;
+    if (legacyRefresh) {
+      // A replacement login must not abandon a still-live legacy refresh lineage.
+      // Core consumes the proof and serializes its descendants before issuing any
+      // new credentials. This explicit credential replacement also retires the
+      // prior session when the following password check fails.
+      const retired = await coreFetch(coreUrl, '/v1/sessions/web/revoke', requestId, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-sentinel-web-session': context.family },
+        body: JSON.stringify({ refresh_token: legacyRefresh }),
+      });
+      const generation = responseGeneration(retired);
+      if (!retired.ok || !generation || !acceptGeneration(coreUrl, context.family, generation)) {
+        const conflicted = retired.status === 409 || (retired.ok && !!generation);
+        const result = applyCorrelation(NextResponse.json({ error: conflicted
+          ? 'WEB_SESSION_SUPERSEDED' : 'SENTINEL_CORE_UNAVAILABLE' }, { status: conflicted ? 409 : 502 }), requestId, retired);
+        // An invalid/consumed proof must not trap subsequent login attempts. Only
+        // fixed legacy cookies are cleared; newer versioned credentials survive.
+        if (retired.status === 409) clearSessionCookies(result);
+        return finish(result);
+      }
+      expectedGeneration = generation;
+    }
     const response = await coreFetch(coreUrl, `/v1/auth/${mode}`, requestId, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'accept-language': request.headers.get('accept-language')?.toLowerCase().startsWith('ru') ? 'ru' : 'en',
         'x-sentinel-web-session': context.family,
+        ...(expectedGeneration ? { 'x-sentinel-web-expected-generation': String(expectedGeneration) } : {}),
       },
       body: await request.text(),
     });
@@ -410,6 +439,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       scopes: session.scopes,
     }), requestId, response);
     retireOlderGenerationCookies(request, result, context.family, generation);
+    clearSessionCookies(result);
     clearMfaCookie(result);
     applySessionCookies(result, session, generation, context.family);
     applyWebSessionContext(result, context.family, generation);

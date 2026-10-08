@@ -8,7 +8,7 @@ import uuid
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
-from threading import RLock
+from threading import Lock, RLock
 from typing import Any
 
 from sqlalchemy import text

@@ -27,6 +27,18 @@ internal object KnowledgeFixture {
 }
 
 class KnowledgeCodecTest {
+    @Test fun boundedJsonAndLargeCanonicalDeltaCannotExhaustParserStack() {
+        for (text in listOf("{unquoted:true}", "{\"a\":1,}", "{\"a\":1,\"a\":2}", "{\"nested\":" + "[".repeat(1000) + "0" + "]".repeat(1000) + "}")) {
+            assertThrows(IllegalArgumentException::class.java) { strictJson(text.toByteArray()) }
+        }
+        val base = KnowledgeFixture.bytes()
+        val destination = ByteArray(262144) { 65 }
+        val envelope = JSONObject().put("schema_version", 1).put("algorithm", "byte-splice-v1")
+            .put("base_digest", KnowledgeFixture.digest(base)).put("destination_digest", KnowledgeFixture.digest(destination))
+            .put("destination_size", destination.size).put("prefix_bytes", 0).put("suffix_bytes", 0)
+            .put("insert_b64", java.util.Base64.getEncoder().encodeToString(destination))
+        assertThrows(IllegalArgumentException::class.java) { KnowledgeCodec.delta(base, envelope, KnowledgeFixture.digest(destination), KnowledgeFixture.profile) }
+    }
     private fun rejects(raw: ByteArray, digest: String = KnowledgeFixture.digest(raw), profile: KnowledgeProfile = KnowledgeFixture.profile) {
         assertThrows(IllegalArgumentException::class.java) { KnowledgeCodec.pack(raw, digest, profile) }
     }

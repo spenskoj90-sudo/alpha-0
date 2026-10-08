@@ -32,11 +32,62 @@ internal fun strictJson(raw: ByteArray, maximum: Int = MAX_KNOWLEDGE_JSON_BYTES)
     try {
         val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(raw)).toString()
+        KnowledgeJsonGrammar(text).validate()
         val tokener = JSONTokener(text)
         val result = tokener.nextValue()
         require(result is JSONObject && tokener.nextClean() == '\u0000') { "KNOWLEDGE_JSON_INVALID" }
         return result
     } catch (error: Exception) { throw IllegalArgumentException("KNOWLEDGE_JSON_INVALID", error) }
+}
+/** Android's JSONTokener is permissive and differs from the JVM test library.
+ * Bound recursion and reject duplicate keys/non-JSON syntax before either parser. */
+private class KnowledgeJsonGrammar(private val text: String) {
+    private var position = 0
+    private fun space() { while (position < text.length && text[position] in " \t\r\n") position++ }
+    private fun take(character: Char): Boolean { space(); return if (position < text.length && text[position] == character) { position++; true } else false }
+    fun validate() { value(0); space(); require(position == text.length) }
+    private fun string(): String {
+        space(); val start = position; require(take('"'))
+        var finished = false
+        while (position < text.length) {
+            val character = text[position++]
+            if (character == '"') { finished = true; break }
+            require(character.code >= 32)
+            if (character == '\\') {
+                require(position < text.length)
+                when (text[position++]) {
+                    '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> Unit
+                    'u' -> { require(position + 4 <= text.length && text.substring(position, position + 4).all { it in "0123456789abcdefABCDEF" }); position += 4 }
+                    else -> throw IllegalArgumentException("KNOWLEDGE_JSON_INVALID")
+                }
+            }
+        }
+        require(finished)
+        return JSONTokener(text.substring(start, position)).nextValue() as String
+    }
+    private fun value(depth: Int) {
+        require(depth <= 32); space(); require(position < text.length)
+        when (text[position]) {
+            '{' -> {
+                position++; val keys = mutableSetOf<String>()
+                if (take('}')) return
+                do { require(keys.add(string()) && take(':')); value(depth + 1) } while (take(','))
+                require(take('}'))
+            }
+            '[' -> { position++; if (take(']')) return; do { value(depth + 1) } while (take(',')); require(take(']')) }
+            '"' -> string()
+            't', 'f', 'n' -> {
+                val literal = when (text[position]) { 't' -> "true"; 'f' -> "false"; else -> "null" }
+                require(text.startsWith(literal, position)); position += literal.length
+            }
+            else -> {
+                val start = position
+                while (position < text.length && text[position] !in " \t\r\n,]}") position++
+                val number = text.substring(start, position)
+                require(number.length in 1..128 && Regex("-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?").matches(number))
+            }
+        }
+    }
 }
 internal fun stringArray(array: JSONArray, minimum: Int, maximum: Int, length: Int): List<String> {
     require(array.length() in minimum..maximum) { "KNOWLEDGE_ARRAY_INVALID" }
@@ -152,8 +203,7 @@ object KnowledgeCodec {
         val suffix = strictInteger(envelope, "suffix_bytes", 0, MAX_KNOWLEDGE_BYTES.toLong()).toInt()
         require(prefix + suffix <= base.size) { "KNOWLEDGE_DELTA_INVALID" }
         val encoded = envelope.get("insert_b64")
-        require(encoded is String && encoded.length <= 4 * ((MAX_KNOWLEDGE_BYTES + 2) / 3) && encoded.length % 4 == 0 &&
-            Regex("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?").matches(encoded)) { "KNOWLEDGE_DELTA_INVALID" }
+        require(encoded is String && encoded.length <= 4 * ((MAX_KNOWLEDGE_BYTES + 2) / 3) && encoded.length % 4 == 0) { "KNOWLEDGE_DELTA_INVALID" }
         val insert = Base64.getDecoder().decode(encoded)
         require(Base64.getEncoder().encodeToString(insert) == encoded && prefix + insert.size + suffix == size) { "KNOWLEDGE_DELTA_INVALID" }
         val result = base.copyOfRange(0, prefix) + insert + if (suffix == 0) byteArrayOf() else base.copyOfRange(base.size - suffix, base.size)

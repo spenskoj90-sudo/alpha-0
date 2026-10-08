@@ -12,7 +12,7 @@
     "node": "24.x"
   },
   "dependencies": {
-    "electron": "44.4.5"
+    "electron": "44.5.1"
   },
   "sentinelPackaging": {
     "electronVersion": "44.4.5",

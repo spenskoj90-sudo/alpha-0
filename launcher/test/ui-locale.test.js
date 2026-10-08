@@ -61,17 +61,34 @@ function openSurface(rendererName) {
   }
   let snapshotHandler;
   let voiceHandler;
+  let knowledgeHandler;
   let consentCalls = 0;
   const document = { documentElement: { lang: 'en' }, getElementById: node, querySelectorAll: () => [], querySelector: () => node('panel'), createElement: tag => node(Symbol(tag)) };
   const window = { localStorage: { getItem: () => null, setItem() {} }, addEventListener() {},
     sentinelOverlay: { onSnapshot(handler) { snapshotHandler = handler; } },
     sentinel: { onCompanionStatus() {}, onAccountStatus() {}, onWowCheckpointStatus() {}, onVoiceStatus(handler) { voiceHandler = handler; },
+      onKnowledgeStatus(handler) { knowledgeHandler = handler; }, knowledgeStatus: async () => ({ state: 'SIGNED_OUT', actionAuthority: false }),
       accountStatus: async () => ({ session: null }), companionStatus: async () => ({ state: 'STOPPED' }), voiceStatus: async () => ({ state: 'SIGNED_OUT' }), catalog: async () => [], getConfig: async () => ({}),
       setVoiceConsent: async () => { consentCalls += 1; } } };
   const context = vm.createContext({ window, document, navigator: { language: 'ru-RU' }, console });
   for (const file of ['ui-locale.js', rendererName]) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', file), 'utf8'), context);
-  return { window, document, node, render: snapshot => snapshotHandler(snapshot), voice: snapshot => voiceHandler(snapshot), consentCalls: () => consentCalls };
+  return { window, document, node, render: snapshot => snapshotHandler(snapshot), voice: snapshot => voiceHandler(snapshot),
+    knowledge: snapshot => knowledgeHandler(snapshot), consentCalls: () => consentCalls };
 }
+
+test('knowledge waiting/unknown states remain truthful and locale changes grant no authority', async () => {
+  const surface = openSurface('renderer.js');
+  await new Promise(resolve => setImmediate(resolve));
+  surface.knowledge({ state: 'WAITING_FOR_VERIFIED_PROFILE', actionAuthority: false });
+  assert.match(surface.node('knowledge-status').textContent, /ожидание подтверждённого/);
+  assert.equal(surface.node('knowledge-refresh').disabled, true);
+  surface.window.sentinelUi.setLocale('en');
+  assert.equal(surface.node('knowledge-status').textContent, 'Knowledge: waiting for a verified game profile');
+  assert.equal(surface.node('knowledge-refresh').disabled, true);
+  surface.knowledge({ state: 'constructor' });
+  assert.equal(surface.node('knowledge-status').textContent, 'Knowledge: unavailable');
+  assert.equal(surface.node('knowledge-refresh').disabled, true);
+});
 
 test('Companion locale switch preserves signed-out and disabled voice authority without making IPC calls', async () => {
   const surface = openSurface('renderer.js');

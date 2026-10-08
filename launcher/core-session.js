@@ -82,9 +82,7 @@ async function readBounded(response, limit, signal) {
     }
   }
   if (!response.body?.getReader) {
-    const bytes = Buffer.from(await abortable(() => response.arrayBuffer(), signal));
-    if (bytes.length > limit) throw new Error('KNOWLEDGE_SIZE_INVALID');
-    return bytes;
+    throw new Error('KNOWLEDGE_RESPONSE_INVALID');
   }
   const chunks = [];
   let length = 0;
@@ -139,6 +137,10 @@ class CoreSessionManager {
   get accessToken() { return this.#session?.session_token || null; }
   get refreshToken() { return this.#session?.refresh_token || null; }
   get status() { return publicSession(this.#session); }
+  // Main-process binding only; publicSession/renderer never exposes credentials.
+  get knowledgeContext() {
+    return this.#session ? Object.freeze({ origin: this.#coreUrl, sessionId: String(this.#sessionEpoch) }) : null;
+  }
   get mfaStatus() {
     return this.#mfaChallenge
       ? Object.freeze({ required: true, expiresAt: this.#mfaExpiresAt || null })

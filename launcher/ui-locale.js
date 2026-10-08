@@ -4,6 +4,14 @@
 (() => {
   const storageKey = 'sentinel.ui.locale';
   const ru = {
+    'Refresh knowledge': 'Обновить знания',
+    'Knowledge: signed out': 'Знания: вход не выполнен',
+    'Knowledge: stopped': 'Знания: остановлены',
+    'Knowledge: waiting for a verified game profile': 'Знания: ожидание подтверждённого игрового профиля',
+    'Knowledge: verified presentation lease': 'Знания: подтверждённое разрешение на отображение',
+    'Knowledge: network degraded; existing lease only': 'Знания: сеть ограничена; действует только прежнее разрешение',
+    'Knowledge: access denied': 'Знания: доступ отклонён',
+    'Knowledge: unavailable': 'Знания: недоступны',
     'FACT': 'ФАКТ', 'INFERENCE': 'ВЫВОД',
     'Confidence unknown · no calibrated estimate': 'Уверенность неизвестна · калиброванной оценки нет',
     'Skip to main content': 'Перейти к основному содержимому',

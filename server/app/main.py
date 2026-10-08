@@ -324,6 +324,15 @@ def validated_web_session(value: str | None) -> str | None:
     return value
 
 
+def reserve_web_operation(family_token: str, **options) -> int | None:
+    try:
+        return store.begin_web_session_operation(family_token, **options)
+    except ValueError as exc:
+        if str(exc) == "WEB_SESSION_OPERATION_LIMIT":
+            raise HTTPException(status_code=429, detail="WEB_SESSION_OPERATION_LIMIT") from exc
+        raise
+
+
 @contextmanager
 def claimed_web_registration(family_token: str | None):
     """Fail-fast claim for one registration mutation per browser family.
@@ -375,14 +384,19 @@ def claimed_web_registration(family_token: str | None):
         yield acquired
     finally:
         if acquired:
-            with store.engine.begin() as connection:
-                connection.execute(
-                    __import__("sqlalchemy").text(
-                        "DELETE FROM web_registration_claims "
-                        "WHERE family_hash=:family AND claim_token_hash=:claim"
-                    ),
-                    {"family": family_hash, "claim": claim_token_hash},
-                )
+            try:
+                with store.engine.begin() as connection:
+                    connection.execute(
+                        __import__("sqlalchemy").text(
+                            "DELETE FROM web_registration_claims "
+                            "WHERE family_hash=:family AND claim_token_hash=:claim"
+                        ),
+                        {"family": family_hash, "claim": claim_token_hash},
+                    )
+            except Exception:
+                # The bounded lease recovers a failed release. Cleanup must not
+                # replace the response to an already committed registration.
+                pass
 
 
 @app.post("/v1/auth/register", response_model=SessionResponse)
@@ -399,7 +413,7 @@ def register_user(
         with claimed_web_registration(web_session) as claimed:
             if not claimed:
                 raise HTTPException(status_code=409, detail="REGISTRATION_IN_PROGRESS")
-            web_operation = store.begin_web_session_operation(web_session) if web_session else None
+            web_operation = reserve_web_operation(web_session) if web_session else None
             user_id = user_store.register(payload.email, payload.password)
             issued = (
                 store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
@@ -840,7 +854,9 @@ def login_user(
 ) -> SessionResponse | MfaChallengeResponse:
     rate_limit(request, "auth-login")
     web_session = validated_web_session(web_session_header)
-    web_operation = store.begin_web_session_operation(web_session) if web_session else None
+    # Reserve known families before password verification so a concurrent
+    # logout still supersedes this in-flight login. New families require proof.
+    web_operation = reserve_web_operation(web_session, create=False) if web_session else None
     try:
         subject = payload.email.strip().lower()
         threshold = int(os.getenv("SENTINEL_AUTH_LOCKOUT_THRESHOLD", "8"))
@@ -851,6 +867,8 @@ def login_user(
             if subject:
                 store.record_security_failure(subject, "auth-login")
             raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+        if web_session and web_operation is None:
+            web_operation = reserve_web_operation(web_session)
         result = _session_or_mfa(
             user_id,
             request,
@@ -1257,11 +1275,15 @@ def prove_device(device_id: str, payload: DeviceProofRequest, request: Request):
 @app.post("/v1/sessions/refresh", response_model=SessionResponse)
 def refresh_session(
     payload: RefreshRequest,
+    request: Request,
     response: Response,
     web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
 ):
+    rate_limit(request, "session-refresh")
     web_session = validated_web_session(web_session_header)
-    web_operation = store.begin_web_session_operation(web_session) if web_session else None
+    web_operation = reserve_web_operation(web_session, create=False, refresh_token=payload.refresh_token) if web_session else None
+    if web_session and web_operation is None:
+        raise HTTPException(status_code=401, detail="INVALID_REFRESH")
     try:
         result = (
             store.rotate_web_refresh(
@@ -1290,15 +1312,20 @@ def refresh_session(
 
 @app.post("/v1/sessions/web/revoke")
 def revoke_web_session(
+    request: Request,
     response: Response,
     payload: RefreshRequest | None = None,
     web_session_header: str | None = Header(None, alias="X-Sentinel-Web-Session"),
     authorization_header: str | None = Header(None, alias="Authorization"),
 ):
+    rate_limit(request, "web-session-revoke")
     web_session = validated_web_session(web_session_header)
     if not web_session:
         raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
-    operation = store.begin_web_session_operation(web_session)
+    operation = reserve_web_operation(web_session, create=False, revocation=True,
+                                      refresh_token=payload.refresh_token if payload is not None else None)
+    if operation is None:
+        raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
     if not store.revoke_web_session_family(
         web_session, operation, payload.refresh_token if payload is not None else None
     ):

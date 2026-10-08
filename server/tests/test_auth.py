@@ -12,6 +12,80 @@ from app.main import app, store, user_store
 client = TestClient(app)
 
 
+def test_unknown_web_revoke_and_invalid_refresh_do_not_allocate_families():
+    family = "unknown-web-" + uuid.uuid4().hex + "x" * 24
+    before = dict(store.web_session_families)
+    assert client.post("/v1/sessions/web/revoke", headers={"X-Sentinel-Web-Session": family}).status_code == 409
+    assert client.post("/v1/sessions/refresh", headers={"X-Sentinel-Web-Session": family},
+                       json={"refresh_token": "invalid-refresh-" + "x" * 48}).status_code == 401
+    assert store.web_session_families == before
+
+
+def test_invalid_login_does_not_allocate_a_web_family():
+    family = "invalid-login-" + uuid.uuid4().hex + "x" * 24
+    before = dict(store.web_session_families)
+    denied = client.post("/v1/auth/login", headers={"X-Sentinel-Web-Session": family},
+                         json={"email": f"{uuid.uuid4().hex}@example.com", "password": "wrong-password-123"})
+    assert denied.status_code == 401
+    assert store.web_session_families == before
+
+
+def test_invalid_refresh_does_not_reserve_or_cancel_known_family_operations():
+    from app.core.security import session_hash
+    family = "known-invalid-refresh-" + uuid.uuid4().hex + "x" * 24
+    store.begin_web_session_operation(family)
+    before = {**store.web_session_families[session_hash(family)]}
+    before["cancelled_operations"] = set(before["cancelled_operations"])
+    denied = client.post("/v1/sessions/refresh", headers={"X-Sentinel-Web-Session": family},
+                         json={"refresh_token": "invalid-refresh-" + "x" * 48})
+    assert denied.status_code == 401
+    assert store.web_session_families[session_hash(family)] == before
+
+
+def test_logout_supersedes_known_family_login_during_password_verification(monkeypatch):
+    family = "known-login-logout-" + uuid.uuid4().hex + "x" * 24
+    email = f"{uuid.uuid4().hex}@example.com"
+    password = "Login-logout-race-password-123"
+    headers = {"X-Sentinel-Web-Session": family}
+    created = client.post("/v1/auth/register", headers=headers, json={"email": email, "password": password})
+    assert created.status_code == 200
+    original = user_store.authenticate
+
+    def authenticate_after_logout(*args):
+        assert client.post("/v1/sessions/web/revoke", headers=headers).status_code == 200
+        return original(*args)
+
+    monkeypatch.setattr(user_store, "authenticate", authenticate_after_logout)
+    accepted = client.post("/v1/auth/login", headers=headers, json={"email": email, "password": password})
+    assert accepted.status_code == 409
+    assert accepted.json()["code"] == "WEB_SESSION_SUPERSEDED"
+    assert store.get_session(created.json()["session_token"]) is None
+
+
+def test_registration_claim_cleanup_failure_does_not_replace_committed_result(monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    class Engine:
+        calls = 0
+
+        @contextmanager
+        def begin(self):
+            self.calls += 1
+            if self.calls == 2:
+                raise RuntimeError("cleanup unavailable")
+            yield self
+
+        def execute(self, statement, values):
+            return SimpleNamespace(scalar_one_or_none=lambda: values.get("claim"))
+
+    monkeypatch.setattr(main_module, "store", SimpleNamespace(engine=Engine()))
+    with main_module.claimed_web_registration("claim-cleanup-" + "x" * 48) as acquired:
+        assert acquired is True
+        result = "committed"
+    assert result == "committed"
+
+
 def test_register_creates_hashed_user_session():
     email = "auth-register@example.com"
     password = "Correct-Horse-Battery-Staple-123"

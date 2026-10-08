@@ -9,6 +9,73 @@ from app.core.security import session_hash
 from app.core.store import MemoryStore, PostgresStore
 
 
+def test_web_operation_window_is_bounded_without_invalidating_active_session():
+    store = MemoryStore()
+    family = "bounded-family-" + "w" * 48
+    operation = store.begin_web_session_operation(family)
+    session = store.issue_web_session(None, "user-1", 3600, 7200, family, operation)
+    for _ in range(256):
+        cancelled = store.begin_web_session_operation(family)
+        store.cancel_web_session_operation(family, cancelled)
+    with pytest.raises(ValueError, match="WEB_SESSION_OPERATION_LIMIT"):
+        store.begin_web_session_operation(family)
+    assert len(store.web_session_families[session_hash(family)]["cancelled_operations"]) == 256
+    assert store.get_session(session[0]) is not None
+    logout = store.begin_web_session_operation(family, create=False, revocation=True)
+    assert store.revoke_web_session_family(family, logout) is True
+    assert store.get_session(session[0]) is None
+
+
+def test_legacy_revocation_proof_can_allocate_only_one_family():
+    store = MemoryStore()
+    access, refresh, _, _ = store.issue_session(None, "legacy-user", 3600, 7200)
+    family = "legacy-one-family-" + "q" * 48
+    operation = store.begin_web_session_operation(family, create=False, refresh_token=refresh, revocation=True)
+    assert operation == 1
+    assert store.revoke_web_session_family(family, operation, refresh) is True
+    assert store.get_session(access) is None
+    assert store.begin_web_session_operation("other-family-" + "r" * 48,
+        create=False, refresh_token=refresh, revocation=True) is None
+    assert len(store.web_session_families) == 1
+
+
+@pytest.mark.postgres
+def test_postgres_web_allocations_and_cancellations_are_bounded():
+    store = PostgresStore(os.environ["DATABASE_URL"])
+    suffix = uuid.uuid4().hex
+    family = "pg-bounded-" + suffix + "x" * 24
+    try:
+        assert store.begin_web_session_operation(family, create=False, revocation=True) is None
+        assert store.begin_web_session_operation(family, create=False, refresh_token="invalid") is None
+        with store.engine.begin() as conn:
+            assert conn.execute(text("SELECT 1 FROM web_session_families WHERE family_hash=:family"),
+                                {"family": session_hash(family)}).first() is None
+        operation = store.begin_web_session_operation(family)
+        store.cancel_web_session_operation(family, operation)
+        for _ in range(255):
+            operation = store.begin_web_session_operation(family)
+            store.cancel_web_session_operation(family, operation)
+        with pytest.raises(ValueError, match="WEB_SESSION_OPERATION_LIMIT"):
+            store.begin_web_session_operation(family)
+        logout = store.begin_web_session_operation(family, create=False, revocation=True)
+        assert store.revoke_web_session_family(family, logout) is True
+        with store.engine.begin() as conn:
+            assert conn.execute(text("SELECT cardinality(cancelled_operations) FROM web_session_families "
+                                     "WHERE family_hash=:family"), {"family": session_hash(family)}).scalar_one() == 0
+        user = "pg-legacy-bounded-" + suffix
+        store.register_device(user, "android", "legacy-key-" + suffix, (suffix * 2)[:64], "challenge")
+        access, refresh, _, _ = store.issue_session(None, user, 3600, 7200)
+        legacy_family = "pg-legacy-family-" + suffix + "q" * 24
+        operation = store.begin_web_session_operation(legacy_family, create=False, refresh_token=refresh, revocation=True)
+        assert operation == 1
+        assert store.revoke_web_session_family(legacy_family, operation, refresh) is True
+        assert store.get_session(access) is None
+        assert store.begin_web_session_operation("pg-other-" + suffix + "r" * 24,
+            create=False, refresh_token=refresh, revocation=True) is None
+    finally:
+        store.engine.dispose()
+
+
 def test_memory_store_refresh_rotation_revokes_previous_access_session():
     store = MemoryStore()
     device_id = store.register_device("user-1", "android", "memory-refresh-key", "1" * 64, "challenge")

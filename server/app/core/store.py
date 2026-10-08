@@ -17,6 +17,7 @@ from app.core.database_engine import create_service_role_engine
 from app.core.security import session_hash
 
 SCOPES = ["character:read", "game:write", "game:read", "audit:read"]
+MAX_PENDING_WEB_OPERATIONS = 256
 
 
 def event_hash_payload(events: list[dict[str, Any]]) -> str:
@@ -70,7 +71,8 @@ class Store(ABC):
     @abstractmethod
     def revoke_session(self, access_token: str) -> bool: ...
     @abstractmethod
-    def begin_web_session_operation(self, family_token: str) -> int: ...
+    def begin_web_session_operation(self, family_token: str, *, create: bool = True,
+                                    refresh_token: str | None = None, revocation: bool = False) -> int | None: ...
     @abstractmethod
     def cancel_web_session_operation(self, family_token: str, operation: int) -> bool: ...
     @abstractmethod
@@ -389,12 +391,39 @@ class MemoryStore(Store):
             and operation not in family.get("cancelled_operations", set())
         )
 
-    def begin_web_session_operation(self, family_token):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False):
         family_hash = session_hash(family_token)
         with self.lock:
+            family = self.web_session_families.get(family_hash)
+            if not create and (not family or (refresh_token is not None and not revocation)):
+                record = next((r for r in self.sessions.values()
+                               if r.get("refresh_hash") == session_hash(refresh_token)), None) if refresh_token else None
+                if not record:
+                    return None
+                if revocation:
+                    if record.get("device_id") is not None or record.get("web_session_family_hash"):
+                        return None
+                    lineage = record.get("refresh_lineage_hash") or record["refresh_hash"]
+                    related = [r for r in self.sessions.values()
+                               if r is record or r.get("refresh_lineage_hash") == lineage]
+                    if not any(not r.get("revoked") and r.get("refresh_expires_at", 0) > time.time()
+                               for r in related):
+                        return None
+                    # Consume the legacy lineage in this reservation, so the same
+                    # revocation proof cannot allocate arbitrary new families.
+                    for related_record in related:
+                        related_record["revoked"] = True
+                        related_record["refresh_used"] = True
+                elif (not family or record.get("revoked") or record.get("refresh_used")
+                      or record.get("refresh_expires_at", 0) <= time.time()
+                      or record.get("web_session_family_hash") != family_hash
+                      or record.get("web_session_generation") != family["active_generation"]):
+                    return None
             family = self.web_session_families.setdefault(
                 family_hash, {"latest_operation": 0, "active_generation": 0, "cancelled_operations": set()}
             )
+            if not revocation and family["latest_operation"] - family["active_generation"] >= MAX_PENDING_WEB_OPERATIONS:
+                raise ValueError("WEB_SESSION_OPERATION_LIMIT")
             family["latest_operation"] += 1
             return family["latest_operation"]
 
@@ -1028,17 +1057,57 @@ class PostgresStore(Store):
             and operation not in cancelled
         )
 
-    def begin_web_session_operation(self, family_token):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False):
+        family_hash = session_hash(family_token)
         with self.engine.begin() as conn:
-            return int(conn.execute(
+            family = conn.execute(text(
+                "SELECT latest_operation,active_generation FROM web_session_families "
+                "WHERE family_hash=:family FOR UPDATE"
+            ), {"family": family_hash}).mappings().first()
+            if not create and (not family or (refresh_token is not None and not revocation)):
+                record = conn.execute(text(
+                    "SELECT id,device_id,web_session_family_hash,web_session_generation,"
+                    "refresh_token_hash,refresh_lineage_hash,refresh_used_at,revoked_at,refresh_expires_at "
+                    "FROM sessions WHERE refresh_token_hash=:refresh FOR UPDATE"
+                ), {"refresh": session_hash(refresh_token)}).mappings().first() if refresh_token else None
+                if not record:
+                    return None
+                if revocation:
+                    if record["device_id"] is not None or record["web_session_family_hash"] is not None:
+                        return None
+                    lineage = record["refresh_lineage_hash"] or record["refresh_token_hash"]
+                    live = conn.execute(text(
+                        "SELECT id FROM sessions WHERE (id=:id OR refresh_lineage_hash=:lineage) "
+                        "AND revoked_at IS NULL AND refresh_expires_at>now() FOR UPDATE"
+                    ), {"id": record["id"], "lineage": lineage}).first()
+                    if not live:
+                        return None
+                    conn.execute(text(
+                        "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()),"
+                        "refresh_used_at=COALESCE(refresh_used_at,now()) "
+                        "WHERE id=:id OR refresh_lineage_hash=:lineage"
+                    ), {"id": record["id"], "lineage": lineage})
+                elif (not family or record["revoked_at"] is not None or record["refresh_used_at"] is not None
+                      or record["refresh_expires_at"] is None or record["refresh_expires_at"] <= datetime.now(UTC)
+                      or record["web_session_family_hash"] != family_hash
+                      or record["web_session_generation"] != family["active_generation"]):
+                    return None
+            if family and not revocation and family["latest_operation"] - family["active_generation"] >= MAX_PENDING_WEB_OPERATIONS:
+                raise ValueError("WEB_SESSION_OPERATION_LIMIT")
+            operation = conn.execute(
                 text(
                     "INSERT INTO web_session_families(family_hash,latest_operation,active_generation) "
                     "VALUES (:family,1,0) ON CONFLICT (family_hash) DO UPDATE SET "
                     "latest_operation=web_session_families.latest_operation+1,updated_at=now() "
+                    "WHERE :revocation OR web_session_families.latest_operation-"
+                    "web_session_families.active_generation<:limit "
                     "RETURNING latest_operation"
                 ),
-                {"family": session_hash(family_token)},
-            ).scalar_one())
+                {"family": family_hash, "revocation": revocation, "limit": MAX_PENDING_WEB_OPERATIONS},
+            ).scalar_one_or_none()
+            if operation is None:
+                raise ValueError("WEB_SESSION_OPERATION_LIMIT")
+            return int(operation)
 
     def cancel_web_session_operation(self, family_token, operation):
         with self.engine.begin() as conn:

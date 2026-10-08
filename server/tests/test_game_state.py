@@ -57,10 +57,17 @@ def test_games_catalog_and_access():
     assert games.status_code == 200
     ids = {g["id"] for g in games.json()["games"]}
     assert "diablo-4-pc" in ids
+    for game in games.json()["games"]:
+        assert game["implementation_status"] == "catalog_foundation"
+        assert game["exact_environment_status"] == "unverified"
+        assert game["recommendation_capability"] == "unavailable"
+        assert game["execution_authority"] is False
 
     detail = client.get("/v1/games/diablo-4-pc", headers=headers)
     assert detail.status_code == 200
     assert detail.json()["name"] == "Diablo IV"
+    assert detail.json()["execution_authority"] is False
+    assert detail.json()["exact_environment_status"] == "unverified"
 
     missing = client.get("/v1/games/no-such-game", headers=headers)
     assert missing.status_code == 404

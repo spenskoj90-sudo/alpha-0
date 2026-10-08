@@ -18,6 +18,8 @@ CREATE TABLE web_registration_claims (
     expires_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX web_session_families_retention_idx ON web_session_families(updated_at);
+CREATE INDEX web_registration_claims_expiry_idx ON web_registration_claims(expires_at);
 
 ALTER TABLE sessions ADD COLUMN web_session_family_hash TEXT
     REFERENCES web_session_families(family_hash) ON DELETE RESTRICT;

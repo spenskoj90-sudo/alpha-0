@@ -48,6 +48,29 @@ describe('Web Core session boundary', () => {
     vi.unstubAllEnvs();
   });
 
+  it.each([401, 200])('bootstraps a fresh browser in one login request (Core %s)', async status => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify(status === 200 ? SESSION : { code: 'INVALID_CREDENTIALS' }),
+      { status, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } },
+    ));
+    const response = await authenticateWeb(new NextRequest('http://localhost/api/session/login', {
+      method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'u@example.com', password: 'secret' }),
+    }), 'login');
+    expect(response.status).toBe(status);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const forwarded = fetch.mock.calls[0][1] as RequestInit;
+    const family = new Headers(forwarded.headers).get('x-sentinel-web-session');
+    expect(family).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(response.cookies.get(WEB_SESSION_COOKIE)?.value).toBe(family);
+    const body = await response.json();
+    expect(body).not.toHaveProperty('session_token');
+    expect(body).not.toHaveProperty('refresh_token');
+    if (status === 401) expect(body.code).toBe('INVALID_CREDENTIALS');
+    else expect(body.authenticated).toBe(true);
+  });
+
   it('enforces explicit same-origin writes including configured public origin', () => {
     vi.stubEnv('SENTINEL_WEB_ORIGIN', 'https://app.example/');
     expect(sameOriginWrite(new NextRequest('http://internal/api', {

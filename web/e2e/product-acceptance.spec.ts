@@ -197,6 +197,12 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
   await expect(page.locator('#games')).toContainText('Diablo IV');
+  await expect(page.locator('#games')).toContainText('Catalog foundation · environment unverified');
+  await page.getByText('Research and observer profiles', { exact: false }).click();
+  await expect(page.locator('#games')).toContainText('Shattered Pixel Dungeon');
+  await expect(page.locator('#games')).toContainText('Observer pilot · calibration pending');
+  await expect(page.locator('#games')).toContainText('World of Warcraft');
+  await expect(page.locator('#games')).toContainText('Adapter foundation · environment unverified');
   await expect(page.locator('#security')).toContainText('Verification pending');
   await expect(page.locator('#activity')).toContainText('auth:register');
   await expect(page.locator('#devices')).toContainText('No devices are registered');

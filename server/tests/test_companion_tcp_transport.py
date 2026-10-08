@@ -78,6 +78,7 @@ def test_real_tls_context_requires_tls_1_2_and_peer_verification() -> None:
 
 def test_real_tls_context_requires_certificate_verification() -> None:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     with pytest.raises(ValueError, match="require certificates"):
@@ -86,6 +87,7 @@ def test_real_tls_context_requires_certificate_verification() -> None:
 
 def test_real_tls_context_requires_hostname_verification() -> None:
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False
     context.verify_mode = ssl.CERT_REQUIRED
     with pytest.raises(ValueError, match="hostname verification"):

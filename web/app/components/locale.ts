@@ -5,6 +5,17 @@ export function resolveLocale(saved: string | null, languages: readonly string[]
 }
 
 export const russian: Readonly<Record<string, string>> = {
+  "Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.": "Записи каталога описывают интеграцию с аккаунтом. Поддержка конкретной игры ещё не проверена; игровые действия отключены.",
+  "Catalog foundation · environment unverified": "Основа каталога · игровая среда не проверена",
+  "Research and observer profiles": "Исследования и профили наблюдения",
+  "Research profiles do not grant access. Each target needs separate version, source and environment verification.": "Исследовательские профили не предоставляют доступ. Для каждой игры нужна отдельная проверка версии, источника данных и игровой среды.",
+  "Observer pilot · calibration pending": "Пилотный наблюдатель · ожидает калибровки",
+  "Adapter foundation · environment unverified": "Основа адаптера · игровая среда не проверена",
+  "Research only · environment unverified": "Только исследование · игровая среда не проверена",
+  "No research profiles are available.": "Исследовательские профили отсутствуют.",
+  "Launcher metadata:": "Конфигурация запуска:",
+  "Configured": "Настроена",
+  "Not configured": "Не настроена",
   "Unknown": "Неизвестно",
   "INTELLIGENCE": "АНАЛИТИКА",
   "Deterministic": "По проверяемым правилам",

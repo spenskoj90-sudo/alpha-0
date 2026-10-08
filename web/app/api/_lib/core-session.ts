@@ -344,8 +344,14 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
   if (!coreUrl) {
     return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, { status: 503 }), requestId);
   }
-  const context = webSessionContext(request);
-  if (!context) return contextRequired(requestId);
+  const existingContext = webSessionContext(request);
+  const context = existingContext ?? {
+    family: randomBytes(32).toString('base64url'), generation: 0, versioned: true,
+  };
+  const finish = (result: NextResponse, generation = 0): NextResponse => {
+    if (!existingContext) applyWebSessionContext(result, context.family, generation);
+    return result;
+  };
   try {
     const response = await coreFetch(coreUrl, `/v1/auth/${mode}`, requestId, {
       method: 'POST',
@@ -358,13 +364,13 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
     });
     if (!response.ok) {
       // A delayed failed login must not erase a newer MFA challenge.
-      return copyUpstream(response, requestId);
+      return finish(await copyUpstream(response, requestId));
     }
     const mfa = await parseMfaChallenge(response);
     if (mfa) {
       const generation = responseGeneration(response);
       if (!generation || !acceptGeneration(coreUrl, context.family, generation)) {
-        return applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_SUPERSEDED' }, { status: 409 }), requestId, response);
+        return finish(applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_SUPERSEDED' }, { status: 409 }), requestId, response));
       }
       const result = applyCorrelation(NextResponse.json({
         mfa_required: true,
@@ -374,15 +380,15 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
       clearSessionCookies(result);
       applyMfaCookie(result, mfa, generation, context.family);
       applyWebSessionContext(result, context.family, generation);
-      return result;
+      return finish(result, generation);
     }
     const session = await parseSession(response);
     if (!session) {
-      return applyCorrelation(NextResponse.json({ error: 'INVALID_CORE_SESSION_RESPONSE' }, { status: 502 }), requestId, response);
+      return finish(applyCorrelation(NextResponse.json({ error: 'INVALID_CORE_SESSION_RESPONSE' }, { status: 502 }), requestId, response));
     }
     const generation = responseGeneration(response);
     if (!generation || !acceptGeneration(coreUrl, context.family, generation)) {
-      return applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_SUPERSEDED' }, { status: 409 }), requestId, response);
+      return finish(applyCorrelation(NextResponse.json({ error: 'WEB_SESSION_SUPERSEDED' }, { status: 409 }), requestId, response));
     }
     const result = applyCorrelation(NextResponse.json({
       authenticated: true,
@@ -392,9 +398,9 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
     retireOlderGenerationCookies(request, result, context.family, generation);
     clearMfaCookie(result);
     applySessionCookies(result, session, generation, context.family);
-    return result;
+    return finish(result, generation);
   } catch {
-    return applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId);
+    return finish(applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId));
   }
 }
 

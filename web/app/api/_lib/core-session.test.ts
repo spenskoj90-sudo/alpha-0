@@ -5,6 +5,8 @@ import {
   ACCESS_COOKIE,
   MFA_COOKIE,
   REFRESH_COOKIE,
+  WEB_GENERATION_COOKIE,
+  WEB_SESSION_COOKIE,
   applySessionCookies,
   authenticateWeb,
   clearMfaCookie,
@@ -27,12 +29,14 @@ function writeRequest(
   body = '{}',
   headers: Record<string, string> = {},
 ): NextRequest {
+  const context = `${WEB_SESSION_COOKIE}=test-family-${'f'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1`;
   return new NextRequest(url, {
     method: 'POST',
     headers: {
       origin: new URL(url).origin,
       'content-type': 'application/json',
       ...headers,
+      cookie: headers.cookie ? `${context}; ${headers.cookie}` : context,
     },
     body,
   });
@@ -42,6 +46,29 @@ describe('Web Core session boundary', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  it.each([401, 200])('bootstraps a fresh browser in one login request (Core %s)', async status => {
+    vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify(status === 200 ? SESSION : { code: 'INVALID_CREDENTIALS' }),
+      { status, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } },
+    ));
+    const response = await authenticateWeb(new NextRequest('http://localhost/api/session/login', {
+      method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'u@example.com', password: 'secret' }),
+    }), 'login');
+    expect(response.status).toBe(status);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const forwarded = fetch.mock.calls[0][1] as RequestInit;
+    const family = new Headers(forwarded.headers).get('x-sentinel-web-session');
+    expect(family).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(response.cookies.getAll().some(cookie => cookie.name.startsWith(WEB_SESSION_COOKIE) && cookie.value === family)).toBe(true);
+    const body = await response.json();
+    expect(body).not.toHaveProperty('session_token');
+    expect(body).not.toHaveProperty('refresh_token');
+    if (status === 401) expect(body.code).toBe('INVALID_CREDENTIALS');
+    else expect(body.authenticated).toBe(true);
   });
 
   it('enforces explicit same-origin writes including configured public origin', () => {
@@ -76,7 +103,7 @@ describe('Web Core session boundary', () => {
     expect(clearedCookie).toContain('Max-Age=0');
   });
 
-  it('copies bounded upstream failures and trusted correlation without exposing MFA state', async () => {
+  it('copies bounded upstream failures and trusted correlation without mutating newer MFA state', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example/');
     const trace = 'a'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('rate-limited', {
@@ -98,7 +125,7 @@ describe('Web Core session boundary', () => {
     expect(await response.text()).toBe('rate-limited');
     expect(response.headers.get('x-request-id')).toBe('upstream-request');
     expect(response.headers.get('x-sentinel-trace-id')).toBe(trace);
-    expect(response.headers.get('set-cookie') ?? '').toContain(`${MFA_COOKIE}=`);
+    expect(response.headers.has('set-cookie')).toBe(false);
   });
 
   it('fails closed on invalid Core URL, malformed session payload and network failure', async () => {
@@ -196,7 +223,7 @@ describe('Web Core session boundary', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify(SESSION), {
         status: 200,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '2' },
       }))
       .mockResolvedValueOnce(new Response('{"ok":true}', {
         status: 200,
@@ -204,7 +231,7 @@ describe('Web Core session boundary', () => {
       }));
 
     const response = await proxyAuthenticated(new NextRequest('http://localhost/api/resource', {
-      headers: { cookie: `${REFRESH_COOKIE}=old-refresh` },
+      headers: { cookie: `${REFRESH_COOKIE}=old-refresh; ${WEB_SESSION_COOKIE}=refresh-family-${'r'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
     }), '/v1/resource');
 
     expect(response.status).toBe(200);
@@ -212,8 +239,8 @@ describe('Web Core session boundary', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://core.example/v1/sessions/refresh');
     expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('authorization')).toBe('Bearer new-access');
     const cookie = response.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`${ACCESS_COOKIE}=new-access`);
-    expect(cookie).toContain(`${REFRESH_COOKIE}=new-refresh`);
+    expect(cookie).toMatch(new RegExp(`${ACCESS_COOKIE}_[0-9a-f]{16}_2=new-access`));
+    expect(cookie).toMatch(new RegExp(`${REFRESH_COOKIE}_[0-9a-f]{16}_2=new-refresh`));
   });
 
   it('denies stale refresh without clearing potentially newer browser state', async () => {
@@ -223,7 +250,7 @@ describe('Web Core session boundary', () => {
       headers: { 'content-type': 'application/json' },
     }));
     const response = await proxyAuthenticated(new NextRequest('http://localhost/api/resource', {
-      headers: { cookie: `${REFRESH_COOKIE}=bad-refresh` },
+      headers: { cookie: `${REFRESH_COOKIE}=bad-refresh; ${WEB_SESSION_COOKIE}=denied-family-${'d'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
     }), '/v1/resource');
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'WEB_SESSION_REQUIRED' });
@@ -244,7 +271,7 @@ describe('Web Core session boundary', () => {
       }));
 
     const response = await proxyAuthenticated(new NextRequest('http://localhost/api/resource', {
-      headers: { cookie: `${ACCESS_COOKIE}=expired; ${REFRESH_COOKIE}=bad-refresh` },
+      headers: { cookie: `${ACCESS_COOKIE}=expired; ${REFRESH_COOKIE}=bad-refresh; ${WEB_SESSION_COOKIE}=retry-family-${'y'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
     }), '/v1/resource');
 
     expect(response.status).toBe(401);
@@ -258,28 +285,31 @@ describe('Web Core session boundary', () => {
       method: 'POST',
       headers: {
         origin: 'https://attacker.example',
-        cookie: `${ACCESS_COOKIE}=access`,
+        cookie: `${ACCESS_COOKIE}=access; ${WEB_SESSION_COOKIE}=proxy-family-${'p'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1`,
       },
     }), '/v1/resource', { method: 'POST' }, true);
     expect(denied.status).toBe(403);
 
     vi.stubEnv('SENTINEL_CORE_URL', '');
     const unconfigured = await proxyAuthenticated(new NextRequest('http://localhost/api/resource', {
-      headers: { cookie: `${ACCESS_COOKIE}=access` },
+      headers: { cookie: `${ACCESS_COOKIE}=access; ${WEB_SESSION_COOKIE}=proxy-family-${'p'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
     }), '/v1/resource');
     expect(unconfigured.status).toBe(503);
 
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
     const unavailable = await proxyAuthenticated(new NextRequest('http://localhost/api/resource', {
-      headers: { cookie: `${ACCESS_COOKIE}=access` },
+      headers: { cookie: `${ACCESS_COOKIE}=access; ${WEB_SESSION_COOKIE}=proxy-family-${'p'.repeat(40)}; ${WEB_GENERATION_COOKIE}=1` },
     }), '/v1/resource');
     expect(unavailable.status).toBe(502);
   });
 
   it('revokes server session on logout and always clears browser credentials', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
+      status: 204,
+      headers: { 'x-sentinel-web-generation': '2' },
+    }));
     const response = await logoutWeb(writeRequest(
       'http://localhost/api/session/logout',
       '{}',
@@ -288,13 +318,16 @@ describe('Web Core session boundary', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ authenticated: false, server_revoked: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const revokeInit = fetchMock.mock.calls[0]?.[1];
+    expect(new Headers(revokeInit?.headers).get('content-type')).toBe('application/json');
+    expect(JSON.parse(String(revokeInit?.body))).toEqual({ refresh_token: 'refresh-secret' });
     const cookie = response.headers.get('set-cookie') ?? '';
     expect(cookie).toContain(`${ACCESS_COOKIE}=`);
     expect(cookie).toContain(`${REFRESH_COOKIE}=`);
     expect(cookie).toContain(`${MFA_COOKIE}=`);
   });
 
-  it('keeps logout local and fail-closed when revoke is unavailable', async () => {
+  it('does not claim or mutate logout when durable revocation is unavailable', async () => {
     vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
     const failedRevoke = await logoutWeb(writeRequest(
@@ -302,13 +335,18 @@ describe('Web Core session boundary', () => {
       '{}',
       { cookie: `${ACCESS_COOKIE}=access-secret` },
     ));
-    await expect(failedRevoke.json()).resolves.toEqual({ authenticated: false, server_revoked: false });
+    expect(failedRevoke.status).toBe(502);
+    await expect(failedRevoke.json()).resolves.toEqual({ error: 'SENTINEL_CORE_UNAVAILABLE' });
+    expect(failedRevoke.headers.has('set-cookie')).toBe(false);
 
     vi.restoreAllMocks();
-    const noSessionFetch = vi.spyOn(globalThis, 'fetch');
+    const noSessionFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
+      status: 204,
+      headers: { 'x-sentinel-web-generation': '2' },
+    }));
     const localOnly = await logoutWeb(writeRequest('http://localhost/api/session/logout'));
-    await expect(localOnly.json()).resolves.toEqual({ authenticated: false, server_revoked: false });
-    expect(noSessionFetch).not.toHaveBeenCalled();
+    await expect(localOnly.json()).resolves.toEqual({ authenticated: false, server_revoked: true });
+    expect(noSessionFetch).toHaveBeenCalledOnce();
   });
 
   it('denies cross-site logout before touching browser or Core state', async () => {

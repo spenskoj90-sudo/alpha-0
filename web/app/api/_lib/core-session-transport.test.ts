@@ -51,7 +51,7 @@ it('cancels a stalled body when the transport deadline expires', async () => {
 it('bounds auth response bodies before parsing token payloads', async () => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('x'.repeat(1_048_577)));
-  const result = await authenticateWeb(new NextRequest('https://app.example/api/session/login', { method: 'POST', headers: { origin: 'https://app.example' }, body: '{}' }), 'login');
+  const result = await authenticateWeb(new NextRequest('https://app.example/api/session/login', { method: 'POST', headers: { origin: 'https://app.example', cookie: `sentinel_web_session=transport-${'t'.repeat(40)}; sentinel_web_generation=0` }, body: '{}' }), 'login');
   expect(result.status).toBe(502);
   expect(await result.json()).toEqual({ error: 'SENTINEL_CORE_UNAVAILABLE' });
 });

@@ -27,6 +27,14 @@ _PURGE_RULES: tuple[tuple[str, str], ...] = (
         "expires_at < now() - interval '7 days' AND "
         "(refresh_expires_at IS NULL OR refresh_expires_at < now() - interval '7 days')",
     ),
+    ("web_registration_claims", "expires_at < now()"),
+    (
+        "web_session_families",
+        "updated_at < now() - interval '90 days' AND "
+        "NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.web_session_family_hash=web_session_families.family_hash) AND "
+        "NOT EXISTS (SELECT 1 FROM web_registration_claims WHERE "
+        "web_registration_claims.family_hash=web_session_families.family_hash)",
+    ),
     ("outbox_events", "status IN ('DONE','FAILED') AND available_at < now() - interval '7 days'"),
     ("worker_jobs", "status IN ('DONE','FAILED') AND available_at < now() - interval '7 days'"),
 )

@@ -73,14 +73,14 @@ describe('POST /api/intelligence/recommendations', () => {
         refresh_token: 'new-refresh',
         expires_at: '2030-01-01T00:00:00Z',
         scopes: ['knowledge:recommend'],
-      }), { status: 200, headers: { 'content-type': 'application/json' } }))
+      }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '2' } }))
       .mockResolvedValueOnce(new Response('{"recommendations":[]}', { status: 200, headers: { 'content-type': 'application/json' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/intelligence/recommendations', {
       method: 'POST',
       headers: {
         origin: 'http://localhost',
-        cookie: 'sentinel_access=expired; sentinel_refresh=refresh-secret',
+        cookie: `sentinel_access=expired; sentinel_refresh=refresh-secret; sentinel_web_session=intelligence-${'i'.repeat(40)}; sentinel_web_generation=1`,
         'x-request-id': 'web-intelligence-refresh',
       },
     }));
@@ -92,7 +92,7 @@ describe('POST /api/intelligence/recommendations', () => {
     }
     expect(new Headers(fetchMock.mock.calls[2][1]?.headers).get('authorization')).toBe('Bearer new-access');
     const setCookie = response.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('sentinel_access=new-access');
-    expect(setCookie).toContain('sentinel_refresh=new-refresh');
+    expect(setCookie).toMatch(/sentinel_access_[0-9a-f]{16}_2=new-access/);
+    expect(setCookie).toMatch(/sentinel_refresh_[0-9a-f]{16}_2=new-refresh/);
   });
 });

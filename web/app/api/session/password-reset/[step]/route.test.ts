@@ -4,12 +4,30 @@ import { POST } from './route';
 
 function invoke(step: string, body: unknown, origin = 'http://localhost') {
   return POST(new NextRequest(`http://localhost/api/session/password-reset/${step}`, {
-    method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body),
+    method: 'POST', headers: {
+      origin,
+      'content-type': 'application/json',
+      cookie: `sentinel_web_session=recovery-${'r'.repeat(40)}; sentinel_web_generation=1`,
+    }, body: JSON.stringify(body),
   }), { params: Promise.resolve({ step }) });
 }
 
 describe('Web password recovery boundary', () => {
   beforeEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example'); });
+
+  it('preserves committed reset success when Core cannot publish the family tombstone', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ status: 'PASSWORD_UPDATED' }, {
+      headers: { 'x-sentinel-web-reset-revocation': 'identity' },
+    }));
+    const response = await invoke('confirm', { token: 'x'.repeat(40), password: 'valid-password-123' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'PASSWORD_UPDATED' });
+    expect(response.cookies.get('sentinel_access')?.maxAge).toBe(0);
+    expect(response.cookies.get('sentinel_refresh')?.maxAge).toBe(0);
+    // No invented generation may replace a concurrently established context.
+    expect(response.cookies.get('sentinel_web_session')).toBeUndefined();
+    expect(response.cookies.get('sentinel_web_generation')).toBeUndefined();
+  });
 
   it('rejects cross-site writes and unknown steps without forwarding', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch');
@@ -32,7 +50,9 @@ describe('Web password recovery boundary', () => {
   });
 
   it('clears all local session/challenge cookies only after verified password update', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'PASSWORD_UPDATED' })));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ status: 'PASSWORD_UPDATED' }), {
+      headers: { 'x-sentinel-web-generation': '2' },
+    }));
     const response = await invoke('confirm', { token: 'x'.repeat(40), password: 'valid-password-123' });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'PASSWORD_UPDATED' });
@@ -82,7 +102,9 @@ describe('Web password recovery boundary', () => {
     expect((await invoke('request', { email: 'user@example.com' })).status).toBe(502);
   });
   it('binds short codes to email and forwards normalized whole-code paste without authority extras', async () => {
-    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"status":"PASSWORD_UPDATED"}'));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"status":"PASSWORD_UPDATED"}', {
+      headers: { 'x-sentinel-web-generation': '2' },
+    }));
     for (const body of [
       { token: '00001234', password: 'valid-password-123' },
       { token: '00001234', email: 'invalid', password: 'valid-password-123' },

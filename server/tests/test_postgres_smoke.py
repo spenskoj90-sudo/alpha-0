@@ -1,4 +1,5 @@
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import time
@@ -19,6 +20,39 @@ def _key_material():
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
     )
     return key, base64.b64encode(public).decode(), hashlib.sha256(public).hexdigest()
+
+
+def test_postgres_reset_transaction_rolls_back_on_tombstone_write_failure(monkeypatch):
+    from sqlalchemy import event
+    from app import main as main_module
+    from app.core.email_provider import TestEmailTransport
+    from app.main import app, store, user_store
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, 'email_transport', transport)
+    client = TestClient(app)
+    email = f'pg-reset-publication-{uuid.uuid4().hex}@example.com'
+    old_password, new_password = 'PG-reset-before-password-123', 'PG-reset-after-password-456'
+    registered = client.post('/v1/auth/register', json={'email': email, 'password': old_password}).json()
+    assert client.post('/v1/auth/password-reset/request', json={'email': email}).status_code == 202
+    code = transport.snapshot()[-1].text.split('Reset code: ', 1)[1].splitlines()[0]
+    def fail_tombstone(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith('INSERT INTO web_session_families('):
+            raise RuntimeError('TOMBSTONE_WRITE_UNAVAILABLE')
+    # Reset owns the transaction; the family write reuses its account connection.
+    event.listen(user_store._engine, 'before_cursor_execute', fail_tombstone)
+    try:
+        response = client.post('/v1/auth/password-reset/confirm',
+            headers={'X-Sentinel-Web-Session': 'pg-reset-family-' + uuid.uuid4().hex + 'x' * 24},
+            json={'email': email, 'token': code, 'password': new_password})
+    finally:
+        event.remove(user_store._engine, 'before_cursor_execute', fail_tombstone)
+    assert response.status_code == 503
+    assert response.json()['code'] == 'PASSWORD_RESET_UNAVAILABLE'
+    assert 'x-sentinel-web-generation' not in response.headers
+    assert store.get_session(registered['session_token']) is not None
+    assert user_store.authenticate(email, old_password) == email
+    assert user_store.authenticate(email, new_password) is None
+    assert client.post('/v1/auth/password-reset/confirm', json={'email': email, 'token': code, 'password': new_password}).status_code == 200
 
 
 def test_postgres_auth_event_and_audit_flow():
@@ -88,6 +122,7 @@ def test_postgres_auth_event_and_audit_flow():
 
     refreshed = client.post("/v1/sessions/refresh", json={"refresh_token": session["refresh_token"]})
     assert refreshed.status_code == 200
+
     audit = client.get(
         "/v1/audit",
         headers={"Authorization": "Bearer " + refreshed.json()["session_token"]},
@@ -201,6 +236,126 @@ def test_postgres_auth_event_and_audit_flow():
     assert revoked_state == "REVOKED"
     assert revoked_sessions >= 1
     assert still_active == 0
+
+
+def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revocation():
+    from app.main import app, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    client = TestClient(app)
+    suffix = uuid.uuid4().hex
+    email = f"pg-web-generation-{suffix}@example.com"
+    password = "Postgres-web-generation-password-123"
+    family = "pg-web-family-" + suffix + "x" * 32
+    registered = client.post("/v1/auth/register", json={"email": email, "password": password})
+    assert registered.status_code == 200
+    second_browser = client.post("/v1/auth/login", json={"email": email, "password": password})
+    assert second_browser.status_code == 200
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE sessions SET refresh_lineage_hash=NULL WHERE identity_id=("
+                "SELECT id FROM identities WHERE user_handle=:user) AND device_id IS NULL"
+            ),
+            {"user": email},
+        )
+
+    pending = store.begin_web_session_operation(family)
+    failed = store.begin_web_session_operation(family)
+    assert store.cancel_web_session_operation(family, failed) is True
+    issued = store.issue_web_session(None, email, 3600, 7200, family, pending)
+    assert issued is not None
+
+    tombstone = store.revoke_web_session_family_latest(family)
+    assert tombstone > failed
+    assert store.get_session(issued[0]) is None
+
+    legacy_refresh = registered.json()["refresh_token"]
+    logout = client.post(
+        "/v1/sessions/web/revoke",
+        headers={"X-Sentinel-Web-Session": family},
+        json={"refresh_token": legacy_refresh},
+    )
+    assert logout.status_code == 200
+    assert client.post(
+        "/v1/sessions/refresh", json={"refresh_token": legacy_refresh}
+    ).status_code == 401
+    assert client.post(
+        "/v1/sessions/refresh", json={"refresh_token": second_browser.json()["refresh_token"]}
+    ).status_code == 200
+
+
+def test_postgres_web_registration_claim_is_cross_worker_and_fail_fast():
+    from app.main import claimed_web_registration
+    from app.core.security import session_hash
+    from app.main import store
+
+    family = "pg-registration-claim-" + uuid.uuid4().hex + "z" * 24
+
+    def claim_once():
+        with claimed_web_registration(family) as claimed:
+            return claimed
+
+    with claimed_web_registration(family) as creator_claimed:
+        assert creator_claimed is True
+        assert store.engine.pool.checkedout() == 0
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            assert pool.submit(claim_once).result() is False
+
+    with store.engine.connect() as conn:
+        assert conn.execute(
+            text("SELECT COUNT(*) FROM web_registration_claims WHERE family_hash=:family"),
+            {"family": session_hash(family)},
+        ).scalar_one() == 0
+    assert claim_once() is True
+
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO web_registration_claims(family_hash,claim_token_hash,expires_at) "
+                "VALUES (:family,'expired-test-claim',now()-interval '1 second')"
+            ),
+            {"family": session_hash(family)},
+        )
+    assert claim_once() is True
+
+
+def test_postgres_legacy_refresh_rotation_cannot_escape_concurrent_logout():
+    from app.main import app, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    client = TestClient(app)
+    suffix = uuid.uuid4().hex
+    email = f"pg-legacy-lineage-race-{suffix}@example.com"
+    registered = client.post(
+        "/v1/auth/register",
+        json={"email": email, "password": "Postgres-legacy-lineage-race-123"},
+    )
+    assert registered.status_code == 200
+    refresh = registered.json()["refresh_token"]
+    with store.engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE sessions SET refresh_lineage_hash=NULL WHERE identity_id=("
+                "SELECT id FROM identities WHERE user_handle=:user)"
+            ),
+            {"user": email},
+        )
+    family = "pg-legacy-race-family-" + suffix + "y" * 24
+    operation = store.begin_web_session_operation(family)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        rotate_future = pool.submit(store.rotate_refresh, refresh, 3600, 7200)
+        logout_future = pool.submit(store.revoke_web_session_family, family, operation, refresh)
+        rotated = rotate_future.result()
+        assert logout_future.result() is True
+
+    assert store.rotate_refresh(refresh, 3600, 7200) is None
+    if rotated is not None:
+        assert store.get_session(rotated[0]) is None
+        assert store.rotate_refresh(rotated[1], 3600, 7200) is None
 
 
 def test_postgres_entitlement_listing_supports_scoped_and_admin_reads():

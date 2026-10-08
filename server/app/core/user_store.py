@@ -3,9 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import Any, Iterable, Literal
+from typing import Any, Callable, Iterable, Literal
 
 from sqlalchemy import text
 
@@ -54,36 +55,46 @@ class UserAccountStore:
     def register(self, email: str, password: str) -> str:
         email = self.normalize_email(email)
         password_hash = hash_password(password)
-        user_id = email
         if self._engine:
             with self._engine.begin() as conn:
-                identity = conn.execute(
-                    text(
-                        "INSERT INTO identities(user_handle) VALUES (:u) "
-                        "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"
-                    ),
-                    {"u": user_id},
-                ).scalar_one()
-                conn.execute(
-                    text(
-                        "INSERT INTO users(identity_id,email,password_hash,status,email_verified_at) "
-                        "VALUES (:identity,:email,:password,'ACTIVE',NULL)"
-                    ),
-                    {"identity": identity, "email": email, "password": password_hash},
-                )
-            return user_id
+                self._insert_registration(email, password_hash, conn)
+            return email
         with self._lock:
-            if email in self._users:
-                raise ValueError("EMAIL_ALREADY_REGISTERED")
-            self._users[email] = {
-                "user_id": user_id,
-                "email": email,
-                "password_hash": password_hash,
-                "status": "ACTIVE",
-                "email_verified_at": None,
-                "created_at": datetime.now(UTC),
-            }
-        return user_id
+            self._insert_registration(email, password_hash)
+        return email
+
+    def _insert_registration(self, email: str, password_hash: str, connection=None) -> None:
+        if connection is not None:
+            identity = connection.execute(text(
+                "INSERT INTO identities(user_handle) VALUES (:u) "
+                "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"
+            ), {"u": email}).scalar_one()
+            connection.execute(text(
+                "INSERT INTO users(identity_id,email,password_hash,status,email_verified_at) "
+                "VALUES (:identity,:email,:password,'ACTIVE',NULL)"
+            ), {"identity": identity, "email": email, "password": password_hash})
+            return
+        if email in self._users:
+            raise ValueError("EMAIL_ALREADY_REGISTERED")
+        self._users[email] = {
+            "user_id": email, "email": email, "password_hash": password_hash,
+            "status": "ACTIVE", "email_verified_at": None, "created_at": datetime.now(UTC),
+        }
+
+    def register_web_session(self, email, password, session_store, access_ttl, refresh_ttl, family, operation):
+        email = self.normalize_email(email)
+        # Password hashing holds no database connection or family lock. At commit,
+        # the family guard, account insert and session insert share one transaction.
+        password_hash = hash_password(password)
+        create_user = lambda connection: self._insert_registration(email, password_hash, connection)
+        if self._engine:
+            return session_store.issue_web_session(None, email, access_ttl, refresh_ttl, family, operation,
+                                                   create_user=create_user)
+        # Memory parity: account readers and family mutations cannot observe the
+        # account/session commit halfway through. No password hashing under locks.
+        with self._lock:
+            return session_store.issue_web_session(None, email, access_ttl, refresh_ttl, family, operation,
+                                                   create_user=create_user)
 
     def authenticate(self, email: str, password: str) -> str | None:
         email = self.normalize_email(email)
@@ -267,7 +278,7 @@ class UserAccountStore:
         conn.execute(text("UPDATE auth_action_tokens SET consumed_at=now() WHERE token_hash=:selector"), {"selector": action["token_hash"]})
         return identity
 
-    def _consume_memory_code(self, email: str | None, purpose: str, code: str) -> dict[str, Any] | None:
+    def _consume_memory_code(self, email: str | None, purpose: str, code: str, before_consume: Callable[[], None] | None = None) -> dict[str, Any] | None:
         # Called only while holding self._lock; failed attempts survive resends/process boundaries in DB.
         now = datetime.now(UTC)
         user = next((u for u in self._users.values() if u.get("email") == self.normalize_email(email or "") and u.get("status") == "ACTIVE"), None)
@@ -281,6 +292,8 @@ class UserAccountStore:
             if action["failed_attempts"] >= EMAIL_CODE_MAX_ATTEMPTS:
                 action["consumed_at"] = now
             return None
+        if before_consume is not None:
+            before_consume()
         action["consumed_at"] = now
         return user
 
@@ -329,7 +342,8 @@ class UserAccountStore:
             row["email_verified_at"] = row.get("email_verified_at") or now
         return True
 
-    def reset_password(self, token: str, new_password: str, store: Any, email: str | None = None) -> str | None:
+    def reset_password(self, token: str, new_password: str, store: Any, email: str | None = None,
+                       *, before_commit: Callable[[Any], None] | None = None) -> str | None:
         token = normalize_action_code(token)
         numeric = bool(EMAIL_CODE_PATTERN.fullmatch(token))
         token_hash = self._action_hash(token)
@@ -348,6 +362,10 @@ class UserAccountStore:
                 ).scalar_one_or_none()
                 if identity_id is None:
                     return None
+                if before_commit is not None:
+                    # Family before sessions matches session issuance/rotation
+                    # lock order. Failure rolls back one-use-code consumption.
+                    before_commit(conn)
                 user_id = conn.execute(
                     text(
                         "UPDATE users SET password_hash=:password,updated_at=now() "
@@ -366,9 +384,12 @@ class UserAccountStore:
                     {"identity": identity_id},
                 )
             return str(user_id)
-        with self._lock:
+        # Match registration's account->session lock order and hold both
+        # across the validated-code, family, password and revocation commit.
+        with self._lock, getattr(store, 'lock', nullcontext()):
             if numeric:
-                row = self._consume_memory_code(email, "PASSWORD_RESET", token)
+                row = self._consume_memory_code(email, "PASSWORD_RESET", token,
+                    (lambda: before_commit(None)) if before_commit is not None else None)
                 if row is None:
                     return None
             else:
@@ -378,14 +399,16 @@ class UserAccountStore:
                 row = self._users.get(str(action["user_id"]))
                 if not row or row.get("status") != "ACTIVE":
                     return None
+                if before_commit is not None:
+                    before_commit(None)
                 action["consumed_at"] = now
             row["password_hash"] = new_hash
             user_id = str(row["user_id"])
-        sessions = getattr(store, "sessions", None)
-        if isinstance(sessions, dict):
-            for record in sessions.values():
-                if record.get("user_id") == user_id:
-                    record["revoked"] = True
+            sessions = getattr(store, "sessions", None)
+            if isinstance(sessions, dict):
+                for record in sessions.values():
+                    if record.get("user_id") == user_id:
+                        record["revoked"] = True
         return user_id
 
     def link_external_identity(

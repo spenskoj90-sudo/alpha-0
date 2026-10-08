@@ -11,6 +11,34 @@ from app.core.retention import RETENTION_ADVISORY_LOCK_ID, purge_expired_runtime
 pytestmark = pytest.mark.postgres
 
 
+def test_retention_expires_registration_leases_and_only_old_unreferenced_families():
+    engine = _engine()
+    suffix = uuid.uuid4().hex
+    old, recent, claimed = [f"{kind}-{suffix}" for kind in ("old", "recent", "claimed")]
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO web_session_families(family_hash,updated_at) VALUES "
+                "(:old,now()-interval '91 days'),(:recent,now()),(:claimed,now()-interval '91 days')"
+            ), {"old": old, "recent": recent, "claimed": claimed})
+            conn.execute(text(
+                "INSERT INTO web_registration_claims(family_hash,claim_token_hash,expires_at) VALUES "
+                "(:old,'expired',now()-interval '1 minute'),(:claimed,'live',now()+interval '1 minute')"
+            ), {"old": old, "claimed": claimed})
+        deleted = purge_expired_runtime_data(engine, batch_size=100)
+        assert deleted["web_registration_claims"] >= 1
+        assert deleted["web_session_families"] >= 1
+        with engine.begin() as conn:
+            assert conn.execute(text("SELECT 1 FROM web_session_families WHERE family_hash=:family"), {"family": old}).first() is None
+            for family in (recent, claimed):
+                assert conn.execute(text("SELECT 1 FROM web_session_families WHERE family_hash=:family"), {"family": family}).first()
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM web_session_families WHERE family_hash IN (:old,:recent,:claimed)"),
+                         {"old": old, "recent": recent, "claimed": claimed})
+        engine.dispose()
+
+
 def _engine():
     return create_engine(
         os.environ["DATABASE_URL"],

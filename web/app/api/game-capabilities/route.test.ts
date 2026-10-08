@@ -8,14 +8,16 @@ it('requires a server-held session to read the research inventory', async () => 
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   const response = await GET(new NextRequest('http://localhost/api/game-capabilities'));
   expect(response.status).toBe(401);
-  expect(response.headers.get('set-cookie')).toBeNull();
+  // A signed-out read initializes the revocation-only browser context.
+  expect(response.headers.get('set-cookie')).toContain('sentinel_web_session_');
+  expect(response.headers.get('set-cookie')).not.toContain('sentinel_access=');
 });
 
 it('reads Core inventory without expanding authority or forwarding browser credentials', async () => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"schema_version":1,"profiles":[]}'));
   const response = await GET(new NextRequest('http://localhost/api/game-capabilities', {
-    headers: { cookie: 'sentinel_access=fixture', 'x-sentinel-admin-token': 'must-not-forward' },
+    headers: { cookie: `sentinel_access=fixture; sentinel_web_session=${'f'.repeat(48)}; sentinel_web_generation=0`, 'x-sentinel-admin-token': 'must-not-forward' },
   }));
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ schema_version: 1, profiles: [] });

@@ -27,11 +27,11 @@ describe('POST /api/session/login', () => {
       refresh_token: 'refresh-secret',
       expires_at: '2030-01-01T00:00:00Z',
       scopes: ['game:read'],
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/session/login', {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: `sentinel_web_session=test-family-${'a'.repeat(40)}; sentinel_web_generation=0` },
       body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
     }));
 
@@ -41,8 +41,8 @@ describe('POST /api/session/login', () => {
     expect(body).not.toContain('access-secret');
     expect(body).not.toContain('refresh-secret');
     const setCookie = response.headers.get('set-cookie') ?? '';
-    expect(setCookie).toContain('sentinel_access=access-secret');
-    expect(setCookie).toContain('sentinel_refresh=refresh-secret');
+    expect(setCookie).toMatch(/sentinel_access_[0-9a-f]{16}_1=access-secret/);
+    expect(setCookie).toMatch(/sentinel_refresh_[0-9a-f]{16}_1=refresh-secret/);
     expect(setCookie.toLowerCase()).toContain('httponly');
     expect(setCookie.toLowerCase()).toContain('samesite=strict');
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -55,11 +55,11 @@ describe('POST /api/session/login', () => {
       mfa_required: true,
       challenge_token: challenge,
       expires_at: '2030-01-01T00:00:00Z',
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    }), { status: 200, headers: { 'content-type': 'application/json', 'x-sentinel-web-generation': '1' } }));
 
     const response = await POST(new NextRequest('http://localhost/api/session/login', {
       method: 'POST',
-      headers: { origin: 'http://localhost', 'content-type': 'application/json' },
+      headers: { origin: 'http://localhost', 'content-type': 'application/json', cookie: `sentinel_web_session=mfa-family-${'b'.repeat(40)}; sentinel_web_generation=0` },
       body: JSON.stringify({ email: 'user@example.com', password: 'correct-horse-battery-staple' }),
     }));
 
@@ -68,7 +68,7 @@ describe('POST /api/session/login', () => {
     expect(payload).toMatchObject({ mfa_required: true });
     expect(JSON.stringify(payload)).not.toContain(challenge);
     const cookie = response.headers.get('set-cookie') ?? '';
-    expect(cookie).toContain(`sentinel_mfa=${challenge}`);
+    expect(cookie).toMatch(new RegExp(`sentinel_mfa_[0-9a-f]{16}_1=${challenge}`));
     expect(cookie).not.toContain('access-secret');
     expect(cookie).not.toContain('refresh-secret');
     expect(cookie.toLowerCase()).toContain('httponly');

@@ -45,6 +45,7 @@ See [Email action codes v1](EMAIL_ACTION_CODES_V1.md) for digest, account/purpos
 
 - `POST /v1/sessions/refresh` — one-time refresh-token rotation.
 - `POST /v1/sessions/revoke` — revoke the current access session.
+- `POST /v1/sessions/web/revoke` — BFF-only revocation of an opaque Web session family. The family value is hashed at rest, grants no positive authority, and advances a durable generation tombstone even when the current access token is absent or stale. The BFF also presents its HttpOnly refresh credential in the request body so a pre-family legacy Web refresh lineage is revoked atomically without revoking independent browser sessions; no refresh token is accepted from browser JavaScript.
 
 ## Authorization and events
 
@@ -134,3 +135,21 @@ All replies are `Cache-Control: no-store`; missing/unavailable distribution or d
 ## Authentication notes
 
 Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures, provider secrets and raw private-key material are not returned in logs or audit metadata.
+
+The Web BFF supplies `X-Sentinel-Web-Session` only on its server-to-Core hop for browser login/register, MFA, password-reset confirmation, refresh and family revocation. Core serializes those mutations with a PostgreSQL-backed operation/generation check and returns `X-Sentinel-Web-Generation`; browser JavaScript never receives the opaque family cookie or Core tokens. Access, refresh and MFA cookies are HttpOnly and family-keyed by generation; the BFF consumes only the highest marker and retires observed lower generations, making response ordering independent of Web worker process memory. Direct device and non-Web session flows retain the existing one-use refresh contract.
+
+Web password reset commits password/code consumption, identity-session revocation and the requested
+family tombstone in one PostgreSQL transaction (equivalent account/session lock ordering in memory).
+A tombstone write failure before commit rolls back the reset; no one-use code or password is lost.
+Core marks successful commit with `X-Sentinel-Web-Reset-Revocation: identity` and its committed
+generation. If a newer login has superseded that generation before the response arrives, the BFF
+preserves reset success and expires only the request's credentials, without replacing newer family
+selectors/markers. This family fence denies a same-family login that verified the old password
+before reset. It does not establish a global account authentication epoch for independent/direct
+login requests; that wider race requires separate account-bound authentication coordination.
+
+During generation-zero logout only, a live fixed-name legacy browser access token may prove
+revocation when its refresh is expired/consumed. The store consumes the presented legacy lineage
+under the reservation lock/transaction before creating one tombstone family. Device-bound,
+foreign-family, expired/revoked and replayed access proofs cannot allocate a family. Legacy access
+never becomes a bootstrap read/login/MFA credential, and unrelated browser lineages remain live.

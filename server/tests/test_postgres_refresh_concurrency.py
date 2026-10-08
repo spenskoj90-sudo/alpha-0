@@ -44,3 +44,35 @@ def test_postgres_refresh_rotation_is_single_winner_under_concurrency():
     with store.engine.connect() as conn:
         replacement_count = conn.execute(text("SELECT COUNT(*) FROM sessions WHERE identity_id = (SELECT id FROM identities WHERE user_handle = :u) AND refresh_token_hash <> :rh"), {"u": user_id, "rh": session_hash(refresh_token)}).scalar_one()
     assert replacement_count == 1
+
+
+def test_postgres_web_session_generation_serializes_workers_and_logout():
+    from app.main import REFRESH_TTL_SECONDS, SESSION_TTL_SECONDS, store
+    from app.core.store import PostgresStore
+
+    assert isinstance(store, PostgresStore)
+    user_id = "pg-web-session-generation"
+    family = "web-family-" + "b" * 48
+    _ensure_identity(store, user_id)
+
+    stale_operation = store.begin_web_session_operation(family)
+    winner_operation = store.begin_web_session_operation(family)
+    stale = store.issue_web_session(
+        None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, family, stale_operation
+    )
+    assert stale is not None
+    assert store.get_session(stale[0]) is not None
+    issued = store.issue_web_session(
+        None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, family, winner_operation
+    )
+    assert issued is not None
+    access, refresh, _, _ = issued
+    assert store.get_session(stale[0]) is None
+
+    refresh_operation = store.begin_web_session_operation(family)
+    logout_operation = store.begin_web_session_operation(family)
+    assert store.revoke_web_session_family(family, logout_operation) is True
+    assert store.rotate_web_refresh(
+        refresh, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, family, refresh_operation
+    ) is None
+    assert store.get_session(access) is None

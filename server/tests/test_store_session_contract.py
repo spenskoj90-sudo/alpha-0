@@ -17,7 +17,7 @@ def test_unknown_web_family_rejects_unusable_or_device_bound_revocation_proof(ba
     family = "invalid-proof-" + suffix + "x" * 24
     user = "proof-user-" + suffix
     try:
-        device = store.register_device(user, "android", "proof-key-" + suffix, (suffix * 2)[:64], "challenge")
+        device = store.register_device(user, "android", "proof-key-" + suffix, (suffix * 2)[:64], "proof-challenge-" + suffix)
         if proof_state == "other-family":
             other_family = "other-proof-" + suffix + "y" * 24
             operation = store.begin_web_session_operation(other_family)
@@ -47,7 +47,7 @@ def test_concurrent_legacy_revocation_allocates_one_family_and_revokes_rotated_d
     suffix = uuid.uuid4().hex
     user = "concurrent-legacy-" + suffix
     try:
-        store.register_device(user, "android", "legacy-proof-" + suffix, (suffix * 2)[:64], "challenge")
+        store.register_device(user, "android", "legacy-proof-" + suffix, (suffix * 2)[:64], "legacy-challenge-" + suffix)
         _, root_refresh, _, _ = store.issue_session(None, user, 3600, 7200)
         independent, _, _, _ = store.issue_session(None, user, 3600, 7200)
         rotated = store.rotate_refresh(root_refresh, 3600, 7200)
@@ -125,7 +125,7 @@ def test_postgres_web_allocations_and_cancellations_are_bounded():
             assert conn.execute(text("SELECT cardinality(cancelled_operations) FROM web_session_families "
                                      "WHERE family_hash=:family"), {"family": session_hash(family)}).scalar_one() == 0
         user = "pg-legacy-bounded-" + suffix
-        store.register_device(user, "android", "legacy-key-" + suffix, (suffix * 2)[:64], "challenge")
+        store.register_device(user, "android", "legacy-key-" + suffix, (suffix * 2)[:64], "bounded-challenge-" + suffix)
         access, refresh, _, _ = store.issue_session(None, user, 3600, 7200)
         legacy_family = "pg-legacy-family-" + suffix + "q" * 24
         operation = store.begin_web_session_operation(legacy_family, create=False, refresh_token=refresh, revocation=True)

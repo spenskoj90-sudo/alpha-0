@@ -62,8 +62,16 @@ function versionedGeneration(request: NextRequest, family: string): number | nul
 }
 
 function webSessionContext(request: NextRequest): WebSessionContext | null {
-  const family = request.cookies.get(WEB_SESSION_COOKIE)?.value ?? '';
-  if (!WEB_SESSION_PATTERN.test(family)) return null;
+  let family = request.cookies.get(WEB_SESSION_COOKIE)?.value ?? '';
+  if (!WEB_SESSION_PATTERN.test(family)) {
+    // Independent anonymous responses write separate bootstrap cookies. They
+    // never overwrite the family selected by a successful credential mutation.
+    const bootstrap = request.cookies.getAll().find(cookie =>
+      WEB_SESSION_PATTERN.test(cookie.value) &&
+      cookie.name === `${WEB_SESSION_COOKIE}_${familyCookieKey(cookie.value)}`,
+    );
+    return bootstrap ? { family: bootstrap.value, generation: 0, versioned: true } : null;
+  }
   const durableGeneration = versionedGeneration(request, family);
   const rawGeneration = durableGeneration === null
     ? request.cookies.get(WEB_GENERATION_COOKIE)?.value ?? '0'
@@ -98,6 +106,12 @@ function retireOlderGenerationCookies(
 }
 
 function applyWebSessionContext(response: NextResponse, family: string, generation: number): void {
+  const bootstrapCookie = `${WEB_SESSION_COOKIE}_${familyCookieKey(family)}`;
+  if (generation === 0) {
+    response.cookies.set(bootstrapCookie, family, { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
+    return;
+  }
+  response.cookies.set(bootstrapCookie, '', { ...cookieBaseOptions(), maxAge: 0 });
   response.cookies.set(WEB_SESSION_COOKIE, family, { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
   response.cookies.set(WEB_GENERATION_COOKIE, String(generation), { ...cookieBaseOptions(), maxAge: refreshMaxAgeSeconds() });
   applyGenerationMarker(response, family, generation);
@@ -398,6 +412,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
     retireOlderGenerationCookies(request, result, context.family, generation);
     clearMfaCookie(result);
     applySessionCookies(result, session, generation, context.family);
+    applyWebSessionContext(result, context.family, generation);
     return finish(result, generation);
   } catch {
     return finish(applyCorrelation(NextResponse.json({ error: 'SENTINEL_CORE_UNAVAILABLE' }, { status: 502 }), requestId));

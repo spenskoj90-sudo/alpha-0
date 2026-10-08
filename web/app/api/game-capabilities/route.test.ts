@@ -9,7 +9,7 @@ it('requires a server-held session to read the research inventory', async () => 
   const response = await GET(new NextRequest('http://localhost/api/game-capabilities'));
   expect(response.status).toBe(401);
   // A signed-out read initializes the revocation-only browser context.
-  expect(response.headers.get('set-cookie')).toContain('sentinel_web_session=');
+  expect(response.headers.get('set-cookie')).toContain('sentinel_web_session_');
   expect(response.headers.get('set-cookie')).not.toContain('sentinel_access=');
 });
 

@@ -63,7 +63,7 @@ describe('Web Core session boundary', () => {
     const forwarded = fetch.mock.calls[0][1] as RequestInit;
     const family = new Headers(forwarded.headers).get('x-sentinel-web-session');
     expect(family).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(response.cookies.get(WEB_SESSION_COOKIE)?.value).toBe(family);
+    expect(response.cookies.getAll().some(cookie => cookie.name.startsWith(WEB_SESSION_COOKIE) && cookie.value === family)).toBe(true);
     const body = await response.json();
     expect(body).not.toHaveProperty('session_token');
     expect(body).not.toHaveProperty('refresh_token');

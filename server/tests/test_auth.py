@@ -86,6 +86,32 @@ def test_registration_claim_cleanup_failure_does_not_replace_committed_result(mo
     assert result == "committed"
 
 
+def test_registration_claim_acquisition_failure_still_fails_closed(monkeypatch):
+    from types import SimpleNamespace
+    import pytest
+
+    def unavailable():
+        raise RuntimeError("claim acquisition unavailable")
+
+    monkeypatch.setattr(main_module, "store", SimpleNamespace(engine=SimpleNamespace(begin=unavailable)))
+    with pytest.raises(RuntimeError, match="claim acquisition unavailable"):
+        with main_module.claimed_web_registration("claim-acquisition-" + "x" * 48):
+            raise AssertionError("must not perform registration")
+
+
+def test_full_reservation_window_returns_bounded_error_and_logout_remains_available():
+    family = "full-window-api-" + uuid.uuid4().hex + "x" * 24
+    for _ in range(256):
+        operation = store.begin_web_session_operation(family)
+        store.cancel_web_session_operation(family, operation)
+    headers = {"X-Sentinel-Web-Session": family}
+    denied = client.post("/v1/auth/login", headers=headers,
+                         json={"email": "unused@example.com", "password": "wrong-password-123"})
+    assert denied.status_code == 429
+    assert denied.json()["code"] == "WEB_SESSION_OPERATION_LIMIT"
+    assert client.post("/v1/sessions/web/revoke", headers=headers).status_code == 200
+
+
 def test_register_creates_hashed_user_session():
     email = "auth-register@example.com"
     password = "Correct-Horse-Battery-Staple-123"

@@ -9,6 +9,68 @@ from app.core.security import session_hash
 from app.core.store import MemoryStore, PostgresStore
 
 
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+@pytest.mark.parametrize("proof_state", ["missing", "expired", "revoked", "device", "other-family"])
+def test_unknown_web_family_rejects_unusable_or_device_bound_revocation_proof(backend, proof_state):
+    store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
+    suffix = uuid.uuid4().hex
+    family = "invalid-proof-" + suffix + "x" * 24
+    user = "proof-user-" + suffix
+    try:
+        device = store.register_device(user, "android", "proof-key-" + suffix, (suffix * 2)[:64], "challenge")
+        if proof_state == "other-family":
+            other_family = "other-proof-" + suffix + "y" * 24
+            operation = store.begin_web_session_operation(other_family)
+            _, refresh, _, _ = store.issue_web_session(None, user, 3600, 7200, other_family, operation)
+        else:
+            access, refresh, _, _ = store.issue_session(device if proof_state == "device" else None, user, 3600,
+                                                       -1 if proof_state == "expired" else 7200)
+            if proof_state == "revoked":
+                store.revoke_session(access)
+            if proof_state == "missing":
+                refresh = "unknown-secret"
+        assert store.begin_web_session_operation(family, create=False, refresh_token=refresh, revocation=True) is None
+        if isinstance(store, MemoryStore):
+            assert session_hash(family) not in store.web_session_families
+        else:
+            with store.engine.begin() as conn:
+                assert conn.execute(text("SELECT 1 FROM web_session_families WHERE family_hash=:family"),
+                                    {"family": session_hash(family)}).first() is None
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+def test_concurrent_legacy_revocation_allocates_one_family_and_revokes_rotated_descendants(backend):
+    store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
+    suffix = uuid.uuid4().hex
+    user = "concurrent-legacy-" + suffix
+    try:
+        store.register_device(user, "android", "legacy-proof-" + suffix, (suffix * 2)[:64], "challenge")
+        _, root_refresh, _, _ = store.issue_session(None, user, 3600, 7200)
+        independent, _, _, _ = store.issue_session(None, user, 3600, 7200)
+        rotated = store.rotate_refresh(root_refresh, 3600, 7200)
+        assert rotated is not None
+
+        def revoke_once(index):
+            family = "concurrent-family-" + suffix + str(index)
+            operation = store.begin_web_session_operation(family, create=False, refresh_token=root_refresh, revocation=True)
+            if operation is not None:
+                assert store.revoke_web_session_family(family, operation, root_refresh) is True
+            return operation
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            operations = list(pool.map(revoke_once, range(2)))
+        assert sorted(item for item in operations if item is not None) == [1]
+        assert store.get_session(rotated[0]) is None
+        assert store.rotate_refresh(rotated[1], 3600, 7200) is None
+        assert store.get_session(independent) is not None
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
 def test_web_operation_window_is_bounded_without_invalidating_active_session():
     store = MemoryStore()
     family = "bounded-family-" + "w" * 48

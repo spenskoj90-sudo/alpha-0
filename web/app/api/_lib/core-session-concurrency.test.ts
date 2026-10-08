@@ -10,6 +10,50 @@ const request = (token: string) => new NextRequest('https://app.example/api/acco
 const rotation = () => Response.json(session, { headers: { 'x-sentinel-web-generation': '2' } });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
+it.each(['failure', 'probe'])('a late fresh-browser %s cannot replace a successful login context', async delayed => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+  const anonymous = () => new NextRequest('https://app.example/api/session/login', {
+    method: 'POST', headers: { origin: 'https://app.example' }, body: '{}',
+  });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(session, { headers: { 'x-sentinel-web-generation': '1' } }));
+  const success = await authenticateWeb(anonymous(), 'login');
+  let late;
+  if (delayed === 'failure') {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ code: 'INVALID_CREDENTIALS' }, { status: 401 }));
+    late = await authenticateWeb(anonymous(), 'login');
+  } else {
+    late = await proxyAuthenticated(new NextRequest('https://app.example/api/account'), '/v1/account');
+  }
+  // Deliver responses out of order into an actual cookie jar, then read account.
+  const jar = new Map<string, string>();
+  for (const response of [success, late]) for (const cookie of response.cookies.getAll()) {
+    if (cookie.maxAge === 0) jar.delete(cookie.name); else jar.set(cookie.name, cookie.value);
+  }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ user: 'same-account' }));
+  fetch.mockClear();
+  const read = await proxyAuthenticated(new NextRequest('https://app.example/api/account', {
+    headers: { cookie: Array.from(jar, ([name, value]) => `${name}=${value}`).join('; ') },
+  }), '/v1/account');
+  expect(read.status).toBe(200);
+  expect(new Headers(fetch.mock.calls[0][1]?.headers).get('authorization')).toBe('Bearer rotated-access');
+});
+
+it('keeps a pre-family access cookie limited to its initial passive migration request', async () => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ ok: true }));
+  const initial = await proxyAuthenticated(new NextRequest('https://app.example/api/account', {
+    headers: { cookie: 'sentinel_access=legacy-access' },
+  }), '/v1/account');
+  expect(initial.status).toBe(200);
+  const cookies = initial.cookies.getAll().map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
+  fetch.mockClear();
+  const later = await proxyAuthenticated(new NextRequest('https://app.example/api/account', {
+    headers: { cookie: `sentinel_access=legacy-access; ${cookies}` },
+  }), '/v1/account');
+  expect(later.status).toBe(401);
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it('joins concurrent refreshes without replaying a settled rotation', async () => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   let finish!: () => void;

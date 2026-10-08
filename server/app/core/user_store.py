@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import Any, Callable, Iterable, Literal
@@ -385,7 +386,7 @@ class UserAccountStore:
             return str(user_id)
         # Match registration's account->session lock order and hold both
         # across the validated-code, family, password and revocation commit.
-        with self._lock, store.lock:
+        with self._lock, getattr(store, 'lock', nullcontext()):
             if numeric:
                 row = self._consume_memory_code(email, "PASSWORD_RESET", token,
                     (lambda: before_commit(None)) if before_commit is not None else None)

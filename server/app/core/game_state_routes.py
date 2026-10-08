@@ -8,7 +8,7 @@ from typing import Any, Callable
 from fastapi import FastAPI, Header, HTTPException, Request
 
 from app.core.entitlements import EntitlementStatus
-from app.core.game_catalog import DIABLO_CATALOG, get_game
+from app.core.game_catalog import DIABLO_CATALOG, get_game, game_metadata
 from app.core.operational_observability import install_operational_plane
 from app.core.security import Principal
 
@@ -75,13 +75,7 @@ def install_game_state_routes(
         authorize_request(principal, "game:read", "game:*", rid)
         games = [
             {
-                "id": game.id,
-                "name": game.name,
-                "family": game.family,
-                "platform": game.platform.value,
-                "versioning": game.versioning,
-                "launcher_supported": game.launcher_supported,
-                "interaction_mode": game.interaction_mode,
+                **game_metadata(game),
             }
             for game in DIABLO_CATALOG
         ]
@@ -101,13 +95,7 @@ def install_game_state_routes(
         if game is None:
             raise HTTPException(status_code=404, detail="GAME_NOT_FOUND")
         return {
-            "id": game.id,
-            "name": game.name,
-            "family": game.family,
-            "platform": game.platform.value,
-            "versioning": game.versioning,
-            "launcher_supported": game.launcher_supported,
-            "interaction_mode": game.interaction_mode,
+            **game_metadata(game),
         }
 
     @app.get("/v1/games/{game_id}/access")

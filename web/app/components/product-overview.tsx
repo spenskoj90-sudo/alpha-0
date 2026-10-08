@@ -41,12 +41,21 @@ export function ProductOverview() {
     <section className="surface-grid" aria-label={t("Control plane surfaces")} aria-busy={busy}>
       <article className="card surface-card" id="games">
         <h2>{t("Games")}</h2>
-        {status ? <p role={data.state === 'ERROR' ? 'alert' : 'status'}>{t(status)}</p> : data.state === 'READY' && (
-          data.games.length ? <ul className="product-list">{data.games.map(game => <li key={game.id}>
+        {status ? <p role={data.state === 'ERROR' ? 'alert' : 'status'}>{t(status)}</p> : data.state === 'READY' && (<>
+          <p className="microcopy">{t("Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.")}</p>
+          {data.games.length ? <ul className="product-list">{data.games.map(game => <li key={game.id}>
             <strong>{game.name}</strong><span className="muted">{game.family} · {game.platform}</span>
-            <span className="microcopy">{game.interaction_mode.replaceAll('_', ' ')}</span>
-          </li>)}</ul> : <p>{t("No games are available in the current catalog.")}</p>
-        )}
+            <span className="state">{t("Catalog foundation · environment unverified")}</span>
+          </li>)}</ul> : <p>{t("No games are available in the current catalog.")}</p>}
+          <details>
+            <summary>{t("Research and observer profiles")} ({data.research.length})</summary>
+            <p className="microcopy">{t("Research profiles do not grant access. Each target needs separate version, source and environment verification.")}</p>
+            {data.research.length ? <ul className="product-list">{data.research.map(profile => <li key={profile.id}>
+              <strong>{profile.name}</strong><span className="muted">{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''} · {profile.environment}</span>
+              <span className="state">{t(profile.implementation_status === 'observer_pilot' ? 'Observer pilot · calibration pending' : profile.implementation_status === 'adapter_foundation' ? 'Adapter foundation · environment unverified' : 'Research only · environment unverified')}</span>
+            </li>)}</ul> : <p>{t("No research profiles are available.")}</p>}
+          </details>
+        </>)}
         <button className="ghost-btn" disabled={busy} onClick={() => void refresh()}>{t("Refresh product data")}</button>
       </article>
       <article className="card surface-card" id="security">

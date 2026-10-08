@@ -20,8 +20,10 @@ class SecureSessionStore {
         private const val ACCESS_TOKEN = "access_token"
         private const val REFRESH_TOKEN = "refresh_token"
         private const val DEVICE_ID = "device_id"
+        private val writer = Any()
+        private var epoch = 0L
 
-        data class Session(val accessToken: String, val refreshToken: String, val deviceId: String? = null)
+        data class Session(val accessToken: String, val refreshToken: String, val deviceId: String? = null, val epoch: Long = 0)
     }
 
     private fun key(): SecretKey {
@@ -42,7 +44,12 @@ class SecureSessionStore {
         return store.getKey(ALIAS, null) as SecretKey
     }
 
-    fun save(context: Context, accessToken: String, refreshToken: String, deviceId: String? = null) {
+    fun save(context: Context, accessToken: String, refreshToken: String, deviceId: String? = null) = synchronized(writer) {
+        epoch += 1
+        write(context, accessToken, refreshToken, deviceId)
+    }
+
+    private fun write(context: Context, accessToken: String, refreshToken: String, deviceId: String?) {
         val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(ACCESS_TOKEN, encrypt(accessToken))
             .putString(REFRESH_TOKEN, encrypt(refreshToken))
@@ -54,21 +61,35 @@ class SecureSessionStore {
         editor.apply()
     }
 
-    fun load(context: Context): Session? {
+    fun load(context: Context): Session? = synchronized(writer) { read(context) }
+    private fun read(context: Context): Session? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val access = prefs.getString(ACCESS_TOKEN, null) ?: return null
         val refresh = prefs.getString(REFRESH_TOKEN, null) ?: return null
         return try {
             val deviceId = prefs.getString(DEVICE_ID, null)?.let { decrypt(it) }
-            Session(decrypt(access), decrypt(refresh), deviceId)
+            Session(decrypt(access), decrypt(refresh), deviceId, epoch)
         } catch (_: Exception) {
             clear(context)
             null
         }
     }
 
-    fun clear(context: Context) {
+    fun clear(context: Context) = synchronized(writer) {
+        epoch += 1
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+    }
+
+    fun replaceIfCurrent(context: Context, expected: Session, accessToken: String, refreshToken: String): Boolean = synchronized(writer) {
+        if (read(context) != expected) return@synchronized false
+        // Refresh preserves principal generation, device binding and the existing Keystore.
+        write(context, accessToken, refreshToken, expected.deviceId)
+        true
+    }
+
+    fun clearIfCurrent(context: Context, expected: Session): Boolean = synchronized(writer) {
+        if (read(context) != expected) return@synchronized false
+        clear(context); true
     }
 
     private fun encrypt(value: String): String {

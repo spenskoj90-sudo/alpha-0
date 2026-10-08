@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import org.json.JSONObject
+import com.alpha0.app.net.CoreRefreshSerialization
 
 /** Principal and tokens stay inside the service-owned broker; never UI assertions. */
 internal data class KnowledgeSessionSnapshot(val origin: String, val sessionId: String, val accessToken: String, val refreshToken: String)
@@ -82,7 +83,11 @@ internal class KnowledgeHttpTransport(private val broker: KnowledgeSessionBroker
         var session = principal()
         var response = request(path, session.accessToken, null, maximum, budget)
         if (response.status == 401 && runCatching { strictJson(response.bytes, maximum).optString("code") }.getOrNull() == "INVALID_SESSION") {
-            if (principal() != session) throw KnowledgeFailure("KNOWLEDGE_SESSION_CHANGED")
+            synchronized(CoreRefreshSerialization.lock) {
+            budget.check()
+            val latest = principal()
+            if (latest.sessionId != session.sessionId) throw KnowledgeFailure("KNOWLEDGE_SESSION_CHANGED")
+            if (latest != session) { session = latest } else {
             rotation.set(session)
             try {
                 val result = request("/v1/sessions/refresh", null, JSONObject().put("refresh_token", session.refreshToken).toString(), 32768, budget)
@@ -100,6 +105,8 @@ internal class KnowledgeHttpTransport(private val broker: KnowledgeSessionBroker
                 if (error is KnowledgeFailure) throw error
                 throw KnowledgeFailure("KNOWLEDGE_NETWORK_ERROR")
             } finally { rotation.set(null) }
+            }
+            }
             response = request(path, session.accessToken, null, maximum, budget)
         }
         budget.check()

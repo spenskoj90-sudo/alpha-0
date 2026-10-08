@@ -33,7 +33,11 @@ interface HttpTransport {
 data class SessionCredentials(
     val accessToken: String,
     val refreshToken: String,
+    val epoch: Long = 0,
 )
+
+/** All Android one-use refresh paths serialize through this process-owned lock. */
+object CoreRefreshSerialization { val lock = Any() }
 
 /**
  * Authenticated Core transport wrapper.
@@ -51,9 +55,11 @@ class SessionRefreshingHttpTransport(
     private val onSessionRefreshed: (SessionCredentials) -> Unit,
     private val onSessionInvalidated: () -> Unit,
     private val requestIdFactory: () -> String = { UUID.randomUUID().toString() },
+    private val replaceIfCurrent: ((SessionCredentials, SessionCredentials) -> Boolean)? = null,
+    private val invalidateIfCurrent: ((SessionCredentials) -> Boolean)? = null,
 ) : HttpTransport {
     private val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
-    private val refreshLock = Any()
+    private val refreshLock = CoreRefreshSerialization.lock
 
     init {
         require(normalizedBaseUrl.startsWith("https://") || normalizedBaseUrl.startsWith("http://")) {
@@ -82,7 +88,7 @@ class SessionRefreshingHttpTransport(
 
             val refreshed = refreshSession(latest, correlatedRequest) ?: return@synchronized latestAttempt
             val retry = delegate.execute(withBearer(correlatedRequest, refreshed.accessToken))
-            if (isSessionAuthenticationFailure(retry)) onSessionInvalidated()
+            if (isSessionAuthenticationFailure(retry)) invalidate(refreshed)
             retry
         }
     }
@@ -112,7 +118,7 @@ class SessionRefreshingHttpTransport(
         )
 
         if (response.status !in 200..299) {
-            if (response.status == 401) onSessionInvalidated()
+            if (response.status == 401) invalidate(current)
             return null
         }
 
@@ -120,11 +126,20 @@ class SessionRefreshingHttpTransport(
         val access = json?.optString("session_token").orEmpty()
         val refresh = json?.optString("refresh_token").orEmpty()
         if (access.isBlank() || refresh.isBlank()) {
-            onSessionInvalidated()
+            invalidate(current)
             return null
         }
 
-        return SessionCredentials(access, refresh).also(onSessionRefreshed)
+        val updated = SessionCredentials(access, refresh, current.epoch)
+        val installed = replaceIfCurrent?.invoke(current, updated) ?: if (sessionProvider() == current) {
+            onSessionRefreshed(updated); true
+        } else false
+        return if (installed) updated else null
+    }
+
+    private fun invalidate(expected: SessionCredentials) {
+        if (invalidateIfCurrent != null) invalidateIfCurrent.invoke(expected)
+        else if (sessionProvider() == expected) onSessionInvalidated()
     }
 
     private fun isCoreRequest(url: String): Boolean =

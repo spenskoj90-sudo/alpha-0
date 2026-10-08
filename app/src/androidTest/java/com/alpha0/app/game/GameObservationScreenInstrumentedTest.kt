@@ -3,6 +3,7 @@ package com.alpha0.app.game
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,6 +18,17 @@ import org.junit.Test
 /** UI permission/state boundaries; not physical game or MediaProjection acceptance. */
 class GameObservationScreenInstrumentedTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun unverifiedTargetShowsKnowledgeWaitingInsteadOfRecommendations() {
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Waiting for a verified target profile").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Review defense").assertDoesNotExist()
+    }
 
     @Test fun missingGameCannotStartCaptureEvenWithConsent() {
         compose.setContent {

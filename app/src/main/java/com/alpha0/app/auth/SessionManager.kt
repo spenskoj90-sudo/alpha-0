@@ -13,21 +13,21 @@ class SessionManager(
 
     suspend fun refreshStoredSession(context: Context): AuthApi.Result = refreshMutex.withLock {
         val current = store.load(context) ?: return@withLock AuthApi.Result.Failure("NO_SESSION")
-        when (val result = api.refresh(current.refreshToken)) {
+        api.refreshWithCommit(current.refreshToken, { store.load(context) == current }) { result -> when (result) {
             is AuthApi.Result.Success -> {
-                store.save(context, result.session.accessToken, result.session.refreshToken, current.deviceId)
-                result
+                if (store.replaceIfCurrent(context, current, result.session.accessToken, result.session.refreshToken)) result
+                else AuthApi.Result.Failure("SESSION_CHANGED")
             }
             is AuthApi.Result.MfaRequired -> {
-                store.clear(context)
+                store.clearIfCurrent(context, current)
                 AuthApi.Result.Failure("INVALID_REFRESH_RESPONSE")
             }
             is AuthApi.Result.Failure -> {
                 if (result.message == "INVALID_REFRESH" || result.message == "SESSION_REVOKED") {
-                    store.clear(context)
+                    store.clearIfCurrent(context, current)
                 }
                 result
             }
-        }
+        } }
     }
 }

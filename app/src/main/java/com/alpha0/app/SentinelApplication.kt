@@ -18,6 +18,7 @@ class SentinelApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.alpha0.app.knowledge.AndroidKnowledgeRuntime.install(this)
         val diagnostics = DiagnosticRuntime.install(this)
         if (diagnostics.isForensicTest()) {
             diagnostics.info("TELEMETRY", "REMOTE_TELEMETRY_DISABLED_FOR_FORENSIC_TEST", result = "SKIPPED")

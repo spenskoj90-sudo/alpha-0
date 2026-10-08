@@ -5,7 +5,7 @@ import json
 import secrets
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import Any, Iterable, Literal
+from typing import Any, Callable, Iterable, Literal
 
 from sqlalchemy import text
 
@@ -277,7 +277,7 @@ class UserAccountStore:
         conn.execute(text("UPDATE auth_action_tokens SET consumed_at=now() WHERE token_hash=:selector"), {"selector": action["token_hash"]})
         return identity
 
-    def _consume_memory_code(self, email: str | None, purpose: str, code: str) -> dict[str, Any] | None:
+    def _consume_memory_code(self, email: str | None, purpose: str, code: str, before_consume: Callable[[], None] | None = None) -> dict[str, Any] | None:
         # Called only while holding self._lock; failed attempts survive resends/process boundaries in DB.
         now = datetime.now(UTC)
         user = next((u for u in self._users.values() if u.get("email") == self.normalize_email(email or "") and u.get("status") == "ACTIVE"), None)
@@ -291,6 +291,8 @@ class UserAccountStore:
             if action["failed_attempts"] >= EMAIL_CODE_MAX_ATTEMPTS:
                 action["consumed_at"] = now
             return None
+        if before_consume is not None:
+            before_consume()
         action["consumed_at"] = now
         return user
 
@@ -339,7 +341,8 @@ class UserAccountStore:
             row["email_verified_at"] = row.get("email_verified_at") or now
         return True
 
-    def reset_password(self, token: str, new_password: str, store: Any, email: str | None = None) -> str | None:
+    def reset_password(self, token: str, new_password: str, store: Any, email: str | None = None,
+                       *, before_commit: Callable[[Any], None] | None = None) -> str | None:
         token = normalize_action_code(token)
         numeric = bool(EMAIL_CODE_PATTERN.fullmatch(token))
         token_hash = self._action_hash(token)
@@ -358,6 +361,10 @@ class UserAccountStore:
                 ).scalar_one_or_none()
                 if identity_id is None:
                     return None
+                if before_commit is not None:
+                    # Family before sessions matches session issuance/rotation
+                    # lock order. Failure rolls back one-use-code consumption.
+                    before_commit(conn)
                 user_id = conn.execute(
                     text(
                         "UPDATE users SET password_hash=:password,updated_at=now() "
@@ -376,9 +383,12 @@ class UserAccountStore:
                     {"identity": identity_id},
                 )
             return str(user_id)
-        with self._lock:
+        # Match registration's account->session lock order and hold both
+        # across the validated-code, family, password and revocation commit.
+        with self._lock, store.lock:
             if numeric:
-                row = self._consume_memory_code(email, "PASSWORD_RESET", token)
+                row = self._consume_memory_code(email, "PASSWORD_RESET", token,
+                    (lambda: before_commit(None)) if before_commit is not None else None)
                 if row is None:
                     return None
             else:
@@ -388,14 +398,16 @@ class UserAccountStore:
                 row = self._users.get(str(action["user_id"]))
                 if not row or row.get("status") != "ACTIVE":
                     return None
+                if before_commit is not None:
+                    before_commit(None)
                 action["consumed_at"] = now
             row["password_hash"] = new_hash
             user_id = str(row["user_id"])
-        sessions = getattr(store, "sessions", None)
-        if isinstance(sessions, dict):
-            for record in sessions.values():
-                if record.get("user_id") == user_id:
-                    record["revoked"] = True
+            sessions = getattr(store, "sessions", None)
+            if isinstance(sessions, dict):
+                for record in sessions.values():
+                    if record.get("user_id") == user_id:
+                        record["revoked"] = True
         return user_id
 
     def link_external_identity(

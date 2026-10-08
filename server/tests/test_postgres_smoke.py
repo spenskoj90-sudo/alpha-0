@@ -22,7 +22,7 @@ def _key_material():
     return key, base64.b64encode(public).decode(), hashlib.sha256(public).hexdigest()
 
 
-def test_postgres_committed_reset_survives_tombstone_write_failure(monkeypatch):
+def test_postgres_reset_transaction_rolls_back_on_tombstone_write_failure(monkeypatch):
     from sqlalchemy import event
     from app import main as main_module
     from app.core.email_provider import TestEmailTransport
@@ -45,15 +45,13 @@ def test_postgres_committed_reset_survives_tombstone_write_failure(monkeypatch):
             json={'email': email, 'token': code, 'password': new_password})
     finally:
         event.remove(store.engine, 'before_cursor_execute', fail_tombstone)
-    assert response.status_code == 200
-    assert response.json() == {'status': 'PASSWORD_UPDATED'}
-    assert response.headers['x-sentinel-web-reset-revocation'] == 'identity'
+    assert response.status_code == 503
+    assert response.json()['code'] == 'PASSWORD_RESET_UNAVAILABLE'
     assert 'x-sentinel-web-generation' not in response.headers
-    assert store.get_session(registered['session_token']) is None
-    assert store.rotate_refresh(registered['refresh_token'], 3600, 7200) is None
-    assert user_store.authenticate(email, old_password) is None
-    assert user_store.authenticate(email, new_password) == email
-    assert client.post('/v1/auth/password-reset/confirm', json={'email': email, 'token': code, 'password': new_password}).status_code == 400
+    assert store.get_session(registered['session_token']) is not None
+    assert user_store.authenticate(email, old_password) == email
+    assert user_store.authenticate(email, new_password) is None
+    assert client.post('/v1/auth/password-reset/confirm', json={'email': email, 'token': code, 'password': new_password}).status_code == 200
 
 
 def test_postgres_auth_event_and_audit_flow():

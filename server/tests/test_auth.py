@@ -12,7 +12,7 @@ from app.main import app, store, user_store
 client = TestClient(app)
 
 
-def test_committed_password_reset_stays_successful_when_family_publication_fails(monkeypatch):
+def test_password_reset_rolls_back_when_family_tombstone_cannot_commit(monkeypatch):
     transport = TestEmailTransport()
     monkeypatch.setattr(main_module, "email_transport", transport)
     email = f"reset-publication-{uuid.uuid4().hex}@example.com"
@@ -29,15 +29,14 @@ def test_committed_password_reset_stays_successful_when_family_publication_fails
         "/v1/auth/password-reset/confirm", headers={"X-Sentinel-Web-Session": "reset-publication-" + "x" * 48},
         json={"email": email, "token": code, "password": new_password},
     )
-    assert response.status_code == 200
-    assert response.json() == {"status": "PASSWORD_UPDATED"}
-    assert response.headers["x-sentinel-web-reset-revocation"] == "identity"
+    assert response.status_code == 503
+    assert response.json()['code'] == 'PASSWORD_RESET_UNAVAILABLE'
     assert "x-sentinel-web-generation" not in response.headers
-    assert store.get_session(registered["session_token"]) is None
-    assert store.rotate_refresh(registered["refresh_token"], 3600, 7200) is None
-    assert user_store.authenticate(email, old_password) is None
-    assert user_store.authenticate(email, new_password) == email
-    assert client.post("/v1/auth/password-reset/confirm", json={"email": email, "token": code, "password": new_password}).status_code == 400
+    assert store.get_session(registered["session_token"]) is not None
+    assert user_store.authenticate(email, old_password) == email
+    assert user_store.authenticate(email, new_password) is None
+    # A failed pre-commit tombstone has not consumed the user's only code.
+    assert client.post("/v1/auth/password-reset/confirm", json={"email": email, "token": code, "password": new_password}).status_code == 200
 
 
 def test_legacy_auth_continuation_cannot_overwrite_a_logout_or_create_an_account(monkeypatch):
@@ -525,9 +524,12 @@ def test_password_reset_commits_family_tombstone_after_password_mutation(monkeyp
     original_reset = user_store.reset_password
 
     def reset_with_interleaved_operation(*args, **kwargs):
-        result = original_reset(*args, **kwargs)
-        store.begin_web_session_operation(family)
-        return result
+        commit = kwargs['before_commit']
+        def with_interleaved_operation(connection):
+            store.begin_web_session_operation(family)
+            commit(connection)
+        kwargs['before_commit'] = with_interleaved_operation
+        return original_reset(*args, **kwargs)
 
     monkeypatch.setattr(user_store, "reset_password", reset_with_interleaved_operation)
     confirmed = client.post(

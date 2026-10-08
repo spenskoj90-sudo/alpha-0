@@ -11,6 +11,43 @@ from app.core.user_store import UserAccountStore
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+def test_atomic_reset_fences_a_login_authenticated_before_reset_even_after_a_failed_attempt(backend):
+    database = os.environ['DATABASE_URL'] if backend is PostgresStore else None
+    store = backend(database) if database else backend()
+    accounts = UserAccountStore(database)
+    suffix = uuid.uuid4().hex
+    email = 'reset-auth-race-' + suffix + '@example.com'
+    old_password, new_password = 'Reset-race-before-password-123', 'Reset-race-after-password-456'
+    family = 'reset-auth-family-' + suffix + 'x' * 24
+    try:
+        accounts.register(email, old_password)
+        original = store.begin_web_session_operation(family)
+        access = store.issue_web_session(None, email, 3600, 7200, family, original)[0]
+        pending = store.begin_web_session_operation(family, create=False)
+        assert accounts.authenticate(email, old_password) == email
+        code = accounts.issue_action_code(email, 'PASSWORD_RESET')
+        def unavailable(conn):
+            raise RuntimeError('TOMBSTONE_UNAVAILABLE')
+        with pytest.raises(RuntimeError, match='TOMBSTONE_UNAVAILABLE'):
+            accounts.reset_password(code, new_password, store, email, before_commit=unavailable)
+        assert accounts.authenticate(email, old_password) == email
+        assert store.get_session(access) is not None
+        def fence(conn):
+            store.revoke_web_session_family_latest(family, connection=conn)
+        assert accounts.reset_password(code, new_password, store, email, before_commit=fence) == email
+        # Resume the pending old-password login after the successful commit.
+        assert store.issue_web_session(None, email, 3600, 7200, family, pending) is None
+        assert store.get_session(access) is None
+        assert accounts.authenticate(email, old_password) is None
+        assert accounts.authenticate(email, new_password) == email
+        assert accounts.reset_password(code, new_password, store, email, before_commit=fence) is None
+    finally:
+        if database:
+            store.engine.dispose()
+            accounts._engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
 @pytest.mark.parametrize("proof_state", ["missing", "expired", "revoked", "device", "other-family"])
 def test_unknown_family_cannot_allocate_with_untrusted_access_proof(backend, proof_state):
     store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
@@ -188,7 +225,8 @@ def test_unknown_web_family_rejects_unusable_or_device_bound_revocation_proof(ba
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
-def test_concurrent_legacy_revocation_allocates_one_family_and_revokes_rotated_descendants(backend):
+@pytest.mark.parametrize("proof_kind", ["refresh", "access"])
+def test_concurrent_legacy_revocation_allocates_one_family_and_revokes_rotated_descendants(backend, proof_kind):
     store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
     suffix = uuid.uuid4().hex
     user = "concurrent-legacy-" + suffix
@@ -201,7 +239,8 @@ def test_concurrent_legacy_revocation_allocates_one_family_and_revokes_rotated_d
 
         def revoke_once(index):
             family = "concurrent-family-" + suffix + str(index)
-            operation = store.begin_web_session_operation(family, create=False, refresh_token=root_refresh, revocation=True)
+            operation = store.begin_web_session_operation(family, create=False, refresh_token=root_refresh,
+                access_token=rotated[0] if proof_kind == 'access' else None, revocation=True)
             if operation is not None:
                 assert store.revoke_web_session_family(family, operation, root_refresh) is True
             return operation

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { authenticateWeb, proxyAuthenticated, WEB_GENERATION_COOKIE, WEB_SESSION_COOKIE } from './core-session';
+import { authenticateWeb, passwordResetWeb, proxyAuthenticated, WEB_GENERATION_COOKIE, WEB_SESSION_COOKIE } from './core-session';
 
 const session = { session_token: 'rotated-access', refresh_token: 'rotated-refresh', expires_at: '2030-01-01T00:00:00Z', scopes: ['game:read'] };
 const request = (token: string) => new NextRequest('https://app.example/api/account', {
@@ -9,6 +9,42 @@ const request = (token: string) => new NextRequest('https://app.example/api/acco
 });
 const rotation = () => Response.json(session, { headers: { 'x-sentinel-web-generation': '2' } });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+
+it('a delayed committed reset remains successful without erasing a newer versioned login', async () => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://reset-order.core.example');
+  const family = `reset-cookie-order-${'z'.repeat(40)}`;
+  const key = createHash('sha256').update(family).digest('hex').slice(0, 16);
+  const cookie = `${WEB_SESSION_COOKIE}=${family}; sentinel_web_generation_${key}_1=1; sentinel_access_${key}_1=old-access`;
+  let release!: (response: Response) => void;
+  const pending = new Promise<Response>(resolve => { release = resolve; });
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async url => String(url).endsWith('/password-reset/confirm')
+    ? pending : Response.json(session, { headers: { 'x-sentinel-web-generation': '3' } }));
+  const reset = passwordResetWeb(new NextRequest('https://app.example/api/session/password-reset/confirm', {
+    method: 'POST', headers: { origin: 'https://app.example', cookie },
+    body: JSON.stringify({ token: 'x'.repeat(40), password: 'safe-replacement-password-123' }),
+  }), 'confirm');
+  const login = await authenticateWeb(new NextRequest('https://app.example/api/session/login', {
+    method: 'POST', headers: { origin: 'https://app.example', cookie }, body: '{}',
+  }), 'login');
+  expect(login.status).toBe(200);
+  release(Response.json({ status: 'PASSWORD_UPDATED' }, { headers: {
+    'x-sentinel-web-generation': '2', 'x-sentinel-web-reset-revocation': 'identity',
+  } }));
+  const lateReset = await reset;
+  expect(lateReset.status).toBe(200);
+  expect(await lateReset.json()).toEqual({ status: 'PASSWORD_UPDATED' });
+  const jar = new Map<string, string>();
+  for (const response of [login, lateReset]) for (const c of response.cookies.getAll()) {
+    if (c.maxAge === 0) jar.delete(c.name); else jar.set(c.name, c.value);
+  }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ user: 'current' }));
+  fetch.mockClear();
+  const read = await proxyAuthenticated(new NextRequest('https://app.example/api/account', {
+    headers: { cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; ') },
+  }), '/v1/account');
+  expect(read.status).toBe(200);
+  expect(new Headers(fetch.mock.calls[0][1]?.headers).get('authorization')).toBe('Bearer rotated-access');
+});
 
 it.each(['failure', 'probe'])('a late fresh-browser %s cannot replace a successful login context', async delayed => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');

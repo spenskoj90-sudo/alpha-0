@@ -6,8 +6,9 @@ import secrets
 import time
 import uuid
 from abc import ABC, abstractmethod
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
-from threading import Lock
+from threading import RLock
 from typing import Any
 
 from sqlalchemy import text
@@ -87,7 +88,7 @@ class Store(ABC):
         self, family_token: str, operation: int, refresh_token: str | None = None
     ) -> bool: ...
     @abstractmethod
-    def revoke_web_session_family_latest(self, family_token: str) -> int: ...
+    def revoke_web_session_family_latest(self, family_token: str, *, connection=None) -> int: ...
     @abstractmethod
     def save_event_batch(self, principal: dict[str, Any], events: list[dict[str, Any]], idempotency_key: str | None) -> dict[str, int]: ...
     @abstractmethod
@@ -143,7 +144,7 @@ class MemoryStore(Store):
         self.subscriptions: dict[str, dict[str, Any]] = {}
         self.billing_events: dict[str, dict[str, Any]] = {}
         self.characters: dict[str, dict[str, Any]] = {}
-        self.lock = Lock()
+        self.lock = RLock()
 
     def register_device(self, user_id, platform, public_key_b64, fingerprint, challenge):
         with self.lock:
@@ -541,7 +542,7 @@ class MemoryStore(Store):
                     presented["revoked"] = True
             return True
 
-    def revoke_web_session_family_latest(self, family_token):
+    def revoke_web_session_family_latest(self, family_token, *, connection=None):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.setdefault(
@@ -1273,9 +1274,11 @@ class PostgresStore(Store):
             ), {"operation": operation, "family": family_hash})
             return True
 
-    def revoke_web_session_family_latest(self, family_token):
+    def revoke_web_session_family_latest(self, family_token, *, connection=None):
         family_hash = session_hash(family_token)
-        with self.engine.begin() as conn:
+        # Password reset supplies its existing transaction, so code consumption,
+        # password, family generation and session revocation share one outcome.
+        with nullcontext(connection) if connection is not None else self.engine.begin() as conn:
             operation = int(conn.execute(text(
                 "INSERT INTO web_session_families(family_hash,latest_operation,active_generation) "
                 "VALUES (:family,1,1) ON CONFLICT (family_hash) DO UPDATE SET "

@@ -138,12 +138,15 @@ Bearer access tokens are opaque values. The server stores only SHA-256 digests. 
 
 The Web BFF supplies `X-Sentinel-Web-Session` only on its server-to-Core hop for browser login/register, MFA, password-reset confirmation, refresh and family revocation. Core serializes those mutations with a PostgreSQL-backed operation/generation check and returns `X-Sentinel-Web-Generation`; browser JavaScript never receives the opaque family cookie or Core tokens. Access, refresh and MFA cookies are HttpOnly and family-keyed by generation; the BFF consumes only the highest marker and retires observed lower generations, making response ordering independent of Web worker process memory. Direct device and non-Web session flows retain the existing one-use refresh contract.
 
-Password-reset success describes the already committed password/code/identity-session transaction.
-Core marks this with `X-Sentinel-Web-Reset-Revocation: identity`. A subsequent family-tombstone
-publication failure does not turn that success into a retryable error and does not invent a
-generation. Without an accepted generation the BFF expires only the credentials observed by
-that request, preserving concurrently selected families/markers. Old sessions remain denied by
-Core. This fallback proves identity revocation, not successful family-generation publication.
+Web password reset commits password/code consumption, identity-session revocation and the requested
+family tombstone in one PostgreSQL transaction (equivalent account/session lock ordering in memory).
+A tombstone write failure before commit rolls back the reset; no one-use code or password is lost.
+Core marks successful commit with `X-Sentinel-Web-Reset-Revocation: identity` and its committed
+generation. If a newer login has superseded that generation before the response arrives, the BFF
+preserves reset success and expires only the request's credentials, without replacing newer family
+selectors/markers. This family fence denies a same-family login that verified the old password
+before reset. It does not establish a global account authentication epoch for independent/direct
+login requests; that wider race requires separate account-bound authentication coordination.
 
 During generation-zero logout only, a live fixed-name legacy browser access token may prove
 revocation when its refresh is expired/consumed. The store consumes the presented legacy lineage

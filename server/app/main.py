@@ -510,19 +510,23 @@ def confirm_password_reset(
 ) -> AuthActionResponse:
     rate_limit(request, "auth-password-reset-confirm")
     web_session = validated_web_session(web_session_header)
-    if not user_store.reset_password(payload.token, payload.password, store, payload.email):
+    web_operation = None
+    def tombstone(connection):
+        nonlocal web_operation
+        web_operation = store.revoke_web_session_family_latest(web_session, connection=connection)
+    try:
+        reset_user = user_store.reset_password(payload.token, payload.password, store, payload.email,
+                                              before_commit=tombstone if web_session else None)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="PASSWORD_RESET_UNAVAILABLE") from exc
+    if not reset_user:
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
     # The password, one-use code and identity-wide session revocation have
-    # committed. Optional browser ordering publication cannot reverse that
-    # outcome or tell the user to retry a consumed code.
+    # committed with the family ordering fence. A late browser response cannot
+    # tell the user to retry an already consumed code.
     response.headers["X-Sentinel-Web-Reset-Revocation"] = "identity"
-    if web_session:
-        try:
-            web_operation = store.revoke_web_session_family_latest(web_session)
-            response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
-        except Exception:
-            # Core sessions remain revoked; publish no invented generation.
-            pass
+    if web_operation is not None:
+        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
     return AuthActionResponse(status="PASSWORD_UPDATED")
 
 

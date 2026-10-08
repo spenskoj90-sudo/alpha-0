@@ -12,6 +12,22 @@ const request = (path: string, cookie = bootstrap) => new NextRequest(`https://a
 const session = { session_token: 'new-access', refresh_token: 'new-refresh', expires_at: '2030-01-01T00:00:00Z', scopes: ['game:read'] };
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
+it('uses legacy access only to revoke an expired refresh lineage, never to authorize a read', async () => {
+  vi.stubEnv('SENTINEL_CORE_URL', 'https://stale-legacy.core.example');
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    const authorization = new Headers(init?.headers).get('authorization');
+    return authorization === 'Bearer legacy-access'
+      ? Response.json({ revoked: true }, { headers: { 'x-sentinel-web-generation': '1' } })
+      : Response.json({ code: 'WEB_SESSION_SUPERSEDED' }, { status: 409 });
+  });
+  const response = await logoutWeb(request('session/logout', `${bootstrap}; sentinel_access=legacy-access`));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ authenticated: false, server_revoked: true });
+  expect(response.cookies.get('sentinel_access')?.maxAge).toBe(0);
+  expect(response.cookies.get('sentinel_refresh')?.maxAge).toBe(0);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
 it('presents the pre-family refresh proof on the logout retry after bootstrap', async () => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ revoked: true }, { headers: { 'x-sentinel-web-generation': '1' } }));

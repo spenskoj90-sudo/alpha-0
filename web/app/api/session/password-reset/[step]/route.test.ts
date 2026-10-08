@@ -15,6 +15,20 @@ function invoke(step: string, body: unknown, origin = 'http://localhost') {
 describe('Web password recovery boundary', () => {
   beforeEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example'); });
 
+  it('preserves committed reset success when Core cannot publish the family tombstone', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ status: 'PASSWORD_UPDATED' }, {
+      headers: { 'x-sentinel-web-reset-revocation': 'identity' },
+    }));
+    const response = await invoke('confirm', { token: 'x'.repeat(40), password: 'valid-password-123' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'PASSWORD_UPDATED' });
+    expect(response.cookies.get('sentinel_access')?.maxAge).toBe(0);
+    expect(response.cookies.get('sentinel_refresh')?.maxAge).toBe(0);
+    // No invented generation may replace a concurrently established context.
+    expect(response.cookies.get('sentinel_web_session')).toBeUndefined();
+    expect(response.cookies.get('sentinel_web_generation')).toBeUndefined();
+  });
+
   it('rejects cross-site writes and unknown steps without forwarding', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch');
     expect((await invoke('request', { email: 'user@example.com' }, 'https://attacker.example')).status).toBe(403);

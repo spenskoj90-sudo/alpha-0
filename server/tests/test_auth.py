@@ -12,6 +12,34 @@ from app.main import app, store, user_store
 client = TestClient(app)
 
 
+def test_committed_password_reset_stays_successful_when_family_publication_fails(monkeypatch):
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, "email_transport", transport)
+    email = f"reset-publication-{uuid.uuid4().hex}@example.com"
+    old_password, new_password = "Reset-before-password-123", "Reset-after-password-456"
+    registered = client.post("/v1/auth/register", json={"email": email, "password": old_password}).json()
+    assert client.post("/v1/auth/password-reset/request", json={"email": email}).status_code == 202
+    code = _message_token(transport.snapshot()[-1].text, "Reset code")
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("DATABASE_CHECKOUT_UNAVAILABLE")
+
+    monkeypatch.setattr(store, "revoke_web_session_family_latest", unavailable)
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/v1/auth/password-reset/confirm", headers={"X-Sentinel-Web-Session": "reset-publication-" + "x" * 48},
+        json={"email": email, "token": code, "password": new_password},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "PASSWORD_UPDATED"}
+    assert response.headers["x-sentinel-web-reset-revocation"] == "identity"
+    assert "x-sentinel-web-generation" not in response.headers
+    assert store.get_session(registered["session_token"]) is None
+    assert store.rotate_refresh(registered["refresh_token"], 3600, 7200) is None
+    assert user_store.authenticate(email, old_password) is None
+    assert user_store.authenticate(email, new_password) == email
+    assert client.post("/v1/auth/password-reset/confirm", json={"email": email, "token": code, "password": new_password}).status_code == 400
+
+
 def test_legacy_auth_continuation_cannot_overwrite_a_logout_or_create_an_account(monkeypatch):
     family = "migration-auth-" + uuid.uuid4().hex + "x" * 24
     headers = {"X-Sentinel-Web-Session": family}
@@ -37,6 +65,22 @@ def test_unknown_web_revoke_and_invalid_refresh_do_not_allocate_families():
     assert client.post("/v1/sessions/refresh", headers={"X-Sentinel-Web-Session": family},
                        json={"refresh_token": "invalid-refresh-" + "x" * 48}).status_code == 401
     assert store.web_session_families == before
+
+
+def test_unknown_web_logout_can_use_live_legacy_access_with_expired_refresh():
+    family = "legacy-access-logout-" + uuid.uuid4().hex + "x" * 24
+    access, refresh, _, _ = store.issue_session(None, "legacy-access-user", 3600, -1)
+    unrelated, _, _, _ = store.issue_session(None, "legacy-access-user", 3600, 7200)
+    response = client.post("/v1/sessions/web/revoke", headers={
+        "X-Sentinel-Web-Session": family, "Authorization": f"Bearer {access}",
+    }, json={"refresh_token": refresh})
+    assert response.status_code == 200
+    assert response.headers["x-sentinel-web-generation"] == "1"
+    assert store.get_session(access) is None
+    assert store.get_session(unrelated) is not None
+    assert client.post("/v1/sessions/web/revoke", headers={
+        "X-Sentinel-Web-Session": "replay-" + uuid.uuid4().hex + "y" * 24, "Authorization": f"Bearer {access}",
+    }, json={"refresh_token": refresh}).status_code == 409
 
 
 def test_invalid_login_does_not_allocate_a_web_family():

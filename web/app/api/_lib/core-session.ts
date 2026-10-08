@@ -506,8 +506,19 @@ export async function passwordResetWeb(request: NextRequest, step: string): Prom
     const result = reply({ status: expected }, upstream.status, upstream);
     if (step === 'confirm') {
       const generation = responseGeneration(upstream);
-      if (!context || !generation || !acceptGeneration(coreUrl, context.family, generation)) {
-        return reply({ error: 'WEB_SESSION_SUPERSEDED' }, 409, upstream);
+      if (!context) return reply({ error: 'WEB_SESSION_SUPERSEDED' }, 409, upstream);
+      if (!generation || !acceptGeneration(coreUrl, context.family, generation)) {
+        if (upstream.headers.get('x-sentinel-web-reset-revocation') !== 'identity') {
+          return reply({ error: 'WEB_SESSION_SUPERSEDED' }, 409, upstream);
+        }
+        // Identity revocation is committed. Expire only credentials observed
+        // by this request; leave newer family selectors/generations untouched.
+        for (const base of [ACCESS_COOKIE, REFRESH_COOKIE, MFA_COOKIE]) {
+          result.cookies.set(versionedCookieName(base, context.family, context.generation), '', { ...cookieBaseOptions(), maxAge: 0 });
+        }
+        clearSessionCookies(result);
+        clearMfaCookie(result);
+        return result;
       }
       retireOlderGenerationCookies(request, result, context.family, generation);
       clearSessionCookies(result);
@@ -665,7 +676,9 @@ export async function logoutWeb(request: NextRequest): Promise<NextResponse> {
   }
   const context = webSessionContext(request);
   if (!context) return contextRequired(requestId);
-  const accessToken = credentialCookie(request, ACCESS_COOKIE, context);
+  // Bare access is a revocation proof only, never a bootstrap read/auth fallback.
+  const accessToken = credentialCookie(request, ACCESS_COOKIE, context) ??
+    (context.generation === 0 ? request.cookies.get(ACCESS_COOKIE)?.value : undefined);
   const refreshToken = credentialCookie(request, REFRESH_COOKIE, context);
   let serverRevoked = false;
   let upstream: Response | undefined;

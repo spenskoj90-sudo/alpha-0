@@ -73,6 +73,7 @@ class Store(ABC):
     @abstractmethod
     def begin_web_session_operation(self, family_token: str, *, create: bool = True,
                                     refresh_token: str | None = None, revocation: bool = False,
+                                    access_token: str | None = None,
                                     expected_generation: int | None = None) -> int | None: ...
     @abstractmethod
     def cancel_web_session_operation(self, family_token: str, operation: int) -> bool: ...
@@ -393,7 +394,7 @@ class MemoryStore(Store):
             and operation not in family.get("cancelled_operations", set())
         )
 
-    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None, access_token=None):
         family_hash = session_hash(family_token)
         with self.lock:
             family = self.web_session_families.get(family_hash)
@@ -401,8 +402,13 @@ class MemoryStore(Store):
                                                     or family["active_generation"] != expected_generation):
                 raise ValueError("WEB_SESSION_SUPERSEDED")
             if not create and (not family or (refresh_token is not None and not revocation)):
+                access_record = self.sessions.get(session_hash(access_token)) if access_token and revocation else None
+                if access_record and (access_record.get('revoked') or access_record.get('expires_at', 0) <= time.time()
+                                      or access_record.get('device_id') is not None or access_record.get('web_session_family_hash')):
+                    access_record = None
                 record = next((r for r in self.sessions.values()
                                if r.get("refresh_hash") == session_hash(refresh_token)), None) if refresh_token else None
+                record = access_record or record
                 if not record:
                     return None
                 if revocation:
@@ -411,7 +417,7 @@ class MemoryStore(Store):
                     lineage = record.get("refresh_lineage_hash") or record["refresh_hash"]
                     related = [r for r in self.sessions.values()
                                if r is record or r.get("refresh_lineage_hash") == lineage]
-                    if not any(not r.get("revoked") and r.get("refresh_expires_at", 0) > time.time()
+                    if not access_record and not any(not r.get("revoked") and r.get("refresh_expires_at", 0) > time.time()
                                for r in related):
                         return None
                     # Consume the legacy lineage in this reservation, so the same
@@ -1064,7 +1070,7 @@ class PostgresStore(Store):
             and operation not in cancelled
         )
 
-    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None):
+    def begin_web_session_operation(self, family_token, *, create=True, refresh_token=None, revocation=False, expected_generation=None, access_token=None):
         family_hash = session_hash(family_token)
         with self.engine.begin() as conn:
             family = conn.execute(text(
@@ -1075,22 +1081,29 @@ class PostgresStore(Store):
                                                     or family["active_generation"] != expected_generation):
                 raise ValueError("WEB_SESSION_SUPERSEDED")
             if not create and (not family or (refresh_token is not None and not revocation)):
-                record = conn.execute(text(
+                # Only a live pre-family browser access session can act as this
+                # one-use revocation proof. It never authenticates a new family.
+                access_record = conn.execute(text(
+                    "SELECT id,device_id,web_session_family_hash,refresh_token_hash,refresh_lineage_hash "
+                    "FROM sessions WHERE session_hash=:access AND revoked_at IS NULL AND expires_at>now() "
+                    "AND device_id IS NULL AND web_session_family_hash IS NULL FOR UPDATE"
+                ), {"access": session_hash(access_token)}).mappings().first() if access_token and revocation else None
+                record = access_record or (conn.execute(text(
                     "SELECT id,device_id,web_session_family_hash,web_session_generation,"
                     "refresh_token_hash,refresh_lineage_hash,refresh_used_at,revoked_at,refresh_expires_at "
                     "FROM sessions WHERE refresh_token_hash=:refresh FOR UPDATE"
-                ), {"refresh": session_hash(refresh_token)}).mappings().first() if refresh_token else None
+                ), {"refresh": session_hash(refresh_token)}).mappings().first() if refresh_token else None)
                 if not record:
                     return None
                 if revocation:
                     if record["device_id"] is not None or record["web_session_family_hash"] is not None:
                         return None
                     lineage = record["refresh_lineage_hash"] or record["refresh_token_hash"]
-                    live = conn.execute(text(
+                    live = access_record or conn.execute(text(
                         "SELECT id FROM sessions WHERE (id=:id OR refresh_lineage_hash=:lineage) "
                         "AND revoked_at IS NULL AND refresh_expires_at>now() FOR UPDATE"
                     ), {"id": record["id"], "lineage": lineage}).first()
-                    if not live:
+                    if not access_record and not live:
                         return None
                     conn.execute(text(
                         "UPDATE sessions SET revoked_at=COALESCE(revoked_at,now()),"

@@ -22,6 +22,40 @@ def _key_material():
     return key, base64.b64encode(public).decode(), hashlib.sha256(public).hexdigest()
 
 
+def test_postgres_committed_reset_survives_tombstone_write_failure(monkeypatch):
+    from sqlalchemy import event
+    from app import main as main_module
+    from app.core.email_provider import TestEmailTransport
+    from app.main import app, store, user_store
+    transport = TestEmailTransport()
+    monkeypatch.setattr(main_module, 'email_transport', transport)
+    client = TestClient(app)
+    email = f'pg-reset-publication-{uuid.uuid4().hex}@example.com'
+    old_password, new_password = 'PG-reset-before-password-123', 'PG-reset-after-password-456'
+    registered = client.post('/v1/auth/register', json={'email': email, 'password': old_password}).json()
+    assert client.post('/v1/auth/password-reset/request', json={'email': email}).status_code == 202
+    code = transport.snapshot()[-1].text.split('Reset code: ', 1)[1].splitlines()[0]
+    def fail_tombstone(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith('INSERT INTO web_session_families('):
+            raise RuntimeError('TOMBSTONE_WRITE_UNAVAILABLE')
+    event.listen(store.engine, 'before_cursor_execute', fail_tombstone)
+    try:
+        response = client.post('/v1/auth/password-reset/confirm',
+            headers={'X-Sentinel-Web-Session': 'pg-reset-family-' + uuid.uuid4().hex + 'x' * 24},
+            json={'email': email, 'token': code, 'password': new_password})
+    finally:
+        event.remove(store.engine, 'before_cursor_execute', fail_tombstone)
+    assert response.status_code == 200
+    assert response.json() == {'status': 'PASSWORD_UPDATED'}
+    assert response.headers['x-sentinel-web-reset-revocation'] == 'identity'
+    assert 'x-sentinel-web-generation' not in response.headers
+    assert store.get_session(registered['session_token']) is None
+    assert store.rotate_refresh(registered['refresh_token'], 3600, 7200) is None
+    assert user_store.authenticate(email, old_password) is None
+    assert user_store.authenticate(email, new_password) == email
+    assert client.post('/v1/auth/password-reset/confirm', json={'email': email, 'token': code, 'password': new_password}).status_code == 400
+
+
 def test_postgres_auth_event_and_audit_flow():
     from app.main import REFRESH_TTL_SECONDS, SESSION_TTL_SECONDS, app, store
     from app.core.store import PostgresStore

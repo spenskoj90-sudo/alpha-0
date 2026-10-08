@@ -137,3 +137,16 @@ All replies are `Cache-Control: no-store`; missing/unavailable distribution or d
 Bearer access tokens are opaque values. The server stores only SHA-256 digests. Access tokens, refresh tokens, proof signatures, provider secrets and raw private-key material are not returned in logs or audit metadata.
 
 The Web BFF supplies `X-Sentinel-Web-Session` only on its server-to-Core hop for browser login/register, MFA, password-reset confirmation, refresh and family revocation. Core serializes those mutations with a PostgreSQL-backed operation/generation check and returns `X-Sentinel-Web-Generation`; browser JavaScript never receives the opaque family cookie or Core tokens. Access, refresh and MFA cookies are HttpOnly and family-keyed by generation; the BFF consumes only the highest marker and retires observed lower generations, making response ordering independent of Web worker process memory. Direct device and non-Web session flows retain the existing one-use refresh contract.
+
+Password-reset success describes the already committed password/code/identity-session transaction.
+Core marks this with `X-Sentinel-Web-Reset-Revocation: identity`. A subsequent family-tombstone
+publication failure does not turn that success into a retryable error and does not invent a
+generation. Without an accepted generation the BFF expires only the credentials observed by
+that request, preserving concurrently selected families/markers. Old sessions remain denied by
+Core. This fallback proves identity revocation, not successful family-generation publication.
+
+During generation-zero logout only, a live fixed-name legacy browser access token may prove
+revocation when its refresh is expired/consumed. The store consumes the presented legacy lineage
+under the reservation lock/transaction before creating one tombstone family. Device-bound,
+foreign-family, expired/revoked and replayed access proofs cannot allocate a family. Legacy access
+never becomes a bootstrap read/login/MFA credential, and unrelated browser lineages remain live.

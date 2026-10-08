@@ -11,6 +11,63 @@ from app.core.user_store import UserAccountStore
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+@pytest.mark.parametrize("proof_state", ["missing", "expired", "revoked", "device", "other-family"])
+def test_unknown_family_cannot_allocate_with_untrusted_access_proof(backend, proof_state):
+    store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
+    suffix = uuid.uuid4().hex
+    user = "invalid-access-" + suffix
+    family = "invalid-access-family-" + suffix + "x" * 24
+    try:
+        device = store.register_device(user, "android", "invalid-access-key-" + suffix, (suffix * 2)[:64], "invalid-access-challenge-" + suffix)
+        if proof_state == 'other-family':
+            other = 'other-access-family-' + suffix + 'y' * 24
+            operation = store.begin_web_session_operation(other)
+            access, _, _, _ = store.issue_web_session(None, user, 3600, 7200, other, operation)
+        else:
+            access, _, _, _ = store.issue_session(device if proof_state == 'device' else None, user,
+                                                 -1 if proof_state == 'expired' else 3600, 7200)
+            if proof_state == 'revoked':
+                store.revoke_session(access)
+            if proof_state == 'missing':
+                access = 'unknown-access-proof'
+        assert store.begin_web_session_operation(family, create=False, access_token=access, revocation=True) is None
+        if isinstance(store, MemoryStore):
+            assert session_hash(family) not in store.web_session_families
+        else:
+            with store.engine.begin() as conn:
+                assert conn.execute(text('SELECT 1 FROM web_session_families WHERE family_hash=:family'), {'family': session_hash(family)}).first() is None
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+@pytest.mark.parametrize("refresh_state", ["expired", "consumed"])
+def test_live_legacy_access_retires_expired_refresh_once_without_revoking_other_browser(backend, refresh_state):
+    store = backend(os.environ["DATABASE_URL"]) if backend is PostgresStore else backend()
+    suffix = uuid.uuid4().hex
+    user = "stale-legacy-access-" + suffix
+    try:
+        store.register_device(user, "android", "access-proof-" + suffix, (suffix * 2)[:64], "access-challenge-" + suffix)
+        access, refresh, _, _ = store.issue_session(None, user, 3600, -1 if refresh_state == "expired" else 7200)
+        if refresh_state == "consumed":
+            access = store.rotate_refresh(refresh, 3600, 7200)[0]
+        independent, _, _, _ = store.issue_session(None, user, 3600, 7200)
+        family = "access-retirement-" + suffix + "x" * 24
+        operation = store.begin_web_session_operation(family, create=False, refresh_token=refresh,
+                                                     access_token=access, revocation=True)
+        assert operation == 1
+        assert store.revoke_web_session_family(family, operation, refresh)
+        assert store.get_session(access) is None
+        assert store.get_session(independent) is not None
+        assert store.begin_web_session_operation("replay-access-" + suffix + "y" * 24, create=False,
+                                                refresh_token=refresh, access_token=access, revocation=True) is None
+    finally:
+        if isinstance(store, PostgresStore):
+            store.engine.dispose()
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
 def test_logout_during_registration_hashing_does_not_persist_an_orphan_account(backend, monkeypatch):
     from app.core import user_store as accounts_module
     database = os.environ["DATABASE_URL"] if backend is PostgresStore else None

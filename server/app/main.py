@@ -512,9 +512,17 @@ def confirm_password_reset(
     web_session = validated_web_session(web_session_header)
     if not user_store.reset_password(payload.token, payload.password, store, payload.email):
         raise HTTPException(status_code=400, detail="AUTH_ACTION_TOKEN_INVALID")
+    # The password, one-use code and identity-wide session revocation have
+    # committed. Optional browser ordering publication cannot reverse that
+    # outcome or tell the user to retry a consumed code.
+    response.headers["X-Sentinel-Web-Reset-Revocation"] = "identity"
     if web_session:
-        web_operation = store.revoke_web_session_family_latest(web_session)
-        response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
+        try:
+            web_operation = store.revoke_web_session_family_latest(web_session)
+            response.headers["X-Sentinel-Web-Generation"] = str(web_operation)
+        except Exception:
+            # Core sessions remain revoked; publish no invented generation.
+            pass
     return AuthActionResponse(status="PASSWORD_UPDATED")
 
 
@@ -1331,7 +1339,12 @@ def revoke_web_session(
     web_session = validated_web_session(web_session_header)
     if not web_session:
         raise HTTPException(status_code=400, detail="WEB_SESSION_REQUIRED")
+    try:
+        access_token = require_bearer(authorization_header) if authorization_header else None
+    except HTTPException:
+        access_token = None
     operation = reserve_web_operation(web_session, create=False, revocation=True,
+                                      access_token=access_token,
                                       refresh_token=payload.refresh_token if payload is not None else None)
     if operation is None:
         raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")

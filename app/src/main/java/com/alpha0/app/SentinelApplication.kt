@@ -53,6 +53,7 @@ class SentinelApplication : Application() {
             options.isSendDefaultPii = false
             options.isAttachScreenshot = false
             options.isAttachViewHierarchy = false
+            restrictTelemetryChannels(options)
             options.beforeSend = SentryOptions.BeforeSendCallback { event, _ ->
                 scrubEvent(event)
             }
@@ -68,6 +69,15 @@ class SentinelApplication : Application() {
         private val SOURCE_SHA = Regex("[0-9a-f]{40}")
         private val ALLOWED_ENVIRONMENTS =
             setOf("development", "ci", "staging", "release-candidate", "production")
+
+        fun restrictTelemetryChannels(options: SentryOptions) {
+            // 8.59 captures manual logs/metrics independently of enabled flags.
+            // This application grants crash reporting only, not those channels.
+            options.logs.isEnabled = false
+            options.logs.beforeSend = SentryOptions.Logs.BeforeSendLogCallback { null }
+            options.metrics.isEnabled = false
+            options.metrics.beforeSend = SentryOptions.Metrics.BeforeSendMetricCallback { _, _ -> null }
+        }
 
         /**
          * Data minimization before any event leaves the device.

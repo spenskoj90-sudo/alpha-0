@@ -12,10 +12,10 @@
     "node": "24.x"
   },
   "dependencies": {
-    "electron": "44.4.5"
+    "electron": "44.5.1"
   },
   "sentinelPackaging": {
-    "electronVersion": "44.4.5",
-    "electronWin32X64Sha256": "11c395820a5aaa8ebcc0686b476d0ac98a730274ebfbdc8cf5538a7c2815cb5d"
+    "electronVersion": "44.5.1",
+    "electronWin32X64Sha256": "9b382492dcfee91f8f9e92c91f7972550a1b95d2299cac72279dab33a600d7db"
   }
 }

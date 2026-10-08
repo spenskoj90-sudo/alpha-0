@@ -77,7 +77,8 @@ class Store(ABC):
     @abstractmethod
     def cancel_web_session_operation(self, family_token: str, operation: int) -> bool: ...
     @abstractmethod
-    def issue_web_session(self, device_id: str | None, user_id: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str]] | None: ...
+    def issue_web_session(self, device_id: str | None, user_id: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int,
+                          *, create_user=None) -> tuple[str, str, datetime, list[str]] | None: ...
     @abstractmethod
     def rotate_web_refresh(self, refresh_token: str, access_ttl: int, refresh_ttl: int, family_token: str, operation: int) -> tuple[str, str, datetime, list[str], dict[str, Any]] | None: ...
     @abstractmethod
@@ -441,7 +442,7 @@ class MemoryStore(Store):
             family.setdefault("cancelled_operations", set()).add(operation)
             return True
 
-    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
+    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation, *, create_user=None):
         family_hash = session_hash(family_token)
         access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
         now = datetime.now(UTC)
@@ -450,6 +451,8 @@ class MemoryStore(Store):
             family = self.web_session_families.get(family_hash)
             if not family or not self._web_operation_can_commit(family, operation):
                 return None
+            if create_user is not None:
+                create_user(None)
             for record in self.sessions.values():
                 if record.get("web_session_family_hash") == family_hash:
                     record["revoked"] = True
@@ -1126,7 +1129,7 @@ class PostgresStore(Store):
             ), {"family": session_hash(family_token), "operation": operation})
             return result.rowcount == 1
 
-    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation):
+    def issue_web_session(self, device_id, user_id, access_ttl, refresh_ttl, family_token, operation, *, create_user=None):
         family_hash = session_hash(family_token)
         access, refresh = secrets.token_urlsafe(48), secrets.token_urlsafe(64)
         now = datetime.now(UTC)
@@ -1140,6 +1143,8 @@ class PostgresStore(Store):
             ).mappings().first()
             if not family or not self._postgres_operation_can_commit(family, operation):
                 return None
+            if create_user is not None:
+                create_user(conn)
             identity_id = conn.execute(
                 text("SELECT id FROM identities WHERE user_handle=:user"), {"user": user_id}
             ).scalar_one()

@@ -53,6 +53,18 @@ it.each([409, 429, 500, 'missing-generation', 'network'] as const)('does not aut
   expect(response.cookies.get('sentinel_refresh')?.maxAge).toBe(failure === 409 ? 0 : undefined);
 });
 
+it.each([401, 429, 500, 'network'] as const)('clears consumed legacy proof even when subsequent auth fails (%s)', async failure => {
+  vi.stubEnv('SENTINEL_CORE_URL', `https://auth-failure-${failure}.core.example`);
+  const fetch = vi.spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(Response.json({ revoked: true }, { headers: { 'x-sentinel-web-generation': '1' } }));
+  if (failure === 'network') fetch.mockRejectedValueOnce(Error('offline'));
+  else fetch.mockResolvedValueOnce(Response.json({ code: 'INVALID_CREDENTIALS' }, { status: failure }));
+  const response = await authenticateWeb(request('session/login'), 'login');
+  expect(response.status).toBe(failure === 'network' ? 502 : failure);
+  expect(response.cookies.get('sentinel_refresh')?.maxAge).toBe(0);
+  expect(response.cookies.get('sentinel_access')?.maxAge).toBe(0);
+});
+
 it('never falls back to a legacy refresh proof after a positive versioned generation', async () => {
   vi.stubEnv('SENTINEL_CORE_URL', 'https://core.example');
   const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ revoked: true }, { headers: { 'x-sentinel-web-generation': '3' } }));

@@ -3,10 +3,74 @@ import os
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from app.core.security import session_hash
 from app.core.store import MemoryStore, PostgresStore
+from app.core.user_store import UserAccountStore
+
+
+@pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])
+def test_logout_during_registration_hashing_does_not_persist_an_orphan_account(backend, monkeypatch):
+    from app.core import user_store as accounts_module
+    database = os.environ["DATABASE_URL"] if backend is PostgresStore else None
+    store = backend(database) if database else backend()
+    accounts = UserAccountStore(database)
+    suffix = uuid.uuid4().hex
+    email = f"atomic-registration-{suffix}@example.com"
+    password = "Atomic-registration-password-123"
+    family = "atomic-registration-" + suffix + "x" * 24
+    operation = store.begin_web_session_operation(family)
+    original_hash = accounts_module.hash_password
+    def logout_during_hash(value):
+        hashed = original_hash(value)
+        logout = store.begin_web_session_operation(family, create=False, revocation=True)
+        assert store.revoke_web_session_family(family, logout)
+        return hashed
+    monkeypatch.setattr(accounts_module, "hash_password", logout_during_hash)
+    try:
+        assert accounts.register_web_session(email, password, store, 3600, 7200, family, operation) is None
+        assert accounts.authenticate(email, password) is None
+        monkeypatch.setattr(accounts_module, "hash_password", original_hash)
+        operation = store.begin_web_session_operation(family)
+        assert accounts.register_web_session(email, password, store, 3600, 7200, family, operation) is not None
+        assert accounts.authenticate(email, password) == email
+    finally:
+        if database:
+            accounts._engine.dispose()
+            store.engine.dispose()
+
+
+@pytest.mark.postgres
+def test_registration_account_and_generation_roll_back_when_session_insert_fails():
+    database = os.environ["DATABASE_URL"]
+    store = PostgresStore(database)
+    accounts = UserAccountStore(database)
+    suffix = uuid.uuid4().hex
+    email = f"registration-rollback-{suffix}@example.com"
+    password = "Registration-rollback-password-123"
+    family = "registration-rollback-" + suffix + "x" * 24
+    operation = store.begin_web_session_operation(family)
+    def fail_session_insert(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith("INSERT INTO sessions("):
+            raise RuntimeError("SESSION_INSERT_UNAVAILABLE")
+    event.listen(store.engine, "before_cursor_execute", fail_session_insert)
+    try:
+        with pytest.raises(RuntimeError, match="SESSION_INSERT_UNAVAILABLE"):
+            accounts.register_web_session(email, password, store, 3600, 7200, family, operation)
+        assert accounts.authenticate(email, password) is None
+        with store.engine.begin() as conn:
+            assert conn.execute(text("SELECT 1 FROM identities WHERE user_handle=:email"), {"email": email}).first() is None
+            assert conn.execute(text("SELECT active_generation FROM web_session_families WHERE family_hash=:family"),
+                                {"family": session_hash(family)}).scalar_one() == 0
+        event.remove(store.engine, "before_cursor_execute", fail_session_insert)
+        assert accounts.register_web_session(email, password, store, 3600, 7200, family, operation) is not None
+        assert accounts.authenticate(email, password) == email
+    finally:
+        if event.contains(store.engine, "before_cursor_execute", fail_session_insert):
+            event.remove(store.engine, "before_cursor_execute", fail_session_insert)
+        accounts._engine.dispose()
+        store.engine.dispose()
 
 
 @pytest.mark.parametrize("backend", [MemoryStore, pytest.param(PostgresStore, marks=pytest.mark.postgres)])

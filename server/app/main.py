@@ -419,12 +419,13 @@ def register_user(
             if not claimed:
                 raise HTTPException(status_code=409, detail="REGISTRATION_IN_PROGRESS")
             web_operation = reserve_web_operation(web_session, expected_generation=expected_generation) if web_session else None
-            user_id = user_store.register(payload.email, payload.password)
-            issued = (
-                store.issue_web_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
-                if web_session and web_operation is not None
-                else store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
-            )
+            if web_session and web_operation is not None:
+                user_id = user_store.normalize_email(payload.email)
+                issued = user_store.register_web_session(payload.email, payload.password, store,
+                                                         SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS, web_session, web_operation)
+            else:
+                user_id = user_store.register(payload.email, payload.password)
+                issued = store.issue_session(None, user_id, SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
             if issued is None:
                 raise HTTPException(status_code=409, detail="WEB_SESSION_SUPERSEDED")
     except Exception as exc:

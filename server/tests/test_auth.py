@@ -22,6 +22,7 @@ def test_legacy_auth_continuation_cannot_overwrite_a_logout_or_create_an_account
         raise AssertionError("superseded auth must fail before identity mutation")
     monkeypatch.setattr(user_store, "authenticate", unexpected)
     monkeypatch.setattr(user_store, "register", unexpected)
+    monkeypatch.setattr(user_store, "register_web_session", unexpected)
     for mode in ("login", "register"):
         denied = client.post(f"/v1/auth/{mode}", headers={**headers, "X-Sentinel-Web-Expected-Generation": str(retired)},
                              json={"email": f"{uuid.uuid4().hex}@example.com", "password": "Migration-password-123"})
@@ -248,10 +249,10 @@ def test_failed_duplicate_registration_does_not_supersede_account_creator(monkey
     email = f"register-race-{uuid.uuid4().hex}@example.com"
     password = "Registration-race-password-123"
     family = "web-registration-race-" + "r" * 48
-    original_register = user_store.register
+    original_register = user_store.register_web_session
     nested = False
 
-    def register_with_duplicate(candidate_email, candidate_password):
+    def register_with_duplicate(*args, **kwargs):
         nonlocal nested
         if not nested:
             nested = True
@@ -262,9 +263,9 @@ def test_failed_duplicate_registration_does_not_supersede_account_creator(monkey
             )
             assert duplicate.status_code == 409
             assert duplicate.json()["code"] == "REGISTRATION_IN_PROGRESS"
-        return original_register(candidate_email, candidate_password)
+        return original_register(*args, **kwargs)
 
-    monkeypatch.setattr(user_store, "register", register_with_duplicate)
+    monkeypatch.setattr(user_store, "register_web_session", register_with_duplicate)
     created = client.post(
         "/v1/auth/register",
         headers={"X-Sentinel-Web-Session": family},

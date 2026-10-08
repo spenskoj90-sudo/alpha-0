@@ -54,36 +54,46 @@ class UserAccountStore:
     def register(self, email: str, password: str) -> str:
         email = self.normalize_email(email)
         password_hash = hash_password(password)
-        user_id = email
         if self._engine:
             with self._engine.begin() as conn:
-                identity = conn.execute(
-                    text(
-                        "INSERT INTO identities(user_handle) VALUES (:u) "
-                        "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"
-                    ),
-                    {"u": user_id},
-                ).scalar_one()
-                conn.execute(
-                    text(
-                        "INSERT INTO users(identity_id,email,password_hash,status,email_verified_at) "
-                        "VALUES (:identity,:email,:password,'ACTIVE',NULL)"
-                    ),
-                    {"identity": identity, "email": email, "password": password_hash},
-                )
-            return user_id
+                self._insert_registration(email, password_hash, conn)
+            return email
         with self._lock:
-            if email in self._users:
-                raise ValueError("EMAIL_ALREADY_REGISTERED")
-            self._users[email] = {
-                "user_id": user_id,
-                "email": email,
-                "password_hash": password_hash,
-                "status": "ACTIVE",
-                "email_verified_at": None,
-                "created_at": datetime.now(UTC),
-            }
-        return user_id
+            self._insert_registration(email, password_hash)
+        return email
+
+    def _insert_registration(self, email: str, password_hash: str, connection=None) -> None:
+        if connection is not None:
+            identity = connection.execute(text(
+                "INSERT INTO identities(user_handle) VALUES (:u) "
+                "ON CONFLICT (user_handle) DO UPDATE SET user_handle=EXCLUDED.user_handle RETURNING id"
+            ), {"u": email}).scalar_one()
+            connection.execute(text(
+                "INSERT INTO users(identity_id,email,password_hash,status,email_verified_at) "
+                "VALUES (:identity,:email,:password,'ACTIVE',NULL)"
+            ), {"identity": identity, "email": email, "password": password_hash})
+            return
+        if email in self._users:
+            raise ValueError("EMAIL_ALREADY_REGISTERED")
+        self._users[email] = {
+            "user_id": email, "email": email, "password_hash": password_hash,
+            "status": "ACTIVE", "email_verified_at": None, "created_at": datetime.now(UTC),
+        }
+
+    def register_web_session(self, email, password, session_store, access_ttl, refresh_ttl, family, operation):
+        email = self.normalize_email(email)
+        # Password hashing holds no database connection or family lock. At commit,
+        # the family guard, account insert and session insert share one transaction.
+        password_hash = hash_password(password)
+        create_user = lambda connection: self._insert_registration(email, password_hash, connection)
+        if self._engine:
+            return session_store.issue_web_session(None, email, access_ttl, refresh_ttl, family, operation,
+                                                   create_user=create_user)
+        # Memory parity: account readers and family mutations cannot observe the
+        # account/session commit halfway through. No password hashing under locks.
+        with self._lock:
+            return session_store.issue_web_session(None, email, access_ttl, refresh_ttl, family, operation,
+                                                   create_user=create_user)
 
     def authenticate(self, email: str, password: str) -> str | None:
         email = self.normalize_email(email)

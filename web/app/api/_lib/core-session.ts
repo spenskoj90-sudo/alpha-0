@@ -366,7 +366,9 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
   const context = existingContext ?? {
     family: randomBytes(32).toString('base64url'), generation: 0, versioned: true,
   };
+  let retiredLegacy = false;
   const finish = (result: NextResponse, generation = 0): NextResponse => {
+    if (retiredLegacy) clearSessionCookies(result);
     if (!existingContext) applyWebSessionContext(result, context.family, generation);
     return result;
   };
@@ -384,6 +386,7 @@ export async function authenticateWeb(request: NextRequest, mode: 'login' | 'reg
         body: JSON.stringify({ refresh_token: legacyRefresh }),
       });
       const generation = responseGeneration(retired);
+      retiredLegacy = retired.ok && generation !== null;
       if (!retired.ok || !generation || !acceptGeneration(coreUrl, context.family, generation)) {
         const conflicted = retired.status === 409 || (retired.ok && !!generation);
         const result = applyCorrelation(NextResponse.json({ error: conflicted

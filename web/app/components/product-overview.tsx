@@ -40,6 +40,8 @@ export function ProductOverview() {
 
   async function revokeDevice(deviceId: string) {
     if (confirmRevoke !== deviceId || busy) return;
+    // Fence a late result against logout, new login or another product refresh.
+    const operationGeneration = ++generation.current;
     setBusy(true);
     setDeviceActionError('');
     setConfirmRevoke(null);
@@ -50,23 +52,28 @@ export function ProductOverview() {
         signal: AbortSignal.timeout(45_000),
       });
       if (response.status === 401) {
-        setData({ state: 'SIGNED_OUT' });
-        window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        if (operationGeneration === generation.current) {
+          setData({ state: 'SIGNED_OUT' });
+          window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        }
         return;
       }
       const result = await response.json();
       if (!response.ok || result?.revoked !== true) {
-        setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+        if (operationGeneration === generation.current) {
+          setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+        }
         return;
       }
-      // This operation may revoke the session of the currently attached device.
-      const revision = ++generation.current;
+      // Revoking the current device may also terminate this browser's session.
       const snapshot = await loadProductData();
-      if (revision === generation.current) setData(snapshot);
+      if (operationGeneration === generation.current) setData(snapshot);
     } catch {
-      setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+      if (operationGeneration === generation.current) {
+        setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+      }
     } finally {
-      setBusy(false);
+      if (operationGeneration === generation.current) setBusy(false);
     }
   }
 

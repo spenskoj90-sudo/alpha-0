@@ -173,6 +173,12 @@ export const russian: Readonly<Record<string, string>> = {
   'Verification code invalid or expired.': 'Код неверен или истёк.',
   'Email verification unavailable. Retry later.': 'Подтверждение email недоступно. Повторите позже.',
   'Too many attempts. Retry later.': 'Слишком много попыток. Повторите позже.',
+  'Confirm device revocation': 'Подтвердить отзыв устройства',
+  'Revoke device': 'Отозвать устройство',
+  'Confirm revoke': 'Подтвердить отзыв',
+  'Cancel': 'Отмена',
+  'Revoking a device terminates its sessions. You may need to sign in again on that device.': 'Отзыв устройства завершает его сеансы. На устройстве может потребоваться повторный вход.',
+  'Device revocation was not confirmed. Refresh and retry.': 'Не удалось подтвердить отзыв устройства. Обновите данные и повторите попытку.',
   'STATUS:': 'СОСТОЯНИЕ:', 'INVALID_CREDENTIALS': 'Неверный email или пароль · INVALID_CREDENTIALS', 'RATE_LIMITED': 'Слишком много попыток · RATE_LIMITED',
 };
 

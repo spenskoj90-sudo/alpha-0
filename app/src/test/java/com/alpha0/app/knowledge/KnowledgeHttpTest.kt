@@ -46,6 +46,42 @@ class KnowledgeHttpTest {
             assertTrue(queries.all { it != null && it.contains("platform=android") && !it.contains("access-") && !it.contains("refresh-") })
         } finally { transport.close(); server.stop(0) }
     }
+    @Test fun deltaUsesCanonicalCoreRouteWithExactProfileAndBearer() {
+        val destination = "b".repeat(64)
+        val base = "a".repeat(64)
+        val requests = java.util.concurrent.LinkedBlockingQueue<Triple<String, String?, String?>>()
+        val unavailable = java.util.concurrent.atomic.AtomicBoolean(false)
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/v1/knowledge/deltas/") { exchange ->
+            requests.offer(Triple(exchange.requestURI.path, exchange.requestURI.rawQuery,
+                exchange.requestHeaders.getFirst("Authorization")))
+            if (unavailable.get()) {
+                exchange.sendResponseHeaders(404, -1)
+                exchange.close()
+            } else {
+                val payload = """{"schema_version":1}""".toByteArray(Charsets.UTF_8)
+                exchange.sendResponseHeaders(200, payload.size.toLong())
+                exchange.responseBody.use { it.write(payload) }
+            }
+        }
+        server.start()
+        val transport = KnowledgeHttpTransport(Broker("http://127.0.0.1:${server.address.port}"))
+        try {
+            assertEquals(1, transport.delta(KnowledgeFixture.profile, destination, base, budget()).getInt("schema_version"))
+            val request = requests.poll(2, TimeUnit.SECONDS)
+            assertNotNull(request)
+            assertEquals("/v1/knowledge/deltas/$destination", request!!.first)
+            assertTrue(request.second.orEmpty().contains("base_digest=$base"))
+            assertTrue(request.second.orEmpty().contains("platform=android"))
+            assertEquals("Bearer access-old", request.third)
+
+            unavailable.set(true)
+            assertEquals("KNOWLEDGE_DELTA_UNAVAILABLE",
+                assertThrows(KnowledgeFailure::class.java) {
+                    transport.delta(KnowledgeFixture.profile, destination, base, budget())
+                }.code)
+        } finally { transport.close(); server.stop(0) }
+    }
     @Test fun redirectsAndStreamedOversizeCannotReachInstallation() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         var oversized = false

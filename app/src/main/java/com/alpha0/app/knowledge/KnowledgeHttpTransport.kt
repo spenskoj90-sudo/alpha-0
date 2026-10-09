@@ -54,7 +54,7 @@ internal class KnowledgeHttpTransport(private val broker: KnowledgeSessionBroker
     }
     override fun delta(profile: KnowledgeProfile, destination: String, base: String, budget: KnowledgeBudget): JSONObject {
         require(KNOWLEDGE_DIGEST.matches(destination) && KNOWLEDGE_DIGEST.matches(base))
-        return strictJson(get("/v1/knowledge/packs/$destination/delta?${query(profile, mapOf("base_digest" to base))}", MAX_KNOWLEDGE_JSON_BYTES, budget, true), MAX_KNOWLEDGE_JSON_BYTES)
+        return strictJson(get("/v1/knowledge/deltas/$destination?${query(profile, mapOf("base_digest" to base))}", MAX_KNOWLEDGE_JSON_BYTES, budget, true), MAX_KNOWLEDGE_JSON_BYTES)
     }
     private data class Response(val status: Int, val bytes: ByteArray)
     private fun get(path: String, maximum: Int, budget: KnowledgeBudget, delta: Boolean = false): ByteArray {

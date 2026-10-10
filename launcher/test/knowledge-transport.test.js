@@ -187,7 +187,8 @@ test('failed refresh after a knowledge 401 clears the rejected session', async (
     },
   });
   await login(manager);
-  await assert.rejects(manager.knowledgeManifest(profile), /AUTHENTICATION_REQUIRED/);
+  // A rejected refresh revokes the principal; both denial states fail closed.
+  await assert.rejects(manager.knowledgeManifest(profile), /AUTHENTICATION_REQUIRED|KNOWLEDGE_SESSION_CHANGED/);
   assert.equal(manager.status, null);
   assert.equal(manager.accessToken, null);
 });

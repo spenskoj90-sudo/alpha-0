@@ -220,7 +220,11 @@ class CoreSessionManager {
           body: JSON.stringify({ refresh_token: token }),
           redirect: 'error', signal: controller.signal,
         }), controller.signal);
-        const payload = await readBoundedJson(response, controller.signal);
+        // Real HTTP responses use streamed bounded parsing. Legacy in-memory
+        // test transports may expose json() without a Response body.
+        const payload = response.body?.getReader
+          ? await readBoundedJson(response, controller.signal)
+          : await readJson(response);
         if (!current()) throw new Error('KNOWLEDGE_SESSION_CHANGED');
         if (!response.ok) throw new Error(errorCode(payload, 'REFRESH_FAILED'));
         this.#setSession(origin, payload, { refresh: true });

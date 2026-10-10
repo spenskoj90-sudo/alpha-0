@@ -11,10 +11,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -101,10 +104,14 @@ class ActivityAcceptanceInstrumentedTest {
         composeRule.onNodeWithText("Sign in", substring = false).performScrollTo().assertIsDisplayed()
     }
 
-    private fun choice(label: String) = composeRule.onNodeWithText(label)
-        .performScrollTo()
-        .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
-        .assertHeightIsAtLeast(48.dp)
+    private fun choice(label: String): androidx.compose.ui.test.SemanticsNodeInteraction {
+        // The settings screen uses LazyColumn: on smaller Android 14 viewports
+        // theme rows are not composed until their parent list scrolls to them.
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(label))
+        return composeRule.onNodeWithText(label)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+            .assertHeightIsAtLeast(48.dp)
+    }
 
     private fun assertPreferences(language: AppLanguage, theme: AppThemeMode) {
         assertEquals(language, AppPreferences(context).language())

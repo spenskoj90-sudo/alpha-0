@@ -43,7 +43,9 @@ test('knowledge deadline includes a stalled refresh body and is shared across ev
   await assert.rejects(manager.knowledgeManifest(profile), /KNOWLEDGE_TIMEOUT/);
   assert.equal(signals.length, 2);
   assert.ok(signals[0] instanceof AbortSignal);
-  assert.equal(signals[0], signals[1]);
+  // The refresh flight has its own deadline; Stop must not cancel a shared rotation.
+  assert.notEqual(signals[0], signals[1]);
+  await new Promise(resolve => setTimeout(resolve, 10));
   assert.equal(cancelled, true);
 });
 
@@ -207,4 +209,102 @@ test('access denial is classified and a cleared session rejects an in-flight res
   manager.clear();
   finish(new Response(JSON.stringify({ status: 'unavailable' }), { status: 200 }));
   await assert.rejects(pending, /KNOWLEDGE_SESSION_CHANGED/);
+});
+
+test('knowledge and Companion coalesce concurrent single-use refresh without logout', async () => {
+  let release;
+  let entered;
+  const reached = new Promise(resolve => { entered = resolve; });
+  let rotations = 0;
+  const manager = new CoreSessionManager({ fetchImpl: async (url, init = {}) => {
+    if (url.endsWith('/v1/auth/login')) return loginResponse();
+    if (url.endsWith('/v1/sessions/refresh')) {
+      rotations += 1;
+      assert.equal(JSON.parse(init.body).refresh_token, 'refresh-token');
+      entered();
+      return new Promise(resolve => { release = resolve; });
+    }
+    if (url.includes('/v1/billing/features') || url.includes('/v1/knowledge/manifest')) {
+      return header(init, 'authorization') === 'Bearer access-old'
+        ? new Response('{}', { status: 401 })
+        : new Response(JSON.stringify({ status: 'available', features: [] }));
+    }
+    throw new Error('unexpected network request');
+  } });
+  await login(manager);
+  const feature = manager.featureStatus();
+  const knowledge = manager.knowledgeManifest(profile);
+  await reached;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(rotations, 1);
+  release(new Response(JSON.stringify({
+    session_token: 'access-new', refresh_token: 'refresh-new', scopes: ['game:read'],
+  })));
+  assert.equal((await knowledge).status, 'available');
+  assert.deepEqual((await feature).features, []);
+  assert.equal(rotations, 1);
+  assert.equal(manager.refreshToken, 'refresh-new');
+  assert.equal(manager.accessToken, 'access-new');
+});
+
+test('stopping knowledge while Companion shares refresh does not revoke its session', async () => {
+  let release;
+  let entered;
+  const reached = new Promise(resolve => { entered = resolve; });
+  let rotations = 0;
+  const manager = new CoreSessionManager({ fetchImpl: async (url, init = {}) => {
+    if (url.endsWith('/v1/auth/login')) return loginResponse();
+    if (url.endsWith('/v1/sessions/refresh')) {
+      rotations += 1;
+      entered();
+      return new Promise(resolve => { release = resolve; });
+    }
+    if (url.includes('/v1/knowledge/manifest') || url.includes('/v1/billing/features')) {
+      return header(init, 'authorization') === 'Bearer access-old'
+        ? new Response('{}', { status: 401 })
+        : new Response(JSON.stringify({ status: 'available', features: [] }));
+    }
+    throw new Error('unexpected network request');
+  } });
+  await login(manager);
+  const knowledge = manager.knowledgeManifest(profile);
+  const feature = manager.featureStatus();
+  await reached;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(rotations, 1);
+  manager.cancelKnowledge();
+  await assert.rejects(knowledge, /KNOWLEDGE_SESSION_CHANGED/);
+  release(new Response(JSON.stringify({ session_token: 'access-new', refresh_token: 'refresh-new' })));
+  assert.deepEqual((await feature).features, []);
+  assert.equal(manager.accessToken, 'access-new');
+  assert.equal(manager.refreshToken, 'refresh-new');
+  assert.equal(rotations, 1);
+});
+
+test('late unsuccessful old refresh never signs out newer login', async () => {
+  let release;
+  let entered;
+  const reached = new Promise(resolve => { entered = resolve; });
+  let logins = 0;
+  const manager = new CoreSessionManager({ fetchImpl: async url => {
+    if (url.endsWith('/v1/auth/login')) {
+      logins += 1;
+      return new Response(JSON.stringify({
+        session_token: 'login-' + logins, refresh_token: 'refresh-' + logins,
+      }));
+    }
+    if (url.endsWith('/v1/sessions/refresh')) {
+      entered();
+      return new Promise(resolve => { release = resolve; });
+    }
+    throw new Error('unexpected route');
+  } });
+  await login(manager);
+  const stale = manager.refresh();
+  await reached;
+  await login(manager);
+  release(new Response(JSON.stringify({ code: 'INVALID_REFRESH' }), { status: 401 }));
+  await assert.rejects(stale, /KNOWLEDGE_SESSION_CHANGED/);
+  assert.equal(manager.accessToken, 'login-2');
+  assert.equal(manager.refreshToken, 'refresh-2');
 });

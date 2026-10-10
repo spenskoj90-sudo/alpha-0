@@ -210,7 +210,7 @@ class CoreSessionManager {
     // caller. It has its own finite deadline; each caller has a separate
     // cancellation/deadline budget while waiting on its shared result.
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new DOMException('Refresh deadline', 'TimeoutError')), KNOWLEDGE_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(new DOMException('Refresh deadline', 'TimeoutError')), this.#knowledgeTimeoutMs);
     const current = () => epoch === this.#sessionEpoch && origin === this.#coreUrl && token === this.refreshToken;
     const promise = (async () => {
       try {

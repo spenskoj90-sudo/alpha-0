@@ -122,6 +122,7 @@ class CoreSessionManager {
   #mfaExpiresAt = null;
   #sessionEpoch = 0;
   #knowledgeControllers = new Set();
+  #refreshFlight = null;
   #knowledgeTimeoutMs;
 
   constructor({ fetchImpl = globalThis.fetch, knowledgeTimeoutMs = KNOWLEDGE_TIMEOUT_MS } = {}) {
@@ -198,20 +199,44 @@ class CoreSessionManager {
     const epoch = this.#sessionEpoch;
     const origin = this.#coreUrl;
     const token = this.refreshToken;
-    const response = await abortable(() => this.#fetch(`${origin}/v1/sessions/refresh`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
-      body: JSON.stringify({ refresh_token: token }),
-      redirect: 'error', signal,
-    }), signal);
-    const payload = signal ? await readBoundedJson(response, signal) : await readJson(response);
-    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('KNOWLEDGE_SESSION_CHANGED');
-    if (!response.ok) {
-      this.clear();
-      throw new Error(errorCode(payload, 'REFRESH_FAILED'));
+    const inFlight = this.#refreshFlight;
+    if (inFlight && inFlight.epoch === epoch && inFlight.origin === origin && inFlight.token === token) {
+      // A stopped knowledge read may leave this wait; it must not cancel an
+      // independently authorized caller using the same one-use rotation.
+      return abortable(() => inFlight.promise, signal);
     }
-    this.#setSession(this.#coreUrl, payload, { refresh: true });
-    return this.status;
+
+    // The network operation belongs to CoreSessionManager, not to either
+    // caller. It has its own finite deadline; each caller has a separate
+    // cancellation/deadline budget while waiting on its shared result.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException('Refresh deadline', 'TimeoutError')), KNOWLEDGE_TIMEOUT_MS);
+    const current = () => epoch === this.#sessionEpoch && origin === this.#coreUrl && token === this.refreshToken;
+    const promise = (async () => {
+      try {
+        const response = await abortable(() => this.#fetch(origin + '/v1/sessions/refresh', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
+          body: JSON.stringify({ refresh_token: token }),
+          redirect: 'error', signal: controller.signal,
+        }), controller.signal);
+        const payload = await readBoundedJson(response, controller.signal);
+        if (!current()) throw new Error('KNOWLEDGE_SESSION_CHANGED');
+        if (!response.ok) throw new Error(errorCode(payload, 'REFRESH_FAILED'));
+        this.#setSession(origin, payload, { refresh: true });
+        return this.status;
+      } catch (error) {
+        // The one-use POST may already have committed. Invalidate only its
+        // still-current credential; never erase a successor login or rotation.
+        if (current()) this.clear();
+        throw error;
+      } finally {
+        clearTimeout(timer);
+        if (this.#refreshFlight?.promise === promise) this.#refreshFlight = null;
+      }
+    })();
+    this.#refreshFlight = { epoch, origin, token, promise };
+    return abortable(() => promise, signal);
   }
 
   async featureStatus() {

@@ -109,6 +109,7 @@ def build_manifest(
     run_id: str,
     run_attempt: str,
     signer_sha256: str,
+    signer_sha1: str | None = None,
     vk_client_id: str = "0",
     expected_signer_sha256: str | None = None,
     previous_version_code: int | None = None,
@@ -131,6 +132,7 @@ def build_manifest(
     vk_redirect_uri = f"vk{vk_id}://vk.ru/blank.html"
     signer = signer_sha256.strip().lower()
     require(SHA256.fullmatch(signer) is not None, "signer certificate SHA-256 must be 64-character lowercase hex")
+    oauth_signer = signer_sha1.strip().lower() if signer_sha1 is not None else None
     expected_signer = expected_signer_sha256.strip().lower() if expected_signer_sha256 is not None else None
     if signing_mode == "stable-test":
         require(expected_signer is not None, "stable-test signing requires a pinned expected signer certificate SHA-256")
@@ -150,6 +152,11 @@ def build_manifest(
         )
     else:
         require(previous_version_code is None, "ephemeral-debug artifacts must not claim an update versionCode baseline")
+    if signing_mode == "stable-test":
+        require(oauth_signer is not None and SHA40.fullmatch(oauth_signer) is not None,
+                "stable-test Google OAuth binding requires a 40-character signer certificate SHA-1")
+    else:
+        require(oauth_signer is None, "ephemeral-debug artifacts cannot declare a durable Google OAuth certificate binding")
     inspect_apk(apk, source_sha, origin, fallback, vk_redirect_uri)
     apk_bytes = apk.read_bytes()
     timestamp = generated_at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -189,6 +196,9 @@ def build_manifest(
         },
         "signingMode": signing_mode,
         "signerCertificateSha256": signer,
+        # SHA-1 is only a public Google Cloud Android OAuth registration input.
+        # Emit it for a verified stable-test signer, never for ephemeral CI keys.
+        **({"signerCertificateSha1": oauth_signer} if oauth_signer is not None else {}),
         "signerLineageVerified": signing_mode == "stable-test",
         "updateCompatible": signing_mode == "stable-test",
         "updateBaselineVersionCode": previous_version_code,
@@ -211,6 +221,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--run-attempt", required=True)
     parser.add_argument("--signer-sha256", required=True)
+    parser.add_argument("--signer-sha1", help="SHA-1 of the verified stable-test APK signing certificate; never a private key")
     parser.add_argument("--vk-client-id", default="0")
     parser.add_argument("--expected-signer-sha256")
     parser.add_argument("--previous-version-code", type=int)
@@ -235,6 +246,7 @@ def main() -> int:
             run_id=args.run_id,
             run_attempt=args.run_attempt,
             signer_sha256=args.signer_sha256,
+            signer_sha1=args.signer_sha1,
             vk_client_id=args.vk_client_id,
             expected_signer_sha256=args.expected_signer_sha256,
             previous_version_code=args.previous_version_code,

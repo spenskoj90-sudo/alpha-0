@@ -115,4 +115,28 @@ signer compatibility. Preserve that installation while the Owner decides custody
 or a separate durable test identity. Google OAuth SHA-1 registration additionally
 comes from the retained **stable** signing certificate, not an ephemeral build.
 
+## Google OAuth Android client handoff (stable test certificate only)
+
+The dedicated **Physical Test Update APK** workflow verifies one APK signing
+certificate via Android `apksigner`, checks its SHA-256 against the pinned
+`PHYSICAL_TEST_SIGNER_SHA256` repository variable, and extracts the **same
+certificate's public SHA-1** fingerprint. Its signed-artifact manifest adds
+`signerCertificateSha1` only for `signingMode=stable-test` after these checks.
+The routine ephemeral-debug manifest must not contain that field.
+
+After the Human Owner chooses the existing-signer/update path or deliberately
+approves a separate durable test identity, use the signed manifest's exact
+`apk.applicationId=com.alpha0.app.physicaltest` and
+`signerCertificateSha1` to create the **Android** OAuth client in the already
+configured Google Cloud SENTINEL Staging project. Preserve its existing
+**Web** OAuth client ID as the Core Credential Manager audience; never replace
+the Web client ID with the Android client ID.
+
+A recorded SHA-1 is a *registration candidate*, not proof that Google Cloud
+registered it, the installed Infinix app shares the signer, or Google login
+worked. A missing/unverified stable test signer must leave Google disabled.
+Do not issue a stable-signed APK, manipulate signing secrets or declare
+`updateCompatible=true` merely to obtain a SHA-1. All signing material stays
+in approved provider custody; no certificate/private-key bytes are published.
+
 API reference: https://developer.android.com/reference/android/content/pm/SigningInfo

@@ -317,7 +317,10 @@ class CoreSessionManager {
   async #authorizedJson(path, { method = 'GET', body = null } = {}, fallback = 'CORE_REQUEST_FAILED') {
     if (!this.#coreUrl || !this.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
     const rid = requestId();
+    const epoch = this.#sessionEpoch;
+    const origin = this.#coreUrl;
     const send = () => {
+      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
       const headers = { Authorization: `Bearer ${this.accessToken}`, 'X-Request-ID': rid };
       const init = { method, headers };
       if (body !== null) {
@@ -327,12 +330,16 @@ class CoreSessionManager {
       return this.#fetch(`${this.#coreUrl}${path}`, init);
     };
 
+    const attemptedAccess = this.accessToken;
     let response = await send();
+    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
     if (response.status === 401 && this.refreshToken) {
-      await this.refresh(rid);
+      // Another caller may already have rotated the same one-use token.
+      if (this.accessToken === attemptedAccess) await this.refresh(rid);
       response = await send();
     }
     const payload = await readJson(response);
+    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
     if (!response.ok) throw new Error(errorCode(payload, fallback));
     return payload;
   }
@@ -356,11 +363,13 @@ class CoreSessionManager {
       }
       signal.throwIfAborted();
     };
+    let attemptedAccess;
     const send = () => {
       ensureCurrent();
+      attemptedAccess = this.accessToken;
       return abortable(() => this.#fetch(url, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${this.accessToken}`, 'X-Request-ID': rid },
+        headers: { Authorization: `Bearer ${attemptedAccess}`, 'X-Request-ID': rid },
         redirect: 'error', cache: 'no-store', signal,
       }), signal);
     };
@@ -369,8 +378,9 @@ class CoreSessionManager {
       response = await send();
       if (response.status === 401 && this.refreshToken) {
         void response.body?.cancel().catch(() => {});
-        try { await this.refresh(rid, { signal }); }
-        catch (error) {
+        try {
+          if (this.accessToken === attemptedAccess) await this.refresh(rid, { signal });
+        } catch (error) {
           if (signal.aborted || epoch !== this.#sessionEpoch) throw error;
           this.clear();
           throw new Error('AUTHENTICATION_REQUIRED');

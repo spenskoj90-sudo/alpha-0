@@ -309,3 +309,41 @@ test('late unsuccessful old refresh never signs out newer login', async () => {
   assert.equal(manager.accessToken, 'login-2');
   assert.equal(manager.refreshToken, 'refresh-2');
 });
+
+test('late 401 from an old bearer reuses rotated credentials without another one-use refresh', async () => {
+  let releaseKnowledge;
+  let releaseVoice;
+  let rotations = 0;
+  const manager = new CoreSessionManager({ fetchImpl: async (url, init = {}) => {
+    if (url.endsWith('/v1/auth/login')) return loginResponse();
+    if (url.endsWith('/v1/sessions/refresh')) {
+      rotations += 1;
+      return new Response(JSON.stringify({ session_token: 'access-new', refresh_token: 'refresh-new' }));
+    }
+    const old = header(init, 'authorization') === 'Bearer access-old';
+    if (url.includes('/v1/knowledge/manifest')) {
+      if (old) return new Promise(resolve => { releaseKnowledge = resolve; });
+      return new Response(JSON.stringify({ status: 'available' }));
+    }
+    if (url.includes('/v1/companion/voice/status')) {
+      if (old) return new Promise(resolve => { releaseVoice = resolve; });
+      return new Response(JSON.stringify({ status: 'ready' }));
+    }
+    if (url.includes('/v1/billing/features')) {
+      return old ? new Response('{}', { status: 401 })
+        : new Response(JSON.stringify({ features: [] }));
+    }
+    throw new Error('unexpected Core route');
+  } });
+  await login(manager);
+  const delayedKnowledge = manager.knowledgeManifest(profile);
+  const delayedVoice = manager.voiceStatus();
+  assert.deepEqual((await manager.featureStatus()).features, []);
+  assert.equal(rotations, 1);
+  releaseKnowledge(new Response('{}', { status: 401 }));
+  releaseVoice(new Response('{}', { status: 401 }));
+  assert.equal((await delayedKnowledge).status, 'available');
+  assert.equal((await delayedVoice).status, 'ready');
+  assert.equal(rotations, 1);
+  assert.equal(manager.refreshToken, 'refresh-new');
+});

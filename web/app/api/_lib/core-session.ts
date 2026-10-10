@@ -531,6 +531,66 @@ export async function passwordResetWeb(request: NextRequest, step: string): Prom
   }
 }
 
+/** Public, non-enumerating verification. This flow never issues or updates browser session cookies. */
+export async function emailVerificationWeb(request: NextRequest, step: string): Promise<NextResponse> {
+  const id = correlationId(request);
+  const respond = (body: object, status: number, upstream?: Response) => {
+    const result = applyCorrelation(NextResponse.json(body, { status }), id, upstream);
+    result.headers.set('cache-control', 'no-store');
+    return result;
+  };
+  if (!sameOriginWrite(request)) return respond({ error: 'CROSS_SITE_REQUEST_DENIED' }, 403);
+  if (step !== 'request' && step !== 'confirm') return respond({ error: 'EMAIL_VERIFY_ROUTE_DENIED' }, 404);
+  const core = configuredCoreUrl();
+  if (!core) return respond({ error: 'SENTINEL_CORE_URL_NOT_CONFIGURED' }, 503);
+  let body: { email: string; token?: string };
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 2048) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+    const obj: unknown = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+    const input = obj as Record<string, unknown>;
+    if (typeof input.email !== 'string' || input.email.length < 3 || input.email.length > 320) {
+      return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+    }
+    const email = input.email.trim().toLowerCase();
+    if (email.length < 3 || !email.includes('@')) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+    body = { email };
+    if (step === 'confirm') {
+      if (typeof input.token !== 'string' || input.token.length > 512) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+      const token = input.token.replace(/\s/g, '');
+      if (!/^[0-9]{8}$/.test(token) && !/^[A-Za-z0-9_-]{32,512}$/.test(token)) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+      body.token = token;
+    }
+  } catch {
+    return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400);
+  }
+  try {
+    const upstream = await coreFetch(core, '/v1/auth/email-verification/' + step, id, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'accept-language': request.headers.get('accept-language')?.toLowerCase().startsWith('ru') ? 'ru' : 'en',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!upstream.ok) {
+      if (upstream.status === 429) return respond({ error: 'EMAIL_VERIFY_RATE_LIMITED' }, 429, upstream);
+      if (step === 'confirm' && upstream.status === 400) return respond({ error: 'AUTH_ACTION_TOKEN_INVALID' }, 400, upstream);
+      if (upstream.status === 422) return respond({ error: 'EMAIL_VERIFY_INPUT_INVALID' }, 400, upstream);
+      return respond({ error: 'SENTINEL_CORE_UNAVAILABLE' }, 502, upstream);
+    }
+    const payload = await upstream.json();
+    const expected = step === 'request' ? 'ACCEPTED' : 'VERIFIED';
+    const status = step === 'request' ? 202 : 200;
+    return upstream.status === status && payload?.status === expected
+      ? respond({ status: expected }, status, upstream)
+      : respond({ error: 'INVALID_CORE_EMAIL_VERIFY_RESPONSE' }, 502, upstream);
+  } catch {
+    return respond({ error: 'SENTINEL_CORE_UNAVAILABLE' }, 502);
+  }
+}
+
 export async function completeMfaWeb(request: NextRequest): Promise<NextResponse> {
   const requestId = correlationId(request);
   if (!sameOriginWrite(request)) {

@@ -7,6 +7,7 @@ const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
 const { OverlayPresentationStore } = require('./overlay-state');
+const { KnowledgePresentation } = require('./knowledge-presentation');
 const {
   CAPTURE_CONTENT_TYPE,
   MAX_AUDIO_BYTES,
@@ -47,6 +48,7 @@ let voiceConsentGranted = false;
 let voiceProviderStatus = null;
 let voiceStateReason = 'VOICE_CONSENT_REQUIRED';
 let voiceCapturePermissionExpiresAt = 0;
+let knowledge = null;
 
 async function accountSnapshot() {
   if (!session.status) return { session: null, features: [], mfa: session.mfaStatus };
@@ -174,11 +176,13 @@ function applyVoiceIntent(intent) {
 
 const companion = new CompanionProcessManager({
   onStatus: status => {
+    if (status.state === 'STOPPED') knowledge?.stop();
     wowBridge?.onCompanionStatus(status);
     mainWindow?.webContents.send('companion:status', status);
     publishOverlaySnapshot();
     publishVoiceSnapshot();
     if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(status.reason)) {
+      knowledge?.deny();
       resetVoiceState(status.reason);
       publishAccountSnapshot();
     }
@@ -228,6 +232,7 @@ function createWindow() {
   });
   mainWindow = win;
   win.on('closed', () => {
+    knowledge?.stop();
     if (mainWindow === win) mainWindow = null;
     resetVoiceState('VOICE_CONSENT_REQUIRED');
     if (overlayWindow && !overlayWindow.isDestroyed()) overlayWindow.close();
@@ -304,10 +309,13 @@ ipcMain.handle('account:mfa-complete', async (_, code) => {
   return accountSnapshot();
 });
 ipcMain.handle('account:logout', () => {
+  knowledge?.logout();
   wowBridge?.stop(); companion.stop('ACCOUNT_LOGOUT'); session.clear(); overlayStore.clear(); wowCheckpointStatus = null; companionRuntimeHealth = null; resetVoiceState('AUTHENTICATION_REQUIRED'); publishOverlaySnapshot(); return true;
 });
 ipcMain.handle('account:status', () => accountSnapshot());
 ipcMain.handle('companion:status', () => companion.status);
+ipcMain.handle('knowledge:status', event => { requireMainRenderer(event); return knowledge?.status(); });
+ipcMain.handle('knowledge:refresh', event => { requireMainRenderer(event); return knowledge?.refresh(); });
 ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (!session.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
   const requestedCore = normalizeCoreUrl(coreUrl);
@@ -316,9 +324,11 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (!Array.isArray(features.features) || !features.features.includes('companion')) throw new Error('COMPANION_ENTITLEMENT_REQUIRED');
   companionRuntimeHealth = null;
   const status = companion.start({ coreUrl: session.coreUrl, sessionToken: session.accessToken });
+  void knowledge?.start();
   wowBridge?.start(); wowBridge?.onCompanionStatus(status); publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
 ipcMain.handle('companion:stop', () => {
+  knowledge?.stop();
   clearVoiceCapturePermission();
   wowBridge?.stop(); const status = companion.stop('STOPPED_BY_USER'); overlayStore.clear(); companionRuntimeHealth = null; publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
@@ -399,6 +409,14 @@ ipcMain.handle('voice:submit', async (event, payload) => {
 });
 
 app.whenReady().then(() => {
+  knowledge = new KnowledgePresentation({
+    directory: path.join(app.getPath('userData'), 'knowledge'), session,
+    // No renderer/game catalog/SavedVariables assertion proves calibration.
+    // Replace only through a reviewed independently verified target adapter.
+    getTrustedContext: () => null,
+    getTrustedObservation: () => null,
+    onChange: status => mainWindow?.webContents.send('knowledge:status', status),
+  });
   configureVoicePermissions();
   wowBridge = createWowBridge(); createOverlayWindow(); createWindow();
   app.on('activate', () => {
@@ -408,5 +426,5 @@ app.whenReady().then(() => {
     }
   });
 });
-app.on('before-quit', () => { if (overlayExpiryTimer) clearTimeout(overlayExpiryTimer); resetVoiceState('APPLICATION_EXIT'); wowBridge?.stop(); companion.stop('APPLICATION_EXIT'); });
+app.on('before-quit', () => { knowledge?.stop(); if (overlayExpiryTimer) clearTimeout(overlayExpiryTimer); resetVoiceState('APPLICATION_EXIT'); wowBridge?.stop(); companion.stop('APPLICATION_EXIT'); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

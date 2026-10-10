@@ -92,6 +92,23 @@ Base checkpoint: `77f5c742412d5c394e9143ad3bf7188e4edee85a`. Plan: `docs/superpo
 - [ ] **#379 — orchestration:** bounded supervised write adapters and measured benefit; reader success is not write execution.
 - [ ] **#381 — benchmark:** justified measured model/review comparison; existing samples with unknown costs are not a full benchmark.
 
+## Future product program — Owner requirements recorded 2026-10-09
+
+Canonical scope: [PLAYER_INTELLIGENCE_ROADMAP_V1.md](PLAYER_INTELLIGENCE_ROADMAP_V1.md), tracking #455. This is a future backlog, not implementation evidence or automatic inclusion in the current release. Finish #451/#454 before opening new implementation streams; #277/#430/#375 retain their existing acceptance scope.
+
+- [ ] **GI-01/GI-02 — sources and knowledge:** exact-profile field/source/freshness/UNKNOWN map, reviewed mechanics and modular distribution within existing pack bounds; measure disk/RAM/latency.
+- [ ] **GI-03 — character improvement:** jointly compare talents/glyphs/gear/enchants/gems/consumables and play goals, including Owner's nonstandard build examples; show reasons/trade-offs and comparable evidence.
+- [ ] **GI-04/GI-05 — adaptive analysis and improvement:** local event-driven priorities, uncertain opponent model, reproducible replay, consented structured post-fight review and independently reviewed pack updates.
+- [ ] **GI-06/GI-07 — bounded execution and expansion:** separate stand-tested action/outcome/Stop/ARM gates; expand classes/encounters/games only after a complete measured slice. AUTOMATIC_EXECUTION_DISABLED remains.
+- [ ] **GI-08 — module contract:** versioned domain modules, shared player state and lifecycle, declared data/action/UI dependencies; registration never grants entitlement or execution.
+- [ ] **GI-09–GI-13 — gameplay beyond combat:** Auction/Economy, Exploration/Travel, Gathering, Crafting and a coordinated cross-module character-development plan. Separate data/quality/privacy/action acceptance for each.
+- [ ] **GI-14–GI-17 — full-game assistance:** dungeons/raids, arenas/BGs, leveling/quests/achievements/reputation, shared inventory/mail/personal/guild banks and enchanting; source/rights/freshness and per-domain action gates.
+- [ ] **BP-01/BP-02 — product packaging:** understandable subscription assistance groups with included dependencies; verified server-side Owner full-feature no-charge grant without bypassing safety/privacy. Names/prices not approved; no live billing activation.
+- [ ] **BP-03/BP-04 — subscription enforcement/security:** weekly/monthly/annual options to be approved, server-authoritative expiry/revoke/admin audit, bounded client leases and fail-closed offline access; verify clock/cache/replay/late-response and tenant isolation. Local computation does not imply perpetual offline subscription rights.
+- [ ] **UX-01 / #375 — public site and game UX:** Owner rejected current public-site structure/design; separate pages/navigation/mobile quality and explicit visual acceptance.
+
+Next: finish the current engineering block. Then source-map the next selected game slice (GI-01), designing its shared module seam (GI-08) without starting all domains at once. Do not shrink the long-term scope to three observer signals or copy competitor presets as the final product.
+
 ## Rules
 
 - Do not mark `[x]` without direct evidence appropriate to the claim: exact SHA + PR/commit + CI Run ID and/or device/runtime evidence.

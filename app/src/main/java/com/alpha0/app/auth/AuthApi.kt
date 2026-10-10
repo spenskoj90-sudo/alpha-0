@@ -7,6 +7,7 @@ import com.alpha0.app.net.HttpRequest
 import com.alpha0.app.net.HttpResponse
 import com.alpha0.app.net.HttpTransport
 import com.alpha0.app.net.UrlConnectionHttpTransport
+import com.alpha0.app.net.CoreRefreshSerialization
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -15,6 +16,8 @@ import java.net.SocketTimeoutException
 
 interface RefreshClient {
     suspend fun refresh(refreshToken: String): AuthApi.Result
+    suspend fun refreshWithCommit(refreshToken: String, stillCurrent: () -> Boolean, commit: (AuthApi.Result) -> AuthApi.Result): AuthApi.Result =
+        if (stillCurrent()) commit(refresh(refreshToken)) else AuthApi.Result.Failure("SESSION_CHANGED")
 }
 
 class AuthApi(
@@ -127,11 +130,18 @@ class AuthApi(
     }
 
     override suspend fun refresh(refreshToken: String): Result = withContext(Dispatchers.IO) {
-        requestJson(
+        synchronized(CoreRefreshSerialization.lock) { requestJson(
             "/v1/sessions/refresh",
             JSONObject().apply { put("refresh_token", refreshToken) }.toString(),
             "REFRESH",
-        )
+        ) }
+    }
+
+    override suspend fun refreshWithCommit(refreshToken: String, stillCurrent: () -> Boolean, commit: (Result) -> Result): Result = withContext(Dispatchers.IO) {
+        synchronized(CoreRefreshSerialization.lock) {
+            if (!stillCurrent()) Result.Failure("SESSION_CHANGED")
+            else commit(requestJson("/v1/sessions/refresh", JSONObject().put("refresh_token", refreshToken).toString(), "REFRESH"))
+        }
     }
 
     suspend fun requestEmailVerification(email: String, language: String = "en"): ActionResult = withContext(Dispatchers.IO) {

@@ -11,6 +11,7 @@
 - `WORKFLOW_CONTRACT.md` and `AI_ORCHESTRATION_ROUTING.md` — execution/routing contracts.
 - `SENTINEL_CURRENT_STATE.md` — semantic orientation only; no mutable HEAD mirror.
 - `TASKS.md` — work queue, not implementation evidence.
+- `PLAYER_INTELLIGENCE_ROADMAP_V1.md` — ACTIVE Owner requirements/future backlog (#455): builds, adaptive analysis, modular full-game domains, subscription groups/Owner access, bounded execution, UX and continuity; not implemented-feature evidence.
 - release/evidence contracts: `SENTINEL_EVIDENCE_PROTOCOL.md`, `RELEASE_GATES.md`, `RELEASE_EVIDENCE_PREFLIGHT_V1.md`, `RELEASE_LINEAGE_V1.md`, `SUPPLY_CHAIN_EVIDENCE_V1.md`, `ARTIFACT_ATTESTATION_V1.md`, `FINAL_RELEASE_ACCEPTANCE_V1.md`, `USER_VISIBLE_ACCEPTANCE_CONTRACT.md`.
 - design authority: `DESIGN_SYSTEM_V3.md` + `../design/sentinel-design-system.v3.json`; the design laboratory is input, not production truth.
 - `CONTROL_BRIDGE_ARCHITECTURE.md` + `../control-bridge/`.

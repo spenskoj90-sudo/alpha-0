@@ -32,6 +32,13 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 }
 
 internal val ENGLISH = mapOf(
+    "game_knowledge_title" to "Verified game knowledge",
+    "game_knowledge_waiting" to "Waiting for a verified target profile",
+    "game_knowledge_loading" to "Checking knowledge freshness",
+    "game_knowledge_ready" to "Verified knowledge available",
+    "game_knowledge_denied" to "Knowledge access denied",
+    "game_knowledge_unavailable" to "Verified knowledge unavailable",
+    "game_knowledge_boundary" to "Only an independently verified exact target and fresh observation can show recommendations. Unverified recognition grants no recommendations, game input or ARM.",
     "game_calibration_title" to "Numeric calibration",
     "game_calibration_pending" to "Physical review pending",
     "game_calibration_disclosure" to "Enter the health you saw in the game. Save records only these numbers and the last OCR candidate to local diagnostics. Missing and stale results are retained; this does not verify recognition. No pixels or raw text are saved.",
@@ -376,6 +383,13 @@ internal val ENGLISH = mapOf(
 )
 
 internal val RUSSIAN = mapOf(
+    "game_knowledge_title" to "Проверенные игровые знания",
+    "game_knowledge_waiting" to "Ожидание проверенного профиля цели",
+    "game_knowledge_loading" to "Проверка актуальности знаний",
+    "game_knowledge_ready" to "Проверенные знания доступны",
+    "game_knowledge_denied" to "Доступ к знаниям запрещён",
+    "game_knowledge_unavailable" to "Проверенные знания недоступны",
+    "game_knowledge_boundary" to "Рекомендации требуют независимой проверки точной цели и свежего наблюдения. Непроверенное распознавание не разрешает рекомендации, ввод в игру или ARM.",
     "game_calibration_title" to "Числовая калибровка",
     "game_calibration_pending" to "Ожидает физической проверки",
     "game_calibration_disclosure" to "Введите здоровье, которое видели в игре. Кнопка сохраняет только эти числа и последний кандидат OCR в локальную диагностику. Пропуски и устаревшие результаты учитываются; распознавание ещё не подтверждено. Кадры и сырой текст не сохраняются.",

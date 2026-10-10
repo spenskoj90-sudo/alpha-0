@@ -17,6 +17,7 @@ object GameObservationRuntime {
     val state = mutableState.asStateFlow()
 
     internal fun begin(install: StockGameInstall, id: String, now: Long) {
+        com.alpha0.app.knowledge.AndroidKnowledgeRuntime.start()
         session.start(id, now)
         mutableState.value = GameObservationViewState(session.snapshot, install)
     }
@@ -26,6 +27,7 @@ object GameObservationRuntime {
     }
 
     internal fun stop(reason: String) {
+        com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
         session.stop(reason)
         publish()
     }

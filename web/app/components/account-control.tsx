@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useLocale } from './locale-provider';
 import { PasswordRecovery } from './password-recovery';
+import { EmailVerification } from './email-verification';
 
 type Plan = {
   code: string;
@@ -138,6 +139,7 @@ export function AccountControl() {
   const [view, setView] = useState<ViewState>('CHECKING');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [recovering, setRecovering] = useState(false);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaRequired, setMfaRequired] = useState(false);
@@ -363,13 +365,15 @@ export function AccountControl() {
         </div>
         <div className="auth-form">
         <div className="panel-heading">
-          <div><div className="label">{t("Account")}</div><h2>{recovering ? t("Recover account") : mode === 'login' ? t("Sign in") : t("Create account")}</h2></div>
+          <div><div className="label">{t("Account")}</div><h2>{recovering ? t("Recover account") : verifyingEmail ? t("Verify email") : mode === 'login' ? t("Sign in") : t("Create account")}</h2></div>
           <span className="badge">{t("Secure Web session")}</span>
         </div>
         {recovering ? <PasswordRecovery initialEmail={email} onCancel={() => { setRecovering(false); setMode('login'); setMessage(''); }} onComplete={() => {
           setRecovering(false); setMode('login'); setPassword(''); setMfaRequired(false); setMfaCode('');
           setMessage('Password updated. Sign in with your new password.'); setMessageTone('status');
           window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        }} /> : verifyingEmail ? <EmailVerification initialEmail={email} onCancel={() => { setVerifyingEmail(false); setMessage(''); }} onComplete={() => {
+          setVerifyingEmail(false); setMessage('Email verified. You can sign in.'); setMessageTone('status');
         }} /> : mfaRequired ? (
           <form onSubmit={completeMfa}>
             <label className="field-label">{t("Authenticator or recovery code")}{' '}<input
@@ -404,6 +408,7 @@ export function AccountControl() {
               {mode === 'login' ? t("Need an account? Register") : t("Already registered? Sign in")}
             </button>
             {mode === 'login' && <button className="text-btn" disabled={busy} onClick={() => { setRecovering(true); setPassword(''); setMessage(''); }}>{t("Forgot password?")}</button>}
+            <button className="text-btn" disabled={busy} onClick={() => { setVerifyingEmail(true); setRecovering(false); setMessage(''); }}>{t("Verify email")}</button>
           </>
         )}
         {message && <p className="status-message" role={messageTone === 'error' ? 'alert' : 'status'} aria-live={messageTone === 'error' ? 'assertive' : 'polite'}>{t(message)}</p>}

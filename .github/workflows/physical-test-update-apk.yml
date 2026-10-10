@@ -128,11 +128,17 @@ jobs:
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$apksigner"
           "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
+          # One certificate only: multi-signer APKs cannot claim a single OAuth identity.
+          test "$(grep -Ec '^Signer #[0-9]+ certificate SHA-256 digest:' physical-test-signer.txt)" -eq 1
           signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
+          signer_sha1="$(sed -n 's/^Signer #1 certificate SHA-1 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
           case "$signer_sha256" in *[!0-9a-f]*|'') echo "invalid signer certificate SHA-256"; exit 1 ;; esac
           test "${#signer_sha256}" -eq 64
           test "$signer_sha256" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"
+          case "$signer_sha1" in *[!0-9a-f]*|'') echo "invalid signer certificate SHA-1"; exit 1 ;; esac
+          test "${#signer_sha1}" -eq 40
           echo "SENTINEL_PHYSICAL_TEST_SIGNER_SHA256=$signer_sha256" >> "$GITHUB_ENV"
+          echo "SENTINEL_PHYSICAL_TEST_SIGNER_SHA1=$signer_sha1" >> "$GITHUB_ENV"
           sha256sum app/build/outputs/apk/physicalTest/app-physicalTest.apk | tee physical-test-apk.sha256
 
       - name: Verify update artifact identity and signer lineage
@@ -145,7 +151,8 @@ jobs:
             --api-base-url "$PHYSICAL_TEST_API_BASE_URL" \
             --api-fallback-base-url "$PHYSICAL_TEST_API_FALLBACK_BASE_URL" \
             --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
-            --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256" --vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID" \
+            --signer-sha256 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256" \
+            --signer-sha1 "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA1" --vk-client-id "$PHYSICAL_TEST_VK_CLIENT_ID" \
             --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256" \
             --previous-version-code "$PHYSICAL_TEST_PREVIOUS_VERSION_CODE" \
             --signing-mode stable-test --workflow-name "Physical Test Update APK" \
@@ -153,6 +160,7 @@ jobs:
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["updateCompatible"]).lower())')" = "true"
           test "$(python -c 'import json; print(str(json.load(open("physical-test-manifest.json"))["signerLineageVerified"]).lower())')" = "true"
           test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"
+          test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha1"])')" = "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA1"
           test "$(cut -d ' ' -f 1 physical-test-apk.sha256)" = "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["apk"]["sha256"])')"
 
       - name: Upload update-compatible exact-SHA APK

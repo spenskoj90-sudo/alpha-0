@@ -12,6 +12,7 @@ from physical_test_artifact import build_manifest
 
 SHA = "a" * 40
 SIGNER = "b" * 64
+SIGNER_SHA1 = "d" * 40
 OTHER_SIGNER = "c" * 64
 ORIGIN = "https://sentinel-core-staging.onrender.com"
 FALLBACK = "https://sentinel-web-staging-fxhn.onrender.com/api/mobile-core"
@@ -90,6 +91,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["federatedAuth"]["vkRedirectUri"], VK_REDIRECT)
         self.assertEqual(manifest["signingMode"], "ephemeral-debug")
         self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
+        self.assertNotIn("signerCertificateSha1", manifest)
         self.assertFalse(manifest["signerLineageVerified"])
         self.assertFalse(manifest["updateCompatible"])
         self.assertEqual(manifest["workflow"]["name"], "Physical Test APK")
@@ -112,6 +114,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
                 run_id="12345",
                 run_attempt="2",
                 signer_sha256=SIGNER,
+                signer_sha1=SIGNER_SHA1,
                 vk_client_id=VK_ID,
                 expected_signer_sha256=SIGNER,
                 previous_version_code=10001,
@@ -123,9 +126,38 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertTrue(manifest["signerLineageVerified"])
         self.assertEqual(manifest["updateBaselineVersionCode"], 10001)
         self.assertEqual(manifest["signerCertificateSha256"], SIGNER)
+        self.assertEqual(manifest["signerCertificateSha1"], SIGNER_SHA1)
+        self.assertEqual(manifest["apk"]["applicationId"], "com.alpha0.app.physicaltest")
         self.assertEqual(manifest["signingMode"], "stable-test")
         self.assertEqual(manifest["workflow"]["name"], "Physical Test Update APK")
         self.assertEqual(manifest["artifactName"], f"sentinel-physical-test-update-apk-{SHA}")
+
+    def test_stable_google_oauth_binding_requires_exact_certificate_sha1(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            for signer_sha1 in (None, "", "invalid", "a" * 39, "A" * 41, "g" * 40):
+                with self.subTest(signer_sha1=signer_sha1), self.assertRaisesRegex(ValueError, "requires a 40-character signer certificate SHA-1"):
+                    build_manifest(
+                        apk=apk, output_metadata=metadata, version_file=version,
+                        source_sha=SHA, api_base_url=ORIGIN, api_fallback_base_url=FALLBACK,
+                        repository="spenskoj90-sudo/alpha-0", run_id="12345", run_attempt="2",
+                        signer_sha256=SIGNER, signer_sha1=signer_sha1,
+                        expected_signer_sha256=SIGNER, vk_client_id=VK_ID,
+                        previous_version_code=10001, signing_mode="stable-test",
+                        workflow_name="Physical Test Update APK",
+                    )
+
+    def test_ephemeral_signing_cannot_claim_google_oauth_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            apk, metadata, version = self.fixture(Path(temp))
+            with self.assertRaisesRegex(ValueError, "ephemeral-debug artifacts cannot declare"):
+                build_manifest(
+                    apk=apk, output_metadata=metadata, version_file=version,
+                    source_sha=SHA, api_base_url=ORIGIN, api_fallback_base_url=FALLBACK,
+                    repository="spenskoj90-sudo/alpha-0", run_id="12345", run_attempt="2",
+                    signer_sha256=SIGNER, signer_sha1=SIGNER_SHA1,
+                    vk_client_id=VK_ID,
+                )
 
     def test_stable_update_refuses_missing_or_non_increasing_baseline(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

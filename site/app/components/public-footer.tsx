@@ -1,10 +1,11 @@
 "use client";
 
+import { publicSections } from "./public-sections";
 import { useLocale } from "./locale-provider";
 import Link from "next/link";
 
 export function PublicFooter() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   return (
     <footer className="site-footer">
       <div className="site-shell footer-grid">
@@ -13,6 +14,7 @@ export function PublicFooter() {
           <p className="footer-copy">{t("Pre-release trusted intelligence platform. Public release and production activation remain separate acceptance gates.")}</p>
         </div>
         <nav className="footer-nav" aria-label={t("Footer")}>
+          {publicSections.map(section => <Link key={section.path} href={`/${section.path}/`}>{locale === "ru" ? section.ru : section.en}</Link>)}
           <Link href="/security/">{t("Security")}</Link>
           <Link href="/privacy/">{t("Privacy")}</Link>
           <Link href="/status/">{t("Release status")}</Link>

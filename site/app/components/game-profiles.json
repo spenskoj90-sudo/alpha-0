@@ -1,0 +1,184 @@
+[
+  {
+    "id": "world-of-warcraft-windows",
+    "name": "World of Warcraft",
+    "platform": "windows",
+    "patch": "3.3.5a",
+    "implementation_status": "adapter_foundation"
+  },
+  {
+    "id": "albion-online-windows",
+    "name": "Albion Online",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "path-of-exile-windows",
+    "name": "Path of Exile",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "path-of-exile-2-windows",
+    "name": "Path of Exile 2",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "dayz-windows",
+    "name": "DayZ",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "stalcraft-windows",
+    "name": "STALCRAFT",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "rust-windows",
+    "name": "Rust",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "arena-breakout-infinite-windows",
+    "name": "Arena Breakout Infinite",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "marvel-rivals-windows",
+    "name": "Marvel Rivals",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "wardogs-windows",
+    "name": "WARDOGS",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "mistfall-hunter-windows",
+    "name": "Mistfall Hunter",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "hunt-showdown-windows",
+    "name": "Hunt: Showdown",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "stay-out-windows",
+    "name": "Stay Out",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "overwatch-windows",
+    "name": "Overwatch",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "deadlock-windows",
+    "name": "Deadlock",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "scum-windows",
+    "name": "SCUM",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "squad-windows",
+    "name": "Squad",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "last-epoch-windows",
+    "name": "Last Epoch",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "apex-legends-windows",
+    "name": "Apex Legends",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "deadside-windows",
+    "name": "Deadside",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "dead-by-daylight-windows",
+    "name": "Dead by Daylight",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "mindustry-android",
+    "name": "Mindustry",
+    "platform": "android",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "mindustry-windows",
+    "name": "Mindustry",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "luanti-android",
+    "name": "Luanti",
+    "platform": "android",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "luanti-windows",
+    "name": "Luanti",
+    "platform": "windows",
+    "patch": null,
+    "implementation_status": "research_only"
+  },
+  {
+    "id": "shattered-pixel-dungeon-android",
+    "name": "Shattered Pixel Dungeon",
+    "platform": "android",
+    "patch": null,
+    "implementation_status": "observer_pilot"
+  }
+]

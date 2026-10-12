@@ -29,3 +29,19 @@ Production deployment is Owner-gated. The hosting edge must apply the repository
 ## Design authority
 
 The site follows SENTINEL Design System v3.0: Calm Precision / Trusted Intelligence. Brand raster/glyph assets are byte-identical copies of the repository-managed production family.
+
+## Public navigation
+
+The compact home links to separate `/features`, `/games`, `/modules`, `/pricing`,
+`/help` and `/access` exports, alongside existing security/privacy/status pages.
+RU/EN selection persists across navigation; page titles follow the locale.
+The access page links to the existing staging Control Plane and collects no credentials.
+Prices are intentionally unpublished. Game entries retain research/foundation/observer
+status and cannot grant capabilities or imply verified support.
+
+`app/components/game-profiles.json` is a public-field projection of
+`server/app/data/game-capability-catalog.v1.json`. After changing the canonical catalog,
+regenerate the projection; CI rejects drift through `scripts/verify_public_site_routes.py`.
+From the repository root after building: `python scripts/verify_public_site_routes.py`.
+For an isolated static browser run: from `web`, use
+`npx playwright test --config public-site.playwright.config.ts`.

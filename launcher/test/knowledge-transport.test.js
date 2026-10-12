@@ -353,6 +353,7 @@ test('late retry 401 cannot clear credentials from a second rotation', async () 
   let enteredRetry;
   const retrySent = new Promise(resolve => { enteredRetry = resolve; });
   let rotations = 0;
+  let cancelled = false;
   const manager = new CoreSessionManager({ fetchImpl: async (url, init = {}) => {
     if (url.endsWith('/v1/auth/login')) return loginResponse();
     if (url.endsWith('/v1/sessions/refresh')) {
@@ -372,8 +373,9 @@ test('late retry 401 cannot clear credentials from a second rotation', async () 
   await retrySent;
   await manager.refresh();
   assert.equal(rotations, 2);
-  releaseRetry(new Response('{}', { status: 401 }));
+  releaseRetry(new Response(new ReadableStream({ cancel() { cancelled = true; } }), { status: 401 }));
   await assert.rejects(pending, /KNOWLEDGE_SESSION_CHANGED/);
+  assert.equal(cancelled, true);
   assert.equal(manager.accessToken, 'access-2');
   assert.equal(manager.refreshToken, 'refresh-2');
   assert.notEqual(manager.status, null);
@@ -389,4 +391,20 @@ test('retry 401 for the current bearer still invalidates the rejected session', 
   await assert.rejects(manager.knowledgeManifest(profile), /AUTHENTICATION_REQUIRED/);
   assert.equal(manager.status, null);
   assert.equal(manager.accessToken, null);
+});
+
+test('terminal knowledge errors cancel unconsumed response streams', async () => {
+  for (const status of [403, 404, 500, 200]) {
+    let cancelled = false;
+    const manager = new CoreSessionManager({ fetchImpl: async url => {
+      if (url.endsWith('/v1/auth/login')) return loginResponse();
+      return new Response(new ReadableStream({ cancel() { cancelled = true; } }), {
+        status, headers: status === 200 ? { 'content-length': '9999999' } : {},
+      });
+    } });
+    await login(manager);
+    await assert.rejects(manager.knowledgeManifest(profile), /KNOWLEDGE_ACCESS_DENIED|KNOWLEDGE_UNAVAILABLE|KNOWLEDGE_REQUEST_FAILED|KNOWLEDGE_SIZE_INVALID/);
+    assert.equal(cancelled, true, `status ${status} stream released`);
+    assert.equal(manager.accessToken, 'access-old');
+  }
 });

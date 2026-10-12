@@ -412,7 +412,10 @@ class CoreSessionManager {
     } finally {
       clearTimeout(timer);
       this.#knowledgeControllers.delete(controller);
-      if (signal.aborted) void response?.body?.cancel().catch(() => {});
+      // Terminal errors may arrive with an unconsumed streaming body.
+      // Release every response on exit, including stale/current denials;
+      // consumed streams are already closed and cancellation is harmless.
+      void response?.body?.cancel().catch(() => {});
     }
   }
 

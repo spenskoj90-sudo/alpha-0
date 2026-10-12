@@ -347,3 +347,46 @@ test('late 401 from an old bearer reuses rotated credentials without another one
   assert.equal(rotations, 1);
   assert.equal(manager.refreshToken, 'refresh-new');
 });
+
+test('late retry 401 cannot clear credentials from a second rotation', async () => {
+  let releaseRetry;
+  let enteredRetry;
+  const retrySent = new Promise(resolve => { enteredRetry = resolve; });
+  let rotations = 0;
+  const manager = new CoreSessionManager({ fetchImpl: async (url, init = {}) => {
+    if (url.endsWith('/v1/auth/login')) return loginResponse();
+    if (url.endsWith('/v1/sessions/refresh')) {
+      rotations += 1;
+      return new Response(JSON.stringify({ session_token: `access-${rotations}`, refresh_token: `refresh-${rotations}` }));
+    }
+    if (url.includes('/v1/knowledge/manifest')) {
+      if (header(init, 'authorization') === 'Bearer access-old') return new Response('{}', { status: 401 });
+      assert.equal(header(init, 'authorization'), 'Bearer access-1');
+      enteredRetry();
+      return new Promise(resolve => { releaseRetry = resolve; });
+    }
+    throw new Error('unexpected Core route');
+  } });
+  await login(manager);
+  const pending = manager.knowledgeManifest(profile);
+  await retrySent;
+  await manager.refresh();
+  assert.equal(rotations, 2);
+  releaseRetry(new Response('{}', { status: 401 }));
+  await assert.rejects(pending, /KNOWLEDGE_SESSION_CHANGED/);
+  assert.equal(manager.accessToken, 'access-2');
+  assert.equal(manager.refreshToken, 'refresh-2');
+  assert.notEqual(manager.status, null);
+});
+
+test('retry 401 for the current bearer still invalidates the rejected session', async () => {
+  const manager = new CoreSessionManager({ fetchImpl: async url => {
+    if (url.endsWith('/v1/auth/login')) return loginResponse();
+    if (url.endsWith('/v1/sessions/refresh')) return loginResponse('access-new');
+    return new Response('{}', { status: 401 });
+  } });
+  await login(manager);
+  await assert.rejects(manager.knowledgeManifest(profile), /AUTHENTICATION_REQUIRED/);
+  assert.equal(manager.status, null);
+  assert.equal(manager.accessToken, null);
+});

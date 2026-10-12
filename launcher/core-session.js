@@ -390,6 +390,10 @@ class CoreSessionManager {
       }
       ensureCurrent();
       if (response.status === 401) {
+        // A second rotation may supersede the retry's bearer while its
+        // response is in flight. Reject that stale read without revoking
+        // the successor credentials; do not retry indefinitely.
+        if (this.accessToken !== attemptedAccess) throw new Error('KNOWLEDGE_SESSION_CHANGED');
         this.clear();
         throw new Error('AUTHENTICATION_REQUIRED');
       }

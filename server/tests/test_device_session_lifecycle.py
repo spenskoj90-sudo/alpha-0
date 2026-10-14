@@ -38,7 +38,7 @@ def session_for(user_id="u1"):
     return access, refresh
 
 
-def test_bind_links_existing_user_session_to_device():
+def test_bind_preserves_unbound_session_until_signed_device_proof():
     reset_store()
     key = ec.generate_private_key(ec.SECP256R1())
     public_b64, fingerprint = public_material(key)
@@ -56,7 +56,21 @@ def test_bind_links_existing_user_session_to_device():
 
     assert response.status_code == 200, response.text
     device_id = response.json()["device_id"]
-    assert store.get_session(access)["device_id"] == device_id
+    assert store.get_session(access)["device_id"] is None
+    denied = client.post("/v1/account/mfa/totp/enroll", headers={"Authorization": f"Bearer {access}"})
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "DEVICE_BOUND_SESSION_REQUIRED"
+    request_id = f"bind-proof-{device_id}"
+    timestamp = int(time.time())
+    signed = canonical_json({"challenge": response.json()["challenge"], "timestamp": timestamp, "request_id": request_id})
+    signature = base64.b64encode(key.sign(signed, ec.ECDSA(hashes.SHA256()))).decode()
+    proven = client.post(f"/v1/devices/{device_id}/prove", json={
+        "challenge": response.json()["challenge"], "timestamp": timestamp,
+        "request_id": request_id, "signature_b64": signature,
+    })
+    assert proven.status_code == 200, proven.text
+    assert store.get_session(proven.json()["session_token"])["device_id"] == device_id
+    assert store.get_session(access)["device_id"] is None
 
 
 def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session():
@@ -65,7 +79,15 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
     owner_public_b64, owner_fingerprint = public_material(owner_key)
     owner_device = store.register_device("u1", "android", owner_public_b64, owner_fingerprint, "unused-owner")
     owner_access, _ = session_for()
-    store.sessions[hashlib.sha256(owner_access.encode()).hexdigest()]["device_id"] = owner_device
+    new_key = ec.generate_private_key(ec.SECP256R1())
+    new_public_b64, new_fingerprint = public_material(new_key)
+    unproved = client.post(f"/v1/devices/{owner_device}/rotate",
+        headers={"Authorization": f"Bearer {owner_access}"},
+        json={"platform": "android", "public_key_der_b64": new_public_b64,
+              "fingerprint_sha256": new_fingerprint})
+    assert unproved.status_code == 403
+    assert unproved.json()["code"] == "DEVICE_PROOF_REQUIRED"
+    owner_access, _, _, _ = store.issue_session(owner_device, "u1", SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
 
     foreign_key = ec.generate_private_key(ec.SECP256R1())
     foreign_public_b64, foreign_fingerprint = public_material(foreign_key)
@@ -83,8 +105,6 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
     assert foreign_attempt.status_code == 403
     assert foreign_attempt.json()["code"] == "DEVICE_SCOPE_MISMATCH"
 
-    new_key = ec.generate_private_key(ec.SECP256R1())
-    new_public_b64, new_fingerprint = public_material(new_key)
     bad_fingerprint = "0" * 64
     bad = client.post(
         f"/v1/devices/{owner_device}/rotate",
@@ -126,7 +146,7 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
         json={"action": "character:read", "resource": "character:42"},
     )
     assert authorized.status_code == 200
-    assert store.get_session(new_access)["device_id"] == payload["device_id"]
+    assert store.get_session(new_access)["device_id"] is None  # Replacement key must prove itself.
 
 
 def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():
@@ -172,8 +192,7 @@ def test_rotation_recovery_finds_accepted_key_without_creating_another_binding()
     old_key = ec.generate_private_key(ec.SECP256R1())
     old_public, old_fingerprint = public_material(old_key)
     old_device = store.register_device("u1", "android", old_public, old_fingerprint, "old-challenge")
-    old_access, _ = session_for()
-    store.sessions[hashlib.sha256(old_access.encode()).hexdigest()]["device_id"] = old_device
+    old_access, _, _, _ = store.issue_session(old_device, "u1", SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
 
     new_key = ec.generate_private_key(ec.SECP256R1())
     new_public, new_fingerprint = public_material(new_key)

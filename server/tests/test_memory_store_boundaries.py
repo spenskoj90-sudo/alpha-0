@@ -88,7 +88,8 @@ def test_device_rotation_validates_owner_state_conflicts_and_can_reuse_exact_new
     assert access and refresh and scopes
     assert store.devices[old]["state"] == "REVOKED"
     assert store.get_session(old_access) is None
-    assert store.get_session(access)["device_id"] == reusable
+    assert store.get_session(access)["device_id"] is None
+    assert "game:write" not in scopes
 
 
 def test_challenge_and_proof_replay_guards_cover_mismatch_expiry_and_consumption() -> None:

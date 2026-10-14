@@ -361,12 +361,21 @@ def test_google_provider_link_requires_authenticated_account_and_fresh_nonce(mon
         (suffix * 2)[:64],
         f"federated-link-challenge-{suffix}",
     )
+    # Historical unproven device associations cannot authorize linking.
     session_record = main_module.store.sessions[session_hash(access)]
     session_record["device_id"] = device_id
+    legacy = client.post(
+        "/v1/account/providers/google/link",
+        headers={"Authorization": f"Bearer {access}"},
+        json=payload,
+    )
+    assert legacy.status_code == 403
+    assert legacy.json()["code"] == "DEVICE_BOUND_SESSION_REQUIRED"
+    proved_access, _, _, _ = main_module.store.issue_session(device_id, email, 300, 300)
 
     linked = client.post(
         "/v1/account/providers/google/link",
-        headers={"Authorization": f"Bearer {access}"},
+        headers={"Authorization": f"Bearer {proved_access}"},
         json=payload,
     )
     assert linked.status_code == 200
@@ -374,14 +383,14 @@ def test_google_provider_link_requires_authenticated_account_and_fresh_nonce(mon
 
     security = client.get(
         "/v1/account/security",
-        headers={"Authorization": f"Bearer {access}"},
+        headers={"Authorization": f"Bearer {proved_access}"},
     )
     assert security.status_code == 200
     assert "google" in security.json()["providers"]
 
     replay = client.post(
         "/v1/account/providers/google/link",
-        headers={"Authorization": f"Bearer {access}"},
+        headers={"Authorization": f"Bearer {proved_access}"},
         json=payload,
     )
     assert replay.status_code == 400

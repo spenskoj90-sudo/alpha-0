@@ -593,10 +593,10 @@ def test_postgres_device_rotation_is_atomic_and_conflict_rolls_back():
     assert new_device != old_device
     assert new_access
     assert new_refresh
-    assert "game:write" in scopes
+    assert "game:write" not in scopes  # New key still must prove possession.
     assert store.get_device(old_device)["state"] == "REVOKED"
     assert store.get_session(old_access) is None
-    assert store.get_session(new_access)["device_id"] == new_device
+    assert store.get_session(new_access)["device_id"] is None
     recovered = store.find_active_device_by_key(new_key, new_fingerprint)
     assert recovered is not None
     assert recovered["device_id"] == new_device

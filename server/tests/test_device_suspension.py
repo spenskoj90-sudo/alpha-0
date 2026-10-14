@@ -137,3 +137,37 @@ def test_revoke_audit_attributes_initiating_browser_not_revoked_device(device_st
         actor = audit['actor_device_id']
     assert actor is None
     assert target == device
+
+
+def test_legacy_device_id_never_promotes_unproven_session_or_refresh(device_store):
+    from app.core.security import session_hash
+
+    owner = str(uuid.uuid4())
+    device = device_store.register_device(owner, 'android', 'pub', uuid.uuid4().hex * 2, uuid.uuid4().hex)
+    account_token, refresh, _, _ = device_store.issue_session(None, owner, 300, 300)
+    if hasattr(device_store, 'engine'):
+        # Upgrade fixture represents a legacy pre-proof /bind row migrated with
+        # device_proof_verified=FALSE, including its still-active refresh lineage.
+        with device_store.engine.begin() as conn:
+            conn.execute(
+                text("UPDATE sessions SET device_id=CAST(:device AS uuid), "
+                     "device_proof_verified=FALSE WHERE session_hash=:token"),
+                {"device": device, "token": session_hash(account_token)},
+            )
+    else:
+        device_store.sessions[session_hash(account_token)]["device_id"] = device
+        device_store.sessions[session_hash(account_token)]["device_proof_verified"] = False
+
+    first = device_store.get_session(account_token)
+    assert first is not None
+    assert first["device_id"] is None
+    assert "game:write" not in first["scopes"]
+
+    rotated = device_store.rotate_refresh(refresh, 300, 300)
+    assert rotated is not None
+    successor, _, _, _, old = rotated
+    assert old["device_id"] is None
+    current = device_store.get_session(successor)
+    assert current is not None
+    assert current["device_id"] is None
+    assert "game:write" not in current["scopes"]

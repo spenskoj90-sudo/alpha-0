@@ -14,7 +14,7 @@ import urllib.error
 import urllib.request
 import uuid
 
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 
@@ -115,17 +115,33 @@ def wait_for_counter_after(counter: int) -> int:
         time.sleep(1)
 
 
-def new_device_payload() -> dict:
+def prove_device_session(account_session: str) -> str:
+    """Bind a disposable public key, then prove possession before MFA writes."""
     private_key = ec.generate_private_key(ec.SECP256R1())
     public_der = private_key.public_key().public_bytes(
         serialization.Encoding.DER,
         serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    return {
-        "platform": "android",
-        "public_key_der_b64": base64.b64encode(public_der).decode("ascii"),
-        "fingerprint_sha256": hashlib.sha256(public_der).hexdigest(),
-    }
+    bound = request_json(
+        "POST", "/v1/devices/bind",
+        payload={
+            "platform": "android",
+            "public_key_der_b64": base64.b64encode(public_der).decode("ascii"),
+            "fingerprint_sha256": hashlib.sha256(public_der).hexdigest(),
+        },
+        bearer=account_session,
+    )
+    device_id, challenge = bound.get("device_id"), bound.get("challenge")
+    if not isinstance(device_id, str) or not isinstance(challenge, str):
+        raise AssertionError("device binding did not return challenge")
+    timestamp = int(time.time())
+    request_id = str(uuid.uuid4())
+    body = {"challenge": challenge, "request_id": request_id, "timestamp": timestamp}
+    signed = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    body["signature_b64"] = base64.b64encode(private_key.sign(signed, ec.ECDSA(hashes.SHA256()))).decode()
+    proof = request_json("POST", f"/v1/devices/{device_id}/prove", payload=body)
+    return require_session(proof, "device proof")
+
 
 
 def require_session(payload: dict, context: str) -> str:
@@ -164,16 +180,11 @@ def main() -> int:
     )
     initial_session = require_session(registered, "register")
 
-    print("step=bind_initial_device")
-    request_json(
-        "POST",
-        "/v1/devices/bind",
-        payload=new_device_payload(),
-        bearer=initial_session,
-    )
+    print("step=bind_and_prove_initial_device")
+    initial_proven = prove_device_session(initial_session)
 
     print("step=pre_mfa_state")
-    pre = request_json("GET", "/v1/account/security", bearer=initial_session)
+    pre = request_json("GET", "/v1/account/security", bearer=initial_proven)
     if pre.get("mfa_enabled") is not False:
         raise AssertionError("new disposable account unexpectedly has MFA enabled")
 
@@ -182,7 +193,7 @@ def main() -> int:
         enrollment = request_json(
             "POST",
             "/v1/account/mfa/totp/enroll",
-            bearer=initial_session,
+            bearer=initial_proven,
         )
     except ApiFailure as exc:
         if exc.status == 503 and exc.code in {
@@ -204,7 +215,7 @@ def main() -> int:
         "POST",
         "/v1/account/mfa/totp/confirm",
         payload={"code": totp(secret, confirm_counter)},
-        bearer=initial_session,
+        bearer=initial_proven,
     )
     if confirmed.get("status") != "MFA_ENABLED":
         raise AssertionError("MFA confirmation did not return MFA_ENABLED")
@@ -273,13 +284,8 @@ def main() -> int:
     if replay_code != "MFA_INVALID":
         raise AssertionError(f"unexpected recovery replay error: {replay_code}")
 
-    print("step=bind_post_mfa_device")
-    request_json(
-        "POST",
-        "/v1/devices/bind",
-        payload=new_device_payload(),
-        bearer=totp_session,
-    )
+    print("step=bind_and_prove_post_mfa_device")
+    totp_proven = prove_device_session(totp_session)
 
     rotate_counter = wait_for_counter_after(login_counter)
     print("step=rotate_recovery_codes")
@@ -287,7 +293,7 @@ def main() -> int:
         "POST",
         "/v1/account/mfa/recovery-codes/rotate",
         payload={"code": totp(secret, rotate_counter)},
-        bearer=totp_session,
+        bearer=totp_proven,
     )
     if rotated.get("status") != "RECOVERY_CODES_ROTATED":
         raise AssertionError("recovery rotation status mismatch")
@@ -299,7 +305,7 @@ def main() -> int:
     enabled_state = request_json(
         "GET",
         "/v1/account/security",
-        bearer=totp_session,
+        bearer=totp_proven,
     )
     if enabled_state.get("mfa_enabled") is not True:
         raise AssertionError("security state did not report MFA enabled")
@@ -320,7 +326,7 @@ def main() -> int:
         "POST",
         "/v1/account/mfa/totp/disable",
         payload={"code": rotated_codes[0]},
-        bearer=totp_session,
+        bearer=totp_proven,
     )
     if disabled.get("status") != "MFA_DISABLED":
         raise AssertionError("MFA disable status mismatch")
@@ -330,7 +336,7 @@ def main() -> int:
         "GET",
         "/v1/account/security",
         status=401,
-        bearer=totp_session,
+        bearer=totp_proven,
     )
 
     print("step=password_only_after_disable")

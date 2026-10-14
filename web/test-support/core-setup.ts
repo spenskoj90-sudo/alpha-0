@@ -1,4 +1,4 @@
-type SetupData = { session_token?: string; secret?: string; recovery_codes?: string[] };
+type SetupData = { session_token?: string; secret?: string; recovery_codes?: string[]; device_id?: string; challenge?: string; code?: string };
 
 // Node fetch avoids Playwright's credential-bearing request call logs. Never let
 // transport or JSON errors (which can include payloads) reach retained reporters.

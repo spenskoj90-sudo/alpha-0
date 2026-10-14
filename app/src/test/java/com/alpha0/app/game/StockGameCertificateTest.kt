@@ -18,6 +18,19 @@ class StockGameCertificateTest {
         assertNull(StockGameCertificate.digest(listOf(byteArrayOf(1), byteArrayOf(2))))
         assertNull(StockGameCertificate.digest(listOf(ByteArray(16385))))
     }
+    @Test fun `consent and service fence rejects identity drift or absent metadata`() {
+        val expected = StockGameInstall("4.0.0", 912, "a".repeat(64))
+        assertTrue(GameInstallFence.matches("4.0.0", 912, "a".repeat(64), expected))
+        assertFalse(GameInstallFence.matches(null, 912, expected.signerSha256, expected))
+        assertFalse(GameInstallFence.matches("4.0.0", null, expected.signerSha256, expected))
+        assertFalse(GameInstallFence.matches("4.0.0", 912, expected.signerSha256, null))
+        assertFalse(GameInstallFence.matches("4.0.1", 912, expected.signerSha256, expected))
+        assertFalse(GameInstallFence.matches("4.0.0", 913, expected.signerSha256, expected))
+        assertFalse(GameInstallFence.matches("4.0.0", 912, "b".repeat(64), expected))
+        assertFalse(GameInstallFence.matches("4.0.0", 912, null, expected))
+        // Missing/ambiguous signer is still UNVERIFIED, but cannot become an attestation.
+        assertTrue(GameInstallFence.matches("4.0.0", 912, null, StockGameInstall("4.0.0", 912)))
+    }
     @Test fun `same game version with different installed signer is different identity`() {
         val first = StockGameInstall("4.0.0", 912, StockGameCertificate.digest(listOf(byteArrayOf(1))))
         val second = first.copy(signerSha256 = StockGameCertificate.digest(listOf(byteArrayOf(2))))

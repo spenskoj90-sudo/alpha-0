@@ -125,9 +125,12 @@ class GameObservationService : Service() {
             val current = SecureSessionStore().load(this)
             val install = ShatteredGameProfile.installed(this)
             if (consent == null || current?.deviceId.isNullOrBlank() || install == null ||
-                intent?.getLongExtra(VERSION, -1) != install.versionCode ||
-                intent?.getStringExtra(VERSION_NAME) != install.versionName ||
-                intent?.getStringExtra(SIGNER) != install.signerSha256) {
+                !GameInstallFence.matches(
+                    intent?.getStringExtra(VERSION_NAME),
+                    intent?.getLongExtra(VERSION, -1),
+                    intent?.getStringExtra(SIGNER),
+                    install,
+                )) {
                 finish("SESSION_OR_GAME_UNAVAILABLE")
                 return START_NOT_STICKY
             }

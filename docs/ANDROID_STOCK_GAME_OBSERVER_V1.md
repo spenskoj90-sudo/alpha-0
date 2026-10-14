@@ -15,6 +15,11 @@ The user opens Games → Android game test in diagnostic/development builds.
 Detection uses one explicit package query, observes installed version name/code,
 and offers the game's own launch intent. Package metadata is not publisher-signature
 verification, an entitlement, capture-source verification or an L3 capability.
+The diagnostic build also reads the installed package's single current APK
+signer certificate SHA-256. Missing/multiple current signers are recorded as
+unknown; signer history and official publisher identity are NOT verified.
+This digest binds observed installed-package metadata, not the app selected
+by Android's MediaProjection chooser.
 The release build has no entry point and its service is manifest-disabled and
 runtime-denied. Build type never grants account/admin or game-action authority.
 
@@ -27,6 +32,10 @@ the selected package to SENTINEL; the source therefore remains user-selected and
 ## Capture lifecycle
 
 - A fresh Android consent result is required for every session.
+- The observed installed package version **name**, version code and current signer digest
+  are rechecked after the consent chooser and again on foreground-service start;
+  if any field changed, the session is denied. This is package-metadata
+  time-of-check/time-of-use fencing, **not** capture-source attestation.
 - A non-exported `mediaProjection` foreground service owns one projection and one
   virtual display. It never persists a projection token or restarts itself.
 - Resize reuses that virtual display, replaces the image surface and invalidates
@@ -83,7 +92,11 @@ No game/version has L3 screen-recognition evidence yet.
 comparisons for one exact source/APK/package/version/signer, installed game
 version, language/HUD and Infinix API34 environment. It accepts only structured
 health ratios and age/sequence metadata; extra fields including pixels or raw
-OCR are rejected. Input is bounded to 32 KiB. Missing and stale observations
+OCR are rejected. Input/summary schema v2 requires a lowercase 64-character
+`game.signerSha256` from the locally observed current APK signer. Unknown or
+ambiguous signer prevents creation of a v2 report; historic v1 records cannot
+be silently upgraded. The certificate digest must be reconciled with the
+Owner-exported diagnostics and exact installation evidence, not guessed. Input is bounded to 32 KiB. Missing and stale observations
 remain in the agreement denominator; fresh mismatches report absolute error.
 The 95% lower bound describes sample agreement uncertainty, not recognizer
 confidence. Synthetic records must be labelled synthetic.
@@ -145,4 +158,6 @@ SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED remai
 
 ## Phone-only numeric calibration collection — 2026-10-03
 
-The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity disables comparisons against old candidate identity. Export uses existing Owner-initiated diagnostics. Engineer reconciles exact manifest/signer/device/game/HUD and constructs the bounded calibration input; UI labels/user entries are not physical or app-source attestations. Recommendations, semantic input and ARM stay unavailable until the prerequisite physical calibration and target/session binding are proven.
+The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity (including its observed current signing certificate)
+disables comparisons against old candidate identity. The digest is diagnostic
+provenance and never attests which application was captured. Export uses existing Owner-initiated diagnostics. Engineer reconciles exact manifest/signer/device/game/HUD and constructs the bounded calibration input; UI labels/user entries are not physical or app-source attestations. Recommendations, semantic input and ARM stay unavailable until the prerequisite physical calibration and target/session binding are proven.

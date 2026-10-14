@@ -10,9 +10,9 @@ from game_observer_calibration import summarize
 
 
 def sample():
-    return {"schema": "sentinel.observer-calibration-input.v1", "sourceSha": "a" * 40,
+    return {"schema": "sentinel.observer-calibration-input.v2", "sourceSha": "a" * 40,
         "apkSha256": "b" * 64, "signerSha256": "c" * 64, "package": "com.alpha0.app.physicaltest", "versionCode": 100000525,
-        "game": {"package": "com.shatteredpixel.shatteredpixeldungeon", "versionName": "4.0.0", "versionCode": 912, "language": "en", "hud": "portrait-upper-left"},
+        "game": {"package": "com.shatteredpixel.shatteredpixeldungeon", "versionName": "4.0.0", "versionCode": 912, "signerSha256": "d" * 64, "language": "en", "hud": "portrait-upper-left"},
         "environment": {"device": "Infinix X6731B", "api": 34}, "sampleKind": "synthetic",
         "samples": [{"sequence": 1, "ageMs": 100, "observed": {"current": 5, "maximum": 10}, "groundTruth": {"current": 5, "maximum": 10}}]}
 
@@ -21,6 +21,8 @@ class CalibrationTests(unittest.TestCase):
     def test_agreement_is_not_physical_or_source_acceptance(self):
         report = summarize(sample())
         self.assertEqual(report["exactMatches"], 1)
+        self.assertEqual(report["game"]["signerSha256"], "d" * 64)
+        self.assertEqual(report["schema"], "sentinel.observer-calibration-summary.v2")
         self.assertEqual(report["sampleAgreement"], 1.0)
         self.assertEqual(report["status"], "PENDING_PHYSICAL_REVIEW")
         self.assertEqual(report["sourceTrust"], "UNVERIFIED")
@@ -42,7 +44,11 @@ class CalibrationTests(unittest.TestCase):
                        lambda v: v.update(versionCode=True), lambda v: v["samples"][0]["observed"].update(current=-1),
                        lambda v: v["samples"].append(copy.deepcopy(v["samples"][0])), lambda v: v.update(samples=[]),
                        lambda v: v.update(samples=[copy.deepcopy(v["samples"][0])] * 33),
-                       lambda v: v.update(sourceSha="short"), lambda v: v["environment"].update(api=33)]:
+                       lambda v: v.update(sourceSha="short"), lambda v: v["environment"].update(api=33),
+                       lambda v: v["game"].update(signerSha256=None),
+                       lambda v: v["game"].update(signerSha256="G" * 64),
+                       lambda v: v["game"].pop("signerSha256"),
+                       lambda v: v["game"].update(signatures=["raw-cert"])]:
             value = sample()
             mutate(value)
             with self.subTest(value=value), self.assertRaises(ValueError):

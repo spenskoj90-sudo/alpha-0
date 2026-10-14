@@ -1,11 +1,23 @@
 package com.alpha0.app.game
 
+/** A single screen frame may contribute at most one successful numeric comparison. */
+data class CalibrationFrameId(val captureId: String, val sequence: Long)
+
 /** Opt-in numeric comparisons only. No pixels, raw OCR or action authority. */
 data class CalibrationSample(val sequence: Int, val ageMs: Long, val observed: HealthCandidate?, val current: Int, val maximum: Int)
 class CalibrationCampaign {
     var count = 0; private set
-    fun record(currentText: String, maximumText: String, observation: HealthObservation?, now: Long, persist: (CalibrationSample) -> Boolean = { true }): CalibrationSample? {
+    private val savedFrames = mutableSetOf<CalibrationFrameId>()
+    private var boundCaptureId: String? = null
+
+    fun record(
+        currentText: String, maximumText: String, observation: HealthObservation?,
+        now: Long, frameId: CalibrationFrameId,
+        persist: (CalibrationSample) -> Boolean = { true },
+    ): CalibrationSample? {
         if (count >= 32 || currentText.length > 6 || maximumText.length > 6 || now < 0) return null
+        if (frameId.captureId.isBlank() || frameId.sequence < 1 || frameId in savedFrames ||
+            (boundCaptureId != null && boundCaptureId != frameId.captureId)) return null
         if (!currentText.matches(Regex("[0-9]{1,6}")) || !maximumText.matches(Regex("[0-9]{1,6}"))) return null
         val current = currentText.toIntOrNull() ?: return null
         val maximum = maximumText.toIntOrNull() ?: return null
@@ -14,6 +26,8 @@ class CalibrationCampaign {
         if (age !in 0..300000) return null
         val sample = CalibrationSample(count + 1, age, observation?.candidate, current, maximum)
         if (!runCatching { persist(sample) }.getOrDefault(false)) return null
+        boundCaptureId = frameId.captureId
+        savedFrames.add(frameId)
         count++
         return sample
     }

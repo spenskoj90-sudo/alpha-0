@@ -213,58 +213,32 @@ def test_authorize_request_audits_allow_and_deny(monkeypatch) -> None:
     assert audits[-1]["decision"] == "DENY"
 
 
-def test_bind_session_to_device_memory_store_validates_session_liveness(monkeypatch) -> None:
+def test_legacy_unproven_device_association_has_no_device_principal() -> None:
     store = MemoryStore()
-    monkeypatch.setattr(main_module, "store", store)
+    access, refresh, _, _ = store.issue_session(None, "u1", 60, 120)
+    # Reproduce persisted legacy state from the old /bind path. This is not
+    # proof: historical sessions cannot gain MFA/provider privileges.
+    record = store.sessions[main_module.session_hash(access)]
+    record["device_id"] = "unproven-device"
+    assert store.get_session(access)["device_id"] is None
 
-    with pytest.raises(HTTPException, match="INVALID_SESSION"):
-        main_module.bind_session_to_device("missing", "device")
-
-    access, _, _, _ = store.issue_session(None, "u1", 60, 120)
-    store.sessions[main_module.session_hash(access)]["revoked"] = True
-    with pytest.raises(HTTPException, match="INVALID_SESSION"):
-        main_module.bind_session_to_device(access, "device")
-
-    access, _, _, _ = store.issue_session(None, "u1", 60, 120)
-    main_module.bind_session_to_device(access, "device")
-    assert store.sessions[main_module.session_hash(access)]["device_id"] == "device"
+    rotated = store.rotate_refresh(refresh, 60, 120)
+    # Unknown/missing devices must fail closed even on refresh.
+    assert rotated is None
 
 
-def test_bind_session_to_device_persistent_store_checks_rowcount(monkeypatch) -> None:
-    class Result:
-        def __init__(self, rowcount):
-            self.rowcount = rowcount
-
-    class Conn:
-        def __init__(self, rowcount):
-            self.rowcount = rowcount
-
-        def execute(self, *_args, **_kwargs):
-            return Result(self.rowcount)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *_args):
-            return False
-
-    class Engine:
-        def __init__(self, rowcount):
-            self.rowcount = rowcount
-
-        def begin(self):
-            return Conn(self.rowcount)
-
-    class Store:
-        def __init__(self, rowcount):
-            self.engine = Engine(rowcount)
-
-    monkeypatch.setattr(main_module, "store", Store(0))
-    with pytest.raises(HTTPException, match="INVALID_SESSION"):
-        main_module.bind_session_to_device("token", "device")
-
-    monkeypatch.setattr(main_module, "store", Store(1))
-    main_module.bind_session_to_device("token", "device")
+def test_unproven_legacy_association_cannot_upgrade_on_refresh() -> None:
+    store = MemoryStore()
+    device = store.register_device("u1", "android", "pub", "f" * 64, "challenge")
+    access, refresh, _, _ = store.issue_session(None, "u1", 60, 120)
+    record = store.sessions[main_module.session_hash(access)]
+    record["device_id"] = device
+    assert store.get_session(access)["device_id"] is None
+    rotated = store.rotate_refresh(refresh, 60, 120)
+    assert rotated is not None
+    successor, _, _, _, prior = rotated
+    assert prior["device_id"] is None
+    assert store.get_session(successor)["device_id"] is None
 
 
 def test_device_ownership_accepts_bound_device_or_same_user_only() -> None:

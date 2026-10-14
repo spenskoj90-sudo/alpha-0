@@ -44,6 +44,9 @@ def classify(paths: list[str], event: str = 'pull_request') -> dict[str, bool]:
             if path.startswith('shared/'): selected |= PROTOCOL
         elif path.startswith('server/'):
             selected |= {'core', 'postgres', 'container', 'p1', 'codeql_python', 'audit_python'}
+            if path == 'server/app/data/game-capability-catalog.v1.json':
+                # The static site publishes a checked public-field projection.
+                selected |= {'site', 'codeql_javascript', 'audit_javascript'}
             # API/schema/provider changes can invalidate every protocol consumer.
             if any(part in path for part in ('/api/', '/schemas', '/auth', '/federated', '/providers', '/migrations/', '/data/')) or CONTRACT.search(name) or name in {'models.py', 'main.py', 'entrypoint.py'}:
                 selected |= PROTOCOL

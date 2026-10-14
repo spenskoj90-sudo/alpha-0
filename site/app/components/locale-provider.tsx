@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { publicSections } from "./public-sections";
 import { usePathname } from "next/navigation";
 import { russianCopy, type CopyKey } from "./locale-dictionary";
 import { LOCALE_STORAGE_KEY, resolveLocale, type Locale } from "./locale-store";
@@ -53,7 +54,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale;
     const route = pathname.replace(/\/$/, "") || "/";
     const metadata = pageMetadata[route];
-    document.title = metadata
+    const section = publicSections.find(item => route === `/${item.path}`);
+    document.title = section ? `${locale === "ru" ? section.ru : section.en} · SENTINEL` : metadata
       ? `${locale === "ru" ? russianCopy[metadata[0]] : metadata[0]}${route === "/" ? "" : " · SENTINEL"}`
       : `${locale === "ru" ? russianCopy["Page not found"] : "Page not found"} · SENTINEL`;
     if (metadata) {

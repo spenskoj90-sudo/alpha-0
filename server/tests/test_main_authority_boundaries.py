@@ -220,7 +220,7 @@ def test_legacy_unproven_device_association_has_no_device_principal() -> None:
     # proof: historical sessions cannot gain MFA/provider privileges.
     record = store.sessions[main_module.session_hash(access)]
     record["device_id"] = "unproven-device"
-    assert store.get_session(access)["device_id"] is None
+    assert store.get_session(access) is None
 
     rotated = store.rotate_refresh(refresh, 60, 120)
     # Unknown/missing devices must fail closed even on refresh.

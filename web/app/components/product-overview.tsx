@@ -81,17 +81,21 @@ export function ProductOverview() {
       if (response.status === 401) {
         if (operationGeneration === generation.current) {
           setData({ state: 'SIGNED_OUT' });
+          setBusy(false);
           window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
         }
         return;
       }
-      // Release the response even when it is a denial; authoritative state,
-      // not the acknowledged body, determines the displayed outcome.
+      // Release the response even when it is a denial. Core readback, not the
+      // acknowledged body, is the source of truth for the displayed outcome.
       await response.body?.cancel().catch(() => {});
+    } catch {
+      // Network/body failures may hide a committed mutation. Do not retry POST.
+    }
+    try {
       await reconcile();
     } catch {
-      // Network/body failures can hide a committed mutation. Do not retry POST.
-      await reconcile();
+      if (operationGeneration === generation.current) setDeviceActionError(uncertain);
     } finally {
       if (operationGeneration === generation.current) setBusy(false);
     }

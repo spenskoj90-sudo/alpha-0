@@ -1209,7 +1209,7 @@ def suspend_device(device_id: str, request: Request, authorization_header: str =
         raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
     if not store.suspend_device(device_id):
         raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
-    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:suspend", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_SUSPENDED", "request_id": request_id(request)})
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "device:suspend", "resource": "device", "metadata": {"target_device_id": device_id}, "decision": "ALLOW", "reason_code": "DEVICE_SUSPENDED", "request_id": request_id(request)})
     return {"suspended": True}
 
 

@@ -90,6 +90,18 @@ class ObservationSessionTest {
         visibility("a", true, 101)
     }
 
+    @Test fun `one completed OCR callback including a miss cannot be overwritten`() {
+        val session = visibleSession()
+        session.frame("a", 110)
+        assertNull(session.snapshot.lastCompletedFrameSequence)
+        assertTrue(session.recognized("a", 1, 110, 111, null))
+        assertEquals(1L, session.snapshot.lastCompletedFrameSequence)
+        assertFalse(session.recognized("a", 1, 110, 112, HealthCandidate(4, 20, 0)))
+        assertNull(session.snapshot.health)
+        session.frame("a", 120)
+        assertNull(session.snapshot.lastCompletedFrameSequence)
+    }
+
     @Test fun `rotation invalidates pending recognition from the previous geometry`() {
         val session = visibleSession()
         session.frame("a", 110)

@@ -146,7 +146,7 @@ def test_rotate_rejects_foreign_device_and_bad_fingerprint_and_replaces_session(
         json={"action": "character:read", "resource": "character:42"},
     )
     assert authorized.status_code == 200
-    assert store.get_session(new_access)["device_id"] == payload["device_id"]
+    assert store.get_session(new_access)["device_id"] is None  # Replacement key must prove itself.
 
 
 def test_revoke_rejects_foreign_device_and_revokes_all_device_sessions():

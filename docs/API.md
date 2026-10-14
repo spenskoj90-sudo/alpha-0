@@ -33,12 +33,13 @@ See [Email action codes v1](EMAIL_ACTION_CODES_V1.md) for digest, account/purpos
 ## Device identity
 
 - `POST /v1/devices/register` — register a device with a public-key fingerprint; supports authenticated user-bound enrollment and the legacy enrollment-token bootstrap path.
-- `POST /v1/devices/bind` — bind a new device key to the authenticated user session and return the first one-time proof challenge.
+- `POST /v1/devices/bind` — register/reuse an account-owned public key and return a one-time challenge. **Does not** elevate or attach the existing bearer session to a device; only successful signed `/prove` can mint a device-bound session.
+- Historical bearer sessions whose device association predates proof verification are **not** treated as device-bound after migration `018_device_proof_session_authority`; reauthentication plus a newly signed proof is required for MFA management, explicit provider linking and device-only privileges. A refresh cannot upgrade an unproven lineage.
 - `POST /v1/devices/recover` — crash-recovery discovery for a previously accepted exact public-key/fingerprint pair; returns only the active device id and a fresh proof challenge, never a session. The caller must still prove possession of the Android Keystore private key through `/v1/devices/{device_id}/prove`.
 - `GET /v1/devices/{device_id}` — read the caller-owned device state, including durable `bound_at` from the binding creation time and nullable `last_seen_at` from throttled authenticated device activity. Unbound sessions do not advance device activity.
 - `POST /v1/devices/{device_id}/challenge` — issue a fresh one-time proof challenge for a caller-owned active device; used for proof retry without creating another device binding.
 - `POST /v1/devices/{device_id}/prove` — consume the device challenge and verify a P-256 signed proof to issue a device-bound session.
-- `POST /v1/devices/{device_id}/rotate` — rotate a caller-owned active device key and issue a new device-bound session.
+- `POST /v1/devices/{device_id}/rotate` — rotate an active device key only from a session already proven for **that exact device**; account ownership without proof cannot rotate. The rotated-key proof challenge remains available for explicit successor proof.
 - `POST /v1/devices/{device_id}/suspend` — caller-owned ACTIVE device only; atomically mark SUSPENDED and revoke its sessions. Repeated/non-active suspension fails closed; no implicit resume or key replacement.
 - `POST /v1/devices/{device_id}/revoke` — revoke a caller-owned device and its sessions.
 

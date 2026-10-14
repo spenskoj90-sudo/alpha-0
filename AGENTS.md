@@ -29,6 +29,8 @@ Read this file first. Do not load the entire repository documentation set by def
 
 ## Context routing
 
+- Before resuming product/game work: `docs/TASKS.md` + `docs/PLAYER_INTELLIGENCE_ROADMAP_V1.md` (#455); preserve future requirements, current priorities and the next verified step. The roadmap is not implementation evidence.
+
 - Android: `app/AGENTS.md`
 - Core/database/auth: `server/AGENTS.md`
 - Authenticated Web Control Plane: `web/AGENTS.md`

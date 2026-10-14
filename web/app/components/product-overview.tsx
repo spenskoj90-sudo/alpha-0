@@ -8,6 +8,8 @@ export function ProductOverview() {
   const { t, locale } = useLocale();
   const [data, setData] = useState<ProductData>({ state: 'SIGNED_OUT' });
   const [busy, setBusy] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const [deviceActionError, setDeviceActionError] = useState('');
   const generation = useRef(0);
 
   useEffect(() => {
@@ -34,6 +36,45 @@ export function ProductOverview() {
     setBusy(true);
     const snapshot = await loadProductData();
     if (revision === generation.current) { setData(snapshot); setBusy(false); }
+  }
+
+  async function revokeDevice(deviceId: string) {
+    if (confirmRevoke !== deviceId || busy) return;
+    // Fence a late result against logout, new login or another product refresh.
+    const operationGeneration = ++generation.current;
+    setBusy(true);
+    setDeviceActionError('');
+    setConfirmRevoke(null);
+    try {
+      const response = await fetch('/api/devices/' + encodeURIComponent(deviceId) + '/revoke', {
+        method: 'POST',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(45_000),
+      });
+      if (response.status === 401) {
+        if (operationGeneration === generation.current) {
+          setData({ state: 'SIGNED_OUT' });
+          window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        }
+        return;
+      }
+      const result = await response.json();
+      if (!response.ok || result?.revoked !== true) {
+        if (operationGeneration === generation.current) {
+          setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+        }
+        return;
+      }
+      // Revoking the current device may also terminate this browser's session.
+      const snapshot = await loadProductData();
+      if (operationGeneration === generation.current) setData(snapshot);
+    } catch {
+      if (operationGeneration === generation.current) {
+        setDeviceActionError('Device revocation was not confirmed. Refresh and retry.');
+      }
+    } finally {
+      if (operationGeneration === generation.current) setBusy(false);
+    }
   }
 
   const status = busy ? 'Loading verified data…' : data.state === 'SIGNED_OUT' ? 'Sign in to view your account data.' : data.state === 'ERROR' ? data.message : '';
@@ -70,12 +111,31 @@ export function ProductOverview() {
       </article>
       <article className="card surface-card" id="devices">
         <h2>{t("Devices")}</h2>
+        {deviceActionError && <p className="status-message" role="alert">{t(deviceActionError)}</p>}
         {status ? <p>{t(status)}</p> : data.state === 'READY' && <>
           {data.devices.length ? <ul className="product-list">{data.devices.map(device => <li key={device.device_id}>
             <div className="row-between"><strong>{device.platform}</strong><span className="state">{device.state === 'ACTIVE' ? t("Registered") : device.state === 'SUSPENDED' ? t("Suspended") : t("Revoked")}</span></div>
             <span className="microcopy">{t("Device ID:")}{' '}{device.device_id}</span>
             <span className="muted">{t("Registered")}{' '}{new Date(device.bound_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}</span>
             <span className="microcopy">{device.last_seen_at ? `${t("Last seen")} ${new Date(device.last_seen_at).toLocaleString(locale === 'ru' ? 'ru-RU' : 'en-US')}` : t("No activity recorded yet")}</span>
+            {device.state !== 'REVOKED' && (confirmRevoke === device.device_id ? (
+              <div className="device-revoke-confirm" role="group" aria-label={t("Confirm device revocation")}>
+                <p className="microcopy">{t("Revoking a device terminates its sessions. You may need to sign in again on that device.")}</p>
+                <div className="button-row">
+                  <button type="button" className="ghost-btn" disabled={busy} onClick={() => void revokeDevice(device.device_id)}>
+                    {t("Confirm revoke")}
+                  </button>
+                  <button type="button" className="text-btn" disabled={busy} onClick={() => setConfirmRevoke(null)}>
+                    {t("Cancel")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="text-btn" disabled={busy} onClick={() => {
+                setConfirmRevoke(device.device_id); setDeviceActionError('');
+              }}>{t("Revoke device")}</button>
+            ))}
+
           </li>)}</ul> : <p>{t("No devices are registered. Sign in on Android and complete device setup to register your device.")}</p>}
           {data.devicesTruncated && <p role="status">{t("Showing the 100 most recent registrations.")}</p>}
           <p className="microcopy">{t("Registration status does not establish that a device is currently online.")}</p>

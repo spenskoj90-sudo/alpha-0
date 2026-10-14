@@ -52,6 +52,8 @@ import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import kotlinx.coroutines.delay
+import com.alpha0.app.knowledge.AndroidKnowledgeRuntime
+import com.alpha0.app.knowledge.KnowledgeViewState
 
 @Composable
 fun GameObservationScreen() {
@@ -59,6 +61,7 @@ fun GameObservationScreen() {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var installed by remember { mutableStateOf(ShatteredGameProfile.installed(context)) }
     val state by GameObservationRuntime.state.collectAsStateWithLifecycle()
+    val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
     var consent by rememberSaveable { mutableStateOf(false) }
     var pendingVersion by rememberSaveable { mutableStateOf<Long?>(null) }
     var pending by rememberSaveable { mutableStateOf(false) }
@@ -91,6 +94,7 @@ fun GameObservationScreen() {
     GameObservationPanel(
         installed = installed,
         state = state,
+        knowledge = knowledge,
         supported = BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 34,
         consent = consent,
         pending = pending,
@@ -140,6 +144,7 @@ internal fun GameObservationPanel(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onLaunch: () -> Unit,
+    knowledge: KnowledgeViewState = KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE"),
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
@@ -208,6 +213,24 @@ internal fun GameObservationPanel(
                         enabled = supported && installed != null && consent && !pending,
                     )
                     if (!supported) Text(strings.text("game_capture_android14"))
+                }
+            }
+        }
+        SentinelCard(kind = SentinelCardKind.CONTENT) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(strings.text("game_knowledge_title"), style = MaterialTheme.typography.titleMedium)
+                val label = when (knowledge.state) {
+                    "WAITING_FOR_VERIFIED_PROFILE" -> "game_knowledge_waiting"
+                    "LOADING" -> "game_knowledge_loading"
+                    "READY" -> "game_knowledge_ready"
+                    "DENIED" -> "game_knowledge_denied"
+                    "STOPPED" -> "status_stopped"
+                    else -> "game_knowledge_unavailable"
+                }
+                StatusBadge(strings.text(label), if (knowledge.state == "READY") SentinelStatus.ACTIVE else SentinelStatus.PENDING)
+                Text(strings.text("game_knowledge_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (knowledge.state == "READY") knowledge.items.forEach { item ->
+                    Text(item.text); Text(item.reason, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

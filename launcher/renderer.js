@@ -6,6 +6,8 @@ const accountStatus = $('account-status');
 const companionStatus = $('companion-status');
 const wowCheckpointStatus = $('wow-checkpoint-status');
 const voiceStatus = $('voice-status');
+const knowledgeStatus = $('knowledge-status');
+const knowledgeRefresh = $('knowledge-refresh');
 const voiceResult = $('voice-result');
 const connectionStatus = $('connection-status');
 const voiceHeadline = $('voice-headline');
@@ -96,6 +98,25 @@ function setWowCheckpoint(status) {
   wowCheckpointStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'STOPPED' ? '' : 'err'}`;
   ui.text(wowCheckpointStatus, 'WOW CHECKPOINT: {state}{depth}{reason}', { state: () => ui.state(state), depth, reason });
 }
+
+function setKnowledge(status) {
+  const labels = {
+    SIGNED_OUT: 'Knowledge: signed out', STOPPED: 'Knowledge: stopped',
+    WAITING_FOR_VERIFIED_PROFILE: 'Knowledge: waiting for a verified game profile',
+    READY: 'Knowledge: verified presentation lease', DEGRADED: 'Knowledge: network degraded; existing lease only',
+    DENIED: 'Knowledge: access denied', UNAVAILABLE: 'Knowledge: unavailable',
+  };
+  const state = status?.state || 'UNAVAILABLE';
+  ui.text(knowledgeStatus, Object.hasOwn(labels, state) ? labels[state] : labels.UNAVAILABLE);
+  knowledgeStatus.className = `status ${state === 'READY' ? 'ok' : 'warn'}`;
+  knowledgeRefresh.disabled = !['READY', 'DEGRADED', 'UNAVAILABLE'].includes(state);
+}
+
+knowledgeRefresh.addEventListener('click', async () => {
+  knowledgeRefresh.disabled = true;
+  try { setKnowledge(await window.sentinel.refreshKnowledge()); }
+  catch { setKnowledge({ state: 'UNAVAILABLE' }); }
+});
 
 function setVoice(status) {
   currentVoice = status && typeof status === 'object' ? status : {
@@ -495,6 +516,7 @@ window.sentinel.onCompanionStatus(setCompanion);
 window.sentinel.onAccountStatus(snapshot => setAccount(snapshot?.session, snapshot?.features || [], snapshot?.mfa));
 window.sentinel.onWowCheckpointStatus(setWowCheckpoint);
 window.sentinel.onVoiceStatus(setVoice);
+window.sentinel.onKnowledgeStatus(setKnowledge);
 
 Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(), window.sentinel.voiceStatus(), renderGames()])
   .then(([snapshot, companion, voice]) => {
@@ -504,3 +526,4 @@ Promise.all([window.sentinel.accountStatus(), window.sentinel.companionStatus(),
     setWowCheckpoint({ state: 'STOPPED' });
   })
   .catch(error => showError(companionStatus, error));
+window.sentinel.knowledgeStatus().then(setKnowledge).catch(() => setKnowledge({ state: 'UNAVAILABLE' }));

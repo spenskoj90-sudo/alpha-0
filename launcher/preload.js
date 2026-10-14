@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('sentinel', {
   logout: () => ipcRenderer.invoke('account:logout'),
   accountStatus: () => ipcRenderer.invoke('account:status'),
   companionStatus: () => ipcRenderer.invoke('companion:status'),
+  knowledgeStatus: () => ipcRenderer.invoke('knowledge:status'),
+  refreshKnowledge: () => ipcRenderer.invoke('knowledge:refresh'),
   startCompanion: coreUrl => ipcRenderer.invoke('companion:start', coreUrl),
   stopCompanion: () => ipcRenderer.invoke('companion:stop'),
   voiceStatus: () => ipcRenderer.invoke('voice:status'),
@@ -42,5 +44,11 @@ contextBridge.exposeInMainWorld('sentinel', {
     const handler = (_event, status) => callback(status);
     ipcRenderer.on('voice:status', handler);
     return () => ipcRenderer.removeListener('voice:status', handler);
+  },
+  onKnowledgeStatus: callback => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on('knowledge:status', handler);
+    return () => ipcRenderer.removeListener('knowledge:status', handler);
   },
 });

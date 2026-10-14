@@ -264,8 +264,13 @@ internal fun GameObservationPanel(
                 OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 SecondaryButton(strings.text("game_calibration_save"), {
                     var writeFailed = false
-                    val sample = campaign.record(expectedCurrent, expectedMaximum, observation.lastHealth, now) { sample ->
-                        val sampleInstall = state.installed ?: installed
+                    // Recheck the live session and installed APK at the actual Save boundary.
+                    // A previously rendered frame or a paused historical candidate is not proof of a current observation.
+                    val live = GameObservationRuntime.state.value
+                    val currentInstall = ShatteredGameProfile.installed(context)
+                    val sample = if (CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
+                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime()) { sample ->
+                        val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
                             "game_package" to ShatteredGameProfile.PACKAGE,
@@ -279,13 +284,13 @@ internal fun GameObservationPanel(
                         ))
                         writeFailed = !saved
                         saved
-                    }
+                    } else null
                     if (sample == null) calibrationMessage = if (writeFailed) "game_calibration_write_failed" else "game_calibration_invalid"
                     else {
                         sampleCount = campaign.count
                         calibrationMessage = "game_calibration_saved"
                     }
-                }, Modifier.fillMaxWidth(), enabled = supported && installed != null && (state.installed == null || state.installed == installed) && sampleCount < 32)
+                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSample(observation, state.installed, installed) && sampleCount < 32)
                 Text(strings.text("game_calibration_count", sampleCount))
                 if (calibrationMessage.isNotBlank()) Text(strings.text(calibrationMessage))
                 Text(strings.text("game_calibration_action_gate"), color = MaterialTheme.colorScheme.onSurfaceVariant)

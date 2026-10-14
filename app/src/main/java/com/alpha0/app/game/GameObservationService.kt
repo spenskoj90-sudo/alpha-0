@@ -126,8 +126,8 @@ class GameObservationService : Service() {
             val install = ShatteredGameProfile.installed(this)
             if (consent == null || current?.deviceId.isNullOrBlank() || install == null ||
                 intent?.getLongExtra(VERSION, -1) != install.versionCode ||
-                intent.getStringExtra(VERSION_NAME) != install.versionName ||
-                intent.getStringExtra(SIGNER) != install.signerSha256) {
+                intent?.getStringExtra(VERSION_NAME) != install.versionName ||
+                intent?.getStringExtra(SIGNER) != install.signerSha256) {
                 finish("SESSION_OR_GAME_UNAVAILABLE")
                 return START_NOT_STICKY
             }

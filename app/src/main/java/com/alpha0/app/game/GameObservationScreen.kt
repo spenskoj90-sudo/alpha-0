@@ -92,7 +92,7 @@ fun GameObservationScreen() {
         val session = SecureSessionStore().load(context)
         when {
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
-            expectedVersion == null || expectedName == null || currentInstall?.versionCode != expectedVersion ||
+            expectedVersion == null || expectedName == null || currentInstall == null || currentInstall.versionCode != expectedVersion ||
                 currentInstall.versionName != expectedName || currentInstall.signerSha256 != expectedSigner ||
                 session?.deviceId.isNullOrBlank() ->
                 GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")

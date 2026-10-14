@@ -280,6 +280,7 @@ class MemoryStore(Store):
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False,
                 "revoked": False,
+                "device_proof_verified": True,  # Validated predecessor authorizes key rotation.
             }
             old["state"] = "REVOKED"
             for session in self.sessions.values():
@@ -336,7 +337,7 @@ class MemoryStore(Store):
         refresh_hash = session_hash(refresh)
         now = datetime.now(UTC)
         exp = now + timedelta(seconds=access_ttl)
-        record = {"user_id": user_id, "device_id": device_id, "scopes": SCOPES, "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(), "refresh_hash": refresh_hash, "refresh_lineage_hash": refresh_hash, "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(), "refresh_used": False, "revoked": False}
+        record = {"user_id": user_id, "device_id": device_id, "scopes": SCOPES, "roles": ["user"], "issued_at": now.timestamp(), "expires_at": exp.timestamp(), "refresh_hash": refresh_hash, "refresh_lineage_hash": refresh_hash, "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(), "refresh_used": False, "revoked": False, "device_proof_verified": device_id is not None}
         with self.lock:
             self.sessions[session_hash(access)] = record
         return access, refresh, exp, SCOPES
@@ -355,6 +356,10 @@ class MemoryStore(Store):
             device = self.devices.get(device_id)
             if not device or device.get("state") != "ACTIVE":
                 return None
+        # Historic tokens promoted by /bind without proof must never be
+        # interpreted as trusted devices. Preserve read-only account identity.
+        if record.get("device_id") is not None and record.get("device_proof_verified") is not True:
+            return {**record, "device_id": None}
         return record
 
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
@@ -387,8 +392,12 @@ class MemoryStore(Store):
                 "refresh_expires_at": (now + timedelta(seconds=refresh_ttl)).timestamp(),
                 "refresh_used": False,
                 "revoked": False,
+                "device_proof_verified": old.get("device_proof_verified") is True,
             }
             self.sessions[session_hash(access)] = new_record
+        # Unverified legacy lineages do not gain device authority from refresh.
+        if old.get("device_id") is not None and old.get("device_proof_verified") is not True:
+            old["device_id"] = None
         return access, refresh, exp, SCOPES, old
 
     def revoke_session(self, access_token):
@@ -928,8 +937,8 @@ class PostgresStore(Store):
                 text(
                     "INSERT INTO sessions("
                     "identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash"
-                    ") VALUES (:uid,:device,:sh,:scopes,now(),:exp,:rh,:rexp,:rh)"
+                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash,device_proof_verified"
+                    ") VALUES (:uid,:device,:sh,:scopes,now(),:exp,:rh,:rexp,:rh,true)"
                 ),
                 {
                     "uid": old["identity_id"],
@@ -1014,14 +1023,14 @@ class PostgresStore(Store):
                 ).scalar_one_or_none()
                 if owned is None:
                     raise ValueError("DEVICE_NOT_ACTIVE")
-            conn.execute(text("INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,refresh_token_hash,refresh_expires_at,refresh_lineage_hash) VALUES ((SELECT id FROM identities WHERE user_handle=:u),(SELECT id FROM device_bindings WHERE id=:d),:sh,:scopes,now(),:exp,:rh,:rexp,:rh)"), {"u": user_id, "d": device_id, "sh": session_hash(access), "scopes": json.dumps(SCOPES), "exp": exp, "rh": session_hash(refresh), "rexp": refexp})
+            conn.execute(text("INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,refresh_token_hash,refresh_expires_at,refresh_lineage_hash,device_proof_verified) VALUES ((SELECT id FROM identities WHERE user_handle=:u),(SELECT id FROM device_bindings WHERE id=:d),:sh,:scopes,now(),:exp,:rh,:rexp,:rh,:proved)"), {"u": user_id, "d": device_id, "sh": session_hash(access), "scopes": json.dumps(SCOPES), "exp": exp, "rh": session_hash(refresh), "rexp": refexp, "proved": device_id is not None})
         return access, refresh, exp, SCOPES
 
     def get_session(self, access_token):
         with self.engine.begin() as conn:
             row = conn.execute(
                 text(
-                    "SELECT s.identity_id::text identity_id,s.device_id::text device_id,s.scopes_json,s.expires_at,i.user_handle "
+                    "SELECT s.identity_id::text identity_id,s.device_id::text device_id,s.device_proof_verified,s.scopes_json,s.expires_at,i.user_handle "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
                     "LEFT JOIN web_session_families w ON w.family_hash=s.web_session_family_hash "
@@ -1034,7 +1043,7 @@ class PostgresStore(Store):
         if not row:
             return None
         scopes = row["scopes_json"] if isinstance(row["scopes_json"], list) else json.loads(row["scopes_json"])
-        return {"user_id": row["user_handle"], "device_id": row["device_id"], "scopes": scopes, "roles": ["user"], "expires_at": row["expires_at"].timestamp(), "revoked": False}
+        return {"user_id": row["user_handle"], "device_id": row["device_id"] if row["device_proof_verified"] else None, "scopes": scopes, "roles": ["user"], "expires_at": row["expires_at"].timestamp(), "revoked": False, "device_proof_verified": bool(row["device_proof_verified"])}
 
     def rotate_refresh(self, refresh_token, access_ttl, refresh_ttl):
         """Atomic rotation: lock, validate, revoke, insert replacement — single transaction."""
@@ -1061,7 +1070,7 @@ class PostgresStore(Store):
             row = conn.execute(
                 text(
                     "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"
-                    "s.refresh_token_hash,s.refresh_lineage_hash,s.refresh_expires_at,"
+                    "s.refresh_token_hash,s.refresh_lineage_hash,s.refresh_expires_at,s.device_proof_verified,"
                     "s.refresh_used_at,s.revoked_at,s.web_session_family_hash,i.id identity_id,d.state device_state "
                     "FROM sessions s JOIN identities i ON i.id=s.identity_id "
                     "LEFT JOIN device_bindings d ON d.id=s.device_id "
@@ -1091,10 +1100,10 @@ class PostgresStore(Store):
             conn.execute(
                 text(
                     "INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,"
-                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash) VALUES ("
+                    "refresh_token_hash,refresh_expires_at,refresh_lineage_hash,device_proof_verified) VALUES ("
                     ":identity_id,"
                     "CAST(:device_id AS uuid),"
-                    ":sh,:scopes,now(),:exp,:rh,:rexp,:lineage)"
+                    ":sh,:scopes,now(),:exp,:rh,:rexp,:lineage,:proved)"
                 ),
                 {
                     "identity_id": row["identity_id"],
@@ -1105,9 +1114,10 @@ class PostgresStore(Store):
                     "rh": session_hash(refresh),
                     "rexp": refexp,
                     "lineage": lineage_hash,
+                    "proved": bool(row["device_proof_verified"]),
                 },
             )
-        return access, refresh, exp, SCOPES, {"user_id": row["user_id"], "device_id": row["device_id"], "scopes": SCOPES}
+        return access, refresh, exp, SCOPES, {"user_id": row["user_id"], "device_id": row["device_id"] if row["device_proof_verified"] else None, "scopes": SCOPES}
 
     def revoke_session(self, access_token):
         with self.engine.begin() as conn:

@@ -235,8 +235,9 @@ def test_postgres_auth_event_and_audit_flow():
             {"id": bound_device_id},
         ).scalar_one()
     assert revoked_state == "REVOKED"
-    assert revoked_sessions >= 1
+    assert revoked_sessions == 0  # Registering a key never minted a device session.
     assert still_active == 0
+    assert store.get_session(bind_access) is not None  # Read-only account bearer remains valid.
 
 
 def test_postgres_web_operation_cancellation_tombstone_and_legacy_refresh_revocation():

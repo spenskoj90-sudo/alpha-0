@@ -39,6 +39,7 @@ See [Email action codes v1](EMAIL_ACTION_CODES_V1.md) for digest, account/purpos
 - `POST /v1/devices/{device_id}/challenge` — issue a fresh one-time proof challenge for a caller-owned active device; used for proof retry without creating another device binding.
 - `POST /v1/devices/{device_id}/prove` — consume the device challenge and verify a P-256 signed proof to issue a device-bound session.
 - `POST /v1/devices/{device_id}/rotate` — rotate a caller-owned active device key and issue a new device-bound session.
+- `POST /v1/devices/{device_id}/suspend` — caller-owned ACTIVE device only; atomically mark SUSPENDED and revoke its sessions. Repeated/non-active suspension fails closed; no implicit resume or key replacement.
 - `POST /v1/devices/{device_id}/revoke` — revoke a caller-owned device and its sessions.
 
 ## Sessions

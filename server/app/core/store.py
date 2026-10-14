@@ -287,6 +287,17 @@ class MemoryStore(Store):
                     session["revoked"] = True
             return new_device_id, access, refresh, exp, SCOPES
 
+    def suspend_device(self, device_id):
+        with self.lock:
+            device = self.devices.get(device_id)
+            if not device or device.get("state") != "ACTIVE":
+                return False
+            device["state"] = "SUSPENDED"
+            for session in self.sessions.values():
+                if session.get("device_id") == device_id:
+                    session["revoked"] = True
+            return True
+
     def revoke_device(self, device_id):
         with self.lock:
             device = self.devices.get(device_id)
@@ -939,6 +950,20 @@ class PostgresStore(Store):
                 {"id": old_device_id},
             )
         return new_device_id, access, refresh, exp, SCOPES
+
+    def suspend_device(self, device_id):
+        with self.engine.begin() as conn:
+            suspended = conn.execute(
+                text("UPDATE device_bindings SET state='SUSPENDED' WHERE id=:id AND state='ACTIVE' RETURNING id"),
+                {"id": device_id},
+            ).scalar_one_or_none()
+            if suspended is None:
+                return False
+            conn.execute(
+                text("UPDATE sessions SET revoked_at=now() WHERE device_id=:id AND revoked_at IS NULL"),
+                {"id": device_id},
+            )
+            return True
 
     def revoke_device(self, device_id):
         with self.engine.begin() as conn:

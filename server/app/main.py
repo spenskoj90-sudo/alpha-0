@@ -1198,6 +1198,21 @@ def get_device(device_id: str, authorization_header: str = Header(..., alias="Au
     }
 
 
+@app.post("/v1/devices/{device_id}/suspend")
+def suspend_device(device_id: str, request: Request, authorization_header: str = Header(..., alias="Authorization")):
+    rate_limit(request, "device-suspend")
+    principal = principal_from_token(require_bearer(authorization_header))
+    device = store.get_device(device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
+    if not device_owned_by(principal, device, device_id):
+        raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    if not store.suspend_device(device_id):
+        raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:suspend", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_SUSPENDED", "request_id": request_id(request)})
+    return {"suspended": True}
+
+
 @app.post("/v1/devices/{device_id}/revoke")
 def revoke_device(device_id: str, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     rid = request_id(request, x_request_id)

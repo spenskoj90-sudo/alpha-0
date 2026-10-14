@@ -166,6 +166,7 @@ class GameObservationService : Service() {
                 "adapter_id" to ShatteredGameProfile.ADAPTER_ID,
                 "game_version" to install.versionName,
                 "game_version_code" to install.versionCode,
+                "game_signer_sha256" to install.signerSha256,
                 "capability_status" to "UNVERIFIED",
             ))
         } catch (_: Exception) {

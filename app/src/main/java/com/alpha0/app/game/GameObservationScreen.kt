@@ -259,6 +259,7 @@ internal fun GameObservationPanel(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
                             "game_package" to ShatteredGameProfile.PACKAGE,
                             "game_version" to sampleInstall?.versionName, "game_version_code" to sampleInstall?.versionCode,
+                            "game_signer_sha256" to sampleInstall?.signerSha256,
                             "age_ms" to sample.ageMs, "recognized_current" to sample.observed?.current,
                             "recognized_maximum" to sample.observed?.maximum,
                             "ground_truth_current" to sample.current, "ground_truth_maximum" to sample.maximum,

@@ -35,16 +35,17 @@ def health(value: object) -> None:
 
 def summarize(value: dict) -> dict:
     keys(value, {"schema", "sourceSha", "apkSha256", "signerSha256", "package", "versionCode", "game", "environment", "sampleKind", "samples"})
-    require(value["schema"] == "sentinel.observer-calibration-input.v1")
+    require(value["schema"] == "sentinel.observer-calibration-input.v2")
     for field, size in (("sourceSha", 40), ("apkSha256", 64), ("signerSha256", 64)):
         require(type(value[field]) is str and re.fullmatch(r"[0-9a-f]{" + str(size) + "}", value[field]) is not None)
     require(value["package"] == "com.alpha0.app.physicaltest")
     integer(value["versionCode"], 1, 2100000000)
     game = value["game"]
-    keys(game, {"package", "versionName", "versionCode", "language", "hud"})
+    keys(game, {"package", "versionName", "versionCode", "language", "hud", "signerSha256"})
     require(game["package"] == "com.shatteredpixel.shatteredpixeldungeon")
     require(type(game["versionName"]) is str and re.fullmatch(r"[A-Za-z0-9._+-]{1,64}", game["versionName"]) is not None)
     integer(game["versionCode"], 1, 2100000000)
+    require(type(game["signerSha256"]) is str and re.fullmatch(r"[0-9a-f]{64}", game["signerSha256"]) is not None)
     require(game["language"] in ("ru", "en") and game["hud"] in ("portrait-upper-left", "landscape-upper-left"))
     keys(value["environment"], {"device", "api"})
     require(value["environment"]["device"] == "Infinix X6731B")
@@ -80,7 +81,7 @@ def summarize(value: dict) -> dict:
     # Sampling uncertainty only: not model confidence or an acceptance threshold.
     lower = (agreement + z2 / (2 * n) - 1.96 * math.sqrt(agreement * (1 - agreement) / n + z2 / (4 * n * n))) / (1 + z2 / n)
     binding = {key: value[key] for key in ("sourceSha", "apkSha256", "signerSha256", "package", "versionCode", "game", "environment", "sampleKind")}
-    return {"schema": "sentinel.observer-calibration-summary.v1", **binding,
+    return {"schema": "sentinel.observer-calibration-summary.v2", **binding,
         "inputDigest": hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
         "status": "PENDING_PHYSICAL_REVIEW", "sourceTrust": "UNVERIFIED", "capabilityAvailable": False,
         "signal": "health_ratio", "samples": n, "exactMatches": matches, "missing": missing, "stale": stale,

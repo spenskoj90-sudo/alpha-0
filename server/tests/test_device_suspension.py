@@ -108,3 +108,32 @@ def test_suspension_serializes_with_inflight_refresh_insert():
             {'id': device},
         ).scalar_one()
     assert live == 0
+
+
+def test_revoke_audit_attributes_initiating_browser_not_revoked_device(device_store, monkeypatch):
+    client, owner, device, browser, device_access, refresh = setup(device_store, monkeypatch)
+    response = client.post(f'/v1/devices/{device}/revoke', headers={'Authorization': 'Bearer ' + browser})
+    assert response.status_code == 200, response.text
+    assert response.json() == {'revoked': True}
+    assert device_store.get_session(device_access) is None
+    assert device_store.rotate_refresh(refresh, 300, 300) is None
+    assert device_store.get_session(browser) is not None
+
+    if hasattr(device_store, 'engine'):
+        with device_store.engine.begin() as conn:
+            audit = conn.execute(text(
+                "SELECT a.device_id::text AS actor_device_id, a.context::text AS metadata "
+                "FROM audit_events a JOIN identities i ON i.id=a.identity_id "
+                "WHERE i.user_handle=:owner AND a.action='device:revoke' "
+                "ORDER BY a.created_at DESC LIMIT 1"
+            ), {'owner': owner}).mappings().one()
+        import json
+        target = json.loads(audit['metadata'])['target_device_id']
+        actor = audit['actor_device_id']
+    else:
+        audit = [row for row in device_store.audit if row['action'] == 'device:revoke'][-1]
+        assert audit['actor_user_id'] == owner
+        target = audit['metadata']['target_device_id']
+        actor = audit['actor_device_id']
+    assert actor is None
+    assert target == device

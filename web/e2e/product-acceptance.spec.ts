@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { coreSetupPost, redactSensitiveOperation } from '../test-support/core-setup';
-import { randomUUID, generateKeyPairSync, createHash } from 'node:crypto';
+import { randomUUID, generateKeyPairSync, createHash, createSign } from 'node:crypto';
 
 const staging = process.env.SENTINEL_BROWSER_TARGET === 'staging';
 const publicSite = staging ? 'https://sentinel-public-site-staging.onrender.com' : 'http://127.0.0.1:3001';
@@ -248,13 +248,27 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   expect(registered.status).toBe(200);
   const token = registered.data.session_token;
   expect(typeof token).toBe('string');
-  const { publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const der = publicKey.export({ type: 'spki', format: 'der' });
   const bound = await coreSetupPost(`${core}/v1/devices/bind`, {
     platform: 'android', public_key_der_b64: der.toString('base64'), fingerprint_sha256: createHash('sha256').update(der).digest('hex'),
   }, token);
   expect(bound.status).toBe(200);
-  const enrolled = await coreSetupPost(`${core}/v1/account/mfa/totp/enroll`, {}, token);
+  // Registering a public key is not proof of possession.
+  const premature = await coreSetupPost(`${core}/v1/account/mfa/totp/enroll`, {}, token);
+  expect(premature.status).toBe(403);
+  expect(premature.data.code).toBe('DEVICE_BOUND_SESSION_REQUIRED');
+  const requestId = randomUUID(), timestamp = Math.floor(Date.now() / 1000);
+  const signature = createSign('SHA256').update(JSON.stringify({
+    challenge: bound.data.challenge, request_id: requestId, timestamp,
+  })).sign(privateKey).toString('base64');
+  const proven = await coreSetupPost(`${core}/v1/devices/${bound.data.device_id}/prove`, {
+    challenge: bound.data.challenge, timestamp, request_id: requestId, signature_b64: signature,
+  });
+  expect(proven.status).toBe(200);
+  const trusted = proven.data.session_token;
+  expect(typeof trusted).toBe('string');
+  const enrolled = await coreSetupPost(`${core}/v1/account/mfa/totp/enroll`, {}, trusted);
   expect(enrolled.status).toBe(200);
   expect(typeof enrolled.data.secret).toBe('string');
   const secret = enrolled.data.secret!;
@@ -266,7 +280,7 @@ test('MFA challenge, invalid code and recovery completion through Web', async ({
   const hash = createHmac('sha1', Buffer.from(key, 'latin1')).update(counter).digest();
   const offset = hash[19] & 15;
   const code = ((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).toString().padStart(6, '0');
-  const confirmed = await coreSetupPost(`${core}/v1/account/mfa/totp/confirm`, { code }, token);
+  const confirmed = await coreSetupPost(`${core}/v1/account/mfa/totp/confirm`, { code }, trusted);
   expect(confirmed.status).toBe(200);
   expect(Array.isArray(confirmed.data.recovery_codes)).toBe(true);
   const recoveryCode = confirmed.data.recovery_codes![0];

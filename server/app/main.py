@@ -1216,6 +1216,7 @@ def suspend_device(device_id: str, request: Request, authorization_header: str =
 @app.post("/v1/devices/{device_id}/revoke")
 def revoke_device(device_id: str, request: Request, authorization_header: str = Header(..., alias="Authorization"), x_request_id: str | None = Header(default=None, alias="X-Request-ID")):
     rid = request_id(request, x_request_id)
+    rate_limit(request, "device-revoke")
     principal = principal_from_token(require_bearer(authorization_header))
     device = store.get_device(device_id)
     if not device:
@@ -1226,7 +1227,8 @@ def revoke_device(device_id: str, request: Request, authorization_header: str = 
         raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
     if not store.revoke_device(device_id):
         raise HTTPException(status_code=409, detail="DEVICE_ALREADY_REVOKED")
-    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:revoke", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
+    # Record the authenticated initiator, not the device being revoked.
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "device:revoke", "resource": "device", "metadata": {"target_device_id": device_id}, "decision": "ALLOW", "reason_code": "DEVICE_REVOKED", "request_id": rid})
     return {"revoked": True}
 
 

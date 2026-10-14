@@ -249,24 +249,6 @@ def authorize_request(principal: Principal, action: str, resource: str, rid: str
         raise HTTPException(status_code=403, detail=reason)
 
 
-def bind_session_to_device(access_token: str, device_id: str) -> None:
-    if isinstance(store, MemoryStore):
-        record = store.sessions.get(session_hash(access_token))
-        if not record or record.get("revoked"):
-            raise HTTPException(status_code=401, detail="INVALID_SESSION")
-        record["device_id"] = device_id
-        return
-    with store.engine.begin() as conn:
-        result = conn.execute(
-            __import__("sqlalchemy").text(
-                "UPDATE sessions SET device_id=(SELECT id FROM device_bindings WHERE id=:device_id) WHERE session_hash=:session_hash AND revoked_at IS NULL"
-            ),
-            {"device_id": device_id, "session_hash": session_hash(access_token)},
-        )
-        if result.rowcount != 1:
-            raise HTTPException(status_code=401, detail="INVALID_SESSION")
-
-
 def device_owned_by(principal: Principal, device: dict[str, Any], device_id: str) -> bool:
     return principal.device_id == device_id or device.get("user_id") == principal.user_id
 
@@ -1136,8 +1118,9 @@ def bind_device(
         raise HTTPException(status_code=400, detail="FINGERPRINT_MISMATCH")
     challenge = secrets.token_urlsafe(32)
     device_id = _register_device_binding(principal.user_id, payload.platform, payload.public_key_der_b64, fingerprint, challenge)
-    bind_session_to_device(token, device_id)
-    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": device_id, "action": "device:bind", "resource": "device", "decision": "ALLOW", "reason_code": "DEVICE_BOUND_SESSION_LINKED", "request_id": rid})
+    # Key registration is not proof of possession. The original session
+    # stays unbound until /v1/devices/{device_id}/prove validates P-256.
+    store.add_audit({"actor_user_id": principal.user_id, "actor_device_id": principal.device_id, "action": "device:bind", "resource": "device", "metadata": {"target_device_id": device_id}, "decision": "ALLOW", "reason_code": "DEVICE_PROOF_PENDING", "request_id": rid})
     return DeviceRegisterResponse(device_id=device_id, state="ACTIVE", challenge=challenge)
 
 
@@ -1248,6 +1231,10 @@ def rotate_device(
         raise HTTPException(status_code=404, detail="DEVICE_NOT_FOUND")
     if not device_owned_by(principal, device, device_id):
         raise HTTPException(status_code=403, detail="DEVICE_SCOPE_MISMATCH")
+    # Rotation moves device identity and mints a successor session. Account
+    # ownership alone must not enable this higher-trust operation.
+    if principal.device_id != device_id:
+        raise HTTPException(status_code=403, detail="DEVICE_PROOF_REQUIRED")
     if device.get("state") != "ACTIVE":
         raise HTTPException(status_code=409, detail="DEVICE_NOT_ACTIVE")
     try:

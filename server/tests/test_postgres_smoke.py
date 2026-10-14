@@ -204,7 +204,8 @@ def test_postgres_auth_event_and_audit_flow():
             {"id": bound_device_id},
         ).scalar_one()
     assert bind_state == "ACTIVE"
-    assert linked >= 1
+    assert linked == 0
+    assert store.get_session(bind_access)["device_id"] is None
 
     # Optional revoke continuation of the bound device.
     revoked = client.post(

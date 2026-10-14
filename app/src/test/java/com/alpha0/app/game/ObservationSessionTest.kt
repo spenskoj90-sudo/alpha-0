@@ -8,6 +8,7 @@ class ObservationSessionTest {
         val session = ObservationSession()
         assertFalse(session.frame("a", 10))
         session.start("a", 100)
+        assertEquals("a", session.snapshot.captureId)
         assertFalse(session.frame("a", 101))
         session.visibility("a", true, 102)
         assertTrue(session.frame("a", 103))
@@ -23,6 +24,7 @@ class ObservationSessionTest {
         assertFalse(session.frame("a", 121))
         assertFalse(session.recognized("a", 1, 110, 122, HealthCandidate(4, 20, 0)))
         assertEquals(ObservationStatus.STOPPED, session.snapshot.status)
+        assertNull(session.snapshot.captureId)
     }
 
     @Test fun `hidden content removes health without pretending it is healthy`() {

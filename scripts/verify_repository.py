@@ -314,8 +314,8 @@ def check_versions(checks: Checks) -> None:
     checks.require("python:3.14.7-slim@sha256:" in read("server/Dockerfile"), "Core image pins Python 3.14.7 by digest")
     launcher = json.loads(read("launcher/package.json"))
     checks.require(launcher.get("engines", {}).get("node") == "24.x", "Launcher declares Node 24 LTS")
-    checks.require(launcher.get("dependencies", {}).get("electron") == "44.5.1", "Launcher pins Electron 44.5.1")
-    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.5.1", "Launcher packaging pins Electron 44.5.1")
+    checks.require(launcher.get("dependencies", {}).get("electron") == "44.7.2", "Launcher pins Electron 44.7.2")
+    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.7.2", "Launcher packaging pins Electron 44.7.2")
     packaging = launcher["sentinelPackaging"]
     host_contract = read("docs/PACKAGED_COMPANION_HOST_ACCEPTANCE_V1.md")
     checks.require(

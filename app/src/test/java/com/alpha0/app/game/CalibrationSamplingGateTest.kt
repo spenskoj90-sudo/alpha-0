@@ -14,6 +14,8 @@ class CalibrationSamplingGateTest {
         session.start("observing", 100)
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         session.visibility("observing", true, 101)
+        assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game)) // no captured frame yet
+        assertTrue(session.frame("observing", 101))
         assertTrue(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, repack))
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, null))
@@ -22,6 +24,26 @@ class CalibrationSamplingGateTest {
         assertTrue(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         session.stop("USER_STOP")
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+    }
+
+    @Test fun `frame identity survives pause but changes on each completed frame and capture`() {
+        val session = ObservationSession()
+        session.start("first", 100)
+        session.visibility("first", true, 101)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.frame("first", 110)
+        val first = CalibrationSamplingGate.frameId(session.snapshot)
+        assertEquals(CalibrationFrameId("first", 1L), first)
+        session.visibility("first", false, 120)
+        assertEquals(first, CalibrationSamplingGate.frameId(session.snapshot))
+        session.visibility("first", true, 130)
+        session.frame("first", 140)
+        assertEquals(CalibrationFrameId("first", 2L), CalibrationSamplingGate.frameId(session.snapshot))
+        session.start("second", 200)
+        session.visibility("second", true, 201)
+        session.frame("second", 210)
+        assertEquals(CalibrationFrameId("second", 1L), CalibrationSamplingGate.frameId(session.snapshot))
     }
 
     @Test fun `historical health never becomes an active sample for later frame`() {

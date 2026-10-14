@@ -64,6 +64,8 @@ fun GameObservationScreen() {
     val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
     var consent by rememberSaveable { mutableStateOf(false) }
     var pendingVersion by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingVersionName by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingSigner by rememberSaveable { mutableStateOf<String?>(null) }
     var pending by rememberSaveable { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
 
@@ -81,12 +83,18 @@ fun GameObservationScreen() {
         pending = false
         consent = false
         val expectedVersion = pendingVersion
+        val expectedName = pendingVersionName
+        val expectedSigner = pendingSigner
         pendingVersion = null
+        pendingVersionName = null
+        pendingSigner = null
         val currentInstall = ShatteredGameProfile.installed(context)
         val session = SecureSessionStore().load(context)
         when {
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
-            expectedVersion == null || currentInstall?.versionCode != expectedVersion || session?.deviceId.isNullOrBlank() ->
+            expectedVersion == null || expectedName == null || currentInstall?.versionCode != expectedVersion ||
+                currentInstall.versionName != expectedName || currentInstall.signerSha256 != expectedSigner ||
+                session?.deviceId.isNullOrBlank() ->
                 GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
             else -> GameObservationService.start(context, result.data!!, currentInstall!!)
         }
@@ -107,6 +115,8 @@ fun GameObservationScreen() {
                 GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
             } else {
                 pendingVersion = current.versionCode
+                pendingVersionName = current.versionName
+                pendingSigner = current.signerSha256
                 pending = true
                 try {
                     val manager = context.getSystemService(MediaProjectionManager::class.java)
@@ -115,6 +125,8 @@ fun GameObservationScreen() {
                 } catch (_: Exception) {
                     pending = false
                     pendingVersion = null
+                    pendingVersionName = null
+                    pendingSigner = null
                     consent = false
                     GameObservationRuntime.stop("CAPTURE_START_FAILED")
                 }

@@ -32,6 +32,10 @@ the selected package to SENTINEL; the source therefore remains user-selected and
 ## Capture lifecycle
 
 - A fresh Android consent result is required for every session.
+- The observed installed package version **name**, version code and current signer digest
+  are rechecked after the consent chooser and again on foreground-service start;
+  if any field changed, the session is denied. This is package-metadata
+  time-of-check/time-of-use fencing, **not** capture-source attestation.
 - A non-exported `mediaProjection` foreground service owns one projection and one
   virtual display. It never persists a projection token or restarts itself.
 - Resize reuses that virtual display, replaces the image surface and invalidates

@@ -125,7 +125,9 @@ class GameObservationService : Service() {
             val current = SecureSessionStore().load(this)
             val install = ShatteredGameProfile.installed(this)
             if (consent == null || current?.deviceId.isNullOrBlank() || install == null ||
-                intent?.getLongExtra(VERSION, -1) != install.versionCode) {
+                intent?.getLongExtra(VERSION, -1) != install.versionCode ||
+                intent.getStringExtra(VERSION_NAME) != install.versionName ||
+                intent.getStringExtra(SIGNER) != install.signerSha256) {
                 finish("SESSION_OR_GAME_UNAVAILABLE")
                 return START_NOT_STICKY
             }
@@ -282,11 +284,14 @@ class GameObservationService : Service() {
         private const val CHANNEL = "sentinel-game-observation"
         private const val CONSENT = "projection-consent"
         private const val VERSION = "game-version"
+        private const val VERSION_NAME = "game-version-name"
+        private const val SIGNER = "game-signer-sha256"
         private const val STOP = "com.alpha0.app.game.STOP_OBSERVATION"
         fun start(context: Context, consent: Intent, install: StockGameInstall) {
             try {
                 ContextCompat.startForegroundService(context, Intent(context, GameObservationService::class.java)
-                    .putExtra(CONSENT, consent).putExtra(VERSION, install.versionCode))
+                    .putExtra(CONSENT, consent).putExtra(VERSION, install.versionCode)
+                    .putExtra(VERSION_NAME, install.versionName).putExtra(SIGNER, install.signerSha256))
             } catch (_: Exception) {
                 GameObservationRuntime.stop("CAPTURE_START_FAILED")
             }

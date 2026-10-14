@@ -114,7 +114,9 @@ class ObservationSessionTest {
         assertNull(session.snapshot.health)
         assertEquals(HealthCandidate(4, 20, 0), session.snapshot.lastHealth?.candidate)
         assertEquals(110L, session.snapshot.lastHealth?.observedAt)
+        assertEquals(110L, session.snapshot.lastRecognizedFrameAt)
         session.stop("USER_STOP")
         assertNull(session.snapshot.lastHealth)
+        assertNull(session.snapshot.lastRecognizedFrameAt)
     }
 }

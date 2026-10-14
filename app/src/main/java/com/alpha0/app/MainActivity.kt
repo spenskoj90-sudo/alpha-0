@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +93,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val sessionStore = SecureSessionStore()
@@ -272,6 +274,7 @@ private fun SentinelApplicationUi(
     val activity = androidx.compose.ui.platform.LocalContext.current as ComponentActivity
     val strings = LocalAppStrings.current
     val navController = rememberNavController()
+    val rotationScope = rememberCoroutineScope()
     var activeSession by remember { mutableStateOf(initialSession) }
     var refreshComplete by remember { mutableStateOf(initialSession == null) }
     var pendingMfaRecoveryCodes by remember { mutableStateOf<List<String>?>(null) }
@@ -724,12 +727,53 @@ private fun SentinelApplicationUi(
                             },
                             onRotated = { rotated ->
                                 val replacementId = rotated.deviceId
-                                val access = rotated.sessionToken
-                                val refresh = rotated.refreshToken
-                                if (!replacementId.isNullOrBlank() && !access.isNullOrBlank() && !refresh.isNullOrBlank()) {
-                                    sessionStore.save(activity, access, refresh, replacementId)
-                                    activeSession = sessionStore.load(activity)
-                                    navController.navigate("home") { popUpTo("home") { inclusive = true } }
+                                // Rotation's response bearer is *not* proof of
+                                // possession of the replacement Keystore key.
+                                // Never save it as a device-bound session.
+                                rotationScope.launch {
+                                    val proof = if (replacementId.isNullOrBlank()) {
+                                        DeviceApi.ProofResult.Failure("ROTATION_DEVICE_ID_MISSING")
+                                    } else withContext(Dispatchers.IO) {
+                                        runCatching {
+                                            val identity = deviceIdentity.getIdentityInfo()
+                                            when (val lookup = deviceApi.recoverRotation(
+                                                deviceIdentity.getPublicKeyDerBase64(), identity.fingerprint,
+                                            )) {
+                                                is DeviceApi.Result.Success -> {
+                                                    if (lookup.value.deviceId != replacementId)
+                                                        DeviceApi.ProofResult.Failure("ROTATION_DEVICE_MISMATCH")
+                                                    else deviceApi.prove(
+                                                        replacementId, lookup.value.challenge, deviceIdentity,
+                                                    )
+                                                }
+                                                is DeviceApi.Result.Failure -> DeviceApi.ProofResult.Failure(lookup.message)
+                                            }
+                                        }.getOrElse { DeviceApi.ProofResult.Failure("ROTATION_PROOF_UNAVAILABLE") }
+                                    }
+                                    GameObservationService.stop(activity, "SESSION_CLOSED")
+                                    sessionStore.clear(activity)
+                                    activeSession = null
+                                    when (proof) {
+                                        is DeviceApi.ProofResult.Success -> {
+                                            sessionStore.save(
+                                                activity, proof.value.accessToken,
+                                                proof.value.refreshToken, proof.value.deviceId,
+                                            )
+                                            activeSession = sessionStore.load(activity)
+                                            navController.navigate("home") {
+                                                popUpTo(navController.graph.id) { inclusive = true }
+                                            }
+                                        }
+                                        is DeviceApi.ProofResult.Failure -> {
+                                            diagnostics.warn(
+                                                "KEYSTORE", "KEY_ROTATION_PROOF", "FAILURE",
+                                                errorCode = proof.message,
+                                            )
+                                            navController.navigate("login") {
+                                                popUpTo(navController.graph.id) { inclusive = true }
+                                            }
+                                        }
+                                    }
                                 }
                             },
                         )

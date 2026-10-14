@@ -78,7 +78,10 @@ class ObservationSession {
             stop(if (now < startedAt) "CLOCK_INVALID" else "TIME_LIMIT")
             return false
         }
-        if (snapshot.lastFrameAt?.let { now - it > 5000 } == true) snapshot = snapshot.copy(health = null)
+        // A completed frame that has aged out while still observing must not be
+        // reclassified as a fresh OCR miss just because its health was cleared.
+        if (snapshot.lastFrameAt?.let { now - it > 5000 } == true)
+            snapshot = snapshot.copy(health = null, lastCompletedFrameSequence = null)
         return true
     }
 

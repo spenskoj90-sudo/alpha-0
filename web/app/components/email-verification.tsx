@@ -4,8 +4,9 @@ import { FormEvent, useState } from 'react';
 import { useLocale } from './locale-provider';
 
 /** Verification does not authenticate or authorize game actions. */
-export function EmailVerification({ initialEmail, onCancel, onComplete }: {
+export function EmailVerification({ initialEmail, onCancel, onComplete, lockedEmail = false, cancelLabel = 'Back to sign in' }: {
   initialEmail: string; onCancel: () => void; onComplete: () => void;
+  lockedEmail?: boolean; cancelLabel?: string;
 }) {
   const { t, locale } = useLocale();
   const [step, setStep] = useState<'request' | 'confirm'>('request');
@@ -55,7 +56,7 @@ export function EmailVerification({ initialEmail, onCancel, onComplete }: {
     <form onSubmit={submit}>
       <label className="field-label">{t("Email")}
         <input type="email" autoComplete="email" maxLength={320} value={email}
-          onChange={event => setEmail(event.target.value)} required disabled={busy} />
+          onChange={event => setEmail(event.target.value)} required disabled={busy || lockedEmail} />
       </label>
       {step === 'confirm' && <>
         <p className="muted">{t("Enter the 8-digit email code. It expires after 15 minutes.")}</p>
@@ -77,7 +78,7 @@ export function EmailVerification({ initialEmail, onCancel, onComplete }: {
         setStep(step === 'request' ? 'confirm' : 'request');
         setToken(''); setError(false); setMessage('');
       }}>{step === 'request' ? t("I already have a verification code") : t("Request another code")}</button>
-      <button type="button" className="text-btn" disabled={busy} onClick={onCancel}>{t("Back to sign in")}</button>
+      <button type="button" className="text-btn" disabled={busy} onClick={onCancel}>{t(cancelLabel)}</button>
     </div>
   </div>;
 }

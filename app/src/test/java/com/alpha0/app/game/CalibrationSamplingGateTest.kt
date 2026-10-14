@@ -64,6 +64,18 @@ class CalibrationSamplingGateTest {
         assertNull(CalibrationSamplingGate.frameId(session.snapshot))
     }
 
+    @Test fun `expired completed frame cannot be relabelled a fresh OCR miss`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        session.frame("capture", 110)
+        session.recognized("capture", 1, 110, 120, HealthCandidate(4, 20, 0))
+        assertNotNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.tick(5111)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
+    }
+
     @Test fun `historical health never becomes an active sample for later frame`() {
         val session = ObservationSession()
         session.start("capture", 100)

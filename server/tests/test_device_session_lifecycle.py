@@ -192,8 +192,7 @@ def test_rotation_recovery_finds_accepted_key_without_creating_another_binding()
     old_key = ec.generate_private_key(ec.SECP256R1())
     old_public, old_fingerprint = public_material(old_key)
     old_device = store.register_device("u1", "android", old_public, old_fingerprint, "old-challenge")
-    old_access, _ = session_for()
-    store.sessions[hashlib.sha256(old_access.encode()).hexdigest()]["device_id"] = old_device
+    old_access, _, _, _ = store.issue_session(old_device, "u1", SESSION_TTL_SECONDS, REFRESH_TTL_SECONDS)
 
     new_key = ec.generate_private_key(ec.SECP256R1())
     new_public, new_fingerprint = public_material(new_key)

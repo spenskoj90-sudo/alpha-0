@@ -25,6 +25,19 @@ app.whenReady().then(() => {
     // keeps the runtime module graph resolvable without node_modules or ASAR.
     require('./companion-process');
     require('./core-session');
+    const { KnowledgePresentation } = require('./knowledge-presentation');
+    require('./knowledge-runtime');
+    const knowledge = new KnowledgePresentation({
+      directory: path.join(app.getPath('userData'), 'knowledge-smoke'),
+      session: { knowledgeContext: { origin: 'https://fixture.invalid', sessionId: 'smoke' }, cancelKnowledge() {} },
+      getTrustedContext: () => null, getTrustedObservation: () => null,
+    });
+    // Real packaged module graph exercises the safe uncalibrated lifecycle.
+    void knowledge.start();
+    if (knowledge.status().state !== 'WAITING_FOR_VERIFIED_PROFILE' || knowledge.presentations().length !== 0) {
+      throw new Error('unverified knowledge lifecycle must fail closed');
+    }
+    knowledge.stop();
     require('./exact-environment-evidence');
     require('./runtime-health');
     require('./voice-runtime');
@@ -38,6 +51,8 @@ app.whenReady().then(() => {
       runtimeModulesLoaded: [
         'companion-process',
         'core-session',
+        'knowledge-runtime',
+        'knowledge-presentation',
         'exact-environment-evidence',
         'runtime-health',
         'voice-runtime',

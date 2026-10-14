@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
             baseUrl = BuildConfig.SENTINEL_API_BASE_URL,
             delegate = rawHttpTransport,
             sessionProvider = {
-                sessionStore.load(this)?.let { SessionCredentials(it.accessToken, it.refreshToken) }
+                sessionStore.load(this)?.let { SessionCredentials(it.accessToken, it.refreshToken, it.epoch) }
             },
             onSessionRefreshed = { refreshed ->
                 val current = sessionStore.load(this)
@@ -164,6 +164,20 @@ class MainActivity : ComponentActivity() {
                 GameObservationService.stop(this, "SESSION_CLOSED")
                 sessionStore.clear(this)
                 sessionSignals.tryEmit(Unit)
+            },
+            replaceIfCurrent = { expected, refreshed ->
+                val current = sessionStore.load(this)
+                val replaced = current != null && current.epoch == expected.epoch && current.accessToken == expected.accessToken &&
+                    current.refreshToken == expected.refreshToken && sessionStore.replaceIfCurrent(this, current, refreshed.accessToken, refreshed.refreshToken)
+                if (replaced) sessionSignals.tryEmit(Unit)
+                replaced
+            },
+            invalidateIfCurrent = { expected ->
+                val current = sessionStore.load(this)
+                val cleared = current != null && current.epoch == expected.epoch && current.accessToken == expected.accessToken &&
+                    current.refreshToken == expected.refreshToken && sessionStore.clearIfCurrent(this, current)
+                if (cleared) { GameObservationService.stop(this, "SESSION_CLOSED"); sessionSignals.tryEmit(Unit) }
+                cleared
             },
         )
         val authApi = AuthApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }

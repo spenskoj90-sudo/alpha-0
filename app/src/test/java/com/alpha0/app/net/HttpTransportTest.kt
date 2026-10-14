@@ -16,6 +16,30 @@ import java.net.URL
 import java.util.UUID
 
 class HttpTransportTest {
+    @Test fun lateRefreshSuccessCannotOverwriteLoginInAnotherLifecycle() {
+        var session: SessionCredentials? = SessionCredentials("old-access", "old-refresh")
+        val fresh = SessionCredentials("new-login-access", "new-login-refresh")
+        val delegate = RecordingTransport { _, index -> when (index) {
+            0 -> HttpResponse(401, """{"code":"INVALID_SESSION"}""")
+            1 -> { session = fresh; HttpResponse(200, """{"session_token":"late-access","refresh_token":"late-refresh"}""") }
+            else -> throw AssertionError("late request must not be retried")
+        } }
+        val transport = SessionRefreshingHttpTransport("https://core.example", delegate, { session }, { session = it }, { session = null })
+        assertEquals(401, transport.execute(HttpRequest(HttpMethod.GET, "https://core.example/v1/account", mapOf("Authorization" to "Bearer old-access"))).status)
+        assertEquals(fresh, session); assertEquals(2, delegate.requests.size)
+    }
+    @Test fun lateRefreshDenialCannotClearNewPrincipal() {
+        var session: SessionCredentials? = SessionCredentials("old-access", "old-refresh")
+        val fresh = SessionCredentials("fresh-access", "fresh-refresh")
+        val delegate = RecordingTransport { _, index -> when (index) {
+            0 -> HttpResponse(401, """{"code":"INVALID_SESSION"}""")
+            1 -> { session = fresh; HttpResponse(401, """{"code":"INVALID_REFRESH"}""") }
+            else -> throw AssertionError("unexpected retry")
+        } }
+        val transport = SessionRefreshingHttpTransport("https://core.example", delegate, { session }, { session = it }, { session = null })
+        transport.execute(HttpRequest(HttpMethod.GET, "https://core.example/v1/account", mapOf("Authorization" to "Bearer old-access")))
+        assertEquals(fresh, session)
+    }
     private class RecordingTransport(
         private val responder: (HttpRequest, Int) -> HttpResponse,
     ) : HttpTransport {

@@ -85,6 +85,8 @@ $ApplicationSources = @(
   "companion-process.js",
   "companion-worker.js",
   "core-session.js",
+  "knowledge-runtime.js",
+  "knowledge-presentation.js",
   "exact-environment-evidence.js",
   "index.html",
   "main.js",

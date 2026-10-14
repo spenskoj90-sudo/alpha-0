@@ -25,6 +25,20 @@ class SessionManagerInstrumentedTest {
         store.clear(context)
     }
 
+    @Test fun lateRefreshAfterLogoutAndLoginPreservesNewPrincipal() = runBlocking {
+        store.save(context, "old-access", "old-refresh", "old-device")
+        val client = object : RefreshClient {
+            override suspend fun refresh(refreshToken: String): AuthApi.Result {
+                store.clear(context); store.save(context, "fresh-access", "fresh-refresh", "fresh-device")
+                return AuthApi.Result.Success(AuthApi.Session("late-access", "late-refresh", emptyList()))
+            }
+        }
+        val result = SessionManager(client, store).refreshStoredSession(context)
+        assertEquals("SESSION_CHANGED", (result as AuthApi.Result.Failure).message)
+        assertEquals("fresh-access", store.load(context)!!.accessToken)
+        assertEquals("fresh-device", store.load(context)!!.deviceId)
+    }
+
     @Test
     fun successfulRefreshReplacesTokensAndPreservesDeviceId() = runBlocking {
         store.save(context, "old-access", "old-refresh", "device-123")

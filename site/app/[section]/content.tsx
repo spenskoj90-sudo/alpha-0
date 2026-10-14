@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import profiles from '../components/game-profiles.json';
+import { gameProfileStatus } from '../components/game-profile-status';
 import { PublicHeader } from '../components/public-header';
 import { PublicFooter } from '../components/public-footer';
 import { useLocale } from '../components/locale-provider';
@@ -49,11 +50,6 @@ export default function PublicSectionPage({ section }: { section: PublicSection 
   const { locale, t } = useLocale();
   const copy = (pair: Pair) => pair[locale === 'ru' ? 1 : 0];
   const entry = publicSections.find(item => item.path === section)!;
-  const state = (status: string): Pair => status === 'observer_pilot'
-    ? ['Observer pilot · Calibration pending', 'Пилот наблюдения · Калибровка ожидается']
-    : status === 'adapter_foundation'
-      ? ['Adapter foundation · Environment unverified', 'Основа адаптера · Среда не проверена']
-      : ['Research only · Environment unverified', 'Только исследование · Среда не проверена'];
   return <>
     <a className="skip-link" href="#main-content">{t('Skip to main content')}</a>
     <PublicHeader />
@@ -66,7 +62,7 @@ export default function PublicSectionPage({ section }: { section: PublicSection 
       {section === 'games' && <>
         <aside className="callout"><strong>{copy(['Game actions are disabled.', 'Игровые действия отключены.'])}</strong><p>{copy(['SENTINEL does not modify original game APKs or executables. Catalog membership does not grant capabilities or entitlements.', 'SENTINEL не изменяет оригинальные APK и исполняемые файлы игр. Наличие в каталоге не предоставляет возможности или права доступа.'])}</p></aside>
         <div className="principle-grid">{profiles.map(profile => <article className="feature-card" key={profile.id}>
-          <h2>{profile.name}</h2><p>{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''}</p><span className="status">{copy(state(profile.implementation_status))}</span>
+          <h2>{profile.name}</h2><p>{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''}</p><span className="status">{copy(gameProfileStatus(profile.implementation_status))}</span>
         </article>)}</div>
       </>}
       {section === 'access' && <div className="hero-actions">

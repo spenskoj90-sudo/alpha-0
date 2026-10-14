@@ -354,6 +354,10 @@ jobs:
         if: needs.changes.outputs.site == 'true'
         working-directory: site
         run: python ../scripts/verify_public_site_routes.py
+      - name: Test public catalog status claims
+        if: needs.changes.outputs.site == 'true'
+        working-directory: site
+        run: npx vitest run app/components/game-profile-status.test.ts
 
   launcher:
     needs: [changes]

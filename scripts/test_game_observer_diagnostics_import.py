@@ -122,7 +122,7 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 read_events(archive)
 
-    def test_cli_output_is_new_atomic_conservative_and_does_not_print_private_data(self):
+    def test_cli_output_is_non_overwriting_conservative_and_does_not_print_private_data(self):
         with tempfile.TemporaryDirectory() as work:
             root = Path(work)
             source, output = root / "diagnostics.gz", root / "summary.json"

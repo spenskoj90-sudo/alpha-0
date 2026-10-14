@@ -130,6 +130,7 @@ class GameObservationService : Service() {
                     intent?.getLongExtra(VERSION, -1),
                     intent?.getStringExtra(SIGNER),
                     install,
+                    signerSupplied = intent?.hasExtra(SIGNER) == true,
                 )) {
                 finish("SESSION_OR_GAME_UNAVAILABLE")
                 return START_NOT_STICKY

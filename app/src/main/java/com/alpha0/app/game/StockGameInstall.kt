@@ -8,8 +8,11 @@ data class StockGameInstall(val versionName: String, val versionCode: Long, val 
 
 /** Exact metadata equality across consent, callback and service start; NOT source attestation. */
 internal object GameInstallFence {
-    fun matches(versionName: String?, versionCode: Long?, signerSha256: String?, current: StockGameInstall?): Boolean =
-        versionName != null && versionCode != null && current != null &&
+    fun matches(
+        versionName: String?, versionCode: Long?, signerSha256: String?,
+        current: StockGameInstall?, signerSupplied: Boolean = true,
+    ): Boolean =
+        signerSupplied && versionName != null && versionCode != null && current != null &&
             current.versionName == versionName &&
             current.versionCode == versionCode &&
             current.signerSha256 == signerSha256

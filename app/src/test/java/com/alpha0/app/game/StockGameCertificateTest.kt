@@ -28,8 +28,12 @@ class StockGameCertificateTest {
         assertFalse(GameInstallFence.matches("4.0.0", 913, expected.signerSha256, expected))
         assertFalse(GameInstallFence.matches("4.0.0", 912, "b".repeat(64), expected))
         assertFalse(GameInstallFence.matches("4.0.0", 912, null, expected))
-        // Missing/ambiguous signer is still UNVERIFIED, but cannot become an attestation.
-        assertTrue(GameInstallFence.matches("4.0.0", 912, null, StockGameInstall("4.0.0", 912)))
+        // UNKNOWN is explicit metadata, not an omitted Intent field. Missing
+        // SIGNER is rejected even if the current signer is itself unknown.
+        val unknown = StockGameInstall("4.0.0", 912)
+        assertTrue(GameInstallFence.matches("4.0.0", 912, null, unknown, signerSupplied = true))
+        assertFalse(GameInstallFence.matches("4.0.0", 912, null, unknown, signerSupplied = false))
+        assertFalse(GameInstallFence.matches("4.0.0", 912, expected.signerSha256, expected, signerSupplied = false))
     }
     @Test fun `same game version with different installed signer is different identity`() {
         val first = StockGameInstall("4.0.0", 912, StockGameCertificate.digest(listOf(byteArrayOf(1))))

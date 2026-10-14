@@ -161,3 +161,44 @@ SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED remai
 The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity (including its observed current signing certificate)
 disables comparisons against old candidate identity. The digest is diagnostic
 provenance and never attests which application was captured. Export uses existing Owner-initiated diagnostics. Engineer reconciles exact manifest/signer/device/game/HUD and constructs the bounded calibration input; UI labels/user entries are not physical or app-source attestations. Recommendations, semantic input and ARM stay unavailable until the prerequisite physical calibration and target/session binding are proven.
+
+## Bounded diagnostic-export import — 2026-10-14
+
+`scripts/game_observer_diagnostics_import.py` accepts an **Owner-initiated**
+`sentinel_forensic_diagnostics.jsonl.gz` export and produces the strict v2
+numeric **summary**, without saving a raw intermediary. This is an offline
+engineering tool; the Android app does not auto-upload diagnostics. It reads at
+most 2 MiB decompressed and 4,000 JSONL records, selects only explicit
+`GAME/CALIBRATION_NUMERIC_SAMPLE/OBSERVED` events, and never copies other
+events, exception stacks, arbitrary details, pixels, raw OCR or credentials.
+
+An export with more than one campaign requires an explicit UUID selection.
+Each selected campaign must begin with sequence 1, be contiguous, have at most
+32 samples, and share one installed game package/version/signer SHA-256.
+Incomplete/ambiguous samples, changed signers, malformed input, invalid
+reference data or an existing output path **fail closed**. Numeric rows still
+include missing and stale observations in the denominator. An observed signer
+is diagnostic metadata, not publisher identity or MediaProjection source proof.
+
+Example from a controlled engineering workspace (the Owner needs **no PC**):
+
+```bash
+python scripts/game_observer_diagnostics_import.py \
+  --diagnostics sentinel_forensic_diagnostics.jsonl.gz \
+  --output calibration-summary.json \
+  --source-sha EXACT_40_HEX_BUILD_SHA \
+  --apk-sha256 EXACT_64_HEX_APK_DIGEST \
+  --signer-sha256 EXACT_64_HEX_SENTINEL_APK_SIGNER \
+  --apk-version-code EXACT_ANDROID_VERSION_CODE \
+  --game-signer-sha256 EXACT_64_HEX_OBSERVED_GAME_SIGNER \
+  --language ru --hud portrait-upper-left
+```
+
+The engineer must reconcile the command's build/APK/signature assertions with
+the independently retained **exact SHA artifact manifest**; those arguments
+are not attestations by themselves. Device model/API and language/HUD are
+operator assertions too. If diagnostics omit any samples due to ring rotation,
+a complete calibration cannot be reconstructed; do not selectively relabel the
+remaining rows as a full campaign or fabricate values. Every summary remains
+`PENDING_PHYSICAL_REVIEW` / `UNVERIFIED` / `UNCALIBRATED`,
+`capabilityAvailable=false`. No game-input action or recommendation is enabled.

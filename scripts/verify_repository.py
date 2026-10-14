@@ -314,8 +314,8 @@ def check_versions(checks: Checks) -> None:
     checks.require("python:3.14.7-slim@sha256:" in read("server/Dockerfile"), "Core image pins Python 3.14.7 by digest")
     launcher = json.loads(read("launcher/package.json"))
     checks.require(launcher.get("engines", {}).get("node") == "24.x", "Launcher declares Node 24 LTS")
-    checks.require(launcher.get("dependencies", {}).get("electron") == "44.5.1", "Launcher pins Electron 44.5.1")
-    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.5.1", "Launcher packaging pins Electron 44.5.1")
+    checks.require(launcher.get("dependencies", {}).get("electron") == "44.7.2", "Launcher pins Electron 44.7.2")
+    checks.require(launcher.get("sentinelPackaging", {}).get("electronVersion") == "44.7.2", "Launcher packaging pins Electron 44.7.2")
     packaging = launcher["sentinelPackaging"]
     host_contract = read("docs/PACKAGED_COMPANION_HOST_ACCEPTANCE_V1.md")
     checks.require(
@@ -324,7 +324,7 @@ def check_versions(checks: Checks) -> None:
         and f'- expected upstream SHA-256: `{packaging["electronWin32X64Sha256"]}`' in host_contract,
         "Packaged-host acceptance contract matches executable runtime pins",
     )
-    checks.require('implementation("io.sentry:sentry-android:8.59.0")' in android, "Android pins Sentry 8.59.0")
+    checks.require('implementation("io.sentry:sentry-android:8.60.0")' in android, "Android pins Sentry 8.60.0")
     checks.require('implementation("androidx.navigation:navigation-compose:2.10.2")' in android, "Android pins Navigation Compose 2.10.2")
     checks.require('"httpx2==2.13.1"' in pyproject, "Core test tooling pins httpx2 2.13.1")
     checks.require('"sqlalchemy==2.0.54"' in pyproject, "Core retains validated SQLAlchemy 2.0.54 RC line")

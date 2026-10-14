@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from './locale-provider';
 import { loadProductData, type ProductData } from './product-data';
+import { EmailVerification } from './email-verification';
 
 export function ProductOverview() {
   const { t, locale } = useLocale();
@@ -10,6 +11,7 @@ export function ProductOverview() {
   const [busy, setBusy] = useState(false);
   const [confirmDevice, setConfirmDevice] = useState<{ id: string; action: 'revoke' | 'suspend' } | null>(null);
   const [deviceActionError, setDeviceActionError] = useState('');
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
   const generation = useRef(0);
 
   useEffect(() => {
@@ -18,6 +20,7 @@ export function ProductOverview() {
     const update = async (event: Event) => {
       const revision = ++generation.current;
       setConfirmDevice(null);
+      setVerifyingEmail(false);
       setDeviceActionError('');
       const session = (event as CustomEvent<boolean | null>).detail;
       if (session !== true) {
@@ -132,6 +135,17 @@ export function ProductOverview() {
           <div><dt>{t("Recovery codes remaining")}</dt><dd>{data.security.mfa_recovery_codes_remaining}</dd></div>
           <div><dt>{t("Linked providers")}</dt><dd>{data.security.providers.join(', ') || t("None linked")}</dd></div>
         </dl>}
+        {data.state === 'READY' && <>
+          {!data.security.email_verified && data.security.email && (verifyingEmail ?
+            <div className="security-email-verification" aria-label={t("Verify account email")}>
+              <EmailVerification initialEmail={data.security.email} lockedEmail
+                cancelLabel="Back to security" onCancel={() => setVerifyingEmail(false)}
+                onComplete={() => { setVerifyingEmail(false); void refresh(); }} />
+            </div> :
+            <button type="button" className="ghost-btn" disabled={busy}
+              onClick={() => setVerifyingEmail(true)}>{t("Verify account email")}</button>)}
+          <p className="microcopy">{t("MFA enrollment, recovery-code management and provider linking require a proven device session. Use Android Security; a Web login alone cannot authorize these changes.")}</p>
+        </>}
       </article>
       <article className="card surface-card" id="devices">
         <h2>{t("Devices")}</h2>

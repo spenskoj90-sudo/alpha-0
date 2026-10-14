@@ -53,7 +53,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
 | Web | Next.js 16.3.8, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.3 |
 | Web lint | ESLint 9.39.5 with eslint-config-next 16.3.8; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
-| Companion | Electron 44.5.1 on Node 24 LTS |
+| Companion | Electron 44.7.2 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.142.2, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.2, websockets 17.2 |
 | Core test tooling | pytest 9.1.1, pytest-cov 7.1.0, httpx2 2.13.1 |
@@ -62,7 +62,7 @@ The repository-wide modernization pass uses stable supported software and immuta
 
 Web and Core container bases are pinned by immutable SHA-256 digest. The Web lockfile is verified in CI under Node 24.21.0 and is required to remain consistent with `package.json`.
 
-The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.5.1 Win32 x64 archive and verifies SHA-256 `9b382492dcfee91f8f9e92c91f7972550a1b95d2299cac72279dab33a600d7db` before staging the application payload.
+The Windows Companion packaging path remains dependency-install independent: it downloads the exact official Electron 44.7.2 Win32 x64 archive and verifies SHA-256 `10a89447ef64ac5cb9f782af48ffd83734a40ae91681259d1048ca3c9e6c5da4` before staging the application payload.
 
 The connected Neon pre-release source was re-observed on 2026-09-19 as PostgreSQL 17.11 even though repository integration/recovery/reference evidence is on PostgreSQL 18. The source contains migration `014_account_mfa` with checksum `572183e9e60ded7c2847fd6b8ea614f1fd51dbcacec0d11cf7d0c00c47e3cf4b`, matching the repository migration exactly; all three MFA tables have RLS and FORCE RLS enabled with the expected service-role policies.
 
@@ -156,6 +156,6 @@ Dependency exclusions are explicit RC compatibility decisions, not claims that r
 
 Dependabot #442–#449 are consolidated with exact Vitest/coverage-v8 5.0.3 and @types/node 24.19.1 in Web and Site. Coverage thresholds and sharp >=0.35.5 remain. FastAPI 0.142.2, websockets 17.2 and cryptography 50.0.2 are exercised with the existing Core suite; earlier dated upgrade notes above are historical.
 
-Electron 44.5.1's official GitHub release asset `electron-v44.5.1-win32-x64.zip` (asset 599622944) independently supplies SHA-256 `9b382492dcfee91f8f9e92c91f7972550a1b95d2299cac72279dab33a600d7db`. Packaging downloads the archive and verifies its bytes against that pin before staging. Metadata inspection alone is not archive/package execution evidence; exact-source Windows runner evidence remains required.
+Electron 44.7.2's official GitHub release asset `electron-v44.7.2-win32-x64.zip` (asset 599622944) independently supplies SHA-256 `10a89447ef64ac5cb9f782af48ffd83734a40ae91681259d1048ca3c9e6c5da4`. Packaging downloads the archive and verifies its bytes against that pin before staging. Metadata inspection alone is not archive/package execution evidence; exact-source Windows runner evidence remains required.
 
 Sentry 8.59.0 captures manual logger/metrics calls independently of enabled flags. Android explicitly drops both payload channels using their beforeSend callbacks while preserving the existing crash scrubber and fail-closed source/environment/DSN initialization. The new dataCollection API is not opted into. See https://github.com/getsentry/sentry-java/releases/tag/8.59.0 and the callback regression.

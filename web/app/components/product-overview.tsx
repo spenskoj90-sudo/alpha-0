@@ -47,6 +47,31 @@ export function ProductOverview() {
     setBusy(true);
     setDeviceActionError('');
     setConfirmDevice(null);
+    const uncertain = action === 'revoke'
+      ? 'Device revocation is unconfirmed. Refresh status before deciding to try again.'
+      : 'Device suspension is unconfirmed. Refresh status before deciding to try again.';
+    // A response may be lost AFTER Core has committed. Never replay a
+    // destructive action on a timeout, 409 or malformed response; first read
+    // back the server-authoritative state through the current Web session.
+    async function reconcile() {
+      if (operationGeneration !== generation.current) return;
+      const snapshot = await loadProductData();
+      if (operationGeneration !== generation.current) return;
+      if (snapshot.state === 'SIGNED_OUT') {
+        setData(snapshot);
+        window.dispatchEvent(new CustomEvent('sentinel-session-changed', { detail: false }));
+        return;
+      }
+      if (snapshot.state !== 'READY') {
+        setDeviceActionError(uncertain);
+        return;
+      }
+      setData(snapshot);
+      const actual = snapshot.devices.find(device => device.device_id === deviceId)?.state;
+      const completed = action === 'revoke' ? actual === 'REVOKED'
+        : actual === 'SUSPENDED' || actual === 'REVOKED'; // Concurrent revoke wins.
+      if (!completed) setDeviceActionError(uncertain);
+    }
     try {
       const response = await fetch('/api/devices/' + encodeURIComponent(deviceId) + '/' + action, {
         method: 'POST',
@@ -60,20 +85,13 @@ export function ProductOverview() {
         }
         return;
       }
-      const result = await response.json();
-      if (!response.ok || result?.[action === 'revoke' ? 'revoked' : 'suspended'] !== true) {
-        if (operationGeneration === generation.current) {
-          setDeviceActionError(action === 'revoke' ? 'Device revocation was not confirmed. Refresh and retry.' : 'Device suspension was not confirmed. Refresh and retry.');
-        }
-        return;
-      }
-      // Revoking the current device may also terminate this browser's session.
-      const snapshot = await loadProductData();
-      if (operationGeneration === generation.current) setData(snapshot);
+      // Release the response even when it is a denial; authoritative state,
+      // not the acknowledged body, determines the displayed outcome.
+      await response.body?.cancel().catch(() => {});
+      await reconcile();
     } catch {
-      if (operationGeneration === generation.current) {
-        setDeviceActionError(action === 'revoke' ? 'Device revocation was not confirmed. Refresh and retry.' : 'Device suspension was not confirmed. Refresh and retry.');
-      }
+      // Network/body failures can hide a committed mutation. Do not retry POST.
+      await reconcile();
     } finally {
       if (operationGeneration === generation.current) setBusy(false);
     }

@@ -9,7 +9,7 @@ from test_owned_device_list import device_store  # shared Memory/PostgreSQL cont
 def setup(device_store, monkeypatch):
     import app.main as main
     owner = str(uuid.uuid4())
-    device = device_store.register_device(owner, 'android', 'key', uuid.uuid4().hex * 2, 'challenge')
+    device = device_store.register_device(owner, 'android', 'key', uuid.uuid4().hex * 2, uuid.uuid4().hex)
     browser = device_store.issue_session(None, owner, 300, 300)[0]
     session, refresh, _, _ = device_store.issue_session(device, owner, 300, 300)
     monkeypatch.setattr(main, 'store', device_store)
@@ -43,7 +43,7 @@ def test_foreign_account_and_missing_auth_cannot_suspend(device_store, monkeypat
 
 def test_revoke_wins_concurrent_suspension_without_reactivation(device_store):
     owner = str(uuid.uuid4())
-    device = device_store.register_device(owner, 'android', 'key', uuid.uuid4().hex * 2, 'challenge')
+    device = device_store.register_device(owner, 'android', 'key', uuid.uuid4().hex * 2, uuid.uuid4().hex)
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(lambda operation: operation(device), [device_store.suspend_device, device_store.revoke_device]))
     assert results[1] is True

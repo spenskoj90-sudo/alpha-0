@@ -6,6 +6,8 @@ data class HealthObservation(val candidate: HealthCandidate, val observedAt: Lon
 data class ObservationSnapshot(
     val status: ObservationStatus = ObservationStatus.STOPPED,
     val reason: String = "USER_STOP",
+    /** Process-local capture generation, never an authority or external identity. */
+    val captureId: String? = null,
     val frames: Long = 0,
     val lastFrameAt: Long? = null,
     val health: HealthCandidate? = null,
@@ -36,7 +38,7 @@ class ObservationSession {
         require(id.isNotBlank() && id.length <= 64 && now >= 0)
         sessionId = id
         startedAt = now
-        snapshot = ObservationSnapshot(status = ObservationStatus.WAITING, reason = "WAITING_FOR_SOURCE")
+        snapshot = ObservationSnapshot(status = ObservationStatus.WAITING, reason = "WAITING_FOR_SOURCE", captureId = id)
     }
 
     @Synchronized fun visibility(id: String, visible: Boolean, now: Long) {
@@ -79,7 +81,7 @@ class ObservationSession {
 
     @Synchronized fun stop(reason: String) {
         sessionId = null
-        snapshot = snapshot.copy(status = ObservationStatus.STOPPED, reason = reason, health = null,
+        snapshot = snapshot.copy(status = ObservationStatus.STOPPED, reason = reason, captureId = null, health = null,
             lastHealth = null, lastRecognizedFrameAt = null)
     }
 }

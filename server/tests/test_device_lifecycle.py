@@ -257,8 +257,8 @@ def test_authenticated_rebind_same_active_key_reuses_device():
     assert rebound.status_code == 200, rebound.text
     assert rebound.json()["device_id"] == first["device_id"]
     assert rebound.json()["challenge"] != first["challenge"]
-    assert store.get_session(first_access)["device_id"] == first["device_id"]
-    assert store.get_session(second_access)["device_id"] == first["device_id"]
+    assert store.get_session(first_access)["device_id"] is None
+    assert store.get_session(second_access)["device_id"] is None
     if hasattr(store, "devices"):
         assert len(store.devices) == 1
 

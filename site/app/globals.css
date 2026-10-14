@@ -361,3 +361,14 @@ button, a { min-height: 44px; }
   .language-switch button { border-color: ButtonText; }
   .language-switch button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -3px; }
 }
+
+/* Complete route navigation remains reachable on narrow Android screens. */
+.site-header-inner { flex-wrap: wrap; padding: 12px 0; gap: 8px 16px; }
+.site-nav { order: 3; flex-basis: 100%; flex-wrap: wrap; justify-content: flex-start; }
+.site-nav a[aria-current="page"] { color: var(--foreground); text-decoration: underline; text-underline-offset: 6px; }
+.route-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.route-card { min-height: 96px; display: flex; align-items: center; }
+.route-card:hover { border-color: var(--signal); }
+.feature-card .text-link { margin-top: 12px; min-height: 44px; }
+@media (max-width: 680px) { .route-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 360px) { .route-grid { grid-template-columns: 1fr; } }

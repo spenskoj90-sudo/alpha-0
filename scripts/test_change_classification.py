@@ -50,6 +50,12 @@ class ChangeClassificationTests(unittest.TestCase):
             for key in ('android','instrumentation','web','companion','bridge'):
                 self.assertTrue(result[key], (path,key))
 
+    def test_canonical_game_catalog_also_validates_public_projection(self):
+        result = classify(['server/app/data/game-capability-catalog.v1.json'])
+        self.assertTrue(result['site'])
+        self.assertTrue(result['web'])
+        self.assertTrue(result['core'])
+
     def test_known_node_dependency_metadata_preserves_security_without_unrelated_hosts(self):
         for surface, flag in [('web', 'web'), ('site', 'site'), ('launcher', 'companion')]:
             for file in ('package.json', 'package-lock.json'):

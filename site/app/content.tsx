@@ -1,5 +1,6 @@
 "use client";
 
+import { publicSections } from "./components/public-sections";
 import { useLocale } from "./components/locale-provider";
 import Image from "next/image";
 import Link from "next/link";
@@ -7,35 +8,7 @@ import { PublicFooter } from "./components/public-footer";
 import { PublicHeader } from "./components/public-header";
 
 export default function PublicHome() {
-  const { t } = useLocale();
-  const capabilities = [
-    {
-      eyebrow: t("INTELLIGENCE"),
-      title: t("Know what a recommendation is based on."),
-      body:
-        t("See the source, freshness and confidence behind a recommendation. Facts and inference stay distinct, and uncertainty stays visible."),
-    },
-    {
-      eyebrow: t("SECURITY"),
-      title: t("Your account. Your control."),
-      body:
-        t("Review account security, connected devices and access in one place. Recommendations remain observational; SENTINEL does not turn them into hidden actions."),
-    },
-    {
-      eyebrow: t("PLAYER EXPERIENCE"),
-      title: t("One system across mobile, web and desktop."),
-      body:
-        t("Check context on your phone, manage your account on the Web, and connect the desktop Companion for overlay, diagnostics and voice workflows."),
-    },
-  ];
-
-  const surfaces = [
-    ["Android", t("Immediate context, security, games and activity"), t("IMPLEMENTED \u00b7 PHYSICAL ACCEPTANCE PENDING")],
-    [t("Web Control Plane"), t("Account, intelligence, billing, devices and administration"), t("IMPLEMENTED \u00b7 UX CONSOLIDATION ACTIVE")],
-    ["Windows Companion", t("Runtime, adapters, overlay, diagnostics and voice"), t("IMPLEMENTED \u00b7 HOST ACCEPTANCE PENDING")],
-    [t("Game integration"), t("Conservative passive observation through explicit adapter boundaries"), t("WOW EXACT-ENVIRONMENT ACCEPTANCE PENDING")],
-  ];
-
+  const { t, locale } = useLocale();
   return (
     <>
       <a className="skip-link" href="#main-content">{t("Skip to main content")}</a>
@@ -48,7 +21,7 @@ export default function PublicHome() {
               <h1>{t("A clearer view.")}<br />{t("You stay in control.")}</h1>
               <p className="hero-lead">{t("SENTINEL is being built to bring game context, account security and useful recommendations together across your phone, Web and desktop. Understand what is known, see where uncertainty remains, and choose your next step.")}</p>
               <div className="hero-actions">
-                <a className="button-primary" href="#product">{t("Explore the product")}</a>
+                <Link className="button-primary" href="/features/">{t("Explore the product")}</Link>
                 <Link className="button-secondary" href="/status/">{t("View release status")}</Link>
               </div>
               <p className="release-note">{t("No public download is offered yet. Release testing is still in progress.")}</p>
@@ -72,54 +45,15 @@ export default function PublicHome() {
           </div>
         </section>
 
-        <section id="product" className="section-block">
-          <div className="site-shell">
-            <div className="section-heading">
-              <div className="eyebrow">{t("PRODUCT PRINCIPLES")}</div>
-              <h2>{t("Useful to the player. Explicit about trust.")}</h2>
-              <p>{t("Useful recommendations need a clear foundation. SENTINEL makes the information behind them visible and keeps your account controls within reach.")}</p>
-            </div>
-            <div className="feature-grid">
-              {capabilities.map((item) => (
-                <article className="feature-card" key={item.eyebrow}>
-                  <div className="eyebrow">{item.eyebrow}</div>
-                  <h3>{item.title}</h3>
-                  <p>{item.body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section-block section-muted">
+        <section id="product" className="section-block section-muted">
           <div className="site-shell">
             <div className="section-heading compact-heading">
-              <div className="eyebrow">{t("SURFACES")}</div>
-              <h2>{t("Designed for phone, Web and desktop.")}</h2>
+              <h2>{locale === 'ru' ? 'Начните с того, что важно вам.' : 'Start with what matters to you.'}</h2>
             </div>
-            <div className="surface-list">
-              {surfaces.map(([name, description, state]) => (
-                <article className="surface-row" key={name}>
-                  <div>
-                    <h3>{name}</h3>
-                    <p>{description}</p>
-                  </div>
-                  <span className="status">{state}</span>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="section-block">
-          <div className="site-shell trust-grid">
-            <div>
-              <div className="eyebrow">{t("WHY SENTINEL")}</div>
-              <h2>{t("Confidence starts with clarity.")}</h2>
-            </div>
-            <div className="trust-copy">
-              <p>{t("You should be able to tell what SENTINEL knows, what it infers and what remains unverified. Its security model keeps account access and recommendations within explicit boundaries, so a clearer view does not cost you control.")}</p>
-              <Link className="text-link" href="/security/">{t("Read the security model \u2192")}</Link>
+            <div className="route-grid">
+              {publicSections.map(section => <Link className="feature-card route-card" key={section.path} href={`/${section.path}/`}>
+                <h3>{locale === 'ru' ? section.ru : section.en}<span aria-hidden="true"> →</span></h3>
+              </Link>)}
             </div>
           </div>
         </section>

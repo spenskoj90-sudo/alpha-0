@@ -324,7 +324,7 @@ def check_versions(checks: Checks) -> None:
         and f'- expected upstream SHA-256: `{packaging["electronWin32X64Sha256"]}`' in host_contract,
         "Packaged-host acceptance contract matches executable runtime pins",
     )
-    checks.require('implementation("io.sentry:sentry-android:8.59.0")' in android, "Android pins Sentry 8.59.0")
+    checks.require('implementation("io.sentry:sentry-android:8.60.0")' in android, "Android pins Sentry 8.60.0")
     checks.require('implementation("androidx.navigation:navigation-compose:2.10.2")' in android, "Android pins Navigation Compose 2.10.2")
     checks.require('"httpx2==2.13.1"' in pyproject, "Core test tooling pins httpx2 2.13.1")
     checks.require('"sqlalchemy==2.0.54"' in pyproject, "Core retains validated SQLAlchemy 2.0.54 RC line")

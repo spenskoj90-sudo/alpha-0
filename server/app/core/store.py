@@ -287,6 +287,17 @@ class MemoryStore(Store):
                     session["revoked"] = True
             return new_device_id, access, refresh, exp, SCOPES
 
+    def suspend_device(self, device_id):
+        with self.lock:
+            device = self.devices.get(device_id)
+            if not device or device.get("state") != "ACTIVE":
+                return False
+            device["state"] = "SUSPENDED"
+            for session in self.sessions.values():
+                if session.get("device_id") == device_id:
+                    session["revoked"] = True
+            return True
+
     def revoke_device(self, device_id):
         with self.lock:
             device = self.devices.get(device_id)
@@ -940,6 +951,20 @@ class PostgresStore(Store):
             )
         return new_device_id, access, refresh, exp, SCOPES
 
+    def suspend_device(self, device_id):
+        with self.engine.begin() as conn:
+            suspended = conn.execute(
+                text("UPDATE device_bindings SET state='SUSPENDED' WHERE id=:id AND state='ACTIVE' RETURNING id"),
+                {"id": device_id},
+            ).scalar_one_or_none()
+            if suspended is None:
+                return False
+            conn.execute(
+                text("UPDATE sessions SET revoked_at=now() WHERE device_id=:id AND revoked_at IS NULL"),
+                {"id": device_id},
+            )
+            return True
+
     def revoke_device(self, device_id):
         with self.engine.begin() as conn:
             revoked = conn.execute(
@@ -979,6 +1004,16 @@ class PostgresStore(Store):
         exp = now + timedelta(seconds=access_ttl)
         refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
+            if device_id is not None:
+                # Lock the device before session creation: suspension/revocation
+                # takes this row lock before bulk session invalidation.
+                owned = conn.execute(
+                    text("SELECT d.id FROM device_bindings d JOIN identities i ON i.id=d.identity_id "
+                         "WHERE d.id=:d AND i.user_handle=:u AND d.state='ACTIVE' FOR UPDATE OF d"),
+                    {"d": device_id, "u": user_id},
+                ).scalar_one_or_none()
+                if owned is None:
+                    raise ValueError("DEVICE_NOT_ACTIVE")
             conn.execute(text("INSERT INTO sessions(identity_id,device_id,session_hash,scopes_json,issued_at,expires_at,refresh_token_hash,refresh_expires_at,refresh_lineage_hash) VALUES ((SELECT id FROM identities WHERE user_handle=:u),(SELECT id FROM device_bindings WHERE id=:d),:sh,:scopes,now(),:exp,:rh,:rexp,:rh)"), {"u": user_id, "d": device_id, "sh": session_hash(access), "scopes": json.dumps(SCOPES), "exp": exp, "rh": session_hash(refresh), "rexp": refexp})
         return access, refresh, exp, SCOPES
 
@@ -1008,6 +1043,21 @@ class PostgresStore(Store):
         exp = now + timedelta(seconds=access_ttl)
         refexp = now + timedelta(seconds=refresh_ttl)
         with self.engine.begin() as conn:
+            # Device association is immutable. Lock device first, then session,
+            # preventing a concurrent READ COMMITTED suspend from missing the
+            # replacement session inserted after its bulk UPDATE snapshot.
+            refresh_hash = session_hash(refresh_token)
+            refresh_device = conn.execute(
+                text("SELECT device_id::text FROM sessions WHERE refresh_token_hash=:rh"),
+                {"rh": refresh_hash},
+            ).scalar_one_or_none()
+            if refresh_device is not None:
+                active = conn.execute(
+                    text("SELECT state FROM device_bindings WHERE id=:id FOR UPDATE"),
+                    {"id": refresh_device},
+                ).scalar_one_or_none()
+                if active != "ACTIVE":
+                    return None
             row = conn.execute(
                 text(
                     "SELECT s.id::text session_id,i.user_handle user_id,s.device_id::text device_id,"

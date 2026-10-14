@@ -14,6 +14,10 @@ class CalibrationSamplingGateTest {
         session.start("observing", 100)
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         session.visibility("observing", true, 101)
+        assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game)) // no captured frame yet
+        assertTrue(session.frame("observing", 101))
+        assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game)) // OCR still pending
+        assertTrue(session.recognized("observing", 1, 101, 102, null))
         assertTrue(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, repack))
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, null))
@@ -21,6 +25,54 @@ class CalibrationSamplingGateTest {
         session.visibility("observing", false, 102)
         assertTrue(CalibrationSamplingGate.canSample(session.snapshot, game, game))
         session.stop("USER_STOP")
+        assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+    }
+
+    @Test fun `frame identity survives pause but changes on each completed frame and capture`() {
+        val session = ObservationSession()
+        session.start("first", 100)
+        session.visibility("first", true, 101)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.frame("first", 110)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.recognized("first", 1, 110, 111, null)
+        val first = CalibrationSamplingGate.frameId(session.snapshot)
+        assertEquals(CalibrationFrameId("first", 1L), first)
+        session.visibility("first", false, 120)
+        assertEquals(first, CalibrationSamplingGate.frameId(session.snapshot))
+        session.visibility("first", true, 130)
+        session.frame("first", 140)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.recognized("first", 2, 140, 141, null)
+        assertEquals(CalibrationFrameId("first", 2L), CalibrationSamplingGate.frameId(session.snapshot))
+        session.start("second", 200)
+        session.visibility("second", true, 201)
+        session.frame("second", 210)
+        session.recognized("second", 1, 210, 211, null)
+        assertEquals(CalibrationFrameId("second", 1L), CalibrationSamplingGate.frameId(session.snapshot))
+    }
+
+    @Test fun `pending OCR cannot be counted as a negative sample after pause`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        session.frame("capture", 110)
+        session.visibility("capture", false, 111)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        assertFalse(session.recognized("capture", 1, 110, 112, null))
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+    }
+
+    @Test fun `expired completed frame cannot be relabelled a fresh OCR miss`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        session.frame("capture", 110)
+        session.recognized("capture", 1, 110, 120, HealthCandidate(4, 20, 0))
+        assertNotNull(CalibrationSamplingGate.frameId(session.snapshot))
+        session.tick(5111)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
         assertFalse(CalibrationSamplingGate.canSample(session.snapshot, game, game))
     }
 

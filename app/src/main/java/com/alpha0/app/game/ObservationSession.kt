@@ -6,12 +6,16 @@ data class HealthObservation(val candidate: HealthCandidate, val observedAt: Lon
 data class ObservationSnapshot(
     val status: ObservationStatus = ObservationStatus.STOPPED,
     val reason: String = "USER_STOP",
+    /** Process-local capture generation, never an authority or external identity. */
+    val captureId: String? = null,
     val frames: Long = 0,
     val lastFrameAt: Long? = null,
     val health: HealthCandidate? = null,
     val lastHealth: HealthObservation? = null,
     /** Last completed non-null OCR frame; cleared by a newer frame, miss, or geometry change. */
     val lastRecognizedFrameAt: Long? = null,
+    /** Only a completed OCR callback (including a confirmed miss) can be sampled. */
+    val lastCompletedFrameSequence: Long? = null,
 )
 data class CaptureSize(val width: Int, val height: Int) {
     companion object {
@@ -29,14 +33,14 @@ class ObservationSession {
     private var sessionId: String? = null
     private var startedAt = 0L
     @Synchronized fun invalidate(id: String) {
-        if (id == sessionId) snapshot = snapshot.copy(health = null, lastFrameAt = null, lastRecognizedFrameAt = null)
+        if (id == sessionId) snapshot = snapshot.copy(health = null, lastFrameAt = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null)
     }
 
     @Synchronized fun start(id: String, now: Long) {
         require(id.isNotBlank() && id.length <= 64 && now >= 0)
         sessionId = id
         startedAt = now
-        snapshot = ObservationSnapshot(status = ObservationStatus.WAITING, reason = "WAITING_FOR_SOURCE")
+        snapshot = ObservationSnapshot(status = ObservationStatus.WAITING, reason = "WAITING_FOR_SOURCE", captureId = id)
     }
 
     @Synchronized fun visibility(id: String, visible: Boolean, now: Long) {
@@ -47,13 +51,14 @@ class ObservationSession {
             health = null,
             lastFrameAt = if (visible) snapshot.lastFrameAt else null,
             lastRecognizedFrameAt = if (visible) null else snapshot.lastRecognizedFrameAt,
+            lastCompletedFrameSequence = if (visible) null else snapshot.lastCompletedFrameSequence,
         )
     }
 
     @Synchronized fun frame(id: String, now: Long): Boolean {
         if (id != sessionId || now < startedAt || !tick(now) || snapshot.status != ObservationStatus.OBSERVING) return false
         if (now < (snapshot.lastFrameAt ?: startedAt)) return false
-        snapshot = snapshot.copy(frames = snapshot.frames + 1, lastFrameAt = now, health = null, lastRecognizedFrameAt = null)
+        snapshot = snapshot.copy(frames = snapshot.frames + 1, lastFrameAt = now, health = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null)
         return true
     }
 
@@ -61,9 +66,9 @@ class ObservationSession {
         id: String, sequence: Long, frameAt: Long, now: Long, health: HealthCandidate?,
     ): Boolean {
         if (id != sessionId || !tick(now) || snapshot.status != ObservationStatus.OBSERVING) return false
-        if (sequence != snapshot.frames || frameAt != snapshot.lastFrameAt || now < frameAt || now - frameAt > 5000) return false
+        if (sequence != snapshot.frames || sequence == snapshot.lastCompletedFrameSequence || frameAt != snapshot.lastFrameAt || now < frameAt || now - frameAt > 5000) return false
         snapshot = snapshot.copy(health = health, lastHealth = health?.let { HealthObservation(it, frameAt) } ?: snapshot.lastHealth,
-            lastRecognizedFrameAt = if (health == null) null else frameAt)
+            lastRecognizedFrameAt = if (health == null) null else frameAt, lastCompletedFrameSequence = sequence)
         return true
     }
 
@@ -73,13 +78,16 @@ class ObservationSession {
             stop(if (now < startedAt) "CLOCK_INVALID" else "TIME_LIMIT")
             return false
         }
-        if (snapshot.lastFrameAt?.let { now - it > 5000 } == true) snapshot = snapshot.copy(health = null)
+        // A completed frame that has aged out while still observing must not be
+        // reclassified as a fresh OCR miss just because its health was cleared.
+        if (snapshot.lastFrameAt?.let { now - it > 5000 } == true)
+            snapshot = snapshot.copy(health = null, lastCompletedFrameSequence = null)
         return true
     }
 
     @Synchronized fun stop(reason: String) {
         sessionId = null
-        snapshot = snapshot.copy(status = ObservationStatus.STOPPED, reason = reason, health = null,
-            lastHealth = null, lastRecognizedFrameAt = null)
+        snapshot = snapshot.copy(status = ObservationStatus.STOPPED, reason = reason, captureId = null, health = null,
+            lastHealth = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null)
     }
 }

@@ -160,11 +160,11 @@ internal fun GameObservationPanel(
     val strings = LocalAppStrings.current
     val observation = state.observation
     val context = LocalContext.current
-    val campaign = remember(state.installed ?: installed) { CalibrationCampaign() }
-    val campaignId = remember(state.installed ?: installed) { UUID.randomUUID().toString() }
+    val campaign = remember(state.installed ?: installed, observation.captureId) { CalibrationCampaign() }
+    val campaignId = remember(state.installed ?: installed, observation.captureId) { UUID.randomUUID().toString() }
     var expectedCurrent by remember { mutableStateOf("") }
     var expectedMaximum by remember { mutableStateOf("") }
-    var sampleCount by remember(state.installed ?: installed) { mutableStateOf(0) }
+    var sampleCount by remember(state.installed ?: installed, observation.captureId) { mutableStateOf(0) }
     var calibrationMessage by remember { mutableStateOf("") }
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
     Column(
@@ -268,8 +268,9 @@ internal fun GameObservationPanel(
                     // A previously rendered frame or a paused historical candidate is not proof of a current observation.
                     val live = GameObservationRuntime.state.value
                     val currentInstall = ShatteredGameProfile.installed(context)
-                    val sample = if (CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
-                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime()) { sample ->
+                    val frameId = CalibrationSamplingGate.frameId(live.observation)
+                    val sample = if (frameId != null && CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
+                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime(), frameId) { sample ->
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,

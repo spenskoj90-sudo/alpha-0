@@ -8,6 +8,7 @@ class ObservationSessionTest {
         val session = ObservationSession()
         assertFalse(session.frame("a", 10))
         session.start("a", 100)
+        assertEquals("a", session.snapshot.captureId)
         assertFalse(session.frame("a", 101))
         session.visibility("a", true, 102)
         assertTrue(session.frame("a", 103))
@@ -23,6 +24,7 @@ class ObservationSessionTest {
         assertFalse(session.frame("a", 121))
         assertFalse(session.recognized("a", 1, 110, 122, HealthCandidate(4, 20, 0)))
         assertEquals(ObservationStatus.STOPPED, session.snapshot.status)
+        assertNull(session.snapshot.captureId)
     }
 
     @Test fun `hidden content removes health without pretending it is healthy`() {
@@ -86,6 +88,18 @@ class ObservationSessionTest {
     private fun visibleSession() = ObservationSession().apply {
         start("a", 100)
         visibility("a", true, 101)
+    }
+
+    @Test fun `one completed OCR callback including a miss cannot be overwritten`() {
+        val session = visibleSession()
+        session.frame("a", 110)
+        assertNull(session.snapshot.lastCompletedFrameSequence)
+        assertTrue(session.recognized("a", 1, 110, 111, null))
+        assertEquals(1L, session.snapshot.lastCompletedFrameSequence)
+        assertFalse(session.recognized("a", 1, 110, 112, HealthCandidate(4, 20, 0)))
+        assertNull(session.snapshot.health)
+        session.frame("a", 120)
+        assertNull(session.snapshot.lastCompletedFrameSequence)
     }
 
     @Test fun `rotation invalidates pending recognition from the previous geometry`() {

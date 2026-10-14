@@ -1,14 +1,19 @@
 package com.alpha0.app.game
 
-/** The opt-in sample must belong to an unchanged installed game and a current
- * capture session. A paused single-phone comparison may use only the last
- * COMPLETED OCR frame; its actual age is recorded and stale rows count as stale.
- * This is metadata/freshness fencing, not screen-source or game attestation.
+/** A comparison is tied to one completed capture generation and frame, not to
+ * a button press. Missing OCR is a legitimate negative sample once a frame exists.
+ * This is metadata fencing, not screen-source or game attestation.
  */
 internal object CalibrationSamplingGate {
+    fun frameId(snapshot: ObservationSnapshot): CalibrationFrameId? {
+        if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED)) return null
+        val captureId = snapshot.captureId?.takeIf { it.isNotBlank() } ?: return null
+        if (snapshot.frames < 1 || snapshot.lastCompletedFrameSequence != snapshot.frames) return null
+        return CalibrationFrameId(captureId, snapshot.frames)
+    }
+
     fun canSample(snapshot: ObservationSnapshot, captured: StockGameInstall?, installed: StockGameInstall?): Boolean =
-        snapshot.status in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED) &&
-            captured != null && captured == installed
+        frameId(snapshot) != null && captured != null && captured == installed
 
     fun current(snapshot: ObservationSnapshot): HealthObservation? {
         val last = snapshot.lastHealth ?: return null

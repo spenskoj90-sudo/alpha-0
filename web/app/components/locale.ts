@@ -6,6 +6,10 @@ export function resolveLocale(saved: string | null, languages: readonly string[]
 
 export const russian: Readonly<Record<string, string>> = {
   "Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.": "Записи каталога описывают интеграцию с аккаунтом. Поддержка конкретной игры ещё не проверена; игровые действия отключены.",
+  "No game has verified exact-environment support. Read-only pilots and catalog records do not grant game actions.": "Ни для одной игры пока не подтверждена поддержка в точной игровой среде. Пилоты чтения экрана и записи каталога не дают права управлять игрой.",
+  "Diagnostic observer pilots": "Диагностические наблюдатели",
+  "No diagnostic observer is available.": "Диагностических наблюдателей пока нет.",
+  "Catalog foundations, not verified support": "Основа каталога, а не подтверждённая поддержка",
   "Catalog foundation · environment unverified": "Основа каталога · игровая среда не проверена",
   "Research and observer profiles": "Исследования и профили наблюдения",
   "Research profiles do not grant access. Each target needs separate version, source and environment verification.": "Исследовательские профили не предоставляют доступ. Для каждой игры нужна отдельная проверка версии, источника данных и игровой среды.",

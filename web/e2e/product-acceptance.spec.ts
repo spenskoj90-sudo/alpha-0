@@ -196,11 +196,14 @@ test('real registration, invalid login, persistent HttpOnly session, product dat
   await page.getByRole('button', { name: 'Need an account? Register' }).click();
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
   await expect(page.getByText('AUTHENTICATED', { exact: true })).toBeVisible();
-  await expect(page.locator('#games')).toContainText('Diablo IV');
+  await expect(page.locator('#games')).toContainText('No game has verified exact-environment support.');
+  await expect(page.locator('#games').getByText('Shattered Pixel Dungeon', { exact: true })).toBeVisible();
+  await expect(page.locator('#games')).toContainText('Observer pilot · calibration pending');
+  await expect(page.locator('#games').getByText('Diablo IV', { exact: true })).toBeHidden();
+  await page.locator('#games').getByText('Catalog foundations, not verified support', { exact: false }).click();
+  await expect(page.locator('#games').getByText('Diablo IV', { exact: true })).toBeVisible();
   await expect(page.locator('#games')).toContainText('Catalog foundation · environment unverified');
   await page.getByText('Research and observer profiles', { exact: false }).click();
-  await expect(page.locator('#games')).toContainText('Shattered Pixel Dungeon');
-  await expect(page.locator('#games')).toContainText('Observer pilot · calibration pending');
   await expect(page.locator('#games')).toContainText('World of Warcraft');
   await expect(page.locator('#games')).toContainText('Adapter foundation · environment unverified');
   await expect(page.locator('#security')).toContainText('Verification pending');

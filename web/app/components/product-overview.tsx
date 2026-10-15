@@ -110,17 +110,27 @@ export function ProductOverview() {
       <article className="card surface-card" id="games">
         <h2>{t("Games")}</h2>
         {status ? <p role={data.state === 'ERROR' ? 'alert' : 'status'}>{t(status)}</p> : data.state === 'READY' && (<>
-          <p className="microcopy">{t("Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.")}</p>
-          {data.games.length ? <ul className="product-list">{data.games.map(game => <li key={game.id}>
-            <strong>{game.name}</strong><span className="muted">{game.family} · {game.platform}</span>
-            <span className="state">{t("Catalog foundation · environment unverified")}</span>
-          </li>)}</ul> : <p>{t("No games are available in the current catalog.")}</p>}
-          <details>
-            <summary>{t("Research and observer profiles")} ({data.research.length})</summary>
-            <p className="microcopy">{t("Research profiles do not grant access. Each target needs separate version, source and environment verification.")}</p>
-            {data.research.length ? <ul className="product-list">{data.research.map(profile => <li key={profile.id}>
+          <p className="microcopy">{t("No game has verified exact-environment support. Read-only pilots and catalog records do not grant game actions.")}</p>
+          {data.research.some(profile => profile.implementation_status === 'observer_pilot') ? <ul className="product-list" aria-label={t("Diagnostic observer pilots")}>
+            {data.research.filter(profile => profile.implementation_status === 'observer_pilot').map(profile => <li key={profile.id}>
               <strong>{profile.name}</strong><span className="muted">{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''} · {profile.environment}</span>
-              <span className="state">{t(profile.implementation_status === 'observer_pilot' ? 'Observer pilot · calibration pending' : profile.implementation_status === 'adapter_foundation' ? 'Adapter foundation · environment unverified' : 'Research only · environment unverified')}</span>
+              <span className="state">{t("Observer pilot · calibration pending")}</span>
+            </li>)}
+          </ul> : <p>{t("No diagnostic observer is available.")}</p>}
+          <details>
+            <summary>{t("Catalog foundations, not verified support")} ({data.games.length})</summary>
+            <p className="microcopy">{t("Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.")}</p>
+            {data.games.length ? <ul className="product-list">{data.games.map(game => <li key={game.id}>
+              <strong>{game.name}</strong><span className="muted">{game.family} · {game.platform}</span>
+              <span className="state">{t("Catalog foundation · environment unverified")}</span>
+            </li>)}</ul> : <p>{t("No games are available in the current catalog.")}</p>}
+          </details>
+          <details>
+            <summary>{t("Research and observer profiles")} ({data.research.filter(profile => profile.implementation_status !== 'observer_pilot').length})</summary>
+            <p className="microcopy">{t("Research profiles do not grant access. Each target needs separate version, source and environment verification.")}</p>
+            {data.research.some(profile => profile.implementation_status !== 'observer_pilot') ? <ul className="product-list">{data.research.filter(profile => profile.implementation_status !== 'observer_pilot').map(profile => <li key={profile.id}>
+              <strong>{profile.name}</strong><span className="muted">{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''} · {profile.environment}</span>
+              <span className="state">{t(profile.implementation_status === 'adapter_foundation' ? 'Adapter foundation · environment unverified' : 'Research only · environment unverified')}</span>
             </li>)}</ul> : <p>{t("No research profiles are available.")}</p>}
           </details>
         </>)}

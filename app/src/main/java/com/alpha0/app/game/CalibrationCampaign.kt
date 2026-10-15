@@ -12,7 +12,7 @@ class CalibrationCampaign {
 
     fun record(
         currentText: String, maximumText: String, observation: HealthObservation?,
-        now: Long, frameId: CalibrationFrameId,
+        now: Long, frameId: CalibrationFrameId, frameAt: Long?,
         persist: (CalibrationSample) -> Boolean = { true },
     ): CalibrationSample? {
         if (count >= 32 || currentText.length > 6 || maximumText.length > 6 || now < 0) return null
@@ -22,8 +22,12 @@ class CalibrationCampaign {
         val current = currentText.toIntOrNull() ?: return null
         val maximum = maximumText.toIntOrNull() ?: return null
         if (maximum !in 1..999999 || current !in 0..maximum) return null
-        val age = observation?.let { now - it.observedAt } ?: 0
-        if (age !in 0..300000) return null
+        // Even an OCR miss has a capture timestamp. Never report an old frame as age 0.
+        val capturedAt = frameAt ?: return null
+        if (capturedAt < 0 || capturedAt > now ||
+            (observation != null && observation.observedAt != capturedAt)) return null
+        val age = now - capturedAt
+        if (age !in 0L..300000L) return null
         val sample = CalibrationSample(count + 1, age, observation?.candidate, current, maximum)
         if (!runCatching { persist(sample) }.getOrDefault(false)) return null
         boundCaptureId = frameId.captureId

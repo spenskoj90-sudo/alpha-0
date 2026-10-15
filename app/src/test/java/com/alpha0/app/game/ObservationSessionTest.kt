@@ -85,6 +85,33 @@ class ObservationSessionTest {
         assertEquals(CaptureSize(1280, 576), CaptureSize.fit(2400, 1080))
     }
 
+    @Test fun `completed OCR evidence survives a paused stale interval but not resume`() {
+        val session = visibleSession()
+        assertTrue(session.frame("a", 110))
+        assertTrue(session.recognized("a", 1, 110, 111, null))
+        session.visibility("a", false, 120)
+        assertEquals(110L, session.snapshot.lastCompletedFrameAt)
+        assertTrue(session.tick(6000))
+        assertEquals(1L, session.snapshot.lastCompletedFrameSequence)
+        assertEquals(110L, session.snapshot.lastCompletedFrameAt)
+        session.visibility("a", true, 6010)
+        assertNull(session.snapshot.lastCompletedFrameSequence)
+        assertNull(session.snapshot.lastCompletedFrameAt)
+        assertFalse(session.recognized("a", 1, 110, 6011, null))
+    }
+
+    @Test fun `resize and Stop erase completed OCR timestamps`() {
+        val session = visibleSession()
+        session.frame("a", 110)
+        session.recognized("a", 1, 110, 111, null)
+        session.invalidate("a")
+        assertNull(session.snapshot.lastCompletedFrameAt)
+        session.frame("a", 120)
+        session.recognized("a", 2, 120, 121, null)
+        session.stop("USER_STOP")
+        assertNull(session.snapshot.lastCompletedFrameAt)
+    }
+
     private fun visibleSession() = ObservationSession().apply {
         start("a", 100)
         visibility("a", true, 101)

@@ -8,7 +8,8 @@ internal object CalibrationSamplingGate {
     fun frameId(snapshot: ObservationSnapshot): CalibrationFrameId? {
         if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED)) return null
         val captureId = snapshot.captureId?.takeIf { it.isNotBlank() } ?: return null
-        if (snapshot.frames < 1 || snapshot.lastCompletedFrameSequence != snapshot.frames) return null
+        if (snapshot.frames < 1 || snapshot.lastCompletedFrameSequence != snapshot.frames ||
+            snapshot.lastCompletedFrameAt == null || snapshot.lastCompletedFrameAt < 0) return null
         return CalibrationFrameId(captureId, snapshot.frames)
     }
 

@@ -53,6 +53,22 @@ class CalibrationSamplingGateTest {
         assertEquals(CalibrationFrameId("second", 1L), CalibrationSamplingGate.frameId(session.snapshot))
     }
 
+    @Test fun `paused OCR miss retains its exact source timestamp while stale`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        session.frame("capture", 110)
+        session.recognized("capture", 1, 110, 111, null)
+        session.visibility("capture", false, 120)
+        session.tick(10000)
+        assertEquals(CalibrationFrameId("capture", 1), CalibrationSamplingGate.frameId(session.snapshot))
+        assertEquals(110L, session.snapshot.lastCompletedFrameAt)
+        val sample = CalibrationCampaign().record("4", "20", CalibrationSamplingGate.current(session.snapshot), 10000,
+            CalibrationSamplingGate.frameId(session.snapshot)!!, session.snapshot.lastCompletedFrameAt)!!
+        assertNull(sample.observed)
+        assertEquals(9890L, sample.ageMs)
+    }
+
     @Test fun `pending OCR cannot be counted as a negative sample after pause`() {
         val session = ObservationSession()
         session.start("capture", 100)

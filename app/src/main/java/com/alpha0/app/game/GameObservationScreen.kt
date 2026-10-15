@@ -270,7 +270,7 @@ internal fun GameObservationPanel(
                     val currentInstall = ShatteredGameProfile.installed(context)
                     val frameId = CalibrationSamplingGate.frameId(live.observation)
                     val sample = if (frameId != null && CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
-                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime(), frameId) { sample ->
+                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime(), frameId, live.observation.lastCompletedFrameAt) { sample ->
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,

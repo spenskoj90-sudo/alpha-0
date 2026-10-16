@@ -55,11 +55,11 @@ def summarize(value: dict) -> dict:
     require(type(rows) is list and 1 <= len(rows) <= 32)
     matches = missing = stale = mismatches = 0
     errors = {"current": 0, "maximum": 0}
-    previous = -1
-    for row in rows:
+    # A sequence gap can silently remove missing/incorrect observations from
+    # the denominator. Require one complete 1..N campaign, never a subset.
+    for expected_sequence, row in enumerate(rows, start=1):
         keys(row, {"sequence", "ageMs", "observed", "groundTruth"})
-        integer(row["sequence"], previous + 1, 2100000000)
-        previous = row["sequence"]
+        integer(row["sequence"], expected_sequence, expected_sequence)
         integer(row["ageMs"], 0, 300000)
         health(row["groundTruth"])
         if row["observed"] is not None:
@@ -110,10 +110,17 @@ def main() -> int:
         print("CALIBRATION_INPUT_INVALID")
         return 1
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    # Do not overwrite previously generated, SHA-bound calibration evidence.
+    try:
+        with args.output.open("x", encoding="utf-8") as dest:
+            dest.write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    except OSError:
+        print("CALIBRATION_INPUT_INVALID")
+        return 1
     print("CALIBRATION_SUMMARY=PENDING_PHYSICAL_REVIEW sourceTrust=UNVERIFIED")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

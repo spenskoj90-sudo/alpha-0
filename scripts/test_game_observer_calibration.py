@@ -43,6 +43,9 @@ class CalibrationTests(unittest.TestCase):
         for mutate in [lambda v: v.update(frame="raw-pixels"), lambda v: v["game"].update(ocr="raw-text"),
                        lambda v: v.update(versionCode=True), lambda v: v["samples"][0]["observed"].update(current=-1),
                        lambda v: v["samples"].append(copy.deepcopy(v["samples"][0])), lambda v: v.update(samples=[]),
+                       lambda v: v["samples"][0].update(sequence=0),
+                       lambda v: v["samples"][0].update(sequence=2),
+                       lambda v: v["samples"].append({**copy.deepcopy(v["samples"][0]), "sequence": 3}),
                        lambda v: v.update(samples=[copy.deepcopy(v["samples"][0])] * 33),
                        lambda v: v.update(sourceSha="short"), lambda v: v["environment"].update(api=33),
                        lambda v: v["game"].update(signerSha256=None),
@@ -80,6 +83,11 @@ class CalibrationTests(unittest.TestCase):
             result = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(output.read_text())["apkSha256"], "b" * 64)
+            previous_bytes = output.read_bytes()
+            duplicate = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(duplicate.returncode, 1)
+            self.assertEqual(duplicate.stdout.strip(), "CALIBRATION_INPUT_INVALID")
+            self.assertEqual(previous_bytes, output.read_bytes())
             output.unlink()
             for raw in ['{"schema":"old","schema":"new"}', " " * 32769]:
                 source.write_text(raw)
@@ -91,3 +99,4 @@ class CalibrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -9,7 +9,7 @@ import tempfile
 import unittest
 import uuid
 
-from game_observer_diagnostics_import import extracted_report, read_events
+from game_observer_diagnostics_import import extracted_report, read_events, verify_export_identity
 
 CAMPAIGN = "01234567-89ab-4def-8234-1234567890ab"
 OTHER = "10234567-89ab-4def-8234-1234567890ab"
@@ -142,6 +142,29 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             report([event()], language="unknown")
 
+    def test_export_identity_must_match_exact_apk_and_new_phone(self):
+        start = dict(source_sha="a" * 40, package_name="com.alpha0.app.physicaltest",
+                     version_code=100000641, build_type="physicalTest",
+                     diagnostics_mode="FORENSIC_TEST", runtime_environment="staging",
+                     sdk=35, manufacturer="Xiaomi", model="25028PC03G")
+        signer = dict(package_name="com.alpha0.app.physicaltest",
+                      installed_version_code=100000641, signer_count=1,
+                      multiple_signers=False, identity_evidence="PACKAGE_MANAGER",
+                      signer_cert_sha256="c" * 64)
+        kwargs = dict(source_sha="a" * 40, signer_sha256="c" * 64,
+                      apk_version_code=100000641, device="Xiaomi 25028PC03G", api=35)
+        verify_export_identity(start, signer, **kwargs)
+        for change in ({"sdk": 34}, {"source_sha": "b" * 40},
+                       {"model": "other"}, {"build_type": "release"}):
+            with self.assertRaises(ValueError):
+                verify_export_identity(start | change, signer, **kwargs)
+        for change in ({"signer_count": 2}, {"signer_cert_sha256": "d" * 64},
+                       {"multiple_signers": True}):
+            with self.assertRaises(ValueError):
+                verify_export_identity(start, signer | change, **kwargs)
+        with self.assertRaises(ValueError):
+            verify_export_identity(None, signer, **kwargs)
+
     def test_gzip_bounds_utf8_json_duplicates_and_unrelated_logs(self):
         with tempfile.TemporaryDirectory() as work:
             archive = Path(work) / "diagnostics.jsonl.gz"
@@ -169,7 +192,17 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as work:
             root = Path(work)
             source, output = root / "diagnostics.gz", root / "summary.json"
-            source.write_bytes(gzip.compress((json.dumps(event()) + "\n").encode()))
+            start = {"component": "RUNTIME", "event": "PROCESS_START", "result": "SUCCESS",
+                     "details": {"source_sha": "a" * 40, "package_name": "com.alpha0.app.physicaltest",
+                                 "version_code": 100000641, "build_type": "physicalTest",
+                                 "diagnostics_mode": "FORENSIC_TEST", "runtime_environment": "staging",
+                                 "sdk": 34, "manufacturer": "Infinix", "model": "X6731B"}}
+            signer = {"component": "RUNTIME", "event": "PACKAGE_SIGNER", "result": "OBSERVED",
+                      "details": {"package_name": "com.alpha0.app.physicaltest",
+                                  "installed_version_code": 100000641, "signer_count": 1,
+                                  "multiple_signers": False, "identity_evidence": "PACKAGE_MANAGER",
+                                  "signer_cert_sha256": "c" * 64}}
+            source.write_bytes(gzip.compress(("\n".join(map(json.dumps, (start, signer, event()))) + "\n").encode()))
             command = [
                 sys.executable, str(Path(__file__).with_name("game_observer_diagnostics_import.py")),
                 "--diagnostics", str(source), "--output", str(output),
@@ -177,6 +210,7 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
                 "--signer-sha256", "c" * 64, "--apk-version-code", "100000641",
                 "--game-signer-sha256", "d" * 64, "--language", "en",
                 "--hud", "portrait-upper-left",
+                "--device", "Infinix X6731B", "--api", "34",
             ]
             process = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(process.returncode, 0, process.stderr)

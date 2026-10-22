@@ -57,6 +57,30 @@ not self-declare timestamps or quality, and metadata cannot register
 executor/action/entitlement fields. Registry validation is not L3
 attestation. Adding a module gives no capture, game write or entitlement.
 
+### Bounded module lifecycle replay (L2 only)
+
+`server/app/core/game_module_lifecycle_replay.py` is an isolated, in-memory
+**synthetic replay reducer**, not a runtime adapter, production recommendation
+engine or action API. It exercises the exact registered module dependencies and
+source lifecycle class using only synthetic **field-presence flags**, never
+game contents, images, OCR text, character inventories or credentials.
+`scripts/game_module_replay.py` demonstrates combat + economy in WoW and
+combat + character-build on stock Android with two distinct fake event streams.
+The runnable regression suite checks exact profile/session, contiguous
+sequence, monotonic timestamps, five-second replay freshness, checkpoint
+supersession, dependency blocking, stopped sessions and atomic rejection of
+invalid/late frames. A saved-variable field cannot masquerade as a session
+stream.
+
+All replay outputs are permanently tagged `L2_SYNTHETIC_ONLY` and
+`source_trust=UNVERIFIED`. The shared player-state remains `UNKNOWN` and
+has no session binding or timestamp; module `outputs_available` is always
+empty and `execution_authority=false`, even when a replay module reports
+`L2_SIMULATED_ONLY`. Existing authenticated `GET /v1/game-capabilities`
+remains source-truth `UNKNOWN`/`NOT_STARTED`. No real gameplay fields are
+accepted or emitted by this fixture and no endpoint, entitlement, operator
+upload or ARM activation is added.
+
 A later source-specific integration must independently prove freshness,
 correctness, publisher/environment permission and physical L3 calibration
 before any status can be promoted. This contract deliberately cannot

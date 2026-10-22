@@ -13,6 +13,8 @@ from game_observer_diagnostics_import import extracted_report, read_events
 
 CAMPAIGN = "01234567-89ab-4def-8234-1234567890ab"
 OTHER = "10234567-89ab-4def-8234-1234567890ab"
+CAPTURE = "21234567-89ab-4def-8234-1234567890ab"
+OTHER_CAPTURE = "31234567-89ab-4def-8234-1234567890ab"
 ARGS = dict(campaign=None, source_sha="a" * 40, apk_sha256="b" * 64,
             signer_sha256="c" * 64, apk_version_code=100000641,
             game_signer_sha256="d" * 64, language="en",
@@ -20,11 +22,15 @@ ARGS = dict(campaign=None, source_sha="a" * 40, apk_sha256="b" * 64,
 
 
 def event(seq=1, campaign=CAMPAIGN, **changes):
+    age = changes.pop("age_ms", 200)
+    frame_at = 100000 + seq * 10000
     details = dict(
         calibration_campaign=campaign, sample_sequence=seq,
+        capture_id=CAPTURE, capture_frame_sequence=seq,
+        frame_captured_at_ms=frame_at, sample_saved_at_ms=frame_at + age,
         game_package="com.shatteredpixel.shatteredpixeldungeon",
         game_version="4.0.0", game_version_code=912,
-        game_signer_sha256="d" * 64, age_ms=200,
+        game_signer_sha256="d" * 64, age_ms=age,
         recognized_current=8, recognized_maximum=10,
         ground_truth_current=8, ground_truth_maximum=10,
         source_status="UNVERIFIED", sample_kind="user-opt-in",
@@ -56,7 +62,9 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
         self.assertEqual(value["sourceTrust"], "UNVERIFIED")
         self.assertEqual(value["recognizerConfidence"], "UNCALIBRATED")
         self.assertFalse(value["capabilityAvailable"])
-        for forbidden in ("diagnostic_note", "exception_stack", "never copy"):
+        self.assertEqual(len(value["frameTraceDigestSha256"]), 64)
+        for forbidden in ("diagnostic_note", "exception_stack", "never copy",
+                          CAPTURE, "capture_id", "frame_captured_at_ms", "sample_saved_at_ms"):
             self.assertNotIn(forbidden, json.dumps(value))
 
     def test_corrupted_or_inconsistent_campaigns_are_denied(self):
@@ -73,12 +81,44 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
             [event(device_environment="ATTESTED")],
             [event(recognized_current=8, recognized_maximum=None)],
             [event(ground_truth_current=True)],
+            [event(capture_id=None)],
+            [event(capture_id="NOT_A_UUID")],
+            [event(), event(2, capture_id=OTHER_CAPTURE)],
+            [event(), event(2, capture_frame_sequence=1)],
+            [event(), event(2, capture_frame_sequence=0)],
+            [event(capture_frame_sequence=True)],
+            [event(frame_captured_at_ms=True)],
+            [event(sample_saved_at_ms=True)],
+            [event(age_ms=300001)],
+            [event(sample_saved_at_ms=109999)],
+            [event(sample_saved_at_ms=110201)],
+            [event(), event(2, frame_captured_at_ms=109999)],
+            [event(age_ms=250000), event(2)],  # saved timestamps regress
             [event(2, OTHER)],                       # Mixed campaigns ambiguous
             [event()] * 33,
         ]
         for rows in modifications:
             with self.subTest(rows=len(rows), last=rows[-1]["details"]), self.assertRaises((ValueError, TypeError)):
                 report(rows)
+
+
+    def test_frame_trace_hash_changes_without_disclosing_raw_capture_identity(self):
+        first = report([event(), event(2)])
+        second = report([event(), event(2, capture_frame_sequence=3)])
+        self.assertNotEqual(first["frameTraceDigestSha256"], second["frameTraceDigestSha256"])
+        self.assertEqual(first["sampleAgreement"], second["sampleAgreement"])
+        self.assertEqual(first["inputDigest"], second["inputDigest"])
+        self.assertNotIn(CAPTURE, json.dumps(first))
+        self.assertNotIn("frame_captured_at_ms", json.dumps(first))
+        self.assertFalse(first["capabilityAvailable"])
+
+    def test_legacy_export_without_frame_provenance_fails_closed(self):
+        older = event()
+        for key in ("capture_id", "capture_frame_sequence",
+                    "frame_captured_at_ms", "sample_saved_at_ms"):
+            older["details"].pop(key)
+        with self.assertRaises((ValueError, TypeError)):
+            report([older])
 
     def test_two_campaigns_require_explicit_selection(self):
         rows = [event(), event(1, OTHER), event(2, OTHER)]

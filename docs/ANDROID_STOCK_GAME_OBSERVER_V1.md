@@ -249,3 +249,37 @@ freshness are validated; a separately gated and reversible action executor
 requires explicit on-device consent, foreground app/source validation, runtime
 Stop, TTL, replay protections and verified single-action dry runs. Never
 enable game input automatically from this historical diagnostic set.
+
+## Separating OCR callback latency from manual Save age
+
+Following the 2026-10-22 Xiaomi/API35 opt-in export, three historic numeric
+matches and one OCR miss were observed, but all four rows were stale
+(5.8–7.7 seconds since acquisition when the user pressed Save). That age
+**does not establish OCR processing latency**: the user must switch from
+the game and type a manual comparison into SENTINEL.
+
+The observer now records `lastCompletedOcrAt` and the corresponding
+nonnegative `lastOcrLatencyMs` only when a completed OCR callback belongs to
+the current frame and occurs within the existing five-second acceptance
+window. A callback older than five seconds increments a bounded late count
+but never becomes a fresh result or a calibration miss. Frame replacement,
+rotation/resize invalidation, visibility resume and Stop clear live timing;
+aggregate completed/miss/late counters reset only on a new capture.
+
+The diagnostic Stop event reports completed OCR frames, OCR misses,
+late callbacks and maximum accepted processing latency without screenshots,
+raw OCR, captured content or session identity. The opt-in Save event adds
+`ocr_completed_at_ms` and `ocr_processing_latency_ms` alongside its
+existing acquisition/Save timestamps. The strict importer validates that
+these two new fields appear together, have integer types, that completion
+lies between frame acquisition and Save, and that reported processing latency
+equals the elapsed acquisition-to-completion interval and is at most five
+seconds. Legacy evidence without both fields remains readable without
+inventing an OCR completion time. The frame-provenance digest binds the
+extra timing values for new rows while the public summary omits raw clocks.
+
+This is **diagnostic timing instrumentation only**. It does not assert
+the captured application's identity, calibrate recognizer accuracy, grant
+trusted game observations, authorize recommendations or enable game input.
+A new opt-in on-device run is required to measure how much latency is OCR
+processing versus human Save; earlier logs cannot supply these timestamps.

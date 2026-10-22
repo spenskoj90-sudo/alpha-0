@@ -26,7 +26,7 @@ class HarnessTests(unittest.TestCase):
         self.git("config", "user.email", "harness@example.invalid")
         (self.root / "AGENTS.md").write_text("governance\n")
         (self.root / "docs").mkdir()
-        (self.root / "docs/TASKS.md").write_text("- [ ] **#314** physical\n- [ ] **#375** visual\n")
+        (self.root / "docs/TASKS.md").write_text("## Canonical acceptance queue\n- [ ] **#314** physical\n- [ ] **#375** visual\n\n## Current engineering queue\n- [ ] **#379** engineering\n")
         self.git("add", ".")
         self.git("commit", "-qm", "fixture")
         self.sha = self.git("rev-parse", "HEAD")
@@ -167,6 +167,43 @@ class HarnessTests(unittest.TestCase):
         module.validate_manifest(self.manifest)
         with self.assertRaises(module.ManifestError):
             module.run(self.manifest)
+
+    def test_acceptance_reader_does_not_mix_in_engineering_queue(self):
+        result = module.run(self.manifest)
+        self.assertEqual(result["lanes"][1]["result"]["activeAcceptanceIssues"], [314, 375])
+        self.assertNotIn(379, result["lanes"][1]["result"]["activeAcceptanceIssues"])
+
+    def test_acceptance_reader_fails_closed_without_canonical_heading(self):
+        original = module._snapshot_file
+        def without_heading(base_sha, relative):
+            if relative == "docs/TASKS.md":
+                return b"- [ ] **#379** engineering only\\n"
+            return original(base_sha, relative)
+        with patch.object(module, "_snapshot_file", side_effect=without_heading):
+            with self.assertRaises(module.ManifestError):
+                module.run(self.manifest)
+
+    def test_write_lanes_must_own_disjoint_paths_and_branches(self):
+        a, b = self.manifest["lanes"]
+        a.update(mode="write", branch="worker/a", worktree="../worker-a")
+        b.update(mode="write", branch="worker/b", worktree="../worker-b")
+        b["ownedPaths"] = ["AGENTS.md"]
+        with self.assertRaises(module.ManifestError):
+            module.validate_manifest(self.manifest)
+        a["ownedPaths"] = ["docs"]
+        b["ownedPaths"] = ["docs/TASKS.md"]
+        with self.assertRaises(module.ManifestError):
+            module.validate_manifest(self.manifest)
+        a["ownedPaths"] = ["AGENTS.md"]
+        b["ownedPaths"] = ["docs/TASKS.md"]
+        b["branch"] = "worker/a"
+        with self.assertRaises(module.ManifestError):
+            module.validate_manifest(self.manifest)
+        b["branch"] = "refs/heads/worker/b"
+        with self.assertRaises(module.ManifestError):
+            module.validate_manifest(self.manifest)
+        b["branch"] = "worker/b"
+        module.validate_manifest(self.manifest)
 
     def test_mutable_worktree_aliases_are_rejected(self):
         for lane, path in zip(self.manifest["lanes"], ["../worker", "../worker/."]):

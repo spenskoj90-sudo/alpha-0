@@ -49,7 +49,7 @@ class DomainModule(ContractModel):
     module_contract_version: Literal[1]
     module_version: str = Field(
         min_length=5, max_length=24,
-        pattern=r"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+        pattern=r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$",
     )
     shared_state_schema_version: Literal[1]
     lifecycle: Literal["session_bound", "checkpoint_bound"]

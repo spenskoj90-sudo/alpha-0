@@ -64,16 +64,14 @@ def test_context_invalidation_clears_scheduling_and_leaves_game_independent(boun
     assert world.turn == 1
 
 
-@pytest.mark.parametrize("change", ["principal", "target", "sequence", "digest", "stale", "deadline", "entitlement"])
+@pytest.mark.parametrize("change", ["target", "sequence", "digest", "stale", "deadline", "entitlement"])
 def test_revalidates_all_boundaries_at_dispatch(change):
     grants = ["offline-game-test"]
     session, world, principal = setup_session(entitlements=lambda _: tuple(grants))
     request = intent(world)
     session.schedule(principal, request, now_ms=1000)
     now = 1001
-    if change == "principal":
-        principal = replace(principal, device_id="other-device")
-    elif change == "target":
+    if change == "target":
         world.session_id = "another-session"
     elif change == "sequence":
         world.advance()
@@ -174,3 +172,40 @@ def test_rejected_future_intent_does_not_poison_monotonic_clock():
     session.schedule(principal, valid, now_ms=1001)
     assert session.drain(principal, now_ms=1002).outcome == "SUCCEEDED"
     assert world.turn == 1
+
+
+@pytest.mark.parametrize("identity_field", ["user_id", "device_id", "scopes"])
+def test_foreign_drain_cannot_consume_or_cancel_owner_action(identity_field):
+    session, world, owner = setup_session()
+    if identity_field == "scopes":
+        foreign = replace(owner, scopes=frozenset({"extra:scope"}))
+    else:
+        foreign = replace(owner, **{identity_field: "another-" + identity_field})
+    # Even an empty queue must not disclose its state to a foreign caller.
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        session.drain(foreign, now_ms=1000)
+    request = intent(world, "owned-request")
+    session.schedule(owner, request, now_ms=1000)
+    for attempt_ms in (1000, 2000, -1):
+        with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+            session.drain(foreign, now_ms=attempt_ms)
+        assert session.pending == request
+        assert not session.stopped and world.turn == 0
+        assert "owned-request" not in session._history
+    # Foreign calls must not poison the accepted clock or idempotency state.
+    assert session.drain(owner, now_ms=1001).outcome == "SUCCEEDED"
+    assert world.turn == 1
+    assert session.schedule(owner, request, now_ms=1002).outcome == "SUCCEEDED"
+
+
+def test_foreign_drain_after_stop_is_not_a_history_or_queue_oracle():
+    session, world, owner = setup_session()
+    request = intent(world)
+    session.schedule(owner, request, now_ms=1000)
+    session.stop("USER_STOP")
+    foreign = replace(owner, device_id="different-device")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        session.drain(foreign, now_ms=1001)
+    assert session.pending is None and session.stopped and world.turn == 0
+    assert session.drain(owner, now_ms=1001) is None
+    assert session.schedule(owner, request, now_ms=1001).outcome == "CANCELLED"

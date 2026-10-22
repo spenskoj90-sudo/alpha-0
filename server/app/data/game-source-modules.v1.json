@@ -57,6 +57,14 @@
           ],
           "ui_surfaces": [
             "recommendations"
+          ],
+          "module_contract_version": 1,
+          "module_version": "1.0.0",
+          "shared_state_schema_version": 1,
+          "lifecycle": "checkpoint_bound",
+          "dependencies": [],
+          "outputs": [
+            "recommendation_context"
           ]
         },
         {
@@ -67,6 +75,14 @@
           ],
           "ui_surfaces": [
             "character_advice"
+          ],
+          "module_contract_version": 1,
+          "module_version": "1.0.0",
+          "shared_state_schema_version": 1,
+          "lifecycle": "session_bound",
+          "dependencies": [],
+          "outputs": [
+            "character_context"
           ]
         },
         {
@@ -76,6 +92,14 @@
           ],
           "ui_surfaces": [
             "economy_advice"
+          ],
+          "module_contract_version": 1,
+          "module_version": "1.0.0",
+          "shared_state_schema_version": 1,
+          "lifecycle": "session_bound",
+          "dependencies": [],
+          "outputs": [
+            "economy_context"
           ]
         }
       ]
@@ -117,6 +141,14 @@
           ],
           "ui_surfaces": [
             "recommendations"
+          ],
+          "module_contract_version": 1,
+          "module_version": "1.0.0",
+          "shared_state_schema_version": 1,
+          "lifecycle": "session_bound",
+          "dependencies": [],
+          "outputs": [
+            "recommendation_context"
           ]
         },
         {
@@ -126,6 +158,14 @@
           ],
           "ui_surfaces": [
             "character_advice"
+          ],
+          "module_contract_version": 1,
+          "module_version": "1.0.0",
+          "shared_state_schema_version": 1,
+          "lifecycle": "session_bound",
+          "dependencies": [],
+          "outputs": [
+            "character_context"
           ]
         }
       ]

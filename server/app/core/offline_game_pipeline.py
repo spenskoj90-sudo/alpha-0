@@ -77,7 +77,7 @@ class OfflineTurnPipeline:
             raise ValueError("REVIEW_INVALID")
         if type(now_ms) is not int or not 0 <= now_ms - reviewed.observation.observed_ms <= REVIEW_MAX_AGE_MS:
             raise ValueError("REVIEW_STALE")
-        if reviewed.pack_digest != self.knowledge.digest or not self._recommended(reviewed):
+        # A review is a caller-held object, not a signed capability. Recompute\n        # its trusted snapshot before considering the proposed rule.\n        if reviewed.observation != self.world.observe(reviewed.observation.observed_ms):\n            raise ValueError("REVIEW_TAMPERED")\n        if reviewed.pack_digest != self.knowledge.digest or not self._recommended(reviewed):
             raise ValueError("RECOMMENDATION_UNAVAILABLE")
         current = self.review(now_ms=now_ms)
         if current.observation.digest != reviewed.observation.digest or \
@@ -85,7 +85,7 @@ class OfflineTurnPipeline:
             raise ValueError("STATE_CHANGED")
         # A pack's prose/rule is not an action grant. The *independent* compiled
         # fixture step guard is rechecked before the ActionGateway checks.
-        if not self._recommended(current) or current.observation.turn >= 3:
+        if not self._recommended(current) or current.observation.turn >= 3 or \\\n                reviewed.evaluation != current.evaluation:
             raise ValueError("RECOMMENDATION_UNAVAILABLE")
         request = ActionIntent(
             schema_version="sentinel.game-action.v1",

@@ -78,9 +78,31 @@ def extracted_report(
     require(1 <= len(samples) <= 32)
     game_version: str | None = None
     game_code: int | None = None
+    capture_id: str | None = None
+    last_frame_sequence = 0
+    last_frame_at = -1
+    last_saved_at = -1
     rows = []
     for i, details in enumerate(samples, start=1):
         require(field(details, "sample_sequence", int) == i)
+        # Bind each comparison to an actual capture generation and advancing
+        # frame sequence. This is local diagnostic metadata, not attestation.
+        observed_capture = field(details, "capture_id", str)
+        require(str(uuid.UUID(observed_capture)) == observed_capture)
+        if capture_id is None:
+            capture_id = observed_capture
+        require(observed_capture == capture_id)
+        frame_sequence = field(details, "capture_frame_sequence", int)
+        frame_at = field(details, "frame_captured_at_ms", int)
+        saved_at = field(details, "sample_saved_at_ms", int)
+        require(last_frame_sequence < frame_sequence <= 2**63 - 1)
+        require(last_frame_at <= frame_at <= saved_at <= 2**63 - 1)
+        require(last_saved_at <= saved_at)
+        age = field(details, "age_ms", int)
+        require(0 <= age <= 300000 and saved_at - frame_at == age)
+        last_frame_sequence = frame_sequence
+        last_frame_at = frame_at
+        last_saved_at = saved_at
         require(field(details, "game_package", str) == PACKAGE)
         version = field(details, "game_version", str)
         code = field(details, "game_version_code", int)
@@ -91,7 +113,6 @@ def extracted_report(
         if game_version is None:
             game_version, game_code = version, code
         require((version, code) == (game_version, game_code))
-        age = field(details, "age_ms", int)
         gt = {"current": field(details, "ground_truth_current", int),
               "maximum": field(details, "ground_truth_maximum", int)}
         current = details.get("recognized_current")

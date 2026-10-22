@@ -9,7 +9,7 @@ import tempfile
 import unittest
 import uuid
 
-from game_observer_diagnostics_import import extracted_report, read_events
+from game_observer_diagnostics_import import extracted_report, read_events, verify_export_identity
 
 CAMPAIGN = "01234567-89ab-4def-8234-1234567890ab"
 OTHER = "10234567-89ab-4def-8234-1234567890ab"
@@ -141,6 +141,29 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
             report([event()], api=33)
         with self.assertRaises(ValueError):
             report([event()], language="unknown")
+
+    def test_export_identity_must_match_exact_apk_and_new_phone(self):
+        start = dict(source_sha="a" * 40, package_name="com.alpha0.app.physicaltest",
+                     version_code=100000641, build_type="physicalTest",
+                     diagnostics_mode="FORENSIC_TEST", runtime_environment="staging",
+                     sdk=35, manufacturer="Xiaomi", model="25028PC03G")
+        signer = dict(package_name="com.alpha0.app.physicaltest",
+                      installed_version_code=100000641, signer_count=1,
+                      multiple_signers=False, identity_evidence="PACKAGE_MANAGER",
+                      signer_cert_sha256="c" * 64)
+        kwargs = dict(source_sha="a" * 40, signer_sha256="c" * 64,
+                      apk_version_code=100000641, device="Xiaomi 25028PC03G", api=35)
+        verify_export_identity(start, signer, **kwargs)
+        for change in ({"sdk": 34}, {"source_sha": "b" * 40},
+                       {"model": "other"}, {"build_type": "release"}):
+            with self.assertRaises(ValueError):
+                verify_export_identity(start | change, signer, **kwargs)
+        for change in ({"signer_count": 2}, {"signer_cert_sha256": "d" * 64},
+                       {"multiple_signers": True}):
+            with self.assertRaises(ValueError):
+                verify_export_identity(start, signer | change, **kwargs)
+        with self.assertRaises(ValueError):
+            verify_export_identity(None, signer, **kwargs)
 
     def test_gzip_bounds_utf8_json_duplicates_and_unrelated_logs(self):
         with tempfile.TemporaryDirectory() as work:

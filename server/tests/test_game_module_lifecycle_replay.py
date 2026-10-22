@@ -108,6 +108,7 @@ def test_stale_source_is_unknown_even_when_previously_simulated_and_stop_latches
     (frame(["player_health", "player_health"]), 1000, "REPLAY_FIELDS_DUPLICATE"),
     (frame([]), 1000, "REPLAY_FIELDS_INVALID"),
     (frame(["normalized_events"]), 1000, "REPLAY_CHECKPOINT_REQUIRED"),
+    (frame(["health_candidate"], target=WOW, kind="checkpoint"), 1000, "REPLAY_FIELD_NOT_DECLARED"),
     (frame(["player_health"], sequence=2), 1000, "REPLAY_SEQUENCE_INVALID"),
     (frame(["player_health"], sequence=True), 1000, "REPLAY_SEQUENCE_INVALID"),
     (frame(["player_health"], observed=1001), 1000, "REPLAY_STALE_SOURCE"),
@@ -155,3 +156,26 @@ def test_replay_never_exposes_game_data_or_accepts_arbitrary_runtime_capabilitie
             ModuleLifecycleReplay(profile(WOW), session_id=invalid)
     with pytest.raises(ValueError, match="REPLAY_IDENTITY_INVALID"):
         ModuleLifecycleReplay(object(), session_id="demo")
+
+def test_android_ocr_cannot_be_relabelled_as_a_checkpoint():
+    replay = ModuleLifecycleReplay(profile(ANDROID), session_id="demo")
+    with pytest.raises(ValueError, match="REPLAY_SESSION_REQUIRED"):
+        replay.observe(frame(["health_candidate"], target=ANDROID,
+                             kind="checkpoint"), now_ms=1000)
+    assert replay.snapshot(now_ms=1000)["sequence"] == 0
+    assert not modules(replay.snapshot(now_ms=1000))["combat"]["synthetic_signals"]
+    replay.observe(frame(["health_candidate"], target=ANDROID,
+                         kind="session"), now_ms=1000)
+    assert replay.snapshot(now_ms=1000)["sequence"] == 1
+
+
+def test_checkpoint_rejection_preserves_prior_session_observation():
+    replay = ModuleLifecycleReplay(profile(ANDROID), session_id="demo")
+    replay.observe(frame(["health_candidate"], target=ANDROID), now_ms=1000)
+    before = replay.snapshot(now_ms=1001)
+    with pytest.raises(ValueError, match="REPLAY_SESSION_REQUIRED"):
+        replay.observe(frame(["health_candidate"], target=ANDROID,
+                             sequence=2, observed=1002, kind="checkpoint"), now_ms=1002)
+    after = replay.snapshot(now_ms=1002)
+    assert after["sequence"] == before["sequence"] == 1
+    assert modules(after)["combat"]["synthetic_signals"] == ["health_candidate"]

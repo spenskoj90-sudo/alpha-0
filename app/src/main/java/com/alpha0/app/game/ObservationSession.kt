@@ -18,6 +18,14 @@ data class ObservationSnapshot(
     val lastCompletedFrameSequence: Long? = null,
     /** Capture timestamp for the last fully processed OCR frame, including a miss. */
     val lastCompletedFrameAt: Long? = null,
+    /** OCR callback completion time for that frame, distinct from manual Save. */
+    val lastCompletedOcrAt: Long? = null,
+    val lastOcrLatencyMs: Long? = null,
+    /** Processing counters, never proof of game-source or action authority. */
+    val ocrCompletedFrames: Long = 0,
+    val ocrMissFrames: Long = 0,
+    val ocrLateCallbacks: Long = 0,
+    val maxOcrLatencyMs: Long? = null,
 )
 data class CaptureSize(val width: Int, val height: Int) {
     companion object {
@@ -35,7 +43,7 @@ class ObservationSession {
     private var sessionId: String? = null
     private var startedAt = 0L
     @Synchronized fun invalidate(id: String) {
-        if (id == sessionId) snapshot = snapshot.copy(health = null, lastFrameAt = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null)
+        if (id == sessionId) snapshot = snapshot.copy(health = null, lastFrameAt = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null, lastCompletedOcrAt = null, lastOcrLatencyMs = null)
     }
 
     @Synchronized fun start(id: String, now: Long) {
@@ -55,13 +63,17 @@ class ObservationSession {
             lastRecognizedFrameAt = if (visible) null else snapshot.lastRecognizedFrameAt,
             lastCompletedFrameSequence = if (visible) null else snapshot.lastCompletedFrameSequence,
             lastCompletedFrameAt = if (visible) null else snapshot.lastCompletedFrameAt,
+            lastCompletedOcrAt = if (visible) null else snapshot.lastCompletedOcrAt,
+            lastOcrLatencyMs = if (visible) null else snapshot.lastOcrLatencyMs,
         )
     }
 
     @Synchronized fun frame(id: String, now: Long): Boolean {
         if (id != sessionId || now < startedAt || !tick(now) || snapshot.status != ObservationStatus.OBSERVING) return false
         if (now < (snapshot.lastFrameAt ?: startedAt)) return false
-        snapshot = snapshot.copy(frames = snapshot.frames + 1, lastFrameAt = now, health = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null)
+        snapshot = snapshot.copy(frames = snapshot.frames + 1, lastFrameAt = now, health = null,
+            lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null,
+            lastCompletedOcrAt = null, lastOcrLatencyMs = null)
         return true
     }
 
@@ -69,10 +81,25 @@ class ObservationSession {
         id: String, sequence: Long, frameAt: Long, now: Long, health: HealthCandidate?,
     ): Boolean {
         if (id != sessionId || !tick(now) || snapshot.status != ObservationStatus.OBSERVING) return false
-        if (sequence != snapshot.frames || sequence == snapshot.lastCompletedFrameSequence || frameAt != snapshot.lastFrameAt || now < frameAt || now - frameAt > 5000) return false
-        snapshot = snapshot.copy(health = health, lastHealth = health?.let { HealthObservation(it, frameAt) } ?: snapshot.lastHealth,
+        if (sequence != snapshot.frames || sequence == snapshot.lastCompletedFrameSequence ||
+            frameAt != snapshot.lastFrameAt || now < frameAt) return false
+        val latencyMs = now - frameAt
+        if (latencyMs > 5000) {
+            snapshot = snapshot.copy(ocrLateCallbacks = snapshot.ocrLateCallbacks + 1)
+            return false
+        }
+        snapshot = snapshot.copy(
+            health = health,
+            lastHealth = health?.let { HealthObservation(it, frameAt) } ?: snapshot.lastHealth,
             lastRecognizedFrameAt = if (health == null) null else frameAt,
-            lastCompletedFrameSequence = sequence, lastCompletedFrameAt = frameAt)
+            lastCompletedFrameSequence = sequence,
+            lastCompletedFrameAt = frameAt,
+            lastCompletedOcrAt = now,
+            lastOcrLatencyMs = latencyMs,
+            ocrCompletedFrames = snapshot.ocrCompletedFrames + 1,
+            ocrMissFrames = snapshot.ocrMissFrames + if (health == null) 1 else 0,
+            maxOcrLatencyMs = maxOf(snapshot.maxOcrLatencyMs ?: 0, latencyMs),
+        )
         return true
     }
 
@@ -87,13 +114,15 @@ class ObservationSession {
         // While paused the user needs time to return to SENTINEL and manually
         // annotate the last completed frame. Freshness is checked on Save.
         if (snapshot.status == ObservationStatus.OBSERVING && snapshot.lastFrameAt?.let { now - it > 5000 } == true)
-            snapshot = snapshot.copy(health = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null)
+            snapshot = snapshot.copy(health = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null,
+                lastCompletedOcrAt = null, lastOcrLatencyMs = null)
         return true
     }
 
     @Synchronized fun stop(reason: String) {
         sessionId = null
         snapshot = snapshot.copy(status = ObservationStatus.STOPPED, reason = reason, captureId = null, health = null,
-            lastHealth = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null)
+            lastHealth = null, lastRecognizedFrameAt = null, lastCompletedFrameSequence = null, lastCompletedFrameAt = null,
+            lastCompletedOcrAt = null, lastOcrLatencyMs = null)
     }
 }

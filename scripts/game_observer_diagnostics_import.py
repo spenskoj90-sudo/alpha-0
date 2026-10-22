@@ -164,8 +164,8 @@ def main() -> int:
     cli.add_argument("--game-signer-sha256", required=True, help="Compare with observed game diagnostic digest")
     cli.add_argument("--language", choices=("ru", "en"), required=True)
     cli.add_argument("--hud", choices=("portrait-upper-left", "landscape-upper-left"), required=True)
-    cli.add_argument("--device", default="Infinix X6731B")
-    cli.add_argument("--api", type=int, default=34)
+    cli.add_argument("--device", required=True, help="Exact manufacturer and model verified from the exported PROCESS_START and artifact evidence")
+    cli.add_argument("--api", type=int, required=True, help="Observed Android API level; never infer from a previous device")
     args = cli.parse_args()
     try:
         report = extracted_report(

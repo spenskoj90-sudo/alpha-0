@@ -169,7 +169,17 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as work:
             root = Path(work)
             source, output = root / "diagnostics.gz", root / "summary.json"
-            source.write_bytes(gzip.compress((json.dumps(event()) + "\n").encode()))
+            start = {"component": "RUNTIME", "event": "PROCESS_START", "result": "SUCCESS",
+                     "details": {"source_sha": "a" * 40, "package_name": "com.alpha0.app.physicaltest",
+                                 "version_code": 100000641, "build_type": "physicalTest",
+                                 "diagnostics_mode": "FORENSIC_TEST", "runtime_environment": "staging",
+                                 "sdk": 34, "manufacturer": "Infinix", "model": "X6731B"}}
+            signer = {"component": "RUNTIME", "event": "PACKAGE_SIGNER", "result": "OBSERVED",
+                      "details": {"package_name": "com.alpha0.app.physicaltest",
+                                  "installed_version_code": 100000641, "signer_count": 1,
+                                  "multiple_signers": False, "identity_evidence": "PACKAGE_MANAGER",
+                                  "signer_cert_sha256": "c" * 64}}
+            source.write_bytes(gzip.compress(("\n".join(map(json.dumps, (start, signer, event()))) + "\n").encode()))
             command = [
                 sys.executable, str(Path(__file__).with_name("game_observer_diagnostics_import.py")),
                 "--diagnostics", str(source), "--output", str(output),
@@ -177,6 +187,7 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
                 "--signer-sha256", "c" * 64, "--apk-version-code", "100000641",
                 "--game-signer-sha256", "d" * 64, "--language", "en",
                 "--hud", "portrait-upper-left",
+                "--device", "Infinix X6731B", "--api", "34",
             ]
             process = subprocess.run(command, capture_output=True, text=True)
             self.assertEqual(process.returncode, 0, process.stderr)

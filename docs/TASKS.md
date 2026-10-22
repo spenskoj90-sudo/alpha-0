@@ -97,7 +97,7 @@ Base checkpoint: `77f5c742412d5c394e9143ad3bf7188e4edee85a`. Plan: `docs/superpo
 
 Canonical scope: [PLAYER_INTELLIGENCE_ROADMAP_V1.md](PLAYER_INTELLIGENCE_ROADMAP_V1.md), tracking #455. This is a future backlog, not implementation evidence or automatic inclusion in the current release. Finish #451/#454 before opening new implementation streams; #277/#430/#375 retain their existing acceptance scope.
 
-- [ ] **GI-01/GI-02 — sources and knowledge:** exact-profile field/source/freshness/UNKNOWN map, reviewed mechanics and modular distribution within existing pack bounds; measure disk/RAM/latency.
+- [ ] **GI-01/GI-02 — sources and knowledge:** the strict read-only exact-profile source/module inventory for WoW checkpoints and Android OCR candidate is implemented, but all live field availability remains UNKNOWN; reviewed mechanics, real source-bound L3 field calibration, measured disk/RAM/latency and independently accepted packs remain pending.
 - [ ] **GI-03 — character improvement:** jointly compare talents/glyphs/gear/enchants/gems/consumables and play goals, including Owner's nonstandard build examples; show reasons/trade-offs and comparable evidence.
 - [ ] **GI-04/GI-05 — adaptive analysis and improvement:** local event-driven priorities, uncertain opponent model, reproducible replay, consented structured post-fight review and independently reviewed pack updates.
 - [ ] **GI-06/GI-07 — bounded execution and expansion:** separate stand-tested action/outcome/Stop/ARM gates; expand classes/encounters/games only after a complete measured slice. AUTOMATIC_EXECUTION_DISABLED remains.

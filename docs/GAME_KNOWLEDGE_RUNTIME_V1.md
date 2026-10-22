@@ -16,6 +16,38 @@ D. Core `PackRegistry` provides a bounded LRU and atomic persistent content-addr
 
 PostgreSQL canonical distribution uses migration `016_knowledge_distribution`: immutable content-addressed bytes and review reference, an exact five-coordinate profile pointer, monotonic publication/revocation revisions and permanent revocation. FORCE RLS permits transaction-service reads; only the table owner/operator can publish or revoke, even when runtime receives an excessive table grant. Statement guards reject TRUNCATE, including CASCADE, which PostgreSQL RLS and row triggers do not cover. Publication uses a profile advisory lock and expected-revision CAS; the current content row is locked against concurrent revocation. The serving process has no publication/evaluation endpoint. Operator custody and signed-release custody stay independent. Android/Companion authenticated local consumers remain pending; the Core filesystem registry alone does not prove that integration.
 
+## Exact source fields and read-only domain module seam (GI-01 / GI-08)
+
+The authenticated existing `GET /v1/game-capabilities` includes
+`source_modules`, a **read-only** exact-profile inventory backed by
+`server/app/data/game-source-modules.v1.json` and strict Core validation.
+This is a field/source/freshness/UNKNOWN map for the two implemented-source
+candidates, not an extra game entitlement or an action API:
+
+- WoW WotLK 3.3.5a / WoWCircle: `normalized_events` have only a
+  SavedVariables checkpoint hypothesis, not live combat telemetry. Health,
+  target health, talents, gear and auction listings are UNKNOWN.
+- Shattered Pixel Dungeon stock Android: `health_candidate` has an
+  uncalibrated, consent-bound HUD OCR hypothesis. Authoritative health
+  and inventory are UNKNOWN.
+
+Each domain module (combat, character build, or economy where listed)
+declares its required signal IDs and presentation surfaces. All field
+`availability` values remain `UNKNOWN`, verified freshness/latency/
+confidence remain `null`, module readiness is
+`WAITING_FOR_VERIFIED_SOURCE` and `execution_authority=false`.
+Source provenance must match the **separate** existing research catalog
+at the same exact game/platform/patch/environment. Unknown sources may
+not self-declare timestamps or quality, and metadata cannot register
+executor/action/entitlement fields. Registry validation is not L3
+attestation. Adding a module gives no capture, game write or entitlement.
+
+A later source-specific integration must independently prove freshness,
+correctness, publisher/environment permission and physical L3 calibration
+before any status can be promoted. This contract deliberately cannot
+self-promote from a client-supplied field, model answer or knowledge pack.
+Other catalog profiles remain research-only and are not silently enrolled.
+
 ## Catalog and first verticals
 
 `/v1/game-capabilities` requires existing authenticated `game:read` policy and publishes the machine-readable inventory. It does not add entitlement games or action allowlists. Unknown installed patches, timing/confidence and publisher permissions are explicitly null/unverified; online action capabilities remain disabled. Android stock Shattered Pixel Dungeon remains an uncalibrated observer pilot with source UNVERIFIED.

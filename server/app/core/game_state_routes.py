@@ -59,10 +59,11 @@ def install_game_state_routes(
         x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
     ) -> dict[str, Any]:
         from app.core.game_capability_catalog import catalog, knowledge_index
+        from app.core.game_source_modules import source_modules
         rid = request_id(request, x_request_id)
         principal = principal_from_token(require_bearer(authorization_header))
         authorize_request(principal, "game:read", "game:*", rid)
-        return {**catalog(), "knowledge_packs": knowledge_index()["packs"]}
+        return {**catalog(), "knowledge_packs": knowledge_index()["packs"], "source_modules": source_modules()}
 
     @app.get("/v1/games")
     def list_games(

@@ -52,6 +52,40 @@ Production principal/session authority remains in the existing authenticated API
 - Stop clears scheduling. It cannot undo a previously delivered side effect.
   The ordinary fixture remains usable with SENTINEL stopped or entitlement absent.
 
+
+## Integrated fixture vertical: observe -> recommend -> confirm -> verify
+
+`server/app/core/offline_game_pipeline.py` now connects the **exact local**
+`TurnWorld` to the existing deterministic knowledge-pack evaluator, without
+giving a knowledge rule action authority. Only the in-memory fixture can set
+`source_verified=True`; this does **not** attest physical capture or any game.
+The reviewed state binds the session, sequence, state digest, source time,
+reviewed rule and pack digest. The pack in
+`scripts/fixtures/offline-turn-knowledge.v1.json` is an explicitly synthetic
+validated **test fixture**, absent from the distribution index and not a
+real-game reviewed strategy.
+
+The caller must separately and explicitly confirm each turn. Before a
+compiled `advance_turn` request is constructed, the bridge verifies:
+- a matching fresh review, within 1000 monotonic milliseconds;
+- identical source session, sequence/digest and unchanged loaded pack;
+- a still-ready recommendation after re-evaluating knowledge (including durable
+  revocation), plus the independently compiled `turn < 3` guard.
+
+The existing `OfflineActionSession` then applies its own principal, consent
+lease, policy/entitlement, rate/budget and dispatch rechecks. Only an actual
+new in-memory observation marks success; uncertain outcomes Stop without
+automatic retry. The bridge has no network route, real input callback,
+publisher permission, physical evidence or general autonomous execution.
+
+`server/tests/test_offline_game_pipeline.py` tests the real component wiring,
+including consent refusal, missing/unvalidated rules, mismatched profile,
+stale/changed session and state, revocation after recommendation, entitlement
+revocation and unknown post-dispatch outcomes.
+`python scripts/game_action_replay.py` emits three source-linked
+recommendation/decision/outcome records. Run using the pinned Core environment;
+the evidence remains L2 synthetic replay, not Android/WoW L3 acceptance.
+
 ## Migration and activation prerequisites
 
 The old `ActionRequest` schema and global `AUTOMATIC_EXECUTION_DISABLED` remain

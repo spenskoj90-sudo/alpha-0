@@ -32,7 +32,22 @@ candidates, not an extra game entitlement or an action API:
   and inventory are UNKNOWN.
 
 Each domain module (combat, character build, or economy where listed)
-declares its required signal IDs and presentation surfaces. All field
+declares its required signal IDs and presentation surfaces. Versioned
+module metadata also declares `module_contract_version=1`, a bounded
+semantic `module_version`, shared player-state schema v1,
+`session_bound` or `checkpoint_bound` lifecycle, same-profile
+module dependencies and a finite set of **presentation-only** outputs.
+The declaration is validated against exact-profile field IDs: a
+SavedVariables-dependent module must be checkpoint-bound, an OCR-dependent
+module session-bound; unknown/cross-profile/self dependencies, cycles,
+duplicate references, undeclared output types and action/entitlement fields
+are rejected. Output types must match the declared UI surfaces.
+
+This is a contract for future routing, **not a running domain module**.
+Lifecycle status is `NOT_STARTED`, all `outputs_available` lists are empty,
+shared player-state availability is `UNKNOWN` with no session binding or
+update timestamp. No module can self-start, promote source trust, emit
+commands, or publish state by appearing in this inventory. All source-field
 `availability` values remain `UNKNOWN`, verified freshness/latency/
 confidence remain `null`, module readiness is
 `WAITING_FOR_VERIFIED_SOURCE` and `execution_authority=false`.

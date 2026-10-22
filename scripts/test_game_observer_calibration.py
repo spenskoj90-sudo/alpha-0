@@ -57,6 +57,21 @@ class CalibrationTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 summarize(value)
 
+    def test_xiaomi_android_15_is_bounded_and_never_promotes(self):
+        value = sample()
+        value["environment"] = {"device": "Xiaomi 25028PC03G", "api": 35}
+        value["sampleKind"] = "physical-opt-in"
+        report = summarize(value)
+        self.assertEqual(report["environment"], value["environment"])
+        self.assertEqual(report["status"], "PENDING_PHYSICAL_REVIEW")
+        self.assertFalse(report["capabilityAvailable"])
+        for wrong in ({"device": "Xiaomi 25028PC03G", "api": 34},
+                      {"device": "Infinix X6731B", "api": 35},
+                      {"device": "unlisted", "api": 35}):
+            value["environment"] = wrong
+            with self.assertRaises(ValueError):
+                summarize(value)
+
     def test_physical_label_alone_never_promotes_or_calibrates(self):
         value = sample()
         value["sampleKind"] = "physical-opt-in"

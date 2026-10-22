@@ -79,6 +79,10 @@ class ModuleLifecycleReplay:
             declared[name].source_type == "saved_variables" for name in frame.fields_present
         ):
             raise ValueError("REPLAY_CHECKPOINT_REQUIRED")
+        if frame.kind != "session" and any(
+            declared[name].source_type == "media_projection_hud_ocr" for name in frame.fields_present
+        ):
+            raise ValueError("REPLAY_SESSION_REQUIRED")
 
         if frame.kind == "checkpoint":
             # A new checkpoint supersedes older snapshot presence; it is not a

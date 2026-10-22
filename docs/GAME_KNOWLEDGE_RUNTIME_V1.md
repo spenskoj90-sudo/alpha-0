@@ -67,7 +67,7 @@ game contents, images, OCR text, character inventories or credentials.
 `scripts/game_module_replay.py` demonstrates combat + economy in WoW and
 combat + character-build on stock Android with two distinct fake event streams.
 The runnable regression suite checks exact profile/session, contiguous
-sequence, monotonic timestamps, five-second replay freshness, checkpoint
+sequence, monotonic timestamps, five-second replay freshness, strict OCR-session versus SavedVariables-checkpoint source-kind rejection, checkpoint
 supersession, dependency blocking, stopped sessions and atomic rejection of
 invalid/late frames. A saved-variable field cannot masquerade as a session
 stream.

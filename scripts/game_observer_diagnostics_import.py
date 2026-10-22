@@ -23,7 +23,7 @@ MAX_LINE_BYTES = 64 * 1024
 PACKAGE = "com.shatteredpixel.shatteredpixeldungeon"
 
 
-def read_events(path: Path) -> list[dict]:
+def read_export(path: Path) -> tuple[list[dict], dict | None, dict | None]:
     require(path.suffix == ".gz")
     require(0 < path.stat().st_size <= MAX_UNCOMPRESSED)
     with gzip.open(path, "rb") as stream:
@@ -32,6 +32,8 @@ def read_events(path: Path) -> list[dict]:
     lines = raw.splitlines()
     require(1 <= len(lines) <= MAX_LINES)
     events = []
+    process_start = None
+    package_signer = None
     for line in lines:
         require(0 < len(line) <= MAX_LINE_BYTES)
         parsed = json.loads(line.decode("utf-8"), object_pairs_hook=unique_object)
@@ -39,14 +41,54 @@ def read_events(path: Path) -> list[dict]:
         if parsed.get("component") == "GAME" and parsed.get("event") == "CALIBRATION_NUMERIC_SAMPLE":
             require(parsed.get("result") == "OBSERVED")
             events.append(parsed)
+        if parsed.get("component") == "RUNTIME" and parsed.get("event") == "PROCESS_START":
+            require(process_start is None and parsed.get("result") == "SUCCESS")
+            process_start = parsed.get("details")
+        if parsed.get("component") == "RUNTIME" and parsed.get("event") == "PACKAGE_SIGNER":
+            require(package_signer is None and parsed.get("result") == "OBSERVED")
+            package_signer = parsed.get("details")
     require(bool(events))
-    return events
+    return events, process_start, package_signer
+
+
+def read_events(path: Path) -> list[dict]:
+    # Retain the narrow historic reader API for the pure numeric test fixtures.
+    return read_export(path)[0]
 
 
 def field(details: dict, key: str, typ: type) -> object:
     require(key in details and type(details[key]) is typ)
     return details[key]
 
+
+
+def verify_export_identity(
+    process_start: dict | None, package_signer: dict | None, *,
+    source_sha: str, signer_sha256: str, apk_version_code: int,
+    device: str, api: int,
+) -> None:
+    """Cross-check untrusted export metadata against *independently* reviewed APK assertions.
+
+    These checks detect accidental mixing/misattribution. They do not attest
+    MediaProjection content, real phone hardware or official game publisher.
+    """
+    require(type(process_start) is dict and type(package_signer) is dict)
+    require(field(process_start, "source_sha", str) == source_sha)
+    require(field(process_start, "package_name", str) == "com.alpha0.app.physicaltest")
+    require(field(process_start, "version_code", int) == apk_version_code)
+    require(field(process_start, "build_type", str) == "physicalTest")
+    require(field(process_start, "diagnostics_mode", str) == "FORENSIC_TEST")
+    require(field(process_start, "runtime_environment", str) == "staging")
+    require(field(process_start, "sdk", int) == api)
+    manufacturer = field(process_start, "manufacturer", str)
+    model = field(process_start, "model", str)
+    require(f"{manufacturer} {model}" == device)
+    require(field(package_signer, "package_name", str) == "com.alpha0.app.physicaltest")
+    require(field(package_signer, "installed_version_code", int) == apk_version_code)
+    require(field(package_signer, "signer_count", int) == 1)
+    require(field(package_signer, "multiple_signers", bool) is False)
+    require(field(package_signer, "identity_evidence", str) == "PACKAGE_MANAGER")
+    require(field(package_signer, "signer_cert_sha256", str) == signer_sha256)
 
 def extracted_report(
     events: list[dict], *,
@@ -168,8 +210,14 @@ def main() -> int:
     cli.add_argument("--api", type=int, required=True, help="Observed Android API level; never infer from a previous device")
     args = cli.parse_args()
     try:
+        events, process_start, package_signer = read_export(args.diagnostics)
+        verify_export_identity(
+            process_start, package_signer, source_sha=args.source_sha,
+            signer_sha256=args.signer_sha256, apk_version_code=args.apk_version_code,
+            device=args.device, api=args.api,
+        )
         report = extracted_report(
-            read_events(args.diagnostics), campaign=args.campaign,
+            events, campaign=args.campaign,
             source_sha=args.source_sha, apk_sha256=args.apk_sha256,
             signer_sha256=args.signer_sha256,
             apk_version_code=args.apk_version_code,

@@ -97,8 +97,8 @@ class ObservationSession {
             lastCompletedOcrAt = now,
             lastOcrLatencyMs = latencyMs,
             ocrCompletedFrames = snapshot.ocrCompletedFrames + 1,
-            ocrMissFrames = snapshot.ocrMissFrames + if (health == null) 1 else 0,
-            maxOcrLatencyMs = maxOf(snapshot.maxOcrLatencyMs ?: 0, latencyMs),
+            ocrMissFrames = snapshot.ocrMissFrames + if (health == null) 1L else 0L,
+            maxOcrLatencyMs = maxOf(snapshot.maxOcrLatencyMs ?: 0L, latencyMs),
         )
         return true
     }

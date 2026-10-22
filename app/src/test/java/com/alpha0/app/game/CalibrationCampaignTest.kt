@@ -12,10 +12,10 @@ class CalibrationCampaignTest {
         val missing = campaign.record("4", "20", null, 100, frame(1), 100)!!
         assertNull(missing.observed)
         assertEquals(0L, missing.ageMs)
-        val agedMiss = campaign.record("4", "20", null, 10000, frame(3), 100)!!
+        val agedMiss = campaign.record("4", "20", null, 10000, frame(2), 100)!!
         assertNull(agedMiss.observed)
         assertEquals(9900L, agedMiss.ageMs)
-        val stale = campaign.record("4", "20", HealthObservation(HealthCandidate(3, 20, 0), 100), 10000, frame(2), 100)!!
+        val stale = campaign.record("4", "20", HealthObservation(HealthCandidate(3, 20, 0), 100), 10000, frame(3), 100)!!
         assertEquals(9900L, stale.ageMs)
         assertEquals(3, campaign.count)
     }
@@ -64,6 +64,30 @@ class CalibrationCampaignTest {
         assertNotNull(campaign.record("5", "20", null, 130, frame(2), 130))
         assertNull(campaign.record("5", "20", null, 131, frame(2), 131))
         assertEquals(2, campaign.count)
+    }
+
+    @Test fun `saved numeric sample exposes only frame identity and monotonic capture metadata`() {
+        val campaign = CalibrationCampaign()
+        val sample = campaign.record("4", "20", HealthObservation(HealthCandidate(3, 20, 0), 100),
+            170, frame(5), 100)!!
+        assertEquals("capture", sample.captureId)
+        assertEquals(5L, sample.frameSequence)
+        assertEquals(100L, sample.capturedAtMs)
+        assertEquals(170L, sample.savedAtMs)
+        assertEquals(sample.savedAtMs - sample.capturedAtMs, sample.ageMs)
+        assertEquals(1, sample.sequence)
+        // Old frames may not be inserted after a newer accepted frame.
+        assertNull(campaign.record("4", "20", null, 180, frame(4), 180))
+        assertEquals(1, campaign.count)
+        assertEquals(2, campaign.record("4", "20", null, 200, frame(6), 200)!!.sequence)
+    }
+
+    @Test fun `a failed diagnostic write does not advance the frame sequence fence`() {
+        val campaign = CalibrationCampaign()
+        assertNull(campaign.record("4", "20", null, 100, frame(5), 100) { false })
+        val stored = campaign.record("4", "20", null, 110, frame(5), 100) { true }!!
+        assertEquals(5L, stored.frameSequence)
+        assertEquals(2, campaign.record("4", "20", null, 120, frame(6), 120)!!.sequence)
     }
 
     @Test fun `one campaign rejects cross-session samples and invalid frame provenance`() {

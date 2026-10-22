@@ -109,4 +109,14 @@ def test_authenticated_research_catalog_grants_no_entitlement():
     assert response.status_code == 200
     assert len(response.json()['profiles']) == 26
     assert all(not p['deterministic_automation'] for p in response.json()['profiles'])
+    sources = response.json()['source_modules']
+    assert sources['execution_authority'] is False
+    assert {p['profile_id'] for p in sources['profiles']} == {
+        'world-of-warcraft-windows', 'shattered-pixel-dungeon-android'
+    }
+    for profile in sources['profiles']:
+        assert profile['exact_environment_status'] == 'l3_pending'
+        assert all(field['availability'] == 'UNKNOWN' for field in profile['fields'])
+        assert all(module['readiness'] == 'WAITING_FOR_VERIFIED_SOURCE' for module in profile['modules'])
+        assert all(module['execution_authority'] is False for module in profile['modules'])
     assert client.get('/v1/games/shattered-pixel-dungeon/access', headers=headers).status_code == 404

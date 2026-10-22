@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "profile_id": "world-of-warcraft-windows",
+      "game": "world-of-warcraft",
+      "platform": "windows",
+      "patch": "3.3.5a",
+      "environment": "wowcircle-private",
+      "fields": [
+        {
+          "id": "normalized_events",
+          "source_type": "saved_variables",
+          "status": "checkpoint_unverified",
+          "provenance": [
+            "docs/EXACT_ENVIRONMENT_L3_EVIDENCE_V1.md"
+          ]
+        },
+        {
+          "id": "player_health",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        },
+        {
+          "id": "target_health",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        },
+        {
+          "id": "talents",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        },
+        {
+          "id": "gear",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        },
+        {
+          "id": "auction_listings",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        }
+      ],
+      "modules": [
+        {
+          "id": "combat",
+          "fields": [
+            "normalized_events",
+            "player_health",
+            "target_health"
+          ],
+          "ui_surfaces": [
+            "recommendations"
+          ]
+        },
+        {
+          "id": "character_build",
+          "fields": [
+            "talents",
+            "gear"
+          ],
+          "ui_surfaces": [
+            "character_advice"
+          ]
+        },
+        {
+          "id": "economy",
+          "fields": [
+            "auction_listings"
+          ],
+          "ui_surfaces": [
+            "economy_advice"
+          ]
+        }
+      ]
+    },
+    {
+      "profile_id": "shattered-pixel-dungeon-android",
+      "game": "shattered-pixel-dungeon",
+      "platform": "android",
+      "patch": null,
+      "environment": "stock-offline-pilot",
+      "fields": [
+        {
+          "id": "health_candidate",
+          "source_type": "media_projection_hud_ocr",
+          "status": "uncalibrated_candidate",
+          "provenance": [
+            "docs/ANDROID_STOCK_GAME_OBSERVER_V1.md"
+          ]
+        },
+        {
+          "id": "player_health",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        },
+        {
+          "id": "inventory",
+          "source_type": null,
+          "status": "unknown",
+          "provenance": []
+        }
+      ],
+      "modules": [
+        {
+          "id": "combat",
+          "fields": [
+            "health_candidate",
+            "player_health"
+          ],
+          "ui_surfaces": [
+            "recommendations"
+          ]
+        },
+        {
+          "id": "character_build",
+          "fields": [
+            "inventory"
+          ],
+          "ui_surfaces": [
+            "character_advice"
+          ]
+        }
+      ]
+    }
+  ]
+}

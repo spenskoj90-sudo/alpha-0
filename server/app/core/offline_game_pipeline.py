@@ -83,14 +83,19 @@ class OfflineTurnPipeline:
             raise ValueError("REVIEW_TAMPERED")
         if reviewed.pack_digest != self.knowledge.digest or not self._recommended(reviewed):
             raise ValueError("RECOMMENDATION_UNAVAILABLE")
+        # Check the review at its original timestamp as well as current state:
+        # recommendation items contain observed_at_ms, so a later valid
+        # confirmation must not compare items against a different timestamp.
+        original = self.review(now_ms=reviewed.observation.observed_ms)
+        if reviewed.evaluation != original.evaluation:
+            raise ValueError("RECOMMENDATION_UNAVAILABLE")
         current = self.review(now_ms=now_ms)
         if current.observation.digest != reviewed.observation.digest or \
                 current.observation.sequence != reviewed.observation.sequence:
             raise ValueError("STATE_CHANGED")
         # A pack's prose/rule is not an action grant. The *independent* compiled
         # fixture step guard is rechecked before the ActionGateway checks.
-        if (not self._recommended(current) or current.observation.turn >= 3
-                or reviewed.evaluation != current.evaluation):
+        if not self._recommended(current) or current.observation.turn >= 3:
             raise ValueError("RECOMMENDATION_UNAVAILABLE")
         request = ActionIntent(
             schema_version="sentinel.game-action.v1",

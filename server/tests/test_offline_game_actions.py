@@ -143,3 +143,34 @@ def test_wrong_target_and_long_expiry_cannot_enter_queue():
         with pytest.raises(ValueError):
             session.schedule(principal, intent(world, **changes), now_ms=1000)
     assert session.pending is None and world.turn == 0
+
+
+def test_other_principal_cannot_probe_pending_or_history_keys():
+    session, world, owner = setup_session()
+    stranger = replace(owner, device_id="different-device")
+    request = intent(world, "secret-key")
+    session.schedule(owner, request, now_ms=1000)
+    for candidate in (request, intent(world, "unrelated-key")):
+        with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+            session.schedule(stranger, candidate, now_ms=1000)
+    assert session.pending == request
+    assert session.drain(owner, now_ms=1001).outcome == "SUCCEEDED"
+    # Same response for an identical replay, conflicting bytes or unknown key.
+    for candidate in (request, request.model_copy(update={"expires_ms": 2000}), intent(world, "absent-key", now_ms=1002)):
+        with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+            session.schedule(stranger, candidate, now_ms=1002)
+    assert world.turn == 1
+    assert session.schedule(owner, request, now_ms=1002).outcome == "SUCCEEDED"
+
+
+def test_rejected_future_intent_does_not_poison_monotonic_clock():
+    session, world, principal = setup_session()
+    invalid = intent(world, "invalid-future", expires_ms=9000)
+    with pytest.raises(ValueError, match="EXPIRED"):
+        session.schedule(principal, invalid, now_ms=5000)
+    assert session.pending is None
+    assert not session.stopped
+    valid = intent(world, "valid", now_ms=1001)
+    session.schedule(principal, valid, now_ms=1001)
+    assert session.drain(principal, now_ms=1002).outcome == "SUCCEEDED"
+    assert world.turn == 1

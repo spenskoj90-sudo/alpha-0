@@ -70,3 +70,16 @@ When secondary-agent use is material, record:
 - defects found by independent review and confirmed by executable evidence.
 
 Keep secondary-agent routing only for task classes where the evidence supports it. If coordination/token/credit/rework cost exceeds the benefit, route the next comparable task to one GPT-led pass.
+
+## Harness evidence boundaries (2026-10-22)
+
+The local read-only harness scopes acceptance issue extraction to the canonical
+acceptance queue in TASKS.md; engineering backlog items are never counted as
+external release gates. Missing canonical sections fail closed rather than
+returning an ambiguous empty release queue.
+
+Write-mode lane manifests are validated but are **not executed** by the local
+harness. Each supervised worker must use a distinct non-main branch, separate
+external worktree and nonoverlapping repository paths (including directory/file
+prefix collisions); only GPT integrates reviewed results. Never mistake a valid
+manifest for authorization, a completed write, CI success, or release readiness.

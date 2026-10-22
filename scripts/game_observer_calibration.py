@@ -48,8 +48,11 @@ def summarize(value: dict) -> dict:
     require(type(game["signerSha256"]) is str and re.fullmatch(r"[0-9a-f]{64}", game["signerSha256"]) is not None)
     require(game["language"] in ("ru", "en") and game["hud"] in ("portrait-upper-left", "landscape-upper-left"))
     keys(value["environment"], {"device", "api"})
-    require(value["environment"]["device"] == "Infinix X6731B")
-    integer(value["environment"]["api"], 34, 34)
+    require(type(value["environment"]["device"]) is str)
+    require(type(value["environment"]["api"]) is int)
+    require((value["environment"]["device"], value["environment"]["api"]) in {
+        ("Infinix X6731B", 34), ("Xiaomi 25028PC03G", 35),
+    })
     require(value["sampleKind"] in ("synthetic", "physical-opt-in"))
     rows = value["samples"]
     require(type(rows) is list and 1 <= len(rows) <= 32)

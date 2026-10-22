@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "offline-turn-review-fixture",
+  "version": "1",
+  "game": "sentinel-turn-fixture",
+  "platform": "windows",
+  "patch": "1",
+  "environment": "local-offline-replay",
+  "profile": "turn-v1",
+  "status": "validated",
+  "provenance": [
+    "fixture:in-memory-turn-world"
+  ],
+  "revoked": false,
+  "valid_until_ms": 900000,
+  "max_state_age_ms": 1500,
+  "rules": [
+    {
+      "id": "advance-turn",
+      "priority": 10,
+      "requires": [
+        {
+          "signal": "turn",
+          "op": "lt",
+          "value": 3
+        }
+      ],
+      "text": {
+        "en": "Consider advancing one fixture turn.",
+        "ru": "Рассмотрите один ход в учебном стенде."
+      },
+      "reason": {
+        "en": "The local fixture has fewer than three turns.",
+        "ru": "В локальном стенде выполнено меньше трёх ходов."
+      },
+      "provenance": [
+        "fixture:compiled-turn-condition"
+      ],
+      "confidence": null
+    }
+  ],
+  "coverage": [
+    "offline_turn_replay"
+  ]
+}

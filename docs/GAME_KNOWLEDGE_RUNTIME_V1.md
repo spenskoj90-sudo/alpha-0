@@ -1,6 +1,6 @@
 # Game Knowledge Runtime v1
 
-Status: data-only deterministic runtime implemented; production combat integration and exact target acceptance pending. Global `AUTOMATIC_EXECUTION_DISABLED` remains active. New game = profile/adapter/capability pack, not another Core.
+Status: data-only deterministic runtime implemented; closed offline fixture recommendation/action integration added; production combat integration and exact target acceptance pending. Global `AUTOMATIC_EXECUTION_DISABLED` remains active. New game = profile/adapter/capability pack, not another Core.
 
 ## Layers and trust
 

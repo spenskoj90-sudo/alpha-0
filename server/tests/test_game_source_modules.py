@@ -40,6 +40,22 @@ def test_wow_checkpoint_and_android_ocr_are_never_presented_as_verified():
     assert wow["fields"][0]["status"] == "checkpoint_unverified"
     assert android["fields"][0]["status"] == "uncalibrated_candidate"
     assert {m["id"] for m in wow["modules"]} == {"combat", "character_build", "economy"}
+    for profile in profiles.values():
+        assert profile["shared_player_state"] == {
+            "schema_version": 1, "availability": "UNKNOWN",
+            "session_binding": None, "last_updated_ms": None,
+        }
+        for module in profile["modules"]:
+            assert module["module_contract_version"] == 1
+            assert module["module_version"] == "1.0.0"
+            assert module["shared_state_schema_version"] == 1
+            assert module["lifecycle_status"] == "NOT_STARTED"
+            assert module["outputs_available"] == []
+            assert module["dependencies"] == []
+            assert module["outputs"]
+    assert next(m for m in wow["modules"] if m["id"] == "combat")["lifecycle"] == "checkpoint_bound"
+    assert next(m for m in android["modules"] if m["id"] == "combat")["lifecycle"] == "session_bound"
+
 
 
 def test_contract_readback_is_independent():
@@ -81,3 +97,55 @@ def test_malformed_bytes_and_unknown_catalog_profiles_fail_closed():
     data["profiles"][0]["game"] = "other-game"
     with pytest.raises(ValueError, match="SOURCE_EXACT_PROFILE_MISMATCH"):
         validate(data)
+
+
+@pytest.mark.parametrize("mutate,expected", [
+    (lambda x: x["profiles"][0]["modules"][0].update(module_contract_version=2), "literal"),
+    (lambda x: x["profiles"][0]["modules"][0].update(module_version="1.0"), "string_too_short"),
+    (lambda x: x["profiles"][0]["modules"][0].update(module_version="01.0.0"), "string_pattern_mismatch"),
+    (lambda x: x["profiles"][0]["modules"][0].update(shared_state_schema_version=2), "literal"),
+    (lambda x: x["profiles"][0]["modules"][0].update(lifecycle="session_bound"), "SOURCE_LIFECYCLE_INVALID"),
+    (lambda x: x["profiles"][1]["modules"][0].update(lifecycle="checkpoint_bound"), "SOURCE_LIFECYCLE_INVALID"),
+    (lambda x: x["profiles"][0]["modules"][0].update(lifecycle="permanent"), "literal"),
+    (lambda x: x["profiles"][0]["modules"][0].update(dependencies=["missing"]), "SOURCE_MODULE_DEPENDENCY_INVALID"),
+    (lambda x: x["profiles"][0]["modules"][0].update(dependencies=["combat"]), "SOURCE_MODULE_DEPENDENCY_INVALID"),
+    (lambda x: x["profiles"][0]["modules"][0].update(dependencies=["economy", "economy"]), "SOURCE_DUPLICATE_DEPENDENCY"),
+    (lambda x: x["profiles"][1]["modules"][0].update(dependencies=["economy"]), "SOURCE_MODULE_DEPENDENCY_INVALID"),
+    (lambda x: x["profiles"][0]["modules"][0].update(outputs=["economy_context"]), "SOURCE_PRESENTATION_MISMATCH"),
+    (lambda x: x["profiles"][0]["modules"][0].update(outputs=["recommendation_context", "recommendation_context"]), "SOURCE_DUPLICATE_PRESENTATION"),
+    (lambda x: x["profiles"][0]["modules"][0].update(ui_surfaces=["recommendations", "recommendations"]), "SOURCE_DUPLICATE_PRESENTATION"),
+    (lambda x: x["profiles"][0]["modules"][0].update(outputs=["game_command"]), "literal"),
+    (lambda x: x["profiles"][0]["modules"][0].pop("module_version"), "Field required"),
+])
+def test_versioned_module_contract_denies_invalid_lifecycle_or_actions(mutate, expected):
+    value = payload()
+    mutate(value)
+    with pytest.raises((ValueError, ValidationError), match=expected):
+        validate(value)
+
+
+def test_module_dependencies_must_form_acyclic_exact_profile_graph():
+    data = payload()
+    combat, character, economy = data["profiles"][0]["modules"]
+    combat["dependencies"] = ["character_build"]
+    economy["dependencies"] = ["combat"]
+    # DAG is permitted but no dependency is inferred to be ready from registration.
+    parsed = validate(data)
+    assert parsed.profiles[0].modules[0].dependencies == ("character_build",)
+    character["dependencies"] = ["economy"]
+    with pytest.raises(ValueError, match="SOURCE_MODULE_CYCLE"):
+        validate(data)
+
+
+def test_different_domains_share_schema_but_no_live_game_state_or_action_grant():
+    profiles = {p["profile_id"]: p for p in source_modules()["profiles"]}
+    wow = profiles["world-of-warcraft-windows"]
+    android = profiles["shattered-pixel-dungeon-android"]
+    for profile, module_id in ((wow, "economy"), (android, "combat")):
+        module = next(m for m in profile["modules"] if m["id"] == module_id)
+        assert module["outputs_available"] == []
+        assert module["available_signals"] == []
+        assert module["readiness"] == "WAITING_FOR_VERIFIED_SOURCE"
+        assert module["lifecycle_status"] == "NOT_STARTED"
+        assert module["execution_authority"] is False
+        assert profile["shared_player_state"]["session_binding"] is None

@@ -98,7 +98,7 @@ def extracted_report(
         frame_at = field(details, "frame_captured_at_ms", int)
         saved_at = field(details, "sample_saved_at_ms", int)
         require(last_frame_sequence < frame_sequence <= 2**63 - 1)
-        require(last_frame_at <= frame_at <= saved_at <= 2**63 - 1)
+        require(0 <= frame_at and last_frame_at <= frame_at <= saved_at <= 2**63 - 1)
         require(last_saved_at <= saved_at)
         age = field(details, "age_ms", int)
         require(0 <= age <= 300000 and saved_at - frame_at == age)

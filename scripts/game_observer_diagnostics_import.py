@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -82,6 +83,7 @@ def extracted_report(
     last_frame_sequence = 0
     last_frame_at = -1
     last_saved_at = -1
+    frame_trace = []
     rows = []
     for i, details in enumerate(samples, start=1):
         require(field(details, "sample_sequence", int) == i)
@@ -103,6 +105,7 @@ def extracted_report(
         last_frame_sequence = frame_sequence
         last_frame_at = frame_at
         last_saved_at = saved_at
+        frame_trace.append([campaign, observed_capture, frame_sequence, frame_at, saved_at])
         require(field(details, "game_package", str) == PACKAGE)
         version = field(details, "game_version", str)
         code = field(details, "game_version_code", int)
@@ -139,7 +142,14 @@ def extracted_report(
     }
     # Existing strict input validator includes missing/stale in denominator and
     # ALWAYS keeps capability unavailable, regardless of numeric agreement.
-    return summarize(input_data)
+    report = summarize(input_data)
+    # Hashed trace enables later reconciliation with the retained diagnostics
+    # without leaking session UUIDs or monotonic timestamps into the summary.
+    # This is diagnostic consistency evidence, NOT a trusted source signature.
+    report["frameTraceDigestSha256"] = hashlib.sha256(
+        json.dumps(frame_trace, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+    ).hexdigest()
+    return report
 
 
 def main() -> int:

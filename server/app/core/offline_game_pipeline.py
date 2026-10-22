@@ -77,12 +77,23 @@ class OfflineTurnPipeline:
             raise ValueError("REVIEW_INVALID")
         if type(now_ms) is not int or not 0 <= now_ms - reviewed.observation.observed_ms <= REVIEW_MAX_AGE_MS:
             raise ValueError("REVIEW_STALE")
-        if reviewed.pack_digest != self.knowledge.digest or not self._recommended(reviewed):
-            raise ValueError("RECOMMENDATION_UNAVAILABLE")
+        # A changed world/session is operational drift, not a forged review.
+        # Preserve these exact reasons before independently checking integrity.
         current = self.review(now_ms=now_ms)
         if current.observation.digest != reviewed.observation.digest or \
                 current.observation.sequence != reviewed.observation.sequence:
             raise ValueError("STATE_CHANGED")
+        # A review is a caller-held object, not a signed capability. Recompute
+        # the original source snapshot before considering the proposed rule.
+        if reviewed.observation != self.world.observe(reviewed.observation.observed_ms):
+            raise ValueError("REVIEW_TAMPERED")
+        if reviewed.pack_digest != self.knowledge.digest or not self._recommended(reviewed):
+            raise ValueError("RECOMMENDATION_UNAVAILABLE")
+        # Recommendation items contain observed_at_ms. Compare their contents
+        # at the original timestamp so valid short-delay consent still works.
+        original = self.review(now_ms=reviewed.observation.observed_ms)
+        if reviewed.evaluation != original.evaluation:
+            raise ValueError("RECOMMENDATION_UNAVAILABLE")
         # A pack's prose/rule is not an action grant. The *independent* compiled
         # fixture step guard is rechecked before the ActionGateway checks.
         if not self._recommended(current) or current.observation.turn >= 3:

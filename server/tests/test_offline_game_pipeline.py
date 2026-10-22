@@ -155,3 +155,37 @@ def test_no_cross_game_adapter_can_be_substituted():
         OfflineTurnPipeline(object(), session, pipeline.knowledge)
     with pytest.raises(ValueError, match="OFFLINE_FIXTURE_ONLY"):
         OfflineTurnPipeline(TurnWorld("another-session"), session, pipeline.knowledge)
+
+def test_forged_review_snapshot_and_recommendation_are_rejected():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    original = pipeline.review(now_ms=1000)
+    forged = replace(original, observation=replace(original.observation, turn=2))
+    with pytest.raises(ValueError, match="REVIEW_TAMPERED"):
+        pipeline.confirm_fixture_step(principal, forged, now_ms=1000,
+                                      idempotency_key="forged-state", confirmed=True)
+    fabricated = replace(original, evaluation=replace(original.evaluation, status="ready", items=()))
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.confirm_fixture_step(principal, fabricated, now_ms=1000,
+                                      idempotency_key="forged-recommendation", confirmed=True)
+    assert world.turn == 0 and session.pending is None
+
+
+def test_valid_confirmation_after_short_delay_preserves_review_integrity():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    reviewed = pipeline.review(now_ms=1000)
+    outcome = pipeline.confirm_fixture_step(principal, reviewed, now_ms=1001,
+                                            idempotency_key="delayed", confirmed=True)
+    assert outcome.outcome == "SUCCEEDED"
+    assert world.turn == 1 and session.pending is None
+
+
+def test_forged_but_ready_recommendation_is_rejected_without_side_effect():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    reviewed = pipeline.review(now_ms=1000)
+    fake_item = dict(reviewed.evaluation.items[0])
+    fake_item["text"] = "Forged instruction"
+    fabricated = replace(reviewed, evaluation=replace(reviewed.evaluation, items=(fake_item,)))
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.confirm_fixture_step(principal, fabricated, now_ms=1000,
+                                      idempotency_key="fake-ready", confirmed=True)
+    assert world.turn == 0 and session.pending is None

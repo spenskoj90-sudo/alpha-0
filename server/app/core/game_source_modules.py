@@ -43,9 +43,22 @@ class SignalSource(ContractModel):
 
 
 class DomainModule(ContractModel):
+    """Versioned read-only wiring declaration, NOT a running module instance."""
+
     id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]*$")
+    module_contract_version: Literal[1]
+    module_version: str = Field(
+        min_length=5, max_length=24,
+        pattern=r"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+    )
+    shared_state_schema_version: Literal[1]
+    lifecycle: Literal["session_bound", "checkpoint_bound"]
+    dependencies: tuple[str, ...] = Field(max_length=16)
     fields: tuple[str, ...] = Field(min_length=1, max_length=32)
     ui_surfaces: tuple[Literal["recommendations", "character_advice", "economy_advice"], ...] = Field(
+        min_length=1, max_length=3
+    )
+    outputs: tuple[Literal["recommendation_context", "character_context", "economy_context"], ...] = Field(
         min_length=1, max_length=3
     )
 
@@ -65,11 +78,55 @@ class ExactSourceProfile(ContractModel):
         modules = [m.id for m in self.modules]
         if len(set(names)) != len(names) or len(set(modules)) != len(modules):
             raise ValueError("SOURCE_DUPLICATE_ID")
+        source_by_id = {source.id: source for source in self.fields}
+        modules_by_id = {module.id: module for module in self.modules}
+        output_by_surface = {
+            "recommendations": "recommendation_context",
+            "character_advice": "character_context",
+            "economy_advice": "economy_context",
+        }
         for module in self.modules:
             if len(set(module.fields)) != len(module.fields):
                 raise ValueError("SOURCE_DUPLICATE_FIELD")
             if any(field not in names for field in module.fields):
                 raise ValueError("SOURCE_UNDECLARED_FIELD")
+            if len(set(module.dependencies)) != len(module.dependencies):
+                raise ValueError("SOURCE_DUPLICATE_DEPENDENCY")
+            if any(dep not in modules_by_id or dep == module.id for dep in module.dependencies):
+                raise ValueError("SOURCE_MODULE_DEPENDENCY_INVALID")
+            if len(set(module.ui_surfaces)) != len(module.ui_surfaces) or len(set(module.outputs)) != len(module.outputs):
+                raise ValueError("SOURCE_DUPLICATE_PRESENTATION")
+            if set(module.outputs) != {output_by_surface[s] for s in module.ui_surfaces}:
+                raise ValueError("SOURCE_PRESENTATION_MISMATCH")
+            if any(
+                source_by_id[name].source_type == "saved_variables"
+                for name in module.fields
+            ) and module.lifecycle != "checkpoint_bound":
+                raise ValueError("SOURCE_LIFECYCLE_INVALID")
+            if any(
+                source_by_id[name].source_type == "media_projection_hud_ocr"
+                for name in module.fields
+            ) and module.lifecycle != "session_bound":
+                raise ValueError("SOURCE_LIFECYCLE_INVALID")
+
+        # Only same-profile dependencies are legal. Cycles cannot be evaluated
+        # in a defined order, even when all observations remain UNKNOWN.
+        finished: set[str] = set()
+        visiting: set[str] = set()
+
+        def visit(module_id: str) -> None:
+            if module_id in visiting:
+                raise ValueError("SOURCE_MODULE_CYCLE")
+            if module_id in finished:
+                return
+            visiting.add(module_id)
+            for dependency in modules_by_id[module_id].dependencies:
+                visit(dependency)
+            visiting.remove(module_id)
+            finished.add(module_id)
+
+        for module_id in modules_by_id:
+            visit(module_id)
         return self
 
 
@@ -119,9 +176,17 @@ def source_modules() -> dict:
             {
                 **profile.model_dump(mode="json"),
                 "exact_environment_status": "l3_pending",
+                "shared_player_state": {
+                    "schema_version": 1,
+                    "availability": "UNKNOWN",
+                    "session_binding": None,
+                    "last_updated_ms": None,
+                },
                 "modules": [
                     {
                         **module.model_dump(mode="json"),
+                        "lifecycle_status": "NOT_STARTED",
+                        "outputs_available": [],
                         "readiness": "WAITING_FOR_VERIFIED_SOURCE",
                         "available_signals": [],
                         "missing_signals": list(module.fields),

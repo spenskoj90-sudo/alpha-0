@@ -200,6 +200,7 @@ python scripts/game_observer_diagnostics_import.py \
   --apk-version-code EXACT_ANDROID_VERSION_CODE \
   --game-signer-sha256 EXACT_64_HEX_OBSERVED_GAME_SIGNER \
   --language ru --hud portrait-upper-left
+  --device "Xiaomi 25028PC03G" --api 35
 ```
 
 The engineer must reconcile the command's build/APK/signature assertions with
@@ -210,3 +211,41 @@ a complete calibration cannot be reconstructed; do not selectively relabel the
 remaining rows as a full campaign or fabricate values. Every summary remains
 `PENDING_PHYSICAL_REVIEW` / `UNVERIFIED` / `UNCALIBRATED`,
 `capabilityAvailable=false`. No game-input action or recommendation is enabled.
+
+## Xiaomi Android 15 opt-in physical diagnostics — 2026-10-22
+
+Owner exported a privately retained forensic diagnostics archive for protected-main
+source `dd0606a507d9b779c0480e9b6683120d7d82d57a`. The GitHub Physical Test
+APK artifact manifest identifies versionCode `100000718`, and its actual APK
+SHA-256 matches that manifest. The export's PROCESS_START and PACKAGE_SIGNER
+metadata agree with the exact source SHA, app version and single APK signer.
+The observed environment is `Xiaomi 25028PC03G`, Android API 35, with the
+installed Shattered Pixel Dungeon version `4.0.2` / code `922`.
+Observed game signer is consistent within the export; this is not proof of
+publisher identity or of the MediaProjection-selected application.
+
+The first opt-in calibration campaign had four ordered completed-frame samples:
+three numeric OCR outputs equal the manually entered values, and one OCR miss.
+**All four samples were 5.8–7.7 seconds old at Save**, above the five-second
+live-freshness threshold: zero qualifying fresh exact matches, four stale,
+no live recognizer accuracy confidence and no action readiness. The first
+capture stopped at the five-minute limit (102 processed frames); a second
+was revoked (21 frames). This test confirms a functioning capture/consent and
+opt-in diagnostics path, not game-source attestation, on-screen calibration
+acceptance or real-time recommendation timing.
+
+The importer now requires explicit `--device` and `--api`, accepts only
+the evidence-scoped old Infinix/API34 and Xiaomi/API35 pairs, and cross-checks
+the export's own PROCESS_START and PACKAGE_SIGNER against independently
+reviewed artifact identity assertions. This rejects mixing devices, APKs and
+diagnostics before summarization; it is not cryptographic hardware attestation.
+Do not include raw logs, private session/capture UUIDs or raw pixels in
+repository artifacts.
+
+**Promotion remains blocked:** all outputs stay `PENDING_PHYSICAL_REVIEW`,
+`UNVERIFIED`, `UNCALIBRATED` and `capabilityAvailable=false`. Recommend
+a non-automatic guidance path only once live source/version and current
+freshness are validated; a separately gated and reversible action executor
+requires explicit on-device consent, foreground app/source validation, runtime
+Stop, TTL, replay protections and verified single-action dry runs. Never
+enable game input automatically from this historical diagnostic set.

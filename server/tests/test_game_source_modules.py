@@ -101,7 +101,7 @@ def test_malformed_bytes_and_unknown_catalog_profiles_fail_closed():
 
 @pytest.mark.parametrize("mutate,expected", [
     (lambda x: x["profiles"][0]["modules"][0].update(module_contract_version=2), "literal"),
-    (lambda x: x["profiles"][0]["modules"][0].update(module_version="1.0"), "string_pattern_mismatch"),
+    (lambda x: x["profiles"][0]["modules"][0].update(module_version="1.0"), "string_too_short"),
     (lambda x: x["profiles"][0]["modules"][0].update(module_version="01.0.0"), "string_pattern_mismatch"),
     (lambda x: x["profiles"][0]["modules"][0].update(shared_state_schema_version=2), "literal"),
     (lambda x: x["profiles"][0]["modules"][0].update(lifecycle="session_bound"), "SOURCE_LIFECYCLE_INVALID"),

@@ -150,7 +150,6 @@ class OfflineActionSession:
     def _validate(self, principal: Principal, request: ActionIntent, now_ms: int, *, scheduled_ms: int) -> Observation:
         if type(now_ms) is not int or now_ms < self._last_now:
             raise ValueError("CLOCK_ROLLBACK")
-        self._last_now = now_ms
         if self.stopped:
             raise ValueError("STOPPED")
         if principal != self._principal:
@@ -173,9 +172,16 @@ class OfflineActionSession:
             required_capabilities=("offline_fixture",), required_entitlements=("offline-game-test",))
         if decision.decision is not ActionDecision.ALLOW:
             raise ValueError(decision.reason_code)
+        # Only accepted context/authority observations may advance the logical clock.
+        # Rejected future-dated intents must not lock out a valid later action.
+        self._last_now = now_ms
         return state
 
     def schedule(self, principal: Principal, request: ActionIntent, *, now_ms: int) -> Outcome | None:
+        # Authentication precedes every history, duplicate and queue-state lookup.
+        # Otherwise another principal can distinguish a known key from a conflict.
+        if self._principal is not None and principal != self._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
         known = self._history.get(request.idempotency_key)
         if known is not None:
             if known[0] != self._fingerprint(request):

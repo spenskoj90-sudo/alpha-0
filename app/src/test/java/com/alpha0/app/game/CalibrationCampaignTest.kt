@@ -98,4 +98,34 @@ class CalibrationCampaignTest {
         assertNull(campaign.record("4", "20", null, 101, frame(1, "other"), 101))
         assertEquals(1, campaign.count)
     }
+
+    @Test fun `capture and save times cannot regress within a campaign`() {
+        val campaign = CalibrationCampaign()
+        assertNotNull(campaign.record("4", "20", null, 120, frame(5), 100))
+        var persisted = 0
+        // A newer frame ID does not permit an older acquisition timestamp.
+        assertNull(campaign.record("4", "20", null, 130, frame(6), 99) {
+            persisted++; true
+        })
+        // Nor may the Save clock move backwards, even if the frame is newer.
+        assertNull(campaign.record("4", "20", null, 119, frame(6), 110) {
+            persisted++; true
+        })
+        assertEquals(0, persisted)
+        assertEquals(1, campaign.count)
+        assertNotNull(campaign.record("4", "20", null, 130, frame(6), 110))
+        assertEquals(2, campaign.count)
+    }
+
+    @Test fun `failed writes do not move either chronology fence`() {
+        val campaign = CalibrationCampaign()
+        assertNotNull(campaign.record("4", "20", null, 120, frame(1), 100))
+        assertNull(campaign.record("4", "20", null, 200, frame(2), 190) { false })
+        // The failed frame's timestamp must not poison an otherwise valid retry.
+        val retry = campaign.record("4", "20", null, 130, frame(2), 110)
+        assertNotNull(retry)
+        assertEquals(110L, retry!!.capturedAtMs)
+        assertEquals(130L, retry.savedAtMs)
+        assertEquals(2, campaign.count)
+    }
 }

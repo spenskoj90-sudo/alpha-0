@@ -158,7 +158,7 @@ SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED remai
 
 ## Phone-only numeric calibration collection — 2026-10-03
 
-The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity (including its observed current signing certificate)
+The diagnostic observer screen now accepts an explicit user-entered current/maximum health comparison. Pressing **Save numeric comparison to diagnostics** records at most 32 opt-in numeric samples per local campaign, tied to the locally observed installed version, candidate age, campaign ID and source UNVERIFIED. Each successful comparison additionally stores the ephemeral capture UUID, increasing completed-frame sequence, monotonic frame acquisition time and monotonic Save time. A failed diagnostic write does not consume the frame, and an older/duplicate frame cannot be saved later in the same campaign. This metadata is **not** an Android app-source, frame-content or publisher attestation. It stores no pixels/raw OCR and does not upload automatically. The ordinary observer still does not persist numeric candidates by itself. Missing/stale candidates are retained for the denominator; changing installed identity (including its observed current signing certificate)
 disables comparisons against old candidate identity. The digest is diagnostic
 provenance and never attests which application was captured. Export uses existing Owner-initiated diagnostics. Engineer reconciles exact manifest/signer/device/game/HUD and constructs the bounded calibration input; UI labels/user entries are not physical or app-source attestations. Recommendations, semantic input and ARM stay unavailable until the prerequisite physical calibration and target/session binding are proven.
 
@@ -175,6 +175,14 @@ events, exception stacks, arbitrary details, pixels, raw OCR or credentials.
 An export with more than one campaign requires an explicit UUID selection.
 Each selected campaign must begin with sequence 1, be contiguous, have at most
 32 samples, and share one installed game package/version/signer SHA-256.
+Frame-bound exports from this implementation also require one canonical capture UUID,
+strictly increasing completed-frame numbers, nondecreasing monotonic capture/Save
+timestamps, and exact `age_ms == sample_saved_at_ms - frame_captured_at_ms`.
+Missing, older or inconsistent frame provenance **fails closed**, including exports
+from older APKs without these fields; historical records are never silently upgraded.
+The v2 numeric summary adds `frameTraceDigestSha256`: a hash of the selected
+campaign's capture UUID, frame numbers and timestamps for later comparison to the
+retained private export, **not** the raw capture ID and not a trusted attestation.
 Incomplete/ambiguous samples, changed signers, malformed input, invalid
 reference data or an existing output path **fail closed**. Numeric rows still
 include missing and stale observations in the denominator. An observed signer

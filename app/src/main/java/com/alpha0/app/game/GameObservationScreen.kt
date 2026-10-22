@@ -274,6 +274,8 @@ internal fun GameObservationPanel(
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
+                            "capture_id" to sample.captureId, "capture_frame_sequence" to sample.frameSequence,
+                            "frame_captured_at_ms" to sample.capturedAtMs, "sample_saved_at_ms" to sample.savedAtMs,
                             "game_package" to ShatteredGameProfile.PACKAGE,
                             "game_version" to sampleInstall?.versionName, "game_version_code" to sampleInstall?.versionCode,
                             "game_signer_sha256" to sampleInstall?.signerSha256,

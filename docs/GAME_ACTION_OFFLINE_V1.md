@@ -45,8 +45,10 @@ Production principal/session authority remains in the existing authenticated API
   rejected. UNKNOWN never triggers delivery again. Principal identity is checked
   before examining pending requests or idempotency history so other principals
   cannot probe whether a key exists. Rejected future-dated intents do not move
-  the accepted monotonic clock or poison legitimate follow-up requests. Rearming
-  never erases history; use a new session after Stop.
+  the accepted monotonic clock or poison legitimate follow-up requests.
+  Dispatch likewise verifies the owner before reading or consuming pending work;
+  foreign drain attempts cannot cancel the owner's intent or disclose queue state.
+  Rearming never erases history; use a new session after Stop.
 - Stop clears scheduling. It cannot undo a previously delivered side effect.
   The ordinary fixture remains usable with SENTINEL stopped or entitlement absent.
 

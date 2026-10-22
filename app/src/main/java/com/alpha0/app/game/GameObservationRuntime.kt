@@ -13,11 +13,13 @@ data class GameObservationViewState(
  */
 object GameObservationRuntime {
     internal val session = ObservationSession()
+    internal val calibration = CalibrationCampaignRegistry()
     private val mutableState = MutableStateFlow(GameObservationViewState())
     val state = mutableState.asStateFlow()
 
     internal fun begin(install: StockGameInstall, id: String, now: Long) {
         com.alpha0.app.knowledge.AndroidKnowledgeRuntime.start()
+        calibration.clear()
         session.start(id, now)
         mutableState.value = GameObservationViewState(session.snapshot, install)
     }
@@ -29,6 +31,7 @@ object GameObservationRuntime {
     internal fun stop(reason: String) {
         com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
         session.stop(reason)
+        calibration.clear()
         publish()
     }
 }

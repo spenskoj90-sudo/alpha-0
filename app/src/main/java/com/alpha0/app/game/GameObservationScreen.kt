@@ -20,7 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.alpha0.app.diagnostics.DiagnosticLogger
-import java.util.UUID
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -160,11 +159,17 @@ internal fun GameObservationPanel(
     val strings = LocalAppStrings.current
     val observation = state.observation
     val context = LocalContext.current
-    val campaign = remember(state.installed ?: installed, observation.captureId) { CalibrationCampaign() }
-    val campaignId = remember(state.installed ?: installed, observation.captureId) { UUID.randomUUID().toString() }
+    val captureGame = state.installed ?: installed
+    // The service may survive an Activity recreation; preserve the same local
+    // campaign and its sample cap for the entire capture generation.
+    val campaignRun = remember(captureGame, observation.captureId) {
+        GameObservationRuntime.calibration.forCapture(observation.captureId, captureGame)
+    }
+    val campaign = campaignRun.campaign
+    val campaignId = campaignRun.campaignId
     var expectedCurrent by remember { mutableStateOf("") }
     var expectedMaximum by remember { mutableStateOf("") }
-    var sampleCount by remember(state.installed ?: installed, observation.captureId) { mutableStateOf(0) }
+    var sampleCount by remember(captureGame, observation.captureId) { mutableStateOf(campaign.count) }
     var calibrationMessage by remember { mutableStateOf("") }
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
     Column(

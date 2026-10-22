@@ -144,10 +144,23 @@ def extracted_report(
         require(last_saved_at <= saved_at)
         age = field(details, "age_ms", int)
         require(0 <= age <= 300000 and saved_at - frame_at == age)
+        # A new APK also reports when ML Kit actually completed. Require the
+        # pair together, validate the exact acquisition-to-OCR interval and
+        # keep legacy diagnostic exports readable without fabricating it.
+        has_completed = "ocr_completed_at_ms" in details
+        has_latency = "ocr_processing_latency_ms" in details
+        require(has_completed == has_latency)
+        trace = [campaign, observed_capture, frame_sequence, frame_at, saved_at]
+        if has_completed:
+            completed_at = field(details, "ocr_completed_at_ms", int)
+            ocr_latency = field(details, "ocr_processing_latency_ms", int)
+            require(frame_at <= completed_at <= saved_at)
+            require(0 <= ocr_latency <= 5000 and completed_at - frame_at == ocr_latency)
+            trace.extend((completed_at, ocr_latency))
         last_frame_sequence = frame_sequence
         last_frame_at = frame_at
         last_saved_at = saved_at
-        frame_trace.append([campaign, observed_capture, frame_sequence, frame_at, saved_at])
+        frame_trace.append(trace)
         require(field(details, "game_package", str) == PACKAGE)
         version = field(details, "game_version", str)
         code = field(details, "game_version_code", int)

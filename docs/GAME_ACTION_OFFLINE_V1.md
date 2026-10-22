@@ -42,8 +42,11 @@ Production principal/session authority remains in the existing authenticated API
   invalidation returns `CANCELLED`; malformed enqueue raises a bounded reason.
   The fixture makes no exactly-once claim for an external side effect.
 - Identical idempotency keys return their prior outcome; conflicting bytes are
-  rejected. UNKNOWN never triggers delivery again. A different principal cannot
-  read a prior result. Rearming never erases history; use a new session after Stop.
+  rejected. UNKNOWN never triggers delivery again. Principal identity is checked
+  before examining pending requests or idempotency history so other principals
+  cannot probe whether a key exists. Rejected future-dated intents do not move
+  the accepted monotonic clock or poison legitimate follow-up requests. Rearming
+  never erases history; use a new session after Stop.
 - Stop clears scheduling. It cannot undo a previously delivered side effect.
   The ordinary fixture remains usable with SENTINEL stopped or entitlement absent.
 

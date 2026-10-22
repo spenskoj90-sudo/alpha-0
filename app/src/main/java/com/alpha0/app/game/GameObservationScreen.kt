@@ -206,6 +206,9 @@ internal fun GameObservationPanel(
                     else -> SentinelStatus.STOPPED
                 })
                 Text(strings.text("game_capture_summary", observation.frames))
+                observation.lastOcrLatencyMs?.let { latency ->
+                    Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 when (observation.reason) {
                     "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
                     "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->

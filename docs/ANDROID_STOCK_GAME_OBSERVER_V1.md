@@ -199,7 +199,7 @@ python scripts/game_observer_diagnostics_import.py \
   --signer-sha256 EXACT_64_HEX_SENTINEL_APK_SIGNER \
   --apk-version-code EXACT_ANDROID_VERSION_CODE \
   --game-signer-sha256 EXACT_64_HEX_OBSERVED_GAME_SIGNER \
-  --language ru --hud portrait-upper-left
+  --language ru --hud portrait-upper-left \
   --device "Xiaomi 25028PC03G" --api 35
 ```
 

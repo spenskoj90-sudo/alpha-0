@@ -105,6 +105,38 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
                 report(rows)
 
 
+    def test_new_ocr_completion_timing_is_checked_without_relabelling_save_age(self):
+        first = event(ocr_completed_at_ms=110050, ocr_processing_latency_ms=50,
+                      age_ms=6200)
+        # The constructed event must keep acquisition, Save and age consistent.
+        first["details"]["sample_saved_at_ms"] = 116200
+        fresh = report([first])
+        assert fresh["stale"] == 1
+        assert fresh["exactMatches"] == 0
+        assert fresh["sourceTrust"] == "UNVERIFIED"
+        assert fresh["capabilityAvailable"] is False
+        legacy = copy.deepcopy(first)
+        legacy["details"].pop("ocr_completed_at_ms")
+        legacy["details"].pop("ocr_processing_latency_ms")
+        assert report([legacy])["samples"] == 1
+        assert fresh["frameTraceDigestSha256"] != report([legacy])["frameTraceDigestSha256"]
+        for key, value in [
+            ("ocr_completed_at_ms", None),
+            ("ocr_completed_at_ms", 109999),
+            ("ocr_completed_at_ms", 116201),
+            ("ocr_processing_latency_ms", True),
+            ("ocr_processing_latency_ms", 51),
+            ("ocr_processing_latency_ms", 5001),
+        ]:
+            malformed = copy.deepcopy(first)
+            malformed["details"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises((ValueError, TypeError)):
+                report([malformed])
+        malformed = copy.deepcopy(first)
+        malformed["details"].pop("ocr_completed_at_ms")
+        with self.assertRaises(ValueError):
+            report([malformed])
+
     def test_frame_trace_hash_changes_without_disclosing_raw_capture_identity(self):
         first = report([event(), event(2)])
         second = report([event(), event(2, capture_frame_sequence=3)])

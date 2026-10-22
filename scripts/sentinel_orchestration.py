@@ -30,7 +30,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     lanes = manifest.get("lanes")
     if not isinstance(lanes, list) or not 1 <= len(lanes) <= MAX_LANES:
         raise ManifestError("lanes must contain 1..8 entries")
-    ids, worktrees = set(), set()
+    ids, worktrees, branches = set(), set(), set()
+    write_ownership: list[tuple[str, str]] = []
     for lane in lanes:
         if not isinstance(lane, dict):
             raise ManifestError("each lane must be an object")
@@ -66,8 +67,19 @@ def validate_manifest(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             branch = lane.get("branch")
             if (not isinstance(worktree, str) or not worktree.strip()
                     or not isinstance(branch, str) or not branch.strip()
-                    or branch != branch.strip() or branch in ("main", "refs/heads/main")):
+                    or branch != branch.strip() or branch in ("main", "refs/heads/main")
+                    or branch.startswith("refs/")):
                 raise ManifestError(f"write lane {lane_id} requires isolated worktree and non-main branch")
+            if branch in branches:
+                raise ManifestError("write lanes cannot share a branch")
+            branches.add(branch)
+            for path in lane["ownedPaths"]:
+                for owner, other in write_ownership:
+                    if path == other or path.startswith(other + "/") or other.startswith(path + "/"):
+                        raise ManifestError(
+                            f"write path collision between {owner} and {lane_id}: {other} / {path}"
+                        )
+                write_ownership.append((lane_id, path))
             resolved = (ROOT / worktree).resolve()
             if resolved == ROOT or ROOT in resolved.parents or resolved in ROOT.parents:
                 raise ManifestError("write lanes must be outside the shared repository")
@@ -133,7 +145,12 @@ def _run_lane(lane: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"reader": lane["reader"], "digests": _digests(lane["baseSha"], lane["ownedPaths"])}
     if lane["reader"] == "acceptance_contract":
         tasks = _snapshot_file(lane["baseSha"], "docs/TASKS.md").decode("utf-8")
-        result["activeAcceptanceIssues"] = sorted({int(x) for x in re.findall(r"- \[ \] \*\*#(\d+)", tasks)})
+        if "## Canonical acceptance queue" not in tasks:
+            raise ManifestError("canonical acceptance queue section is missing")
+        acceptance = tasks.split("## Canonical acceptance queue", 1)[1].split("\n## ", 1)[0]
+        result["activeAcceptanceIssues"] = sorted({
+            int(x) for x in re.findall(r"- \[ \] \*\*#(\d+)", acceptance)
+        })
     return {"id": lane["id"], "mode": "read_only", "status": "SUCCESS",
             "durationMs": round((time.monotonic() - started) * 1000, 3), "result": result}
 

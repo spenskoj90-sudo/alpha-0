@@ -268,6 +268,10 @@ class GameObservationService : Service() {
         runCatching { recognizer?.close() }; recognizer = null
         if (sessionId != null) DiagnosticLogger.get(this).info("GAME", "OBSERVATION_STOPPED", "OBSERVED", details = mapOf(
             "reason" to reason, "processed_frames" to GameObservationRuntime.session.snapshot.frames,
+            "ocr_completed_frames" to GameObservationRuntime.session.snapshot.ocrCompletedFrames,
+            "ocr_miss_frames" to GameObservationRuntime.session.snapshot.ocrMissFrames,
+            "ocr_late_callbacks" to GameObservationRuntime.session.snapshot.ocrLateCallbacks,
+            "ocr_max_latency_ms" to GameObservationRuntime.session.snapshot.maxOcrLatencyMs,
         ))
         sessionId = null
         stopForeground(STOP_FOREGROUND_REMOVE)

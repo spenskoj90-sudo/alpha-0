@@ -206,6 +206,9 @@ internal fun GameObservationPanel(
                     else -> SentinelStatus.STOPPED
                 })
                 Text(strings.text("game_capture_summary", observation.frames))
+                observation.lastOcrLatencyMs?.let { latency ->
+                    Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 when (observation.reason) {
                     "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
                     "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
@@ -284,7 +287,10 @@ internal fun GameObservationPanel(
                             "game_package" to ShatteredGameProfile.PACKAGE,
                             "game_version" to sampleInstall?.versionName, "game_version_code" to sampleInstall?.versionCode,
                             "game_signer_sha256" to sampleInstall?.signerSha256,
-                            "age_ms" to sample.ageMs, "recognized_current" to sample.observed?.current,
+                            "age_ms" to sample.ageMs,
+                            "ocr_completed_at_ms" to live.observation.lastCompletedOcrAt,
+                            "ocr_processing_latency_ms" to live.observation.lastOcrLatencyMs,
+                            "recognized_current" to sample.observed?.current,
                             "recognized_maximum" to sample.observed?.maximum,
                             "ground_truth_current" to sample.current, "ground_truth_maximum" to sample.maximum,
                             "source_status" to "UNVERIFIED", "sample_kind" to "user-opt-in",

@@ -21,6 +21,8 @@ class CalibrationCampaign {
     private val savedFrames = mutableSetOf<CalibrationFrameId>()
     private var boundCaptureId: String? = null
     private var lastSavedFrameSequence = 0L
+    private var lastSavedCapturedAt = -1L
+    private var lastSavedAt = -1L
 
     fun record(
         currentText: String, maximumText: String, observation: HealthObservation?,
@@ -37,7 +39,10 @@ class CalibrationCampaign {
         if (maximum !in 1..999999 || current !in 0..maximum) return null
         // Even an OCR miss has a capture timestamp. Never report an old frame as age 0.
         val capturedAt = frameAt ?: return null
+        // The offline importer requires both capture and Save clocks to be
+        // nondecreasing. Reject impossible chronology before it reaches diagnostics.
         if (capturedAt < 0 || capturedAt > now ||
+            capturedAt < lastSavedCapturedAt || now < lastSavedAt ||
             (observation != null && observation.observedAt != capturedAt)) return null
         val age = now - capturedAt
         if (age !in 0L..300000L) return null
@@ -48,6 +53,8 @@ class CalibrationCampaign {
         if (!runCatching { persist(sample) }.getOrDefault(false)) return null
         boundCaptureId = frameId.captureId
         lastSavedFrameSequence = frameId.sequence
+        lastSavedCapturedAt = capturedAt
+        lastSavedAt = now
         savedFrames.add(frameId)
         count++
         return sample

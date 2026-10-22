@@ -200,6 +200,10 @@ class OfflineActionSession:
         return None
 
     def drain(self, principal: Principal, *, now_ms: int) -> Outcome | None:
+        # Reject a foreign dispatcher before disclosing queue state or consuming
+        # a pending intent. Only the session owner may advance the replay loop.
+        if self._principal is not None and principal != self._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
         request = self.pending
         if request is None:
             return None

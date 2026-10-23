@@ -721,7 +721,7 @@ def check_engineering_blocks(checks: Checks) -> None:
     )
     checks.require(
         m.get("releaseScope") == "UNCHANGED"
-        and "FINAL_RELEASE_ACCEPTANCE_V1.md" not in read("docs/RELEASE_GATES.md").splitlines()[0]
+        and "RELEASE_GATES.md" in read("docs/DOCUMENT_STATUS.md")
         and "publication" in routing
         and "A–I" in read("docs/DOCUMENT_STATUS.md"),
         "new routing does not silently change release scope and authority",

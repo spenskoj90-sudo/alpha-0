@@ -6,6 +6,9 @@
 
 **ACTIVE:** SENTINEL uses GPT-controlled orchestration. The Human Owner remains final authority and sole owner of protected actions. GPT/ChatGPT is the sole Owner-facing orchestrator and final integrator; bounded secondary agents/services may work only under GPT supervision in isolated lanes. Parallel work integrates serially, and GPT may merge only after the exact-SHA gate passes.
 
+
+**Open GitHub issue tracking is being consolidated.** The durable disposition and unresolved gates are recorded in [`PR_ISSUE_DISPOSITION_2026-10-23.md`](PR_ISSUE_DISPOSITION_2026-10-23.md); closing a tracking Issue does not mark any physical, signing, provider or release requirement as accepted.
+
 ## Completed foundation on main
 
 - [x] GPT-controlled orchestration governance, compact AGENTS context routing, exact-SHA merge gate and repository-first evidence model (#377). Retired GPT-only/tombstone instruction files were removed from the working tree on 2026-09-29; Git history preserves provenance.

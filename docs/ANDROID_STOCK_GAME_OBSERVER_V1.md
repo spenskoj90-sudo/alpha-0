@@ -385,3 +385,36 @@ no timing breakdown. They do not modify diagnostic Save clocks, serialized data,
 refresh/freshness thresholds or calibration acceptance, and add no sensitive data.
 Existing callback timing and STOP counters remain the source for performance study.
 No source attestation, recommendations or game input are enabled.
+
+## Read-only APK upgrade preflight — 2026-10-23
+
+An Owner-exported `.gz` diagnostics file records the installed physical-test
+package/version and a PackageManager-reported signer certificate digest. The
+exact GitHub artifact ZIP contains a diagnostic APK and an exact-SHA manifest.
+
+Before considering an update, inspect both files offline:
+
+    python scripts/physical_test_install_preflight.py --diagnostics owner-opt-in-diagnostics.gz --artifact exact-physical-test-workflow.zip
+
+The read-only script does not contact Android, install an APK, use signing
+keys or modify account/session state. It bounds diagnostic input and rejects
+ambiguous installed-package identity, checks the exact APK bytes against
+the manifest SHA-256, confirms the candidate staging/package/version identity
+and blocks mismatched signers, non-increasing versions and unverified update
+lineage. A mismatch returns BLOCKED / SIGNER_MISMATCH (exit 2); invalid
+inputs return exit 1. Exit 0 means only ELIGIBLE_FOR_OWNER_DEVICE_CONFIRMATION,
+**not** that APK signing was independently cryptographically verified or that
+the device will accept installation. The declared manifest signer must still
+be verified through trusted apksigner/Android PackageManager evidence.
+
+The Owner's 2026-10-22 Xiaomi diagnostic build is version 100000718, signer
+0c6fe4ef…b6f144. The exact 6a45e887… main APK is version 100000752, signer
+cc41bfdf…161c5b. Inspection of the private export and actual workflow ZIP
+returned BLOCKED / SIGNER_MISMATCH. Do not uninstall the installed app,
+clear its Keystore/session data or force a sideload across signer mismatch.
+
+The existing manual Physical Test Update APK workflow supports a separately
+pinned stable signing identity through provider-native secrets, but signing-key
+custody and any new signing identity remain Owner-only gates. Ordinary CI
+still uses an ephemeral debug certificate, without update compatibility.
+No game actions, capability trust or release gate is enabled by this check.

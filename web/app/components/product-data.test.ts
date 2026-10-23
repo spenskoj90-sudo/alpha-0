@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadProductData } from './product-data';
+import { reconcileGameInventory } from './game-inventory';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -68,5 +69,31 @@ describe('product data state', () => {
       return new Response(JSON.stringify(payload));
     });
     await expect(loadProductData()).resolves.toMatchObject({ state: 'ERROR' });
+  });
+});
+
+describe('safe combined game status inventory', () => {
+  const game = { id: 'diablo-4-pc', name: 'Diablo IV', family: 'Diablo', platform: 'windows', interaction_mode: 'adapter',
+    implementation_status: 'catalog_foundation' as const, exact_environment_status: 'unverified' as const, execution_authority: false as const };
+  const research = { id: 'shattered-android', name: 'Shattered Pixel Dungeon', platform: 'android' as const,
+    patch: null, environment: 'offline-pilot', implementation_status: 'observer_pilot' as const,
+    exact_environment_status: 'l3_pending' as const };
+  it('preserves unverified state and sorts diagnostic pilot before foundation', () => {
+    const items = reconcileGameInventory([game], [research]);
+    expect(items.map(x => x.evidence)).toEqual(['observer_pilot', 'catalog_foundation']);
+    expect(items.every(x => !x.executable && !x.environmentVerified)).toBe(true);
+  });
+  it('merges a matching ID only as read-only inventory', () => {
+    const items = reconcileGameInventory([game], [{
+      id: game.id, name: game.name, platform: 'windows', patch: null,
+      environment: 'unverified', implementation_status: 'research_only', exact_environment_status: 'l3_pending',
+    }]);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ sources: 'both', executable: false, environmentVerified: false, evidence: 'research_only' });
+  });
+  it('blocks duplicate and conflicting identities', () => {
+    expect(() => reconcileGameInventory([game, game], [])).toThrow('INVALID_ACCOUNT_GAME_CATALOG');
+    expect(() => reconcileGameInventory([game], [{ ...research, id: game.id }])).toThrow('GAME_PROFILE_IDENTITY_CONFLICT');
+    expect(() => reconcileGameInventory([], [research, research])).toThrow('INVALID_RESEARCH_GAME_CATALOG');
   });
 });

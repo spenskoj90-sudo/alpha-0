@@ -1,3 +1,4 @@
+import { reconcileGameInventory, type GameInventoryEntry } from './game-inventory';
 export type Security = {
   email: string | null;
   email_verified: boolean;
@@ -15,7 +16,7 @@ export type Device = { device_id: string; platform: string; state: 'ACTIVE' | 'R
 export type ProductData =
   | { state: 'SIGNED_OUT' }
   | { state: 'ERROR'; message: string }
-  | { state: 'READY'; security: Security; games: Game[]; research: ResearchProfile[]; events: AuditEvent[]; devices: Device[]; devicesTruncated: boolean };
+  | { state: 'READY'; security: Security; games: Game[]; research: ResearchProfile[]; inventory: GameInventoryEntry[]; events: AuditEvent[]; devices: Device[]; devicesTruncated: boolean };
 
 function researchProfiles(value: unknown): ResearchProfile[] {
   if (!value || typeof value !== 'object') throw new Error('INVALID');
@@ -70,7 +71,8 @@ export async function loadProductData(): Promise<ProductData> {
     if (catalog.games.length > 256 || !catalog.games.every(g => g && ['id', 'name', 'family', 'platform', 'interaction_mode'].every(k => typeof g[k] === 'string') &&
       g.implementation_status === 'catalog_foundation' && g.exact_environment_status === 'unverified' && g.execution_authority === false)) throw new Error('INVALID');
     if (!audit.events.every(e => e && ['action', 'decision', 'reason_code', 'resource'].every(k => typeof e[k] === 'string'))) throw new Error('INVALID');
-    return { state: 'READY', security, devices: devices.devices, devicesTruncated: devices.truncated, games: catalog.games, research, events: audit.events.slice().reverse().sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0)).slice(0, 100) };
+    const inventory = reconcileGameInventory(catalog.games as Game[], research);
+    return { state: 'READY', security, devices: devices.devices, devicesTruncated: devices.truncated, games: catalog.games, research, inventory, events: audit.events.slice().reverse().sort((a, b) => (Date.parse(b.created_at ?? '') || 0) - (Date.parse(a.created_at ?? '') || 0)).slice(0, 100) };
   } catch (error) {
     if (error instanceof Error && error.message === 'SIGNED_OUT') return { state: 'SIGNED_OUT' };
     return { state: 'ERROR', message: 'Product data could not be verified. Check your connection and retry.' };

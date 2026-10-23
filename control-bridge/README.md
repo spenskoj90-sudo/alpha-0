@@ -44,3 +44,5 @@ pytest
 ```
 
 Remote staging deployment is a separate environment step after merge and must be exact-SHA-bound.
+
+Runtime probe status is endpoint-scoped: redirecting login pages do not count as healthy. Release-readiness gate IDs originate from the checked-in task contract, **not** the live GitHub Issues list; the Bridge never authorizes signing or publication.

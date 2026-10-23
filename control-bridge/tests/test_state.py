@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import io
+import urllib.error
+import urllib.request
 from sentinel_bridge import state
 
 def test_project_state_uses_repository_contracts(monkeypatch):
@@ -110,3 +113,81 @@ def test_healthz_uses_render_commit_fallback(monkeypatch):
     assert payload["status"] == "ok"
     assert payload["service"] == "sentinel-control-bridge"
     assert payload["sourceSha"] == "c" * 40
+
+
+def test_runtime_probe_rejects_non_http_and_credentials_without_network(monkeypatch):
+    def should_not_open(*_args, **_kwargs):
+        raise AssertionError("Untrusted URL must never be opened")
+    monkeypatch.setattr(state.urllib.request, "build_opener", should_not_open)
+    for url in ("file:///etc/passwd", "https://user:password@example.com", "https://example.com/?callback=https://elsewhere", "https://[invalid"):
+        result = state._probe("core", url, "/healthz")
+        assert result == {"name": "core", "configured": True, "status": "INVALID_CONFIGURATION"}
+        assert url not in json.dumps(result)
+
+
+def test_probe_no_follow_redirect_and_no_false_health(monkeypatch):
+    class FakeOpener:
+        def __init__(self):
+            self.calls = []
+        def open(self, request, timeout):
+            self.calls.append((request.full_url, timeout))
+            raise urllib.error.HTTPError(request.full_url, 302, "Moved", {}, io.BytesIO(b""))
+    opener = FakeOpener()
+    def build_opener(*handlers):
+        assert state._NoProbeRedirect in handlers
+        return opener
+    monkeypatch.setattr(state.urllib.request, "build_opener", build_opener)
+    result = state._probe("web", "https://web.example", "/")
+    assert result["status"] == "DEGRADED" and result["httpStatus"] == 302
+    assert opener.calls == [("https://web.example/", 5.0)]
+
+
+def test_probe_only_exact_200_is_healthy(monkeypatch):
+    class FakeResponse:
+        def __init__(self, code):
+            self.status = code
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            return False
+    class FakeOpener:
+        def __init__(self):
+            self.code = 200
+        def open(self, *_args, **_kwargs):
+            return FakeResponse(self.code)
+    opener = FakeOpener()
+    monkeypatch.setattr(state.urllib.request, "build_opener", lambda *_: opener)
+    assert state._probe("core", "https://core.example", "/healthz")["status"] == "HEALTHY"
+    opener.code = 204
+    assert state._probe("core", "https://core.example", "/healthz")["status"] == "DEGRADED"
+    opener.code = 301
+    assert state._probe("core", "https://core.example", "/healthz")["status"] == "DEGRADED"
+
+
+def test_absent_acceptance_queue_never_satisfies_repository_checklist(monkeypatch):
+    monkeypatch.setenv("SENTINEL_SOURCE_SHA", "a" * 40)
+    monkeypatch.setattr(state, "_read_json", lambda _: {
+        "ownerVisualAcceptanceRequired": True,
+        "surfaces": [{"id": "android", "ready": True, "ownerVisualAccepted": True}],
+    })
+    monkeypatch.setattr(state, "_read_text", lambda _: "## Engineering queue\n- [x] **#371 done**")
+    summary = state.release_readiness()
+    assert summary["gateInventoryVerified"] is False
+    assert summary["checklistSatisfied"] is False
+    assert summary["releaseReady"] is False
+
+
+def test_closed_github_issue_is_not_equivalent_to_accepted_gate(monkeypatch):
+    monkeypatch.setattr(state, "_read_text", lambda _: (
+        "## Canonical acceptance queue\n"
+        "- [x] **Neon pre-release setup**\n"
+        "- [ ] **#314 — physical acceptance**\n"
+        "\n## Current engineering queue\n"
+        "- [ ] **#381 — optional benchmark**\n"
+    ))
+    summary = state.release_readiness()
+    assert summary["gateInventoryVerified"] is True
+    assert summary["activeAcceptanceIssues"] == [314]
+    assert summary["repositoryPendingAcceptanceGateRefs"] == [314]
+    assert summary["githubIssueStateVerified"] is False
+    assert summary["releaseReady"] is False

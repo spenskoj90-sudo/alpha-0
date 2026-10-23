@@ -49,6 +49,17 @@ class AppStringsTest {
     }
 
     @Test
+    fun `calibration labels separate frame age from OCR and human entry`() {
+        for (strings in listOf(AppStrings(AppLanguage.ENGLISH, ENGLISH), AppStrings(AppLanguage.RUSSIAN, RUSSIAN))) {
+            for (key in listOf("game_calibration_frame_age", "game_calibration_processing", "game_calibration_since_ocr")) {
+                val label = strings.text(key, 7)
+                assertFalse("$key must render a duration", label.isBlank() || label.contains("%d"))
+            }
+            assertFalse(strings.text("game_calibration_timing_note").isBlank())
+        }
+    }
+
+    @Test
     fun `unknown key has a deterministic fallback`() {
         val strings = AppStrings(AppLanguage.RUSSIAN, RUSSIAN)
         assertEquals("unknown_key", strings.text("unknown_key"))

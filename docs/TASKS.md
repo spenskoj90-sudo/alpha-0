@@ -7,7 +7,7 @@
 **ACTIVE:** SENTINEL uses GPT-controlled orchestration. The Human Owner remains final authority and sole owner of protected actions. GPT/ChatGPT is the sole Owner-facing orchestrator and final integrator; bounded secondary agents/services may work only under GPT supervision in isolated lanes. Parallel work integrates serially, and GPT may merge only after the exact-SHA gate passes.
 
 
-**Open GitHub issue tracking is being consolidated.** The durable disposition and unresolved gates are recorded in [`PR_ISSUE_DISPOSITION_2026-10-23.md`](PR_ISSUE_DISPOSITION_2026-10-23.md); closing a tracking Issue does not mark any physical, signing, provider or release requirement as accepted.
+**GitHub Issue tracking was administratively closed on 2026-10-23.** The durable disposition and unresolved gates are recorded in [`PR_ISSUE_DISPOSITION_2026-10-23.md`](PR_ISSUE_DISPOSITION_2026-10-23.md); closing a tracking Issue does not mark any physical, signing, provider or release requirement as accepted.
 
 ## Owner-approved current engineering blocks — 2026-10-23
 
@@ -81,7 +81,7 @@ The 2026-09-13 code-first rebaseline distinguished implemented foundations from 
 
 ## Canonical acceptance queue
 
-This is the authoritative **external acceptance queue**; the engineering queue does not replace or weaken these seven gates. Completed repository work is not reopened merely because an external acceptance item remains. Each item maps to one active GitHub acceptance issue.
+This is the authoritative **external acceptance queue**; the engineering queue does not replace or weaken these seven gates. Completed repository work is not reopened merely because an external acceptance item remains. The issue numbers below are **historical closed tracking references** and are not live open GitHub Issues; all underlying release/physical/provider/Owner acceptance requirements remain open until proven.
 
 - [x] **Neon pre-release PostgreSQL 18 cutover.** On 2026-09-21 the staging Core was intentionally reset onto the prepared PostgreSQL 18.6 `sentinel-pre-release` database instead of importing the historical PG17 application dataset. The exact migration/FORCE-RLS baseline is preserved, the Render deployment reached `live`, and the former PG17 project is retained as `sentinel-pre-release-pg17-rollback` for rollback/evidence. Historical pre-release identities/users/devices/sessions are intentionally not part of the new baseline.
 - [ ] **#371 — ZERO-COST STAGING PROVIDERS:** preserve dated Resend sandbox transport evidence, verify the current email candidate lifecycle, and complete selected Google/Telegram/VK configuration and staging/physical evidence. Do not repeat already completed BotFather identity setup. Repository adapters and fail-closed provider discovery are already implemented/tested.

@@ -154,6 +154,13 @@ AES/GCM-encrypted session, and `AppPreferences`. The verification step checks
 the same EC public-key fingerprint and signing ability, decrypted synthetic
 session/device ID, preferences, and an app-private file after the update.
 
+The same test checks `LocalApkUpdate.stage` against the actual next APK
+while the baseline is installed: only the matching package, higher versionCode
+and identical signing certificate yield `Ready`. It validates the staged
+file digest and FileProvider read access. After Android replaces the app,
+the same APK must be blocked as `VERSION_NOT_HIGHER`; app-private session,
+settings and Keystore checks remain mandatory.
+
 This synthetic proof cannot recover or attest the Owner's signing private key,
 does not prove real-session server continuity, and does not establish compatibility
 with an installed APK signed using a different certificate. No auth tokens,

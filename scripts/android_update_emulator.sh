@@ -71,6 +71,18 @@ case "$1" in
       { echo "Failed to seed synthetic Keystore/session evidence" >&2; exit 1; }
     value="$(adb shell "run-as $PKG cat files/update_contract_marker" | tr -d '\r')"
     [[ "$value" == SENTINEL_UPDATE_PRESERVED ]] || { echo "Seed data missing" >&2; exit 1; }
+    # Upload the actual future APK to the target app's private files. No
+    # system installer or unknown-sources permission is invoked by this check.
+    adb shell "run-as $PKG sh -c 'mkdir -p files && cat > files/synthetic_candidate.apk'" < "$NEXT"
+    expected_bytes="$(wc -c < "$NEXT" | tr -d '[:space:]')"
+    transferred_bytes="$(adb shell "run-as $PKG wc -c files/synthetic_candidate.apk" | tr -d '\r' | awk '{print $1}')"
+    [[ "$transferred_bytes" == "$expected_bytes" ]] ||
+      { echo "Transferred upgrade APK length differs from compiled artifact" >&2; exit 1; }
+    adb shell am instrument -w \
+      -e class com.alpha0.app.update.UpdatePreflightInstrumentedTest#acceptsCompatibleNewerSameSignerApk \
+      "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/preflight-before.txt"
+    grep -q '^OK (1 test)' "$OUT/preflight-before.txt" ||
+      { echo "In-app APK preflight rejected a compatible signed upgrade" >&2; exit 1; }
     adb install -r "$NEXT"
     package_state="$(adb shell dumpsys package "$PKG")"
     [[ "$package_state" == *"versionCode=$NEW "* ]] || { echo "Update version missing" >&2; exit 1; }
@@ -82,7 +94,12 @@ case "$1" in
       "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/verify-instrumentation.txt"
     grep -q '^OK (1 test)' "$OUT/verify-instrumentation.txt" ||
       { echo "Keystore or encrypted session continuity failed after update" >&2; exit 1; }
-    echo "PASS: Android upgraded a same-signer APK; file, Keystore identity, encrypted session and UI settings survived"
+    adb shell am instrument -w \
+      -e class com.alpha0.app.update.UpdatePreflightInstrumentedTest#rejectsSameVersionAfterUpgrade \
+      "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/preflight-after.txt"
+    grep -q '^OK (1 test)' "$OUT/preflight-after.txt" ||
+      { echo "In-app preflight failed to block already installed version" >&2; exit 1; }
+    echo "PASS: Same-signer APK upgraded; in-app preflight accepted newer APK and rejected non-increasing version; app-private data, Keystore, session and preferences survived"
 
     ;;
   *) echo "Usage: bash $0 build|verify" >&2; exit 2 ;;

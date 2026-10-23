@@ -366,3 +366,22 @@ The historic export cannot prove reduced StrictMode observations for a
 new APK; an exact-build physical retest remains necessary. No game actions,
 trust promotion, automatic guidance, new data collection, or release
 capability is enabled by this change.
+
+## Manual sample timing shown on device — 2026-10-23
+
+The Owner clarified that a health-changing move is made **in the game first**, and the
+numeric reference is typed only after returning to SENTINEL. The delayed manual Save
+therefore cannot be taken as either OCR execution latency or synchronous truth at the
+frame timestamp. Keep stale samples in the diagnostic denominator because they cannot
+be used as *current* state, without turning the operator's typing/navigation time into
+an OCR performance failure or treating retrospective equality as proven frame accuracy.
+
+The diagnostic calibration panel now displays distinct, labelled intervals for the
+last completed OCR frame: capture-to-now age, capture-to-OCR processing, and
+OCR-completion-to-now age (which **may include** game/app switching, waiting, and
+manual typing). These values are derived exclusively from an internally consistent
+completed frame and monotonic callback timestamps; missing/invalid provenance yields
+no timing breakdown. They do not modify diagnostic Save clocks, serialized data,
+refresh/freshness thresholds or calibration acceptance, and add no sensitive data.
+Existing callback timing and STOP counters remain the source for performance study.
+No source attestation, recommendations or game input are enabled.

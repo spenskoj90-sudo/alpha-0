@@ -57,6 +57,9 @@ def summarize(value: dict) -> dict:
     rows = value["samples"]
     require(type(rows) is list and 1 <= len(rows) <= 32)
     matches = missing = stale = mismatches = 0
+    # Diagnostic only: equality with values typed at Save is NOT proof of
+    # ground truth at acquisition and must not influence freshness acceptance.
+    retrospective_equal = retrospective_different = retrospective_missing = 0
     errors = {"current": 0, "maximum": 0}
     # A sequence gap can silently remove missing/incorrect observations from
     # the denominator. Require one complete 1..N campaign, never a subset.
@@ -67,6 +70,12 @@ def summarize(value: dict) -> dict:
         health(row["groundTruth"])
         if row["observed"] is not None:
             health(row["observed"])
+        if row["observed"] is None:
+            retrospective_missing += 1
+        elif row["observed"] == row["groundTruth"]:
+            retrospective_equal += 1
+        else:
+            retrospective_different += 1
         if row["ageMs"] > 5000:
             stale += 1
         elif row["observed"] is None:
@@ -89,6 +98,12 @@ def summarize(value: dict) -> dict:
         "status": "PENDING_PHYSICAL_REVIEW", "sourceTrust": "UNVERIFIED", "capabilityAvailable": False,
         "signal": "health_ratio", "samples": n, "exactMatches": matches, "missing": missing, "stale": stale,
         "mismatches": mismatches, "sampleAgreement": agreement, "sampleAgreement95LowerBound": max(0.0, lower),
+        "retrospectiveValueEquality": {
+            "basis": "USER_ENTERED_AT_SAVE_NOT_FRAME_TRUTH",
+            "equal": retrospective_equal,
+            "different": retrospective_different,
+            "missing": retrospective_missing,
+        },
         "maximumAbsoluteError": errors if matches + mismatches else None,
         "recognizerConfidence": "UNCALIBRATED"}
 

@@ -35,8 +35,11 @@ class UpdatePreflightInstrumentedTest {
     fun acceptsCompatibleNewerSameSignerApk() = runBlocking {
         diagnosticOnly()
         assertTrue("Next APK absent from target app-private storage", candidate.isFile)
-        val expectedDigest = MessageDigest.getInstance("SHA-256")
-            .digest(candidate.readBytes()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val digest = MessageDigest.getInstance("SHA-256")
+        candidate.forEachBlock(64 * 1024) { bytes, count ->
+            digest.update(bytes, 0, count)
+        }
+        val expectedDigest = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
         val result = LocalApkUpdate.stage(context, Uri.fromFile(candidate))
         assertTrue("Compatible APK should pass actual PackageManager preflight: $result",

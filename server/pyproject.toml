@@ -8,10 +8,10 @@ version = "1.0.0rc2"
 description = "SENTINEL CORE security-first modular monolith"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi==0.143.0",
+  "fastapi==0.143.3",
   "uvicorn[standard]==0.53.0",
   "websockets==17.2",
-  "pydantic==2.13.5",
+  "pydantic==2.14.1",
   "sqlalchemy==2.0.54",
   "psycopg[binary]==3.3.6",
   "cryptography==50.0.2",

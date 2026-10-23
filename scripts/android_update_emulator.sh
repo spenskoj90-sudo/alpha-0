@@ -31,23 +31,17 @@ case "$1" in
        "$SENTINEL_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] ||
        { echo "Exact-SHA staging build required" >&2; exit 1; }
     mkdir -p "$OUT"
-    # A unique, disposable CI-only certificate is generated per run, and reused
-    # for both APKs. It is never published or confused with Owner stable custody.
-    local_keystore="$OUT/ci-update-only.p12"
-    local_password="$(openssl rand -hex 24)"
-    keytool -genkeypair -noprompt -storetype PKCS12 \
-      -keystore "$local_keystore" -storepass "$local_password" \
-      -alias ci-update -keypass "$local_password" -keyalg RSA -keysize 3072 \
-      -validity 1 -dname "CN=SENTINEL isolated update emulator test" >/dev/null 2>&1
-    chmod 600 "$local_keystore"
-    export SENTINEL_PHYSICAL_TEST_KEYSTORE_PATH="$local_keystore"
-    export SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD="$local_password"
-    export SENTINEL_PHYSICAL_TEST_KEY_ALIAS=ci-update
-    export SENTINEL_PHYSICAL_TEST_KEY_PASSWORD="$local_password"
+    # Both APKs and their test instrumentation use the runner's isolated
+    # ephemeral debug signer. No durable or Owner signing material is involved.
     SENTINEL_PHYSICAL_TEST_VERSION_CODE="$OLD" ./gradlew --no-daemon assemblePhysicalTest
     cp "$SRC" "$BASE"
     SENTINEL_PHYSICAL_TEST_VERSION_CODE="$NEW" ./gradlew --no-daemon assemblePhysicalTest
     cp "$SRC" "$NEXT"
+    # Instrumentation is compiled against exactly the updated diagnostic variant.
+    SENTINEL_PHYSICAL_TEST_VERSION_CODE="$NEW" ./gradlew --no-daemon assemblePhysicalTestAndroidTest
+    mapfile -t test_apks < <(find app/build/outputs/apk/androidTest/physicalTest -maxdepth 1 -type f -name '*.apk')
+    [[ "${#test_apks[@]}" -eq 1 ]] || { echo "Expected one upgrade-only instrumentation APK" >&2; exit 1; }
+    cp "${test_apks[0]}" "$OUT/instrumentation.apk"
     assert_version "$BASE" "$OLD"
     assert_version "$NEXT" "$NEW"
     f1="$(fingerprint "$BASE")"
@@ -56,7 +50,11 @@ case "$1" in
     echo "Updated APK certificate SHA-256: $f2"
     [[ "$f1" =~ ^[a-f0-9]{64}$ && "$f1" == "$f2" ]] ||
       { echo "Signer extraction failed or APK signing identity changed" >&2; exit 1; }
-    echo "PASS: APK identities and ephemeral test signer verified"
+    # Test APK is also signed by the same disposable debug signer, as required
+    # by Android's instrumentation target signature check.
+    fixt="$(fingerprint "$OUT/instrumentation.apk")"
+    [[ "$fixt" == "$f1" ]] || { echo "Instrumentation signer differs from test target" >&2; exit 1; }
+    echo "PASS: APK identities, test instrumentation and ephemeral signer verified"
     ;;
   verify)
     assert_version "$BASE" "$OLD"
@@ -64,7 +62,13 @@ case "$1" in
     adb install -r "$BASE"
     package_state="$(adb shell dumpsys package "$PKG")"
     [[ "$package_state" == *"versionCode=$OLD "* ]] || { echo "Baseline version missing" >&2; exit 1; }
+    adb install -r "$OUT/instrumentation.apk"
     adb shell "run-as $PKG sh -c 'mkdir -p files && printf SENTINEL_UPDATE_PRESERVED > files/update_contract_marker'"
+    adb shell am instrument -w \
+      -e class com.alpha0.app.security.UpgradeContinuityInstrumentedTest#seedDeviceState \
+      "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/seed-instrumentation.txt"
+    grep -q '^OK (1 test)' "$OUT/seed-instrumentation.txt" ||
+      { echo "Failed to seed synthetic Keystore/session evidence" >&2; exit 1; }
     value="$(adb shell "run-as $PKG cat files/update_contract_marker" | tr -d '\r')"
     [[ "$value" == SENTINEL_UPDATE_PRESERVED ]] || { echo "Seed data missing" >&2; exit 1; }
     adb install -r "$NEXT"
@@ -73,7 +77,13 @@ case "$1" in
     value="$(adb shell "run-as $PKG cat files/update_contract_marker" | tr -d '\r')"
     [[ "$value" == SENTINEL_UPDATE_PRESERVED ]] ||
       { echo "Private data lost during in-place update" >&2; exit 1; }
-    echo "PASS: Android installed compatible APK over existing app and retained private data"
+    adb shell am instrument -w \
+      -e class com.alpha0.app.security.UpgradeContinuityInstrumentedTest#verifyPreservedDeviceState \
+      "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/verify-instrumentation.txt"
+    grep -q '^OK (1 test)' "$OUT/verify-instrumentation.txt" ||
+      { echo "Keystore or encrypted session continuity failed after update" >&2; exit 1; }
+    echo "PASS: Android upgraded a same-signer APK; file, Keystore identity, encrypted session and UI settings survived"
+
     ;;
   *) echo "Usage: bash $0 build|verify" >&2; exit 2 ;;
 esac

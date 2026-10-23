@@ -209,6 +209,17 @@ internal fun GameObservationPanel(
                 observation.lastOcrLatencyMs?.let { latency ->
                     Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                // A stopped capture retains only bounded processing aggregates.
+                // Do not present these counters as confidence or trusted game state.
+                if (observation.frames > 0L) {
+                    Text(strings.text("game_capture_ocr_counters",
+                        observation.ocrCompletedFrames, observation.ocrMissFrames, observation.ocrLateCallbacks))
+                    observation.maxOcrLatencyMs?.let { maximum ->
+                        Text(strings.text("game_capture_ocr_max", maximum))
+                    }
+                    Text(strings.text("game_capture_ocr_metrics_note"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 when (observation.reason) {
                     "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
                     "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->

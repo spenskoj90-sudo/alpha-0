@@ -165,3 +165,15 @@ This synthetic proof cannot recover or attest the Owner's signing private key,
 does not prove real-session server continuity, and does not establish compatibility
 with an installed APK signed using a different certificate. No auth tokens,
 Keystore private keys or credentials are exported from the emulator.
+
+## Race-safe local APK handoff
+
+The diagnostic Updates tab stages each user-selected APK under a distinct
+randomized app-private cache filename, not a shared `candidate.apk` path. The
+completed file is read-only. A newer selection cannot replace the file behind
+an already-approved FileProvider URI. Before launching Android's installer the
+app re-reads the candidate from disk, independently verifies its bounded SHA-256
+against the staged receipt, its exact versionCode and the current package/signer
+compatibility. Changed, removed, stale or unverifiable APK bytes fail closed;
+Android still requests explicit user installation approval. This is not a
+network download channel or a physical Owner-signer compatibility claim.

@@ -27,6 +27,6 @@ class LocalApkUpdateInstrumentedTest {
             ApkUpdatePolicy.BlockReason.VERSION_NOT_HIGHER,
             (result as LocalApkUpdate.Result.Blocked).reason,
         )
-        assertFalse(File(context.cacheDir, "sentinel_updates/candidate.apk").exists())
+        assertFalse(File(context.cacheDir, "sentinel_updates").listFiles().orEmpty().any { it.extension == "apk" })
     }
 }

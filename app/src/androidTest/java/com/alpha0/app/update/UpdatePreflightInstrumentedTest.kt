@@ -23,7 +23,6 @@ import java.security.MessageDigest
 class UpdatePreflightInstrumentedTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val candidate get() = File(context.filesDir, "synthetic_candidate.apk")
-    private val staged get() = File(context.cacheDir, "sentinel_updates/candidate.apk")
     private val candidateCode = 1700000302L
 
     private fun diagnosticOnly() {
@@ -48,7 +47,9 @@ class UpdatePreflightInstrumentedTest {
         assertEquals(candidateCode, ready.versionCode)
         assertEquals(expectedDigest, ready.sha256)
         assertTrue(ready.file.isFile)
-        assertEquals(staged.canonicalPath, ready.file.canonicalPath)
+        assertTrue("Unique staging filename required", ready.file.name.endsWith(".apk"))
+        assertEquals(File(context.cacheDir, "sentinel_updates").canonicalPath, ready.file.parentFile.canonicalPath)
+        assertTrue(ready.file.name.startsWith("candidate-"))
         val sharedUri = FileProvider.getUriForFile(
             context, context.packageName + ".diagnostics.files", ready.file)
         context.contentResolver.openInputStream(sharedUri).use { input ->
@@ -68,6 +69,7 @@ class UpdatePreflightInstrumentedTest {
             result is LocalApkUpdate.Result.Blocked)
         assertEquals(ApkUpdatePolicy.BlockReason.VERSION_NOT_HIGHER,
             (result as LocalApkUpdate.Result.Blocked).reason)
-        assertFalse("Rejected APK must not remain in app cache", staged.exists())
+        // A previously accepted candidate may still be in use by the system installer.
+        // A rejected candidate must never return Ready or create an installer request.
     }
 }

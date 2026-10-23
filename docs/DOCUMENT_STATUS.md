@@ -5,6 +5,8 @@
 
 ## Active authority and orientation
 
+- `ENGINEERING_BLOCKS.md` + `engineering-blocks.v1.json` — ACTIVE Owner-approved 2026-10-23 A–I platform/shared-system work registry; new block names replace historical completed productization labels but do not claim their new scope completed. Existing release/security gates are unchanged.
+
 - `AI_ORCHESTRATION_OPERATING_SYSTEM.md` — canonical GPT-controlled governance.
 - root/scoped `AGENTS.md` — compact context routing.
 - `CHATGPT_PROJECT_INSTRUCTIONS.md` and `CHATGPT_WORKING_ENVIRONMENT.md` — compact ChatGPT/Work context.

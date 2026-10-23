@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +23,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +34,7 @@ import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import kotlinx.coroutines.launch
 import com.google.android.play.core.appupdate.AppUpdateOptions
 import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.InstallStatus
@@ -47,6 +50,25 @@ fun UpdateScreen() {
     val activity = context.findActivity()
     val manager = remember(context) { AppUpdateManagerFactory.create(context) }
     var state by remember { mutableStateOf(UpdateState.IDLE) }
+    val diagnostic = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic"
+    val scope = rememberCoroutineScope()
+    var localChecking by remember { mutableStateOf(false) }
+    var localResult by remember { mutableStateOf<LocalApkUpdate.Result?>(null) }
+    var installOutcome by remember { mutableStateOf<LocalApkUpdate.InstallOutcome?>(null) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
+        if (selected != null && !localChecking) {
+            localChecking = true
+            localResult = null
+            installOutcome = null
+            scope.launch {
+                try {
+                    localResult = LocalApkUpdate.stage(context, selected)
+                } finally {
+                    localChecking = false
+                }
+            }
+        }
+    }
     val channelLabel = when (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL) {
         "play" -> strings.text("channel_play")
         "diagnostic" -> strings.text("channel_diagnostic")
@@ -112,6 +134,76 @@ fun UpdateScreen() {
                 }
             }
         }
+        if (diagnostic) {
+            item {
+                Text(strings.text("update_local_intro"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                PrimaryButton(
+                    text = strings.text("update_local_choose"),
+                    onClick = { picker.launch(arrayOf("*/*")) },
+                    enabled = !localChecking,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                if (localChecking) {
+                    CircularProgressIndicator()
+                    Text(strings.text("update_local_checking"))
+                }
+                val result = localResult
+                when (result) {
+                    is LocalApkUpdate.Result.Ready -> {
+                        SentinelCard {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(strings.text("update_local_ready", result.versionCode, result.sha256.take(12)))
+                                Text(strings.text("update_local_confirm"))
+                            }
+                        }
+                        PrimaryButton(
+                            text = strings.text("update_local_install"),
+                            onClick = { installOutcome = LocalApkUpdate.install(context, result) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    is LocalApkUpdate.Result.Blocked -> {
+                        val key = when (result.reason) {
+                            ApkUpdatePolicy.BlockReason.PACKAGE_MISMATCH -> "update_local_wrong_package"
+                            ApkUpdatePolicy.BlockReason.VERSION_NOT_HIGHER -> "update_local_old_version"
+                            ApkUpdatePolicy.BlockReason.SIGNER_UNVERIFIED -> "update_local_unverified_signer"
+                            ApkUpdatePolicy.BlockReason.SIGNER_MISMATCH -> "update_local_signer_mismatch"
+                        }
+                        Text(strings.text(key), color = MaterialTheme.colorScheme.error)
+                    }
+                    LocalApkUpdate.Result.Failed -> {
+                        Text(strings.text("update_local_failed"), color = MaterialTheme.colorScheme.error)
+                    }
+                    null -> Unit
+                }
+                when (installOutcome) {
+                    LocalApkUpdate.InstallOutcome.PERMISSION_REQUIRED -> {
+                        Text(strings.text("update_local_permission"))
+                        PrimaryButton(
+                            text = strings.text("update_local_permission_settings"),
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(
+                                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                        Uri.parse("package:" + context.packageName),
+                                    ))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    LocalApkUpdate.InstallOutcome.LAUNCHED -> Text(strings.text("update_local_installer"))
+                    LocalApkUpdate.InstallOutcome.FAILED -> Text(
+                        strings.text("update_local_failed"), color = MaterialTheme.colorScheme.error,
+                    )
+                    null -> Unit
+                }
+            }
+        } else {
         item {
             val readyToInstall = state == UpdateState.READY_TO_INSTALL
             PrimaryButton(
@@ -151,6 +243,7 @@ fun UpdateScreen() {
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
         }
     }
 }

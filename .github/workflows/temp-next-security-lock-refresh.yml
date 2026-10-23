@@ -1,0 +1,30 @@
+name: Temporary Next.js security lock refresh
+on:
+  push:
+    branches:
+      - integration/android-calibration-timing-diagnostics-2026-10-23
+    paths:
+      - .github/workflows/temp-next-security-lock-refresh.yml
+permissions:
+  contents: read
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Resolve patched Next.js dependencies without scripts
+        working-directory: web
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify exact Next.js versions in regenerated lock
+        working-directory: web
+        run: |
+          node -e 'const p=require("./package-lock.json");if(p.packages["node_modules/next"].version!=="16.4.2"||p.packages["node_modules/eslint-config-next"].version!=="16.4.2")process.exit(1)'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: regenerated-next-security-lock-16-4-2
+          path: web/package-lock.json
+          retention-days: 1

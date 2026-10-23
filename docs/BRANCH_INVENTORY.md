@@ -3,6 +3,10 @@
 **Status:** ACTIVE  
 **Repository:** `spenskoj90-sudo/alpha-0`
 
+## 2026-10-23 Block A interpretation
+
+This ACTIVE ledger includes dated September classifications **but is not a live October branch listing**. A 2026-10-23 read-only inspection found `main` and ten other remote refs, including `feat/companion-knowledge-consumer-v1` with potentially unique branch-only work. The new A–I routing decision is **not** an automatic deletion classification. Revalidate exact live tips/PR heads and branch-only semantic content before adding new deletion targets, and do not use squash-merge ahead counts as proof of outstanding useful work or safe disposal. Existing fail-closed cleanup rules below remain intact.
+
 ## Durable cleanup model
 
 Branch state is decided from live GitHub refs, exact PR metadata and semantic reconciliation evidence. This document is the reviewed cleanup ledger consumed by the protected-main Branch Hygiene workflow; it is not a substitute for live enumeration.

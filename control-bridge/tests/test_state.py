@@ -182,13 +182,14 @@ def test_absent_acceptance_queue_never_satisfies_repository_checklist(monkeypatc
 
 
 def test_closed_github_issue_is_not_equivalent_to_accepted_gate(monkeypatch):
-    monkeypatch.setattr(state, "_read_text", lambda _: (
+    original = state._read_text
+    monkeypatch.setattr(state, "_read_text", lambda path: (
         "## Canonical acceptance queue\n"
         "- [x] **Neon pre-release setup**\n"
         "- [ ] **#314 — physical acceptance**\n"
         "\n## Current engineering queue\n"
         "- [ ] **#381 — optional benchmark**\n"
-    ))
+    ) if path == "docs/TASKS.md" else original(path))
     summary = state.release_readiness()
     assert summary["gateInventoryVerified"] is True
     assert summary["activeAcceptanceIssues"] == [314]

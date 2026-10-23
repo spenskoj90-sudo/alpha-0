@@ -320,3 +320,30 @@ recognizer confidence, recommendations or automated actions. Both summaries
 stay `PENDING_PHYSICAL_REVIEW`, `UNVERIFIED`, `UNCALIBRATED` and
 `capabilityAvailable=false`. Physical source binding and a separate Owner
 acceptance remain gates for any game recommendation or executor.
+
+
+## On-device capture-processing summary — 2026-10-23
+
+In the private Android diagnostic build, the game observation screen now
+shows per-capture accepted OCR callbacks, numeric OCR misses and callbacks
+received after the strict five-second acceptance interval, together with the
+maximum accepted acquisition-to-OCR delay. The readout persists after a
+user Stop/time-limit/revocation **only as process-local aggregate counters**,
+so the Owner can check a completed session without exporting private logs
+for every quick performance check. A fresh capture resets all four counters.
+The metrics do not contain raw images, OCR text, frame timestamps, capture
+UUIDs, health numbers or game save data.
+
+The UI explicitly marks the counters as processing telemetry, **not**
+recognition accuracy, verified game-source binding, campaign calibration,
+recommendation readiness or platform input authorization. A missed OCR
+callback, an unavailable HUD ratio and a late callback are distinguished;
+no percentage or confidence rating is derived. Stop still erases current
+and historical health candidates and OCR live completion time. English and
+Russian diagnostic strings/tests cover the readout. The release build
+remains manifest/runtime-disabled for observation.
+
+This enables a quicker Owner-side comparison on the next Xiaomi/API35
+physical-test APK, but it does not replace the opt-in numeric ground-truth
+campaign or source/foreground consent acceptance and does not enable
+automated gameplay.

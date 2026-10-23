@@ -103,6 +103,36 @@ class ObservationSessionTest {
         assertEquals(0L, session.snapshot.ocrLateCallbacks)
     }
 
+    @Test fun `completed test retains processing counters but never retained health or game trust`() {
+        val session = visibleSession()
+        assertTrue(session.frame("a", 110))
+        assertTrue(session.recognized("a", 1, 110, 160, HealthCandidate(13, 20, 0)))
+        assertTrue(session.frame("a", 210))
+        assertTrue(session.recognized("a", 2, 210, 240, null))
+        assertTrue(session.frame("a", 310))
+        assertFalse(session.recognized("a", 3, 310, 5311, HealthCandidate(11, 20, 0)))
+        session.stop("USER_STOP")
+        val summary = session.snapshot
+        assertEquals(ObservationStatus.STOPPED, summary.status)
+        assertEquals(3L, summary.frames)
+        assertEquals(2L, summary.ocrCompletedFrames)
+        assertEquals(1L, summary.ocrMissFrames)
+        assertEquals(1L, summary.ocrLateCallbacks)
+        assertEquals(50L, summary.maxOcrLatencyMs)
+        assertNull(summary.captureId)
+        assertNull(summary.health)
+        assertNull(summary.lastHealth)
+        assertNull(summary.lastOcrLatencyMs)
+        assertFalse(session.recognized("a", 3, 310, 5312, HealthCandidate(11, 20, 0)))
+        assertEquals(summary, session.snapshot)
+        session.start("b", 6000)
+        assertEquals(0L, session.snapshot.frames)
+        assertEquals(0L, session.snapshot.ocrCompletedFrames)
+        assertEquals(0L, session.snapshot.ocrMissFrames)
+        assertEquals(0L, session.snapshot.ocrLateCallbacks)
+        assertNull(session.snapshot.maxOcrLatencyMs)
+    }
+
     @Test fun `deadline stops capture even when no new frames arrive`() {
         val session = visibleSession()
         assertTrue(session.tick(300099))

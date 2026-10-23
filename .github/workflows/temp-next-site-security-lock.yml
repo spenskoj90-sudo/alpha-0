@@ -1,0 +1,38 @@
+name: Temporary Next.js public-site security lock refresh
+on:
+  push:
+    branches:
+      - integration/android-calibration-timing-diagnostics-2026-10-23
+    paths:
+      - .github/workflows/temp-next-site-security-lock.yml
+permissions:
+  contents: write
+jobs:
+  site-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Resolve patched static public-site dependencies without scripts
+        working-directory: site
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify exact patched public-site dependencies
+        working-directory: site
+        run: |
+          node -e 'const p=require("./package-lock.json");if(p.packages["node_modules/next"].version!=="16.4.2"||p.packages["node_modules/eslint-config-next"].version!=="16.4.2")process.exit(1)'
+      - name: Commit verified lock to feature branch only
+        run: |
+          git config user.name "sentinel-ci-lock-refresh"
+          git config user.email "sentinel-ci-lock-refresh@users.noreply.github.com"
+          git add site/package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "security(site): refresh patched Next.js 16.4.2 npm lockfile"
+          git push origin HEAD:refs/heads/integration/android-calibration-timing-diagnostics-2026-10-23
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: regenerated-site-next-lock-16-4-2
+          path: site/package-lock.json
+          retention-days: 1

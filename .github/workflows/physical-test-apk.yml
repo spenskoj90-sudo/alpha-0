@@ -59,6 +59,9 @@ jobs:
       - name: Mark diagnostic signing mode
         run: echo "SENTINEL_PHYSICAL_TEST_SIGNING_MODE=ephemeral-debug" >> "$GITHUB_ENV"
 
+      - name: Test offline APK update preflight safety guard
+        run: python -m unittest discover -s scripts -p "test_physical_test_install_preflight.py" -v
+
       - name: Run Android unit tests across configured variants
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}

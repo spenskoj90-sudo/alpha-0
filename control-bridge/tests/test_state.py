@@ -44,9 +44,13 @@ def test_checklist_cannot_claim_verified_release_readiness(monkeypatch):
         "ownerVisualAcceptanceRequired": True,
         "surfaces": [{"id": "android", "ready": True, "ownerVisualAccepted": True}],
     })
-    monkeypatch.setattr(state, "_read_text", lambda _: "")
+    monkeypatch.setattr(state, "_read_text", lambda _: (
+        "## Canonical acceptance queue\n- [x] **All repository checklist entries completed**\n"
+        "\n## Current engineering queue\n"
+    ))
     payload = state.release_readiness()
     assert payload["releaseReady"] is False
+    assert payload["gateInventoryVerified"] is True
     assert payload["checklistSatisfied"] is True
     assert payload["releaseEvidence"]["status"] == "UNVERIFIED"
 

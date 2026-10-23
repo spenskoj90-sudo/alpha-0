@@ -9,11 +9,13 @@ import com.alpha0.app.ui.AppThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 
 /**
- * Only compiled with SENTINEL_UPGRADE_RETENTION_E2E=true; never part of normal
- * installed APKs or standard instrumentation. Synthetic values only.
+ * Synthetic values only. The normal debug instrumentation skips these tests;
+ * the dedicated E2E workflow selects the physicalTest build type explicitly.
+ * This source is never part of the installed application APK.
  */
 @RunWith(AndroidJUnit4::class)
 class UpgradeContinuityInstrumentedTest {
@@ -26,6 +28,7 @@ class UpgradeContinuityInstrumentedTest {
 
     @Test
     fun seedDeviceState() {
+        assumeTrue(BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic")
         assertEquals("com.alpha0.app.physicaltest", BuildConfig.APPLICATION_ID)
         val identity = DeviceIdentity().also { it.attachDiagnostics(context) }
         val fingerprint = identity.getIdentityInfo().fingerprint
@@ -46,6 +49,7 @@ class UpgradeContinuityInstrumentedTest {
 
     @Test
     fun verifyPreservedDeviceState() {
+        assumeTrue(BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic")
         assertEquals("com.alpha0.app.physicaltest", BuildConfig.APPLICATION_ID)
         val before = context.getSharedPreferences(prefsName, 0)
             .getString(proofKey, null)

@@ -125,7 +125,6 @@ android {
     namespace = "com.alpha0.app"
     if (upgradeRetentionE2E) {
         testBuildType = "physicalTest"
-        sourceSets.getByName("androidTest").java.srcDir("src/androidTestUpgrade/java")
     }
 
     compileSdk = 37

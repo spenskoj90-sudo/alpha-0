@@ -148,7 +148,7 @@ The dedicated `Android APK In-Place Update Retention` workflow builds two diagno
 APKs and a test instrumentation APK using the runner's ephemeral debug signer,
 with the same application ID and increasing versionCode. Android API 34
 installs the baseline and upgrades it using `adb install -r` without uninstalling.
-An instrumentation-only, E2E-gated source set seeds synthetic values in the
+A diagnostic-gated instrumentation test seeds synthetic values in the
 real `DeviceIdentity` AndroidKeyStore EC identity, `SecureSessionStore`
 AES/GCM-encrypted session, and `AppPreferences`. The verification step checks
 the same EC public-key fingerprint and signing ability, decrypted synthetic

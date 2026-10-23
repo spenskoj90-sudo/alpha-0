@@ -5,6 +5,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Any
 
@@ -76,15 +77,33 @@ def provider_state() -> dict[str, Any]:
         },
     }
 
+class _NoProbeRedirect(urllib.request.HTTPRedirectHandler):
+    """Probe only its configured endpoint, never a redirected login or unrelated host."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
 def _probe(name: str, base_url: str, path: str, timeout_seconds: float = 5.0) -> dict[str, Any]:
     if not base_url:
         return {"name": name, "configured": False, "status": "UNCONFIGURED"}
-    url = base_url.rstrip("/") + path
+    # Never treat a local file, embedded URL credentials, or a redirected
+    # identity-provider/login page as proof that a configured runtime is healthy.
+    try:
+        parsed = urlsplit(base_url.strip())
+        if (parsed.scheme not in ("http", "https") or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None
+                or parsed.query or parsed.fragment or parsed.port == 0):
+            return {"name": name, "configured": True, "status": "INVALID_CONFIGURATION"}
+    except ValueError:
+        return {"name": name, "configured": True, "status": "INVALID_CONFIGURATION"}
+    url = base_url.strip().rstrip("/") + path
     request = urllib.request.Request(url, headers={"User-Agent": "sentinel-control-bridge/1"}, method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        opener = urllib.request.build_opener(_NoProbeRedirect)
+        with opener.open(request, timeout=timeout_seconds) as response:
             code = int(getattr(response, "status", 0))
-        return {"name": name, "configured": True, "status": "HEALTHY" if 200 <= code < 400 else "DEGRADED", "httpStatus": code}
+        return {"name": name, "configured": True, "status": "HEALTHY" if code == 200 else "DEGRADED", "httpStatus": code}
     except urllib.error.HTTPError as exc:
         return {"name": name, "configured": True, "status": "DEGRADED", "httpStatus": int(exc.code)}
     except Exception as exc:
@@ -103,8 +122,14 @@ def runtime_health() -> dict[str, Any]:
 def release_readiness() -> dict[str, Any]:
     ux = _read_json("design/user-visible-acceptance.v1.json")
     task_text = _read_text("docs/TASKS.md")
-    acceptance_text = task_text.split("## Canonical acceptance queue", 1)[-1].split("\n## ", 1)[0]
-    issue_ids = sorted({int(value) for value in re.findall(r"- \[ \] \*\*#(\d+)", acceptance_text)})
+    section = re.search(
+        r"^## Canonical acceptance queue\s*\n(.*?)(?=^## |\Z)",
+        task_text, re.MULTILINE | re.DOTALL,
+    )
+    acceptance_text = section.group(1) if section else ""
+    # A missing/renamed queue is missing contract evidence, not an empty queue.
+    inventory_verified = bool(section and re.search(r"^- \[[ x]\] \*\*", acceptance_text, re.MULTILINE))
+    issue_ids = sorted({int(value) for value in re.findall(r"^- \[ \] \*\*#(\d+)", acceptance_text, re.MULTILINE)})
     raw_surfaces = ux.get("surfaces", [])
     surfaces = [item for item in raw_surfaces if isinstance(item, dict) and isinstance(item.get("id"), str)] if isinstance(raw_surfaces, list) else []
     owner_acceptance_required = bool(ux.get("ownerVisualAcceptanceRequired"))
@@ -119,7 +144,13 @@ def release_readiness() -> dict[str, Any]:
         "schema": "sentinel.control-bridge.release-readiness.v1",
         "sourceSha": source_sha(),
         "evidenceScope": "repository-checklist-summary",
+        # Historical field name retained for API compatibility: these are
+        # repository gate references, NOT a live GitHub open-Issue inventory.
         "activeAcceptanceIssues": issue_ids,
+        "repositoryPendingAcceptanceGateRefs": issue_ids,
+        "gateInventoryVerified": inventory_verified,
+        "githubIssueStateVerified": False,
+
         "ownerVisualAcceptance": {
             "required": owner_acceptance_required,
             "acceptedSurfaces": [item.get("id") for item in surfaces if item.get("ownerVisualAccepted")],
@@ -127,6 +158,7 @@ def release_readiness() -> dict[str, Any]:
         },
         "checklistSatisfied": (
             source_sha() != "UNKNOWN"
+            and inventory_verified
             and not issue_ids
             and valid_surfaces
             and (not owner_acceptance_required or accepted)

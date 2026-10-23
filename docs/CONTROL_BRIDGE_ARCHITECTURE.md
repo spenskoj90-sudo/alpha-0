@@ -26,3 +26,23 @@ The bridge does not replace GitHub, Render, Neon, PostHog, Google Drive or other
 ## OpenAI integration
 
 OpenAI Agents/Responses can consume a remote MCP server. The bridge itself does not need an OpenAI API key. The consuming orchestrator owns API credentials, model routing, approvals, tracing and caching.
+
+## Runtime and acceptance-report fidelity
+
+The Bridge runtime probe accepts only HTTP(S) URLs without embedded credentials,
+query strings or fragments, disables HTTP redirects, and counts only a direct
+HTTP 200 from the configured Core `/healthz` or Web `/` endpoint as `HEALTHY`.
+Redirects (including login/SSO redirects) and other HTTP codes are `DEGRADED`,
+not proof that the original endpoint worked. Invalid URLs are reported as
+`INVALID_CONFIGURATION` without opening the URL or returning its value.
+These endpoint checks are narrow connectivity evidence, not release acceptance.
+
+`release_readiness` parses the **repository** canonical acceptance queue;
+`repositoryPendingAcceptanceGateRefs` lists contract gate IDs, not live open
+GitHub Issues. `githubIssueStateVerified=false` makes that distinction explicit.
+The historical `activeAcceptanceIssues` compatibility field retains the same
+repository-bound numbers and should not be used as live issue status. Missing
+acceptance queue sections fail closed as `gateInventoryVerified=false` and
+`checklistSatisfied=false`. `releaseReady=false` and
+`releaseEvidence.status=UNVERIFIED` remain unconditional without separately
+verified exact-candidate evidence.

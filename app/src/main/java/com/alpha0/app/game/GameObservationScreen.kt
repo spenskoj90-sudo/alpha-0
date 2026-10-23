@@ -279,6 +279,15 @@ internal fun GameObservationPanel(
                 Text(strings.text("game_calibration_title"), style = MaterialTheme.typography.titleMedium)
                 StatusBadge(strings.text("game_calibration_pending"), SentinelStatus.PENDING)
                 Text(strings.text("game_calibration_disclosure"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Two distinct intervals: on-device OCR versus elapsed time since its
+                // callback, including the Owner switching back and typing. This is
+                // never a frame-time ground-truth or action-response benchmark.
+                CalibrationSamplingGate.timing(observation, now)?.let { timing ->
+                    Text(strings.text("game_calibration_frame_age", timing.frameAgeMs / 1000))
+                    Text(strings.text("game_calibration_processing", timing.processingMs))
+                    Text(strings.text("game_calibration_since_ocr", timing.afterOcrMs / 1000))
+                }
+                Text(strings.text("game_calibration_timing_note"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                 SecondaryButton(strings.text("game_calibration_save"), {

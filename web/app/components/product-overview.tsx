@@ -116,7 +116,7 @@ export function ProductOverview() {
           {data.inventory.length === 0 && <p>{t("No games are available in the current catalog.")}</p>}
           {([
             { status: 'observer_pilot', heading: 'Diagnostic observer pilots', label: 'Observer pilot · calibration pending' },
-            { status: 'adapter_foundation', heading: 'Adapter foundations · environment unverified', label: 'Adapter foundation · environment unverified' },
+            { status: 'adapter_foundation', heading: 'Research and observer profiles', label: 'Adapter foundation · environment unverified' },
             { status: 'catalog_foundation', heading: 'Catalog foundations, not verified support', label: 'Catalog foundation · environment unverified' },
             { status: 'research_only', heading: 'Research only · environment unverified', label: 'Research only · environment unverified' },
           ] as const).map(group => {

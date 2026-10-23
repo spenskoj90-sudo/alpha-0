@@ -5,7 +5,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +19,8 @@ class LocalApkUpdateInstrumentedTest {
         val installedApk = File(context.applicationInfo.sourceDir)
         assertTrue(installedApk.isFile)
 
+        val before = File(context.cacheDir, "sentinel_updates").listFiles().orEmpty()
+            .filter { it.extension == "apk" }.map { it.name }.toSet()
         val result = LocalApkUpdate.stage(context, Uri.fromFile(installedApk))
 
         assertTrue("Expected a version rejection from the real PackageManager", result is LocalApkUpdate.Result.Blocked)
@@ -27,6 +28,8 @@ class LocalApkUpdateInstrumentedTest {
             ApkUpdatePolicy.BlockReason.VERSION_NOT_HIGHER,
             (result as LocalApkUpdate.Result.Blocked).reason,
         )
-        assertFalse(File(context.cacheDir, "sentinel_updates/candidate.apk").exists())
+        val after = File(context.cacheDir, "sentinel_updates").listFiles().orEmpty()
+            .filter { it.extension == "apk" }.map { it.name }.toSet()
+        assertEquals("Rejected APK must not create a new staged file", before, after)
     }
 }

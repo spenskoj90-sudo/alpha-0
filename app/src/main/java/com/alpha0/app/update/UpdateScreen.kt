@@ -53,6 +53,7 @@ fun UpdateScreen() {
     val diagnostic = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic"
     val scope = rememberCoroutineScope()
     var localChecking by remember { mutableStateOf(false) }
+    var localInstalling by remember { mutableStateOf(false) }
     var localResult by remember { mutableStateOf<LocalApkUpdate.Result?>(null) }
     var installOutcome by remember { mutableStateOf<LocalApkUpdate.InstallOutcome?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
@@ -142,7 +143,7 @@ fun UpdateScreen() {
                 PrimaryButton(
                     text = strings.text("update_local_choose"),
                     onClick = { picker.launch(arrayOf("*/*")) },
-                    enabled = !localChecking,
+                    enabled = !localChecking && !localInstalling,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -162,7 +163,20 @@ fun UpdateScreen() {
                         }
                         PrimaryButton(
                             text = strings.text("update_local_install"),
-                            onClick = { installOutcome = LocalApkUpdate.install(context, result) },
+                            onClick = {
+                                if (!localInstalling) {
+                                    localInstalling = true
+                                    installOutcome = null
+                                    scope.launch {
+                                        try {
+                                            installOutcome = LocalApkUpdate.install(context, result)
+                                        } finally {
+                                            localInstalling = false
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !localInstalling && !localChecking,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -197,6 +211,9 @@ fun UpdateScreen() {
                         )
                     }
                     LocalApkUpdate.InstallOutcome.LAUNCHED -> Text(strings.text("update_local_installer"))
+                    LocalApkUpdate.InstallOutcome.BLOCKED -> Text(
+                        strings.text("update_local_recheck_blocked"), color = MaterialTheme.colorScheme.error,
+                    )
                     LocalApkUpdate.InstallOutcome.FAILED -> Text(
                         strings.text("update_local_failed"), color = MaterialTheme.colorScheme.error,
                     )

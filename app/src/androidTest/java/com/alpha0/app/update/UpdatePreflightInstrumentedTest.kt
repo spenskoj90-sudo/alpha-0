@@ -23,7 +23,6 @@ import java.security.MessageDigest
 class UpdatePreflightInstrumentedTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val candidate get() = File(context.filesDir, "synthetic_candidate.apk")
-    private val staged get() = File(context.cacheDir, "sentinel_updates/candidate.apk")
     private val candidateCode = 1700000302L
 
     private fun diagnosticOnly() {
@@ -48,13 +47,32 @@ class UpdatePreflightInstrumentedTest {
         assertEquals(candidateCode, ready.versionCode)
         assertEquals(expectedDigest, ready.sha256)
         assertTrue(ready.file.isFile)
-        assertEquals(staged.canonicalPath, ready.file.canonicalPath)
+        assertTrue("Unique staging filename required", ready.file.name.endsWith(".apk"))
+        assertEquals(File(context.cacheDir, "sentinel_updates").canonicalPath, ready.file.parentFile.canonicalPath)
+        assertTrue(ready.file.name.startsWith("candidate-"))
         val sharedUri = FileProvider.getUriForFile(
             context, context.packageName + ".diagnostics.files", ready.file)
         context.contentResolver.openInputStream(sharedUri).use { input ->
             assertTrue("System installer cannot read staged FileProvider URI",
                 input != null && input.read() >= 0)
         }
+
+        // A second choice must not alter the first installer URI's bytes.
+        val second = LocalApkUpdate.stage(context, Uri.fromFile(candidate))
+        assertTrue("Repeated selection must remain a compatible candidate",
+            second is LocalApkUpdate.Result.Ready)
+        val newerReady = second as LocalApkUpdate.Result.Ready
+        assertTrue("Candidate files must be distinct", newerReady.file != ready.file)
+        assertEquals("Old candidate receipt changed", expectedDigest, ready.sha256)
+        assertEquals("New candidate bytes differ", expectedDigest, newerReady.sha256)
+        assertTrue("Old installer file disappeared on reselection", ready.file.isFile)
+
+        // Corrupt a staged candidate after checking it. No installer may be launched.
+        assertTrue("Test must be able to edit isolated staged file", ready.file.setWritable(true))
+        ready.file.appendBytes(byteArrayOf(0x41))
+        assertEquals("Changed candidate must be rejected before invoking Android",
+            LocalApkUpdate.InstallOutcome.BLOCKED, LocalApkUpdate.install(context, ready))
+        assertTrue("New selection must remain unchanged", newerReady.file.isFile)
     }
 
     @Test
@@ -68,6 +86,7 @@ class UpdatePreflightInstrumentedTest {
             result is LocalApkUpdate.Result.Blocked)
         assertEquals(ApkUpdatePolicy.BlockReason.VERSION_NOT_HIGHER,
             (result as LocalApkUpdate.Result.Blocked).reason)
-        assertFalse("Rejected APK must not remain in app cache", staged.exists())
+        // A previously accepted candidate may still be in use by the system installer.
+        // A rejected candidate must never return Ready or create an installer request.
     }
 }

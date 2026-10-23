@@ -90,7 +90,7 @@ No game/version has L3 screen-recognition evidence yet.
 
 `scripts/game_observer_calibration.py` summarizes at most 32 opt-in numeric
 comparisons for one exact source/APK/package/version/signer, installed game
-version, language/HUD and Infinix API34 environment. It accepts only structured
+version, language/HUD and a narrowly allowlisted physical-test environment. It accepts only structured
 health ratios and age/sequence metadata; extra fields including pixels or raw
 OCR are rejected. Only the explicit Infinix/API34 and Xiaomi/API35 evidence
 pairs are supported. Input/summary schema v2 requires a lowercase 64-character

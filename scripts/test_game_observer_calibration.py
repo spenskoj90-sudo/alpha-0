@@ -72,6 +72,30 @@ class CalibrationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 summarize(value)
 
+    def test_retrospective_value_equality_does_not_promote_stale_samples(self):
+        value = sample()
+        value["samples"] = [
+            {"sequence": 1, "ageMs": 6200, "observed": {"current": 13, "maximum": 20},
+             "groundTruth": {"current": 13, "maximum": 20}},
+            {"sequence": 2, "ageMs": 5800, "observed": {"current": 15, "maximum": 20},
+             "groundTruth": {"current": 15, "maximum": 20}},
+            {"sequence": 3, "ageMs": 7650, "observed": {"current": 11, "maximum": 20},
+             "groundTruth": {"current": 9, "maximum": 20}},
+            {"sequence": 4, "ageMs": 6570, "observed": None,
+             "groundTruth": {"current": 9, "maximum": 20}},
+        ]
+        report = summarize(value)
+        self.assertEqual(report["stale"], 4)
+        self.assertEqual(report["exactMatches"], 0)
+        self.assertEqual(report["sampleAgreement"], 0.0)
+        self.assertEqual(report["retrospectiveValueEquality"], {
+            "basis": "USER_ENTERED_AT_SAVE_NOT_FRAME_TRUTH",
+            "equal": 2, "different": 1, "missing": 1,
+        })
+        self.assertEqual(report["status"], "PENDING_PHYSICAL_REVIEW")
+        self.assertEqual(report["recognizerConfidence"], "UNCALIBRATED")
+        self.assertFalse(report["capabilityAvailable"])
+
     def test_physical_label_alone_never_promotes_or_calibrates(self):
         value = sample()
         value["sampleKind"] = "physical-opt-in"

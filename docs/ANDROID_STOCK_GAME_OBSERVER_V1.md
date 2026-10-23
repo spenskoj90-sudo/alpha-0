@@ -347,3 +347,22 @@ This enables a quicker Owner-side comparison on the next Xiaomi/API35
 physical-test APK, but it does not replace the opt-in numeric ground-truth
 campaign or source/foreground consent acceptance and does not enable
 automated gameplay.
+
+## Asynchronous session identity revalidation — 2026-10-23
+
+Review of the Owner's Xiaomi/API35 opt-in diagnostic export showed 148
+main-thread StrictMode Keystore reads under the observer's periodic session
+heartbeat. The private Android observer now runs its recurring encrypted
+session read and installed-game fingerprint comparison on a single dedicated
+background worker, without deferring the main-thread Stop, screen-lock,
+five-minute deadline, or MediaProjection revocation handling. Only a matching
+capture generation can apply a result. An unavailable worker, executor failure,
+changed session/device/game, or a check exceeding ten seconds fails closed
+and stops observation; stopping invalidates outstanding results. Focused JVM
+tests cover overlapping checks, cancellation, stale callbacks, and timeout.
+
+This is a source-level latency and fail-closed lifecycle correction.
+The historic export cannot prove reduced StrictMode observations for a
+new APK; an exact-build physical retest remains necessary. No game actions,
+trust promotion, automatic guidance, new data collection, or release
+capability is enabled by this change.

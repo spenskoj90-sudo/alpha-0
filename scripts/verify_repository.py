@@ -301,13 +301,13 @@ def check_versions(checks: Checks) -> None:
         web_package.get("scripts", {}).get("start") == "next start -H 0.0.0.0",
         "Web runtime binds Next to the external service interface explicitly",
     )
-    checks.require(web_package.get("dependencies", {}).get("next") == "16.3.8", "Web pins Next.js 16.3.8")
+    checks.require(web_package.get("dependencies", {}).get("next") == "16.4.2", "Web pins Next.js 16.4.2")
     checks.require(web_package.get("dependencies", {}).get("react") == "19.3.0", "Web pins React 19.3.0")
     checks.require(web_package.get("devDependencies", {}).get("typescript") == "6.0.3", "Web pins TypeScript 6.0.3")
     checks.require(web_package.get("devDependencies", {}).get("eslint") == "9.39.5", "Web uses Next-compatible ESLint 9.39.5")
     site_web_package = json.loads(read("site/package.json"))
     checks.require(site_web_package.get("engines", {}).get("node") == "24.x", "Public site declares Node 24 LTS")
-    checks.require(site_web_package.get("dependencies", {}).get("next") == "16.3.8", "Public site pins Next.js 16.3.8")
+    checks.require(site_web_package.get("dependencies", {}).get("next") == "16.4.2", "Public site pins Next.js 16.4.2")
     checks.require(site_web_package.get("dependencies", {}).get("react") == "19.3.0", "Public site pins React 19.3.0")
     checks.require(site_web_package.get("devDependencies", {}).get("typescript") == "6.0.3", "Public site pins TypeScript 6.0.3")
     checks.require("node:24.21.0-alpine3.24@sha256:" in read("web/Dockerfile"), "Web image pins Node 24.21.0 by digest")
@@ -658,7 +658,7 @@ def check_governance(checks: Checks) -> None:
         and "httpx2 2.13.1" in platform
         and "**TypeScript 7.0.2:**" in platform
         and "**SQLAlchemy 2.1.0:**" in platform
-        and "**Next.js / eslint-config-next 16.3.8:**" in platform,
+        and "**Next.js / eslint-config-next 16.4.2:**" in platform,
         "platform baseline records final upstream recheck and explicit RC compatibility holds",
     )
     checks.require((ROOT / "docs/REMOTE_BRANCH_CLEANUP_2026-09-12.md").exists(), "remote branch cleanup classification exists")

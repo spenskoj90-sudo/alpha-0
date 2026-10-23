@@ -1,6 +1,8 @@
 package com.alpha0.app.security
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.content.Context
+import java.security.KeyStore
 import androidx.test.platform.app.InstrumentationRegistry
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.ui.AppLanguage
@@ -40,6 +42,15 @@ class UpgradeContinuityInstrumentedTest {
         assertTrue(identity.verify("synthetic-challenge".toByteArray(),
             identity.sign("synthetic-challenge".toByteArray())))
         SecureSessionStore().save(context, sampleAccess, sampleRefresh, sampleDevice)
+        // Explicitly flush the preceding async SharedPreferences write before
+        // the instrumentation process exits and the package is replaced.
+        val encryptedPrefs = context.getSharedPreferences("sentinel_session", Context.MODE_PRIVATE)
+        assertTrue("Synthetic encrypted session absent before upgrade",
+            encryptedPrefs.contains("access_token") && encryptedPrefs.contains("refresh_token"))
+        assertTrue("Synthetic encrypted session not durable", encryptedPrefs.edit().commit())
+        assertTrue("Synthetic session AES alias missing before upgrade",
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                .containsAlias("alpha0.session.aes.v1"))
         val settings = AppPreferences(context)
         settings.setLanguage(AppLanguage.RUSSIAN)
         settings.setTheme(AppThemeMode.DARK)
@@ -59,6 +70,14 @@ class UpgradeContinuityInstrumentedTest {
         assertEquals("Android Keystore identity changed", before, identity.getIdentityInfo().fingerprint)
         val challenge = "post-upgrade-synthetic-challenge".toByteArray()
         assertTrue("Preserved private key must sign", identity.verify(challenge, identity.sign(challenge)))
+        val encryptedPrefs = context.getSharedPreferences("sentinel_session", Context.MODE_PRIVATE)
+        assertTrue("Encrypted access record absent after upgrade",
+            encryptedPrefs.contains("access_token"))
+        assertTrue("Encrypted refresh record absent after upgrade",
+            encryptedPrefs.contains("refresh_token"))
+        assertTrue("Synthetic session AES alias absent after upgrade",
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                .containsAlias("alpha0.session.aes.v1"))
         val session = SecureSessionStore().load(context)
         assertEquals("Encrypted access session lost", sampleAccess, session?.accessToken)
         assertEquals("Encrypted refresh session lost", sampleRefresh, session?.refreshToken)

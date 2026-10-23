@@ -71,6 +71,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
+      - name: Test APK certificate report compatibility
+        run: python -m unittest discover -s scripts -p "test_apk_signer_certificate.py" -v
+
       - name: Test offline APK update preflight safety guard
         run: python -m unittest discover -s scripts -p "test_physical_test_install_preflight.py" -v
 
@@ -131,10 +134,9 @@ jobs:
           apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$apksigner"
           "$apksigner" verify --print-certs app/build/outputs/apk/physicalTest/app-physicalTest.apk > physical-test-signer.txt
-          # One certificate only: multi-signer APKs cannot claim a single OAuth identity.
-          test "$(grep -Ec '^Signer #[0-9]+ certificate SHA-256 digest:' physical-test-signer.txt)" -eq 1
-          signer_sha256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
-          signer_sha1="$(sed -n 's/^Signer #1 certificate SHA-1 digest: //p' physical-test-signer.txt | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
+          # Accept Android Build Tools 37 "V2 Signer:" and legacy "Signer #1".
+          signer_sha256="$(python scripts/apk_signer_certificate.py --report physical-test-signer.txt --algorithm sha256)"
+          signer_sha1="$(python scripts/apk_signer_certificate.py --report physical-test-signer.txt --algorithm sha1)"
           case "$signer_sha256" in *[!0-9a-f]*|'') echo "invalid signer certificate SHA-256"; exit 1 ;; esac
           test "${#signer_sha256}" -eq 64
           test "$signer_sha256" = "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256"

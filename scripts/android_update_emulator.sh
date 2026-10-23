@@ -21,8 +21,7 @@ assert_version() {
 }
 fingerprint() {
   "$(sdk_tool apksigner)" verify --print-certs "$1" |
-    sed -n 's/^Signer #1 certificate SHA-256 digest: //p' |
-    tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:'
+    python3 scripts/apk_signer_certificate.py --algorithm sha256
 }
 
 case "$1" in
@@ -51,16 +50,12 @@ case "$1" in
     cp "$SRC" "$NEXT"
     assert_version "$BASE" "$OLD"
     assert_version "$NEXT" "$NEW"
-    echo "Baseline public APK signer report:"
-    "$(sdk_tool apksigner)" verify --print-certs "$BASE"
-    echo "Updated public APK signer report:"
-    "$(sdk_tool apksigner)" verify --print-certs "$NEXT"
     f1="$(fingerprint "$BASE")"
     f2="$(fingerprint "$NEXT")"
     echo "Baseline APK certificate SHA-256: $f1"
     echo "Updated APK certificate SHA-256: $f2"
     [[ "$f1" =~ ^[a-f0-9]{64}$ && "$f1" == "$f2" ]] ||
-      { echo "Debug signer changed across builds" >&2; exit 1; }
+      { echo "Signer extraction failed or APK signing identity changed" >&2; exit 1; }
     echo "PASS: APK identities and ephemeral test signer verified"
     ;;
   verify)

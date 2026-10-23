@@ -51,8 +51,8 @@ The repository-wide modernization pass uses stable supported software and immuta
 | Surface | Accepted baseline |
 | --- | --- |
 | Native Node runtime | 24.21.0 LTS via `.node-version` |
-| Web | Next.js 16.3.8, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.3 |
-| Web lint | ESLint 9.39.5 with eslint-config-next 16.3.8; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
+| Web | Next.js 16.4.2, React/React DOM 19.3.0, TypeScript 6.0.3, Vitest 5.0.3 |
+| Web lint | ESLint 9.39.5 with eslint-config-next 16.4.2; ESLint 10 is intentionally excluded because the current Next plugin graph does not declare compatible peer support |
 | Companion | Electron 44.7.2 on Node 24 LTS |
 | Native Python runtime | 3.14.7 via `.python-version` |
 | Core | FastAPI 0.142.2, Uvicorn 0.53.0, Pydantic 2.13.5, SQLAlchemy 2.0.54, psycopg 3.3.6, cryptography 50.0.2, websockets 17.2 |
@@ -134,7 +134,7 @@ Vitest and its V8 coverage provider move together to 5.0.2 in both Web and Publi
 
 ## Release-readiness dependency reconciliation — 2026-10-01
 
-- **Next.js / eslint-config-next 16.3.8:** accepted atomically in Web and Public Site. The actual [September 30 security release](https://nextjs.org/blog/september-2026-security-release) supersedes the earlier planned-version note and fixes seven disclosed vulnerabilities. Deterministic lockfiles and repository version gates move together. Current App Router/Turbopack/static-export configuration limits several advisory paths, but that is not a reason to retain the older framework. Future Next tooling updates are coupled across both surfaces.
+- **Next.js / eslint-config-next 16.4.2:** accepted atomically in Web and Public Site after October 2026 critical-advisory remediation. The actual [September 30 security release](https://nextjs.org/blog/september-2026-security-release) supersedes the earlier planned-version note and fixes seven disclosed vulnerabilities. Deterministic lockfiles and repository version gates move together. Current App Router/Turbopack/static-export configuration limits several advisory paths, but that is not a reason to retain the older framework. Future Next tooling updates are coupled across both surfaces.
 - **Sentry Android 8.58.0:** accepted for the manifest-version-detection resource-handle fix. Existing `sendDefaultPii(false)`, privacy scrubbing and fail-closed deployment identity remain unchanged. Do not partially configure the new `dataCollection` API: opting in changes defaults for unspecified fields. [Upstream release](https://github.com/getsentry/sentry-java/releases/tag/8.58.0).
 - **setup-gradle 6.4.0:** all seven workflow invocations use immutable `3f5f9adaf7d9fecd50b5935e54106014257a94e6`, verified against the signed release tag. Gradle runtime and checksum/bootstrap validation remain unchanged. [Upstream release](https://github.com/gradle/actions/releases/tag/v6.4.0).
 - **Node declarations 26 / PR #405:** rejected; Node runtime remains 24.21.0, with 24.x declarations and matching Web/Public Site tooling. A new declaration major can admit APIs absent from the selected runtime. Dependabot excludes >=25 until a deliberate runtime migration.
@@ -159,3 +159,25 @@ Dependabot #442–#449 are consolidated with exact Vitest/coverage-v8 5.0.3 and 
 Electron 44.7.2's official GitHub release asset `electron-v44.7.2-win32-x64.zip` (asset 599622944) independently supplies SHA-256 `10a89447ef64ac5cb9f782af48ffd83734a40ae91681259d1048ca3c9e6c5da4`. Packaging downloads the archive and verifies its bytes against that pin before staging. Metadata inspection alone is not archive/package execution evidence; exact-source Windows runner evidence remains required.
 
 Sentry 8.59.0 captures manual logger/metrics calls independently of enabled flags. Android explicitly drops both payload channels using their beforeSend callbacks while preserving the existing crash scrubber and fail-closed source/environment/DSN initialization. The new dataCollection API is not opted into. See https://github.com/getsentry/sentry-java/releases/tag/8.59.0 and the callback regression.
+
+
+## October 23, 2026 — Next.js emergency security baseline
+
+The protected-main Web and Public Site release-candidate source previously
+pinned `next` and `eslint-config-next` to 16.3.8. Fresh exact-PR
+`npm audit --audit-level=high` and P1 SCA evidence identified three
+Next.js advisories, including critical unauthenticated remote-code-execution
+conditions (`GHSA-2464-fhr4-w9xw`, `GHSA-673q-mjm6-r5xr`) and denial of
+service (`GHSA-p3m5-59mp-jv5r`). The patched 16.x baseline is 16.4.1+.
+Web and Public Site now both pin **16.4.2**, including the matched Next
+ESLint configuration, and use npm-generated deterministic lockfiles from a
+trusted Node 24 GitHub Actions runner. The temporary lock-regeneration
+workflow was deleted from the feature branch after generating the lockfiles.
+
+This is an ordinary vulnerable-dependency correction, **not** a policy or
+branch-protection weakening. Existing exact-version repository assertions
+have been advanced together with the runtime and public-site package
+contracts; required `npm audit`, P1 SCA, `npm ci`, builds, browser
+acceptance, supply-chain evidence and protected-main runtime validation
+remain mandatory. This source change does not authorize production release,
+production deployment, certificate custody or external/physical acceptance.

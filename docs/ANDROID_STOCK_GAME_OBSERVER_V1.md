@@ -92,7 +92,8 @@ No game/version has L3 screen-recognition evidence yet.
 comparisons for one exact source/APK/package/version/signer, installed game
 version, language/HUD and Infinix API34 environment. It accepts only structured
 health ratios and age/sequence metadata; extra fields including pixels or raw
-OCR are rejected. Input/summary schema v2 requires a lowercase 64-character
+OCR are rejected. Only the explicit Infinix/API34 and Xiaomi/API35 evidence
+pairs are supported. Input/summary schema v2 requires a lowercase 64-character
 `game.signerSha256` from the locally observed current APK signer. Unknown or
 ambiguous signer prevents creation of a v2 report; historic v1 records cannot
 be silently upgraded. The certificate digest must be reconciled with the
@@ -283,3 +284,39 @@ the captured application's identity, calibrate recognizer accuracy, grant
 trusted game observations, authorize recommendations or enable game input.
 A new opt-in on-device run is required to measure how much latency is OCR
 processing versus human Save; earlier logs cannot supply these timestamps.
+
+## Offline comparison quality and timing decomposition — 2026-10-23
+
+The same Owner-entered health values can answer two **different** diagnostic
+questions. They must never be conflated:
+
+- **Fresh sample agreement** (`exactMatches / samples`) includes missing,
+  mismatched and >5000 ms old samples in its strict denominator. Existing
+  L3/verification thresholds and the five-second gate are unchanged.
+- **Retrospective value equality** counts numerically equal, different and
+  unavailable OCR values against what the Owner typed at manual Save,
+  **irrespective of age**. It is labelled
+  `USER_ENTERED_AT_SAVE_NOT_FRAME_TRUTH`. It is a debugging comparison,
+  **not** evidence that the character's health was unchanged between the
+  frame and Save; it is not recognizer accuracy or an authorization threshold.
+
+The privacy-bounded `sentinel.observer-calibration-summary.v2` retains its
+strict `sampleAgreement` and adds only
+`retrospectiveValueEquality` (equal/different/missing).
+The opt-in diagnostic importer additionally computes
+`optInTimingDiagnostics` exclusively from the at-most-32 **saved comparisons**:
+a count of frames with valid callback timing, an explicit total count, and
+minimum/lower-median/maximum for acquisition-to-OCR and OCR-to-Save intervals
+in milliseconds. Legacy exports or partially instrumented campaigns retain
+`null` latency summaries and/or explicit partial coverage instead of
+inventing zero latency. The derived output contains no raw clocks, capture
+UUID, images, OCR text or user-entered per-frame health values.
+
+The 2026-10-22 Xiaomi export predates OCR callback timing and cannot tell us
+whether its 5.8–7.7 second Save ages were caused by slow OCR or by returning
+to the app and entering ground truth. Historical numerical equality can be
+reported with its severe timing qualifier but **cannot** promote source trust,
+recognizer confidence, recommendations or automated actions. Both summaries
+stay `PENDING_PHYSICAL_REVIEW`, `UNVERIFIED`, `UNCALIBRATED` and
+`capabilityAvailable=false`. Physical source binding and a separate Owner
+acceptance remain gates for any game recommendation or executor.

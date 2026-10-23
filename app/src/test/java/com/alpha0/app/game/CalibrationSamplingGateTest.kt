@@ -143,5 +143,40 @@ class CalibrationSamplingGateTest {
         session.visibility("capture", false, 132)
         assertNull(CalibrationSamplingGate.current(session.snapshot))
     }
+
+    @Test fun `OCR timing is separate from human app switching and manual entry`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        assertTrue(session.frame("capture", 110))
+        assertTrue(session.recognized("capture", 1, 110, 150, HealthCandidate(4, 20, 0)))
+        session.visibility("capture", false, 170)
+        val timing = CalibrationSamplingGate.timing(session.snapshot, 7150)
+        assertNotNull(timing)
+        assertEquals(7040L, timing!!.frameAgeMs)
+        assertEquals(40L, timing.processingMs)
+        assertEquals(7000L, timing.afterOcrMs)
+        // This is an old frame for live decisions but a valid retrospective input.
+        assertTrue(CalibrationSamplingGate.canSample(session.snapshot, game, game))
+        session.visibility("capture", true, 7200)
+        assertNull(CalibrationSamplingGate.timing(session.snapshot, 7201))
+        session.stop("USER_STOP")
+        assertNull(CalibrationSamplingGate.timing(session.snapshot, 7300))
+    }
+
+    @Test fun `timing readout rejects inconsistent and missing frame provenance`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        assertTrue(session.frame("capture", 110))
+        assertNull(CalibrationSamplingGate.timing(session.snapshot, 120))
+        assertTrue(session.recognized("capture", 1, 110, 125, null))
+        assertNull(CalibrationSamplingGate.timing(session.snapshot, 124))
+        assertEquals(15L, CalibrationSamplingGate.timing(session.snapshot, 125)!!.processingMs)
+        assertNull(CalibrationSamplingGate.timing(session.snapshot.copy(lastOcrLatencyMs = 17), 130))
+        assertNull(CalibrationSamplingGate.timing(session.snapshot.copy(lastCompletedOcrAt = null), 130))
+        assertNull(CalibrationSamplingGate.timing(session.snapshot, 300111))
+    }
+
 }
 

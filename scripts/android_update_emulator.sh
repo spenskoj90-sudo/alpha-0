@@ -32,6 +32,19 @@ case "$1" in
        "$SENTINEL_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] ||
        { echo "Exact-SHA staging build required" >&2; exit 1; }
     mkdir -p "$OUT"
+    # A unique, disposable CI-only certificate is generated per run, and reused
+    # for both APKs. It is never published or confused with Owner stable custody.
+    local_keystore="$OUT/ci-update-only.p12"
+    local_password="$(openssl rand -hex 24)"
+    keytool -genkeypair -noprompt -storetype PKCS12 \
+      -keystore "$local_keystore" -storepass "$local_password" \
+      -alias ci-update -keypass "$local_password" -keyalg RSA -keysize 3072 \
+      -validity 1 -dname "CN=SENTINEL isolated update emulator test" >/dev/null 2>&1
+    chmod 600 "$local_keystore"
+    export SENTINEL_PHYSICAL_TEST_KEYSTORE_PATH="$local_keystore"
+    export SENTINEL_PHYSICAL_TEST_KEYSTORE_PASSWORD="$local_password"
+    export SENTINEL_PHYSICAL_TEST_KEY_ALIAS=ci-update
+    export SENTINEL_PHYSICAL_TEST_KEY_PASSWORD="$local_password"
     SENTINEL_PHYSICAL_TEST_VERSION_CODE="$OLD" ./gradlew --no-daemon assemblePhysicalTest
     cp "$SRC" "$BASE"
     SENTINEL_PHYSICAL_TEST_VERSION_CODE="$NEW" ./gradlew --no-daemon assemblePhysicalTest

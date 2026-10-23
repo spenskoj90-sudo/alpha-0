@@ -90,6 +90,14 @@ def verify_export_identity(
     require(field(package_signer, "identity_evidence", str) == "PACKAGE_MANAGER")
     require(field(package_signer, "signer_cert_sha256", str) == signer_sha256)
 
+def bounded_millisecond_summary(values: list[int]) -> dict | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return {"minimumMs": ordered[0], "medianLowMs": ordered[(len(ordered) - 1) // 2],
+            "maximumMs": ordered[-1]}
+
+
 def extracted_report(
     events: list[dict], *,
     campaign: str | None,
@@ -127,6 +135,8 @@ def extracted_report(
     last_saved_at = -1
     frame_trace = []
     rows = []
+    processing_latencies = []
+    post_ocr_save_delays = []
     for i, details in enumerate(samples, start=1):
         require(field(details, "sample_sequence", int) == i)
         # Bind each comparison to an actual capture generation and advancing
@@ -156,6 +166,8 @@ def extracted_report(
             ocr_latency = field(details, "ocr_processing_latency_ms", int)
             require(frame_at <= completed_at <= saved_at)
             require(0 <= ocr_latency <= 5000 and completed_at - frame_at == ocr_latency)
+            processing_latencies.append(ocr_latency)
+            post_ocr_save_delays.append(saved_at - completed_at)
             trace.extend((completed_at, ocr_latency))
         last_frame_sequence = frame_sequence
         last_frame_at = frame_at
@@ -198,6 +210,16 @@ def extracted_report(
     # Existing strict input validator includes missing/stale in denominator and
     # ALWAYS keeps capability unavailable, regardless of numeric agreement.
     report = summarize(input_data)
+    # Both intervals are untrusted opt-in diagnostic observations. They are
+    # never used to recategorize a stale Save as a fresh calibration match.
+    # An incomplete timing rollout is explicitly counted, not silently filled.
+    report["optInTimingDiagnostics"] = {
+        "sampleScope": "SAVED_COMPARISONS_ONLY",
+        "timedSamples": len(processing_latencies),
+        "totalSamples": len(rows),
+        "ocrProcessing": bounded_millisecond_summary(processing_latencies),
+        "postOcrSave": bounded_millisecond_summary(post_ocr_save_delays),
+    }
     # Hashed trace enables later reconciliation with the retained diagnostics
     # without leaking session UUIDs or monotonic timestamps into the summary.
     # This is diagnostic consistency evidence, NOT a trusted source signature.

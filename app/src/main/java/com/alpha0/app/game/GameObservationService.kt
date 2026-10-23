@@ -42,6 +42,7 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
 import java.util.UUID
+import java.util.concurrent.Executors
 
 /** Explicit, five-minute, read-only capture. Never restarts or reuses a projection token. */
 class GameObservationService : Service() {
@@ -57,6 +58,10 @@ class GameObservationService : Service() {
     private var recognitionBusy = false
     private var lastProcessedAt = -2000L
     private var lastSessionCheckAt = 0L
+    private val sessionCheckWindow = SessionCheckWindow()
+    private val sessionCheckExecutor = Executors.newSingleThreadExecutor { work ->
+        Thread(work, "sentinel-observer-session-check").apply { isDaemon = true }
+    }
 
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) = finish("SCREEN_LOCKED")
@@ -95,12 +100,34 @@ class GameObservationService : Service() {
             val elapsed = now()
             if (!GameObservationRuntime.session.tick(elapsed)) return finish(GameObservationRuntime.session.snapshot.reason)
             if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked != false) return finish("SCREEN_LOCKED")
-            if (elapsed - lastSessionCheckAt >= 30000) {
+            // Never block the main-thread capture/Stop heartbeat on Keystore I/O.
+            // A missing, hung, or failed check stops capture instead of trusting old state.
+            if (sessionCheckWindow.expired(elapsed)) return finish("SESSION_CHECK_TIMEOUT")
+            if (elapsed - lastSessionCheckAt >= 30_000) {
                 lastSessionCheckAt = elapsed
-                val current = SecureSessionStore().load(this@GameObservationService)
-                if (current?.deviceId != deviceId || current == null) return finish("SESSION_CLOSED")
-                if (ShatteredGameProfile.installed(this@GameObservationService) != GameObservationRuntime.state.value.installed) {
-                    return finish("GAME_CHANGED")
+                val id = sessionId ?: return
+                val ticket = sessionCheckWindow.begin(elapsed) ?: return finish("SESSION_CHECK_FAILED")
+                val expectedDeviceId = deviceId
+                val expectedGame = GameObservationRuntime.state.value.installed
+                try {
+                    sessionCheckExecutor.execute {
+                        val failure = runCatching {
+                            val current = SecureSessionStore().load(applicationContext)
+                            when {
+                                current == null || current.deviceId != expectedDeviceId -> "SESSION_CLOSED"
+                                ShatteredGameProfile.installed(applicationContext) != expectedGame -> "GAME_CHANGED"
+                                else -> null
+                            }
+                        }.getOrElse { "SESSION_CHECK_FAILED" }
+                        handler.post {
+                            if (stopping || id != sessionId) return@post
+                            if (sessionCheckWindow.expired(now())) return@post finish("SESSION_CHECK_TIMEOUT")
+                            if (!sessionCheckWindow.complete(ticket)) return@post
+                            if (failure != null) finish(failure)
+                        }
+                    }
+                } catch (_: RuntimeException) {
+                    return finish("SESSION_CHECK_FAILED")
                 }
             }
             GameObservationRuntime.publish()
@@ -253,6 +280,8 @@ class GameObservationService : Service() {
     private fun finish(reason: String) {
         if (stopping) return
         stopping = true
+        sessionCheckWindow.cancel()
+        sessionCheckExecutor.shutdownNow()
         if (reason != "SERVICE_DESTROYED" || GameObservationRuntime.session.snapshot.status != ObservationStatus.STOPPED) {
             GameObservationRuntime.stop(reason)
         }

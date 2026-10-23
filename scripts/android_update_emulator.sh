@@ -53,6 +53,8 @@ case "$1" in
     assert_version "$NEXT" "$NEW"
     f1="$(fingerprint "$BASE")"
     f2="$(fingerprint "$NEXT")"
+    echo "Baseline APK certificate SHA-256: $f1"
+    echo "Updated APK certificate SHA-256: $f2"
     [[ "$f1" =~ ^[a-f0-9]{64}$ && "$f1" == "$f2" ]] ||
       { echo "Debug signer changed across builds" >&2; exit 1; }
     echo "PASS: APK identities and ephemeral test signer verified"

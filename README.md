@@ -8,6 +8,10 @@ The repository's canonical build version is stored in [`VERSION`](VERSION). Rele
 
 **Git `main` is the authoritative source for actual repository/product state.** Read `main` at an exact commit SHA to determine what is implemented. `docs/SENTINEL_CURRENT_STATE.md` is a semantic orientation guide, not a live state mirror and not a substitute for inspecting the repository.
 
+## Owner-approved engineering blocks (2026-10-23)
+
+[The permanent A–I registry](docs/ENGINEERING_BLOCKS.md) routes A Repository, B Android and Android games, C Windows Companion/WoW and PC games, D authenticated Web Control, E public Website, F Core/Cloud, G shared Intelligence, H Design System and I Release/Distribution. A selected platform vertical includes native design, security, compatibility, performance, tests, evidence and necessary cross-cutting implementation. Optional active game assistance is now an approved *future direction* for B/C, **not enabled** or permitted on arbitrary games/servers. Design System v3 remains current until one of five H studies is explicitly selected by the Owner. Current release gates are unaffected.
+
 ## MVP scope currently implemented on main
 
 - Android client with Android Keystore-backed P-256 identity and AES-GCM session storage.

@@ -664,6 +664,70 @@ def check_governance(checks: Checks) -> None:
     checks.require((ROOT / "docs/REMOTE_BRANCH_CLEANUP_2026-09-12.md").exists(), "remote branch cleanup classification exists")
 
 
+def check_engineering_blocks(checks: Checks) -> None:
+    """Guard Owner-approved 2026-10-23 work taxonomy without enabling game actions."""
+    m = json.loads(read("docs/engineering-blocks.v1.json"))
+    routing = read("docs/ENGINEERING_BLOCKS.md")
+    tasks = read("docs/TASKS.md")
+    checks.require(
+        m.get("schema") == "sentinel.engineering-blocks.v1"
+        and m.get("status") == "ACTIVE"
+        and m.get("ownerApprovedDate") == "2026-10-23",
+        "Owner-approved A-I block manifest is current",
+    )
+    blocks = m.get("blocks", [])
+    checks.require(
+        len(blocks) == 9
+        and [item.get("id") for item in blocks] == list("ABCDEFGHI")
+        and len({item.get("slug") for item in blocks}) == 9
+        and all(item.get("sections") and item.get("paths") for item in blocks),
+        "A-I IDs, names, sections and source anchors are unique and complete",
+    )
+    checks.require(
+        {item["id"] for item in blocks if item.get("type") == "platform"} == set("BCDE")
+        and {item["id"] for item in blocks if item.get("type") == "shared"} == set("FGHI")
+        and {item["id"] for item in blocks if item.get("type") == "governance"} == {"A"},
+        "platform vs shared-service vs repository ownership is stable",
+    )
+    checks.require(
+        all("**" + item["id"] + "**" in routing for item in blocks)
+        and "ENGINEERING_BLOCKS.md" in read("AGENTS.md")
+        and "Legacy Block B" in tasks
+        and "Legacy Block D" in tasks,
+        "canonical human routing and historical task terminology are aligned",
+    )
+    automation = m.get("gameAutomation", {})
+    checks.require(
+        automation.get("ownerProductDirectionApproved") is True
+        and automation.get("androidPlanned") is True
+        and automation.get("wowWindowsPlanned") is True
+        and automation.get("defaultEnabled") is False
+        and automation.get("currentExecutionState") == "AUTOMATIC_EXECUTION_DISABLED"
+        and automation.get("noAntiCheatEvasion") is True
+        and {"verified_exact_environment", "lawful_operator_permission",
+             "explicit_consent_and_entitlement", "bounded_policy_action_gateway",
+             "stop_override_revocation", "verified_outcome"}.issubset(
+                 set(automation.get("runtimeRequires", []))
+             ),
+        "game automation remains disabled and exact-environment/consent/policy gated",
+    )
+    design = m.get("designStudy", {})
+    checks.require(
+        len(design.get("proposals", [])) == 5
+        and design.get("ownerSelection") == "PENDING"
+        and m.get("selectedFutureDesign") is None
+        and m.get("currentDesignAuthority") == "design/sentinel-design-system.v3.json",
+        "five design proposals cannot replace the active v3 without Owner approval",
+    )
+    checks.require(
+        m.get("releaseScope") == "UNCHANGED"
+        and "FINAL_RELEASE_ACCEPTANCE_V1.md" not in read("docs/RELEASE_GATES.md").splitlines()[0]
+        and "publication" in routing
+        and "A–I" in read("docs/DOCUMENT_STATUS.md"),
+        "new routing does not silently change release scope and authority",
+    )
+
+
 def main() -> int:
     checks = Checks()
     check_actions(checks)
@@ -671,6 +735,7 @@ def main() -> int:
     check_web(checks)
     check_versions(checks)
     check_governance(checks)
+    check_engineering_blocks(checks)
     print(f"\nPOLICY_PASSED={checks.passes} POLICY_FAILED={len(checks.failures)}")
     if checks.failures:
         print("Repository policy violations:")

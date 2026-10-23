@@ -137,6 +137,46 @@ class OptInDiagnosticsImportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             report([malformed])
 
+    def test_timing_summary_separates_processing_and_post_ocr_save(self):
+        rows = [
+            event(1, age_ms=6200, ocr_completed_at_ms=110050,
+                  ocr_processing_latency_ms=50),
+            event(2, age_ms=6500, ocr_completed_at_ms=120240,
+                  ocr_processing_latency_ms=240),
+            event(3, age_ms=200),
+        ]
+        value = report(rows)
+        self.assertEqual(value["stale"], 2)
+        self.assertEqual(value["exactMatches"], 1)
+        self.assertEqual(value["retrospectiveValueEquality"], {
+            "basis": "USER_ENTERED_AT_SAVE_NOT_FRAME_TRUTH",
+            "equal": 3, "different": 0, "missing": 0,
+        })
+        self.assertEqual(value["optInTimingDiagnostics"], {
+            "sampleScope": "SAVED_COMPARISONS_ONLY",
+            "timedSamples": 2, "totalSamples": 3,
+            "ocrProcessing": {"minimumMs": 50, "medianLowMs": 50,
+                              "maximumMs": 240},
+            "postOcrSave": {"minimumMs": 6150, "medianLowMs": 6150,
+                            "maximumMs": 6260},
+        })
+        self.assertFalse(value["capabilityAvailable"])
+        self.assertEqual(value["recognizerConfidence"], "UNCALIBRATED")
+        as_text = json.dumps(value)
+        self.assertNotIn(CAPTURE, as_text)
+        self.assertNotIn("ocr_completed_at_ms", as_text)
+        self.assertNotIn("sample_saved_at_ms", as_text)
+
+    def test_legacy_export_timing_is_unknown_not_assumed_zero(self):
+        value = report([event()])
+        self.assertEqual(value["optInTimingDiagnostics"], {
+            "sampleScope": "SAVED_COMPARISONS_ONLY",
+            "timedSamples": 0, "totalSamples": 1,
+            "ocrProcessing": None, "postOcrSave": None,
+        })
+        self.assertEqual(value["exactMatches"], 1)
+        self.assertFalse(value["capabilityAvailable"])
+
     def test_frame_trace_hash_changes_without_disclosing_raw_capture_identity(self):
         first = report([event(), event(2)])
         second = report([event(), event(2, capture_frame_sequence=3)])

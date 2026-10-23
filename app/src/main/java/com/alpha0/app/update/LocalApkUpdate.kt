@@ -84,14 +84,16 @@ internal object LocalApkUpdate {
         var temporary: File? = null
         var staged: File? = null
         try {
-            temporary = File.createTempFile("candidate-", ".tmp", folder)
-            staged = File(folder, temporary.name.removeSuffix(".tmp") + ".apk")
+            val temp = File.createTempFile("candidate-", ".tmp", folder)
+            temporary = temp
+            val candidateFile = File(folder, temp.name.removeSuffix(".tmp") + ".apk")
+            staged = candidateFile
             val digest = MessageDigest.getInstance("SHA-256")
             var size = 0L
             val input = context.contentResolver.openInputStream(uri)
                 ?: throw IllegalArgumentException("APK_UNREADABLE")
             input.use { source ->
-                FileOutputStream(temporary).use { output ->
+                FileOutputStream(temp).use { output ->
                     val buffer = ByteArray(64 * 1024)
                     while (true) {
                         val count = source.read(buffer)
@@ -105,16 +107,16 @@ internal object LocalApkUpdate {
                     output.fd.sync()
                 }
             }
-            if (size == 0L || !temporary.renameTo(staged)) throw IllegalArgumentException("INVALID_APK")
-            val reason = policyCheck(context, staged)
+            if (size == 0L || !temp.renameTo(candidateFile)) throw IllegalArgumentException("INVALID_APK")
+            val reason = policyCheck(context, candidateFile)
             if (reason != null) {
-                staged.delete()
+                candidateFile.delete()
                 Result.Blocked(reason)
             } else {
-                val candidate = candidateInfo(context, staged) ?: throw IllegalArgumentException("INVALID_APK")
+                val candidate = candidateInfo(context, candidateFile) ?: throw IllegalArgumentException("INVALID_APK")
                 val sha = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
-                if (!staged.setReadOnly()) throw IllegalArgumentException("STAGING_NOT_READ_ONLY")
-                Result.Ready(staged, candidate.longVersionCode, sha)
+                if (!candidateFile.setReadOnly()) throw IllegalArgumentException("STAGING_NOT_READ_ONLY")
+                Result.Ready(candidateFile, candidate.longVersionCode, sha)
             }
         } catch (cancel: CancellationException) {
             staged?.delete()

@@ -56,6 +56,23 @@ class UpdatePreflightInstrumentedTest {
             assertTrue("System installer cannot read staged FileProvider URI",
                 input != null && input.read() >= 0)
         }
+
+        // A second choice must not alter the first installer URI's bytes.
+        val second = LocalApkUpdate.stage(context, Uri.fromFile(candidate))
+        assertTrue("Repeated selection must remain a compatible candidate",
+            second is LocalApkUpdate.Result.Ready)
+        val newerReady = second as LocalApkUpdate.Result.Ready
+        assertTrue("Candidate files must be distinct", newerReady.file != ready.file)
+        assertEquals("Old candidate receipt changed", expectedDigest, ready.sha256)
+        assertEquals("New candidate bytes differ", expectedDigest, newerReady.sha256)
+        assertTrue("Old installer file disappeared on reselection", ready.file.isFile)
+
+        // Corrupt a staged candidate after checking it. No installer may be launched.
+        assertTrue("Test must be able to edit isolated staged file", ready.file.setWritable(true))
+        ready.file.appendBytes(byteArrayOf(0x41))
+        assertEquals("Changed candidate must be rejected before invoking Android",
+            LocalApkUpdate.InstallOutcome.BLOCKED, LocalApkUpdate.install(context, ready))
+        assertTrue("New selection must remain unchanged", newerReady.file.isFile)
     }
 
     @Test

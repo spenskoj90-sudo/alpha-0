@@ -54,6 +54,10 @@ class UpgradeContinuityInstrumentedTest {
         val settings = AppPreferences(context)
         settings.setLanguage(AppLanguage.RUSSIAN)
         settings.setTheme(AppThemeMode.DARK)
+        val uiPrefs = context.getSharedPreferences("sentinel_ui_preferences", Context.MODE_PRIVATE)
+        assertTrue("Synthetic UI settings incomplete before upgrade",
+            uiPrefs.contains("language") && uiPrefs.contains("theme"))
+        assertTrue("Synthetic UI settings not durable", uiPrefs.edit().commit())
         val saved = SecureSessionStore().load(context)
         assertEquals(sampleDevice, saved?.deviceId)
     }

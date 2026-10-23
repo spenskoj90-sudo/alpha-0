@@ -111,28 +111,30 @@ export function ProductOverview() {
         <h2>{t("Games")}</h2>
         {status ? <p role={data.state === 'ERROR' ? 'alert' : 'status'}>{t(status)}</p> : data.state === 'READY' && (<>
           <p className="microcopy">{t("No game has verified exact-environment support. Read-only pilots and catalog records do not grant game actions.")}</p>
-          {data.research.some(profile => profile.implementation_status === 'observer_pilot') ? <ul className="product-list" aria-label={t("Diagnostic observer pilots")}>
-            {data.research.filter(profile => profile.implementation_status === 'observer_pilot').map(profile => <li key={profile.id}>
-              <strong>{profile.name}</strong><span className="muted">{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''} · {profile.environment}</span>
-              <span className="state">{t("Observer pilot · calibration pending")}</span>
-            </li>)}
-          </ul> : <p>{t("No diagnostic observer is available.")}</p>}
-          <details>
-            <summary>{t("Catalog foundations, not verified support")} ({data.games.length})</summary>
-            <p className="microcopy">{t("Catalog entries describe account integration. Exact game support remains unverified; no game actions are enabled.")}</p>
-            {data.games.length ? <ul className="product-list">{data.games.map(game => <li key={game.id}>
-              <strong>{game.name}</strong><span className="muted">{game.family} · {game.platform}</span>
-              <span className="state">{t("Catalog foundation · environment unverified")}</span>
-            </li>)}</ul> : <p>{t("No games are available in the current catalog.")}</p>}
-          </details>
-          <details>
-            <summary>{t("Research and observer profiles")} ({data.research.filter(profile => profile.implementation_status !== 'observer_pilot').length})</summary>
-            <p className="microcopy">{t("Research profiles do not grant access. Each target needs separate version, source and environment verification.")}</p>
-            {data.research.some(profile => profile.implementation_status !== 'observer_pilot') ? <ul className="product-list">{data.research.filter(profile => profile.implementation_status !== 'observer_pilot').map(profile => <li key={profile.id}>
-              <strong>{profile.name}</strong><span className="muted">{profile.platform}{profile.patch ? ` · ${profile.patch}` : ''} · {profile.environment}</span>
-              <span className="state">{t(profile.implementation_status === 'adapter_foundation' ? 'Adapter foundation · environment unverified' : 'Research only · environment unverified')}</span>
-            </li>)}</ul> : <p>{t("No research profiles are available.")}</p>}
-          </details>
+
+          <p className="microcopy" role="status">{t("Combined catalog and research inventory")} ({data.inventory.length}) · {t("Verified integrations")}: 0</p>
+          {data.inventory.length === 0 && <p>{t("No games are available in the current catalog.")}</p>}
+          {([
+            { status: 'observer_pilot', heading: 'Diagnostic observer pilots', label: 'Observer pilot · calibration pending' },
+            { status: 'adapter_foundation', heading: 'Research and observer profiles', label: 'Adapter foundation · environment unverified' },
+            { status: 'catalog_foundation', heading: 'Catalog foundations, not verified support', label: 'Catalog foundation · environment unverified' },
+            { status: 'research_only', heading: 'Research only · environment unverified', label: 'Research only · environment unverified' },
+          ] as const).map(group => {
+            const entries = data.inventory.filter(entry => entry.evidence === group.status);
+            if (entries.length === 0) return null;
+            const listing = <ul className="product-list" aria-label={t(group.heading)}>{entries.map(entry => <li key={entry.id}>
+              <strong>{entry.name}</strong>
+              <span className="muted">{entry.platform}{entry.patch ? ' · ' + entry.patch : ''} · {entry.environment}</span>
+              <span className="state">{t(group.label)}</span>
+            </li>)}</ul>;
+            return group.status === 'observer_pilot'
+              ? <div key={group.status}><h3>{t(group.heading)} ({entries.length})</h3>{listing}</div>
+              : <details key={group.status}>
+                  <summary>{t(group.heading)} ({entries.length})</summary>
+                  <p className="microcopy">{t("Research profiles do not grant access. Each target needs separate version, source and environment verification.")}</p>
+                  {listing}
+                </details>;
+          })}
         </>)}
         <button className="ghost-btn" disabled={busy} onClick={() => void refresh()}>{t("Refresh product data")}</button>
       </article>

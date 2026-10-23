@@ -73,7 +73,11 @@ case "$1" in
     [[ "$value" == SENTINEL_UPDATE_PRESERVED ]] || { echo "Seed data missing" >&2; exit 1; }
     # Upload the actual future APK to the target app's private files. No
     # system installer or unknown-sources permission is invoked by this check.
-    adb shell -T run-as "$PKG" sh -c 'cat > files/synthetic_candidate.apk' < "$NEXT"
+    adb shell "run-as $PKG sh -c 'mkdir -p files && cat > files/synthetic_candidate.apk'" < "$NEXT"
+    expected_bytes="$(wc -c < "$NEXT" | tr -d '[:space:]')"
+    transferred_bytes="$(adb shell "run-as $PKG wc -c files/synthetic_candidate.apk" | tr -d '\r' | awk '{print $1}')"
+    [[ "$transferred_bytes" == "$expected_bytes" ]] ||
+      { echo "Transferred upgrade APK length differs from compiled artifact" >&2; exit 1; }
     adb shell am instrument -w \
       -e class com.alpha0.app.update.UpdatePreflightInstrumentedTest#acceptsCompatibleNewerSameSignerApk \
       "$PKG.test/androidx.test.runner.AndroidJUnitRunner" | tee "$OUT/preflight-before.txt"

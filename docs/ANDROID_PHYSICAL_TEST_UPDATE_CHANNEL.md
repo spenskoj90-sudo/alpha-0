@@ -140,3 +140,21 @@ Do not issue a stable-signed APK, manipulate signing secrets or declare
 in approved provider custody; no certificate/private-key bytes are published.
 
 API reference: https://developer.android.com/reference/android/content/pm/SigningInfo
+
+
+## Same-signer retention proof (isolated emulator)
+
+The dedicated `Android APK In-Place Update Retention` workflow builds two diagnostic
+APKs and a test instrumentation APK using the runner's ephemeral debug signer,
+with the same application ID and increasing versionCode. Android API 34
+installs the baseline and upgrades it using `adb install -r` without uninstalling.
+A diagnostic-gated instrumentation test seeds synthetic values in the
+real `DeviceIdentity` AndroidKeyStore EC identity, `SecureSessionStore`
+AES/GCM-encrypted session, and `AppPreferences`. The verification step checks
+the same EC public-key fingerprint and signing ability, decrypted synthetic
+session/device ID, preferences, and an app-private file after the update.
+
+This synthetic proof cannot recover or attest the Owner's signing private key,
+does not prove real-session server continuity, and does not establish compatibility
+with an installed APK signed using a different certificate. No auth tokens,
+Keystore private keys or credentials are exported from the emulator.

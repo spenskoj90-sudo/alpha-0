@@ -11,6 +11,9 @@ val releaseRequested = gradle.startParameter.taskNames.any { taskName ->
 val physicalTestRequested = gradle.startParameter.taskNames.any { taskName ->
     taskName.substringAfterLast(':').contains("PhysicalTest", ignoreCase = false)
 }
+// This isolated test-only source set cannot run in normal CI or production builds.
+val upgradeRetentionE2E = providers.environmentVariable("SENTINEL_UPGRADE_RETENTION_E2E")
+    .orElse("false").get() == "true"
 val explicitApiBaseUrl = providers.environmentVariable("SENTINEL_API_BASE_URL").orNull
     ?.trim()
     ?.trimEnd('/')
@@ -120,6 +123,9 @@ if (physicalTestRequested) {
 
 android {
     namespace = "com.alpha0.app"
+    if (upgradeRetentionE2E) {
+        testBuildType = "physicalTest"
+    }
 
     compileSdk = 37
 

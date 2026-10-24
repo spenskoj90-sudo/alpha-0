@@ -24,6 +24,10 @@ All data and credentials in form journeys must be fictional. No values are sent 
 There is no production API, actual login, admin authority, checkout, screen capture,
 microphone capture, game input, live game telemetry or download installation.
 
+## Game workspace continuation
+
+[GAME_WORKSPACES.md](GAME_WORKSPACES.md) specifies eleven distinct game layouts, opt-in fictional fixtures, local interactive drafts, table controls and the Android tablet study. New screenshots and evidence are in `qa/workspaces/`. Figma synchronization remains blocked by its Starter call limit.
+
 ## What this pass contains
 
 - Four original vector identity studies: Confluence, Waypoint, Parallax, Nexus. None selected.
@@ -56,6 +60,8 @@ not Node. They are evidence of this authoring pass, not an idempotent full-file 
 node --test design/h-system/tests/*.test.mjs
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/path/to/chromium \
   node design/h-system/tests/browser.cjs
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/path/to/chromium \
+  node design/h-system/tests/browser-workspaces.cjs
 ```
 
 If Playwright owns its browser, omit CHROMIUM_EXECUTABLE. Existing repository CI uses

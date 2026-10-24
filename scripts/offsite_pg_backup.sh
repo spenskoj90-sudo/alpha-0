@@ -41,6 +41,15 @@ PY
 [[ "$DATABASE_URL" != *-pooler* ]] || fail "pooled URLs cannot be used with pg_dump"
 [[ "${BACKUP_AGE_RECIPIENT:-}" =~ ^age1[0-9a-z]{30,}$ ]] || fail "missing or invalid age public recipient"
 [[ "${BACKUP_S3_BUCKET:-}" =~ ^[a-z0-9][a-z0-9.-]{2,62}$ ]] || fail "missing or invalid bucket"
+[[ "${BACKUP_R2_ENDPOINT:-}" =~ ^https://[a-f0-9]{32}(\.(eu|fedramp))?\.r2\.cloudflarestorage\.com/?$ ]] || fail "missing or invalid Cloudflare R2 endpoint"
+[[ -n "${AWS_ACCESS_KEY_ID:-}" && -n "${AWS_SECRET_ACCESS_KEY:-}" ]] || fail "R2 limited-scope S3 API credentials not configured"
+[[ "${AWS_REGION:-auto}" == "auto" ]] || fail "R2 AWS_REGION must be auto"
+export AWS_EC2_METADATA_DISABLED=true
+export AWS_DEFAULT_REGION=auto
+export AWS_REGION=auto
+export AWS_PAGER=""
+export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
+export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 command -v docker >/dev/null || fail "Docker unavailable"
 command -v age >/dev/null || fail "age unavailable"
 command -v aws >/dev/null || fail "AWS CLI unavailable"
@@ -69,14 +78,16 @@ size="$(wc -c < "$ciphertext" | tr -d ' ')"
 [[ "$size" -gt 100 ]] || fail "ciphertext unexpectedly small"
 
 remote="s3://$BACKUP_S3_BUCKET/$obj"
-aws s3 cp --only-show-errors --sse AES256 "$ciphertext" "$remote"
-# Read the copy back from the independent provider and verify byte-for-byte.
-aws s3 cp --only-show-errors "$remote" "$download"
+# R2 has platform-managed server-side encryption; the payload was already
+# encrypted by age. Do not use AWS S3-only --sse AES256 flags with Cloudflare R2.
+aws --endpoint-url "$BACKUP_R2_ENDPOINT" s3 cp --only-show-errors "$ciphertext" "$remote"
+# Download the ciphertext from R2 and compare it byte-for-byte.
+aws --endpoint-url "$BACKUP_R2_ENDPOINT" s3 cp --only-show-errors "$remote" "$download"
 cmp -s "$ciphertext" "$download" || fail "remote ciphertext mismatch"
 
 {
-  printf 'Encrypted offsite backup uploaded and ciphertext compared successfully.\n\n'
-  printf 'Location: s3://%s/%s\n' "$BACKUP_S3_BUCKET" "$obj"
+  printf 'Encrypted Cloudflare R2 backup uploaded and ciphertext compared successfully.\n\n'
+  printf 'Cloudflare R2 object: s3://%s/%s\n' "$BACKUP_S3_BUCKET" "$obj"
   printf 'Encrypted size: %s bytes\n' "$size"
   printf 'Encrypted SHA-256: %s\n' "$digest"
   printf 'Source: Neon sentinel/staging (read-only pg_dump)\n'

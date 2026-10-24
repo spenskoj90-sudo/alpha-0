@@ -17,6 +17,7 @@ on:
       - ".github/workflows/offsite-backup-contract.yml"
       - "scripts/offsite_pg_backup.sh"
       - "scripts/test_offsite_pg_backup_contract.py"
+      - "scripts/test_offsite_pg_backup_simulated.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
 
 permissions:

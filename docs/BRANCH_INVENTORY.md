@@ -96,3 +96,23 @@ The 13 dependency PRs were evaluated from exact patches. Accepted fixes are inco
 | `dependabot/npm_and_yarn/site/eslint-10.11.0` | `3f4c7a718c9cf76b737a3e8319a5b0e85c2223a1` | CONTENT_SUPERSEDED | RECONCILED: PR #423 ESLint10.11 update rejected: current eslint-plugin-react7.37.5 supports through ^9.7, excluding10; retain9.39.5 under PR #426 tooling hold. |
 | `dependabot/npm_and_yarn/web/eslint-10.11.0` | `5c4cf1f252e58004803cd7925d0f433599fcef36` | CONTENT_SUPERSEDED | RECONCILED: PR #424 ESLint10.11 update rejected: current eslint-plugin-react7.37.5 supports through ^9.7, excluding10; retain9.39.5 under PR #426 tooling hold. |
 | `dependabot/npm_and_yarn/web/typescript-7.0.2` | `d89b54759193d801d013a82f64bce190eabb9ffc` | CONTENT_SUPERSEDED | RECONCILED: PR #425 TypeScript7.0.2 update rejected: current TypeScript ESLint plugin8.70.0 requires >=4.8.4 <6.1.0; retain6.0.3 under PR #426 tooling hold. |
+
+## October 2026 live-ref reconciliation — Block A, 2026-10-24
+
+**Classification evidence:** the nine rows below were reviewed against live refs, PR metadata, and protected main after PR #519. Every listed PR was independently confirmed **merged**, with `base=main`, same repository head, branch name and **exact PR head SHA equal to the listed live branch tip**. The branches were not classified using ahead/behind counts or an old manifest. The Branch Hygiene job must still revalidate remote tips, protection, PR lineage and merge status immediately before any deletion; a changed ref is preserved and the job fails closed.
+
+| Branch | Exact reviewed tip | Classification | Evidence |
+| --- | --- | --- | --- |
+| `integration/2026-10-03` | `50599c7f49b09886e3f581d7daaf06285fc3c45b` | MERGED_EXACT | PR #438 merged; live tip equals exact PR head |
+| `integration/release-readiness-2026-10-08` | `90a0b1ed6927aa797a4d5ffb91f2b95f1c6b809d` | MERGED_EXACT | PR #454 merged; live tip equals exact PR head |
+| `integration/public-site-2026-10-12` | `759a01af82e9a181a29145e137ff652dd6a299c4` | MERGED_EXACT | PR #457 merged; live tip equals exact PR head |
+| `integration/account-security-2026-10-14` | `d74b3b5de9af9dba1b919ae356ac108722b02d17` | MERGED_EXACT | PR #458 merged; live tip equals exact PR head |
+| `integration/device-lifecycle-readback-2026-10-14` | `52e5a843c80bcf1af88ce4577b73f26ec7489179` | MERGED_EXACT | PR #459 merged; live tip equals exact PR head |
+| `fix/stable-android-oauth-sha1-evidence` | `41f0cc63d24c3d65d8a137e54d4d49e27b69b9ed` | MERGED_EXACT | PR #456 merged; live tip equals exact PR head |
+| `fix/game-calibration-integrity-2026-10-16` | `30944f1bbffd3b529f2fa911a883da571b9956d9` | MERGED_EXACT | PR #477 merged; live tip equals exact PR head |
+| `integration/android-calibration-timing-diagnostics-2026-10-23` | `b43db517ff4fe6f91f4944372610d48440877178` | MERGED_EXACT | PR #506 merged; live tip equals exact PR head |
+| `docs/owner-approved-platform-blocks-20261023` | `7cda59ffbd045f006576258d65b9dec237d723ee` | MERGED_EXACT | PR #519 merged; live tip equals exact PR head |
+
+**Explicit holds, NOT cleanup targets:** `feat/companion-knowledge-consumer-v1` at `ad51886eefa6bd223586a257f6ee08904f517db6` has one branch-only commit and added launcher knowledge runtime/test files; semantic reconciliation against the integrated Companion/knowledge implementation is still required, so do not dispose of it. The Dependabot `dependabot/github_actions/actions/download-artifact-8.0.2` branch at `59a37a0eaa5c5b902ffd2f4a74d62086235ee023` belongs to closed, **unmerged**, failing PR #470; a rejected dependency proposal is not a merged exact head. Keep it out of the destructive ledger pending scoped re-evaluation/Owner-approved disposition. Current live inventory and exact SHA outrank this dated record on future passes.
+
+This ledger concerns deletion of fully merged short-lived refs **only**, not files, release tags, branch-protection settings, game execution, signing, publication, production deployment or acceptance claims.

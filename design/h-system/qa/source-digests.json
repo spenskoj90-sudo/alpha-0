@@ -2,7 +2,7 @@
   "baseMain": "f81f70da743fa1528b919f198f1a34cf9fdaf5c5",
   "sha256": {
     "ASSET_PROVENANCE.md": "fb0be31560e337e4ccc48e5a6e20eb5bcc397e6a47bed99699e3d738a51ab0df",
-    "GAME_WORKSPACES.md": "5f1c2691bb28314358fcf5a6f240e67a1ae6edc1e970e71979824aa530f6abbf",
+    "GAME_WORKSPACES.md": "dfe85f6f9a6c7c2707bc70e206db1b0eb8228eaaec2a88dbdb2c37ba2aaf60f8",
     "HANDOFF.md": "81ba01498c24c56caa75eb7b4f63e5b641f4547e5c998f4bcb80be20b155c380",
     "README.md": "b032c1bbc45e2107b47c6037e9b4b84f9d042e3c7577e72cd5ee8da9bc11739a",
     "app.mjs": "1eff23ce4b13f6f9fefe78c301f579339f1ca779a276e392ec3978d9b71b38db",
@@ -166,13 +166,13 @@
     "model.mjs": "b5cb590f99cbdf7c163a909acd77ffe6fb7953d0ff8473f604812263188b0eec",
     "serve.py": "bb610d5ce58535870a56f2d9478b52500a7d8eca22972dbad3e02701339067c7",
     "style.css": "2759f9316fe1b2937b900acf97981597b4faa9a53aed1dc65dfcdf607f515da0",
-    "tests/browser-workspaces.cjs": "3345b17a042e12b7d8395a8085e2adf23a2c148e62adf77b1043613c8824457c",
+    "tests/browser-workspaces.cjs": "317b3ddfe2f2eba37fe4452aeff3a002d818bdaef5e160c258e584b0841374c9",
     "tests/browser.cjs": "84242f3a2df09b7570dd1cc06b3ab7548834fc1c35cb0219b49169caf6726eb3",
     "tests/contrast.test.mjs": "38828ec642f664c80b6e13533419e74a3eda2f4a3fd41aba23cc63d3b2f0e2c2",
     "tests/model.test.mjs": "01a8a21408572b46bf5f49faf8c1ba7fcf21c6ba04f8a0a5f28eca0fbb375e46",
     "tests/workspace.test.mjs": "a112f6431eafb83afc2bd07859cc918c50fef1851f7b402cac43b8252a627ec5",
     "workspace-data.mjs": "c170ce52ed022b527616b8525759471ca8c3d0989fb376871d7a60fad013f43c",
     "workspace-model.mjs": "356817f9b8e180f27e24ea1a6b2f7bde9a01340e033ea51501f48e9364ec63b3",
-    "workspace-view.mjs": "fa35d8ed8097494c2c5526b89e178073e8277ed441d61e897705ed5837a8f1f8"
+    "workspace-view.mjs": "84807e2aa0f270f218335eefcfcc85ae2e388ccd3fd78afbe92fb5048cbbcaf3"
   }
 }

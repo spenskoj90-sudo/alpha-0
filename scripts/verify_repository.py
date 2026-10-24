@@ -826,6 +826,74 @@ def check_h_design_studies(checks: Checks) -> None:
     )
 
 
+
+def check_h_deep_design_program(checks: Checks) -> None:
+    """An Owner-approved H1-H11 design program is not a production style selection."""
+    program = json.loads(read("design/h-design-program.v2.json"))
+    registry = json.loads(read("docs/engineering-blocks.v1.json"))
+    design = read("docs/DESIGN_PROGRAM_H_V2.md")
+    active = json.loads(read("design/sentinel-design-system.v3.json"))
+    h = next((x for x in registry.get("blocks", []) if x.get("id") == "H"), {})
+    expected_sections = [
+        "H1_BRAND_CORE", "H2_ICONOGRAPHY", "H3_FOUNDATIONS", "H4_COMPONENTS",
+        "H5_MOTION_NAVIGATION", "H6_ANDROID", "H7_WINDOWS_LAUNCHER_OVERLAY",
+        "H8_WEB_CONTROL", "H9_PUBLIC_WEBSITE", "H10_ILLUSTRATION_ASSETS",
+        "H11_ACCESSIBILITY_CONSISTENCY",
+    ]
+    checks.require(
+        program.get("schema") == "sentinel.design-program.h.v2"
+        and program.get("status") == "ACTIVE_OWNER_APPROVED_PROGRAM_DESIGN_UNSELECTED"
+        and program.get("approvedOn") == "2026-10-24"
+        and h.get("sections") == expected_sections
+        and [p.get("id") for p in program.get("workstreams", [])] == [f"H{i}" for i in range(1, 12)]
+        and all(p.get("deliverables") for p in program.get("workstreams", [])),
+        "Owner H1-H11 program and current block registry agree",
+    )
+    routes = program.get("routes", {})
+    checks.require(
+        all(len(routes.get(surface, [])) >= 13 for surface in ("android", "windows", "webControl", "publicSite"))
+        and len(set(routes.get("publicSite", []))) == len(routes.get("publicSite", []))
+        and {"/", "/features", "/games", "/how-it-works", "/security", "/faq",
+             "/support", "/about", "/download", "/legal"}.issubset(set(routes.get("publicSite", [])))
+        and "distinct URLs" in design
+        and "multi-page" not in design.split("## Architecture and real-page requirement")[0],
+        "H9 enforces separate public-site route design rather than flat scroll mockups",
+    )
+    selection = program.get("designSelection", {})
+    legacy = selection.get("legacyShieldRadarS", {})
+    checks.require(
+        selection.get("selectedId") is None
+        and selection.get("selectionState") == "PENDING"
+        and selection.get("paletteDecision") == "DEFERRED"
+        and selection.get("productionAuthority") == "design/sentinel-design-system.v3.json"
+        and legacy.get("productionAsset") == "KEEP_UNTIL_OWNER_ACCEPTS_VERIFIED_REPLACEMENT"
+        and active.get("status") == "ACTIVE"
+        and registry.get("designStudy", {}).get("ownerSelection") == "PENDING"
+        and registry.get("designStudy", {}).get("paletteSelectionDeferred") is True,
+        "brand creative reset cannot silently replace or remove active v3",
+    )
+    safety = program.get("invariants", {})
+    checks.require(
+        safety.get("automationEnabled") is False
+        and safety.get("gameActionsRequireExactPermittedEnvironment") is True
+        and safety.get("operatorPermissionRequired") is True
+        and safety.get("noAntiCheatEvasion") is True
+        and safety.get("noProductionDesignSwapWithoutOwner") is True
+        and safety.get("noReleaseSigningOrDeploymentWithoutOwner") is True
+        and safety.get("designMustBeEditable") is True,
+        "new visual studies do not change game authority, design acceptance or release gates",
+    )
+    states = set(program.get("requiredInteractiveStates", []))
+    checks.require(
+        {"focus-visible", "loading", "progress", "skeleton", "empty", "offline",
+         "stale", "unknown", "unavailable", "denied", "revoked", "stopped"}.issubset(states)
+        and len(program.get("requiredFlows", [])) >= 7
+        and program.get("existingStudies", {}).get("ruEnEditableScreens") == 40
+        and all("H" + str(i) in design for i in range(1, 12)),
+        "H deep design covers navigable product journeys and honest state components",
+    )
+
+
 def main() -> int:
     checks = Checks()
     check_actions(checks)
@@ -835,6 +903,7 @@ def main() -> int:
     check_governance(checks)
     check_engineering_blocks(checks)
     check_h_design_studies(checks)
+    check_h_deep_design_program(checks)
     print(f"\nPOLICY_PASSED={checks.passes} POLICY_FAILED={len(checks.failures)}")
     if checks.failures:
         print("Repository policy violations:")

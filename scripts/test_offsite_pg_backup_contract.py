@@ -117,7 +117,7 @@ class BackupContractTests(unittest.TestCase):
         self.assertIn("| age --encrypt", s)
         self.assertIn("aws --endpoint-url", s)
         self.assertNotIn("--sse AES256 \"$ciphertext\"", s)
-        self.assertIn("r2.cloudflarestorage", s)
+        self.assertIn("cloudflarestorage", s)  # Domain label is escaped in Bash regex
         self.assertIn('cmp -s "$ciphertext" "$download"', s)
         self.assertNotIn("\\npg_restore ", s)  # Mentioning restore in the summary is allowed
         self.assertNotIn("set -x", s)

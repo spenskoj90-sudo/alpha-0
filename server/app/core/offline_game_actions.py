@@ -74,6 +74,10 @@ class TurnWorld:
         self.turn = 0
         self.sequence = 0
         self.fault = fault
+        # Synthetic host context only. These are not claims about a live OS,
+        # capture permission, game focus, or third-party environment.
+        self.focus_active = True
+        self.permission_active = True
 
     def observe(self, now_ms: int) -> Observation:
         canonical = json.dumps({"target": self.target.model_dump(), "session": self.session_id,

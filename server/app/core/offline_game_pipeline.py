@@ -37,6 +37,10 @@ class OfflineTurnPipeline:
         self.session = session
         self.knowledge = knowledge
         self.session_id = world.session_id
+        # A bounded lease has at most three successful ticks. Cache the request
+        # timestamp and observed outcome; a retry never reconstructs a new
+        # ActionIntent from an already advanced world.
+        self._bounded_results: dict[str, tuple[int, Outcome]] = {}
 
     def review(self, *, now_ms: int, locale: str = "en") -> TurnReview:
         if type(now_ms) is not int or now_ms <= 0:
@@ -94,9 +98,26 @@ class OfflineTurnPipeline:
             self.session.stop("CONSENT_REVOKED")
             raise ValueError("CONSENT_REVOKED")
         try:
+            # Synthetic, trusted-host context is checked even on a duplicate;
+            # restoring focus/permission must not revive a stopped lease.
+            if self.world.session_id != self.session_id or self.world.target != FIXTURE_TARGET:
+                raise ValueError("SESSION_CHANGED")
+            if self.world.focus_active is not True:
+                raise ValueError("FOCUS_LOST")
+            if self.world.permission_active is not True:
+                raise ValueError("PERMISSION_REVOKED")
+            # Principal/lease/consent/context gates precede the cache lookup.
+            # A changed timestamp for the same key is a conflicting request.
+            prior = self._bounded_results.get(idempotency_key)
+            if prior is not None:
+                if now_ms != prior[0]:
+                    raise ValueError("IDEMPOTENCY_CONFLICT")
+                return prior[1]
             reviewed = self.review(now_ms=now_ms)
-            return self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
-                                                idempotency_key=idempotency_key)
+            result = self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
+                                                  idempotency_key=idempotency_key)
+            self._bounded_results[idempotency_key] = (now_ms, result)
+            return result
         except (ValueError, RuntimeError):
             # A bounded automatic lease cannot silently resume after failed
             # freshness, entitlement, authorization, budget or outcome checks.

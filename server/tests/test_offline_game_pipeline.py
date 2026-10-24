@@ -82,6 +82,94 @@ def test_bounded_fixture_ticks_use_one_lease_and_verify_each_outcome():
     assert session.stopped and world.turn == 3
 
 
+def test_bounded_tick_duplicate_returns_recorded_outcome_without_new_delivery():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    for _ in range(2):
+        assert pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=True,
+        ) == first
+    assert first.outcome == "SUCCEEDED" and world.turn == 1 and not session.stopped
+    second = pipeline.bounded_fixture_tick(
+        principal, now_ms=2000, idempotency_key="second", consent_active=True,
+    )
+    assert second.observed_sequence == 2 and world.turn == 2
+    # Even after an unrelated successful tick, the first request remains stable.
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ) == first
+    assert world.turn == 2 and session._steps == 2
+
+
+def test_bounded_tick_reuse_of_key_with_different_timestamp_stops_lease():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="same", consent_active=True,
+    )
+    with pytest.raises(ValueError, match="IDEMPOTENCY_CONFLICT"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="same", consent_active=True,
+        )
+    assert session.stopped and world.turn == 1
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="same", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+@pytest.mark.parametrize("boundary,reason", [
+    ("focus", "FOCUS_LOST"),
+    ("permission", "PERMISSION_REVOKED"),
+    ("session", "SESSION_CHANGED"),
+])
+def test_bounded_tick_context_loss_is_latched_before_new_or_duplicate_action(boundary, reason):
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED"
+    if boundary == "focus":
+        world.focus_active = False
+    elif boundary == "permission":
+        world.permission_active = False
+    else:
+        world.session_id = "new-session"
+    with pytest.raises(ValueError, match=reason):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=True,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+    # Returning to the old context never silently re-arms the lease.
+    world.focus_active = True
+    world.permission_active = True
+    world.session_id = pipeline.session_id
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+def test_bounded_tick_revocation_precedes_idempotent_result_replay():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    with pytest.raises(ValueError, match="CONSENT_REVOKED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=False,
+        )
+    assert session.stopped and world.turn == 1
+    stranger = replace(principal, device_id="not-the-owner")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.bounded_fixture_tick(
+            stranger, now_ms=1000, idempotency_key="first", consent_active=True,
+        )
+
+
 def test_bounded_fixture_tick_revoked_consent_latches_stop():
     pipeline, world, session, principal, _ = setup_pipeline()
     assert pipeline.bounded_fixture_tick(

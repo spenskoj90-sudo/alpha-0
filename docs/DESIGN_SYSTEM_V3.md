@@ -14,6 +14,10 @@ The Owner approved **five** cross-platform design studies under H: **Calm Precis
 
 Block H has completed an **editable Figma comparative study**: [40 Russian/English prototype screens and five candidate palettes](DESIGN_STUDIES_H_2026-10-24.md), machine-bound to `design/h-design-studies.v1.json`. Current Design System v3 remains ACTIVE, and none of the four alternatives has been Owner-selected or production-implemented. The study does not certify production UI accessibility, live runtime or physical visual acceptance. Further native translation is gated on one explicit Owner design selection.
 
+## New approved design exploration scope — 2026-10-24
+
+The Owner **deferred palette and final visual selection** and approved an expanded [H1–H11 deep brand/product design program](DESIGN_PROGRAM_H_V2.md). The former dominant **volumetric S/radar/shield creative direction is not adequate for SENTINEL's future primary identity**: the next visual identity must represent game intelligence, assistance, controlled permitted game action and multiple platforms rather than primarily security. Develop genuinely different symbol alternatives and a coherent icon set, complete page/route/component/motion systems, a genuine multi-route public website and platform-native Android/Windows/Web control experiences. **Do not remove currently shipped v3 brand assets, current tokens or accepted UI until the new identity has explicit Owner visual selection and a tested native migration.** v3 stays ACTIVE while design studies advance.
+
 ## Reference refresh · 2026-09-27
 
 The latest design-laboratory reference extends the already-adopted v3 foundations without replacing production architecture. The refreshed reference adds explicit interactive studies for **Voice**, **Admin**, **Access**, **Billing** and **Resilience**, plus a detailed cross-platform screen/state inventory and Compose/Electron handoff guidance. The foundational brand artwork, semantic color direction, typography families, low-radius geometry, status grammar and accessibility rules remain compatible with the existing v3 production contract.

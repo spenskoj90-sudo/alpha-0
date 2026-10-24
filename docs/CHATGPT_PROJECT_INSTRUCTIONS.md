@@ -16,7 +16,7 @@ The Human Owner is final authority. GPT/ChatGPT is the sole Owner-facing orchest
 
 1. Start substantive engineering from live `spenskoj90-sudo/alpha-0` `main`; resolve the exact SHA.
 2. Treat live GitHub/runtime/provider evidence as truth. Memory and old chats are orientation only.
-3. Read root `AGENTS.md`, then only task-relevant scoped instructions/contracts. Do not preload all docs.
+3. Read root `AGENTS.md`, then route the selected A–I block via `docs/ENGINEERING_BLOCKS.md`, then only task-relevant scoped instructions/contracts. Do not preload all docs.
 4. Prefer one coherent vertical pass over many micro-passes.
 5. Use one compact reconciliation, then execute. Avoid repeated full audits and audit-of-audit loops.
 6. Continue routine work autonomously:

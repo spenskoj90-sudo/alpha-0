@@ -29,6 +29,8 @@ Read this file first. Do not load the entire repository documentation set by def
 
 ## Context routing
 
+- **Approved permanent A–I work registry (2026-10-23):** `docs/ENGINEERING_BLOCKS.md` + `docs/engineering-blocks.v1.json`; route the Owner-selected block before scoped contracts. A=repository hygiene, B=Android, C=Windows/PC/WoW, D=Web Control, E=Public Website, F=Core/Cloud, G=Intelligence, H=Design System, I=Release. Cross-cutting design/security/version-compatibility/performance/tests/docs are included within the selected platform vertical. Historical Block B/C/D productization labels are not the new platform IDs.
+
 - Before resuming product/game work: `docs/TASKS.md` + `docs/PLAYER_INTELLIGENCE_ROADMAP_V1.md` (#455); preserve future requirements, current priorities and the next verified step. The roadmap is not implementation evidence.
 
 - Android: `app/AGENTS.md`

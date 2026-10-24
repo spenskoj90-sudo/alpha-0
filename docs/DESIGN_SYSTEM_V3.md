@@ -6,6 +6,10 @@
 **Reviewed earlier native studies:** `a6fc9d4c513dde9d549e5dd70159b1365a76b95c` (not the imported registry pin)
 **Production design owner:** GPT, within the Owner-approved direction.
 
+## Owner-approved block H design exploration · 2026-10-23
+
+The Owner approved **five** cross-platform design studies under H: **Calm Precision (existing v3)**, Sentinel Command, Tactical Slate, Signal Minimal and Intelligence Atlas. No replacement was selected or Owner-visually accepted. This document and `design/sentinel-design-system.v3.json` **remain the ACTIVE production authority** until an explicitly accepted native migration. Compare candidate UX on the same Android Dashboard/Game Assistant, Windows Companion/WoW Overlay, authenticated Web Control and public Website screens, in RU/EN, with responsive layout, relevant themes, Stop/unknown/degraded states, focus/contrast and accessibility. Designs are required within every platform feature vertical; unfinished external lab work is not automatically imported. See `docs/ENGINEERING_BLOCKS.md`.
+
 ## Reference refresh · 2026-09-27
 
 The latest design-laboratory reference extends the already-adopted v3 foundations without replacing production architecture. The refreshed reference adds explicit interactive studies for **Voice**, **Admin**, **Access**, **Billing** and **Resilience**, plus a detailed cross-platform screen/state inventory and Compose/Electron handoff guidance. The foundational brand artwork, semantic color direction, typography families, low-radius geometry, status grammar and accessibility rules remain compatible with the existing v3 production contract.

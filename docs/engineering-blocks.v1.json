@@ -1,0 +1,219 @@
+{
+  "schema": "sentinel.engineering-blocks.v1",
+  "status": "ACTIVE",
+  "ownerApprovedDate": "2026-10-23",
+  "releaseScope": "UNCHANGED",
+  "currentDesignAuthority": "design/sentinel-design-system.v3.json",
+  "selectedFutureDesign": null,
+  "featureDefinitionOfDone": [
+    "implementation",
+    "platform_native_design_ux",
+    "security_privacy_permission",
+    "game_os_version_compatibility",
+    "performance_resources",
+    "accessibility_localization",
+    "automated_tests",
+    "runtime_evidence",
+    "documentation"
+  ],
+  "ownershipRule": "Selected user-facing platform B/C/D/E owns its complete vertical including necessary F/G/H/I cross-cutting changes. A maintains repository hygiene. Shared-system-only tasks go to F/G/H/I.",
+  "gameAutomation": {
+    "ownerProductDirectionApproved": true,
+    "androidPlanned": true,
+    "wowWindowsPlanned": true,
+    "defaultEnabled": false,
+    "currentExecutionState": "AUTOMATIC_EXECUTION_DISABLED",
+    "modes": [
+      "OFF",
+      "ADVISORY",
+      "CONFIRM_EACH",
+      "BOUNDED_ACTIVE_WHERE_PERMITTED"
+    ],
+    "runtimeRequires": [
+      "verified_exact_environment",
+      "lawful_operator_permission",
+      "explicit_consent_and_entitlement",
+      "bounded_policy_action_gateway",
+      "fresh_observation",
+      "stop_override_revocation",
+      "verified_outcome"
+    ],
+    "noAntiCheatEvasion": true
+  },
+  "designStudy": {
+    "proposals": [
+      "Calm Precision (v3 incumbent)",
+      "Sentinel Command",
+      "Tactical Slate",
+      "Signal Minimal",
+      "Intelligence Atlas"
+    ],
+    "ownerSelection": "PENDING",
+    "productionActiveUntilReplaced": "CALM PRECISION / TRUSTED INTELLIGENCE"
+  },
+  "blocks": [
+    {
+      "id": "A",
+      "slug": "REPOSITORY",
+      "type": "governance",
+      "sections": [
+        "A1_BRANCHES",
+        "A2_DOCS",
+        "A3_DEPENDENCIES",
+        "A4_CI",
+        "A5_AUDIT"
+      ],
+      "paths": [
+        "docs/",
+        "scripts/",
+        ".github/"
+      ]
+    },
+    {
+      "id": "B",
+      "slug": "ANDROID",
+      "type": "platform",
+      "sections": [
+        "B1_APP",
+        "B2_GAMES",
+        "B3_CAPTURE_OCR",
+        "B4_GAME_INTELLIGENCE",
+        "B5_ACTIVE_ASSISTANT",
+        "B6_PER_GAME_MODULES",
+        "B7_SECURITY",
+        "B8_COMPATIBILITY",
+        "B9_DESIGN",
+        "B10_QUALITY"
+      ],
+      "paths": [
+        "app/"
+      ]
+    },
+    {
+      "id": "C",
+      "slug": "WINDOWS_PC",
+      "type": "platform",
+      "sections": [
+        "C1_HOST",
+        "C2_GAME_ADAPTERS",
+        "C3_WOW_CHARACTER_BUILDS",
+        "C4_WOW_PVE",
+        "C5_WOW_PVP",
+        "C6_WOW_ACTIVE_ASSISTANT",
+        "C7_WOW_AUCTION",
+        "C8_WOW_PROFESSIONS",
+        "C9_WOW_LEVELING_QUESTS",
+        "C10_WOW_ECONOMY",
+        "C11_ANALYTICS",
+        "C12_COMPANION_OVERLAY_VOICE",
+        "C13_SECURITY",
+        "C14_DESIGN_QUALITY"
+      ],
+      "paths": [
+        "launcher/",
+        "wow-addon/"
+      ]
+    },
+    {
+      "id": "D",
+      "slug": "WEB_CONTROL",
+      "type": "platform",
+      "sections": [
+        "D1_ACCOUNT",
+        "D2_DEVICES",
+        "D3_GAMES",
+        "D4_BILLING",
+        "D5_ADMIN",
+        "D6_DESIGN_SECURITY_QUALITY"
+      ],
+      "paths": [
+        "web/"
+      ]
+    },
+    {
+      "id": "E",
+      "slug": "PUBLIC_WEBSITE",
+      "type": "platform",
+      "sections": [
+        "E1_PAGES",
+        "E2_GAME_PAGES",
+        "E3_DOWNLOADS",
+        "E4_PUBLIC_CONTENT",
+        "E5_DESIGN_ACCESSIBILITY"
+      ],
+      "paths": [
+        "site/"
+      ]
+    },
+    {
+      "id": "F",
+      "slug": "CORE_CLOUD",
+      "type": "shared",
+      "sections": [
+        "F1_API_AUTH",
+        "F2_DATABASE_RLS",
+        "F3_BILLING",
+        "F4_EVENTS_WORKERS",
+        "F5_PROVIDERS",
+        "F6_STAGING",
+        "F7_RECOVERY"
+      ],
+      "paths": [
+        "server/",
+        "observability/"
+      ]
+    },
+    {
+      "id": "G",
+      "slug": "INTELLIGENCE_ENGINE",
+      "type": "shared",
+      "sections": [
+        "G1_KNOWLEDGE_PACKS",
+        "G2_PROVENANCE",
+        "G3_MODULE_CONTRACTS",
+        "G4_REPLAY_INFERENCE",
+        "G5_ACTION_POLICY",
+        "G6_EVALUATION"
+      ],
+      "paths": [
+        "server/",
+        "app/",
+        "launcher/"
+      ]
+    },
+    {
+      "id": "H",
+      "slug": "DESIGN_SYSTEM",
+      "type": "shared",
+      "sections": [
+        "H1_FIVE_STUDIES",
+        "H2_OWNER_SELECTION",
+        "H3_TOKENS",
+        "H4_COMPONENTS",
+        "H5_NATIVE_TRANSLATION",
+        "H6_ACCESSIBILITY"
+      ],
+      "paths": [
+        "design/",
+        "docs/DESIGN_SYSTEM_V3.md"
+      ]
+    },
+    {
+      "id": "I",
+      "slug": "RELEASE_DISTRIBUTION",
+      "type": "shared",
+      "sections": [
+        "I1_ARTIFACTS",
+        "I2_SIGNING",
+        "I3_UPDATES",
+        "I4_ATTESTATION",
+        "I5_FINAL_ACCEPTANCE",
+        "I6_PUBLICATION"
+      ],
+      "paths": [
+        ".github/workflows/",
+        "docs/RELEASE_GATES.md"
+      ]
+    }
+  ]
+}

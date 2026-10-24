@@ -15,6 +15,10 @@ COMPACT RECONCILE → ROUTE → EXECUTE → TEST → FIX → REVIEW → PR → C
 
 ROUTE stays single-GPT by default. It may create independent parallel lanes only when the expected speed/coverage benefit exceeds context and integration overhead. Each lane has isolated mutable state and an explicit owner.
 
+## Owner-approved permanent A–I block routing
+
+`docs/ENGINEERING_BLOCKS.md` and `docs/engineering-blocks.v1.json` are the ACTIVE 2026-10-23 selection/ownership contract: A repository; B Android; C Windows/PC/WoW; D Web Control; E public site; F Core/Cloud; G Intelligence; H Design System; I Release/Distribution. The Owner selects a platform block, which includes necessary design, security, compatibility, performance, native UX, quality/testing and API/shared integration in the same bounded vertical. Historical task labels Block B/C/D are not new platform completeness claims. Existing exact-SHA review/CI and Owner-only gates remain in effect.
+
 ## Parallel-lane contract
 
 Every writing lane defines:

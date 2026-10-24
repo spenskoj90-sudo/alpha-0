@@ -13,18 +13,21 @@ const path=require('node:path');
  let routes=0,checks=0;const {publicPages,productPages}=await import('../content.mjs');
  const targets={site:publicPages,...productPages};const output=process.env.H_QA_OUTPUT||'/tmp/sentinel-h-qa';fs.mkdirSync(output,{recursive:true});
  try{
- await page.goto('http://127.0.0.1:4176/?surface=site&lang=en');await page.locator('h1').waitFor();await page.locator('#theme').click();
+ for(const endpoint of ['/..%2f..%2fetc%2fpasswd','/missing.woff2'])assert.equal((await page.request.get('http://127.0.0.1:4176'+endpoint)).status(),404);checks++;
+ await page.goto('http://127.0.0.1:4176/?surface='+encodeURIComponent('" data-injected="yes'));await page.locator('h1').waitFor();assert.equal(await page.locator('[data-injected]').count(),0);assert.equal(await page.locator('#surface').inputValue(),'site');checks++;
+ await page.goto('http://127.0.0.1:4176/?surface=site&lang=en');await page.locator('h1').waitFor();await page.evaluate(()=>document.fonts.ready);await page.locator('#theme').click();
  assert.equal(await page.locator('body').evaluate(e=>getComputedStyle(e).color),'rgb(24, 36, 51)','light theme must resolve dark foreground');
  assert.equal(await page.locator('body').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(244, 246, 249)','light theme must paint light canvas');await page.locator('#theme').click();checks++;
- for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
+ for(const viewport of [{width:320,height:844},{width:390,height:844},{width:768,height:1000},{width:1024,height:1000},{width:1440,height:1000}]){
  await page.setViewportSize(viewport);
  for(const lang of ['ru','en'])for(const [surface,pages]of Object.entries(targets))for(const p of pages){
-  await page.goto(`http://127.0.0.1:4176${p.path}?surface=${surface}&lang=${lang}`);await page.locator('h1').waitFor();
+  await page.goto(`http://127.0.0.1:4176${p.path}?surface=${surface}&lang=${lang}`);await page.locator('h1').waitFor();await page.evaluate(()=>document.fonts.ready);
   assert.equal(await page.locator('h1').innerText(),p.title[lang==='ru'?0:1]);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${surface}${p.path} ${lang} ${viewport.width} overflow`);
-  const broken=await page.locator('a[href]').evaluateAll(links=>links.filter(a=>a.href.startsWith('javascript:')).length);assert.equal(broken,0);const hrefs=await page.locator('a[href]').evaluateAll(es=>es.map(e=>e.href));for(const href of hrefs){const u=new URL(href);if(u.origin==='http://127.0.0.1:4176'){const destination=u.searchParams.get('surface')||surface;const routeSet=destination==='library'?['/brand','/icons','/components']:(targets[destination]||[]).map(r=>r.path);assert.ok(routeSet.includes(u.pathname),`broken link ${href} on ${surface}${p.path}`);}}routes++;
+  const broken=await page.locator('a[href]').evaluateAll(links=>links.filter(a=>!['http:','https:'].includes(new URL(a.href).protocol)).length);assert.equal(broken,0);const hrefs=await page.locator('a[href]').evaluateAll(es=>es.map(e=>e.href));for(const href of hrefs){const u=new URL(href);if(u.origin==='http://127.0.0.1:4176'){const destination=u.searchParams.get('surface')||surface;const routeSet=destination==='library'?['/brand','/icons','/components']:(targets[destination]||[]).map(r=>r.path);assert.ok(routeSet.includes(u.pathname),`broken link ${href} on ${surface}${p.path}`);}}routes++;
  }
  }
+ await page.setViewportSize({width:390,height:844});
  // Permission, observation, revoke, recovery and persistent Stop.
  await page.goto('http://127.0.0.1:4176/capture?surface=android&lang=en');await page.locator('#consent').check();await page.locator('[data-event=permission-dialog]').click();await page.locator('dialog [data-event=grant]').click();await page.locator('[data-event=observe]').click();assert.match(await page.locator('#observation-status').innerText(),/Demo observation/);checks++;
  await page.locator('[data-event=revoke]').click();assert.match(await page.locator('#observation-status').innerText(),/Permission revoked/);assert.equal(await page.locator('[data-event=observe]').count(),0);checks++;
@@ -47,9 +50,9 @@ const path=require('node:path');
  await page.goto('http://127.0.0.1:4176/account?surface=windows&lang=en');await page.locator('[data-event=sign-out]').click();assert.equal(new URL(page.url()).pathname,'/launcher');assert.equal(await page.locator('.sticky-stop .badge').innerText(),'STOPPED');checks++;
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.evaluate(()=>matchMedia('(prefers-reduced-motion:reduce)').matches),true);assert.equal(await page.locator('button').first().evaluate(e=>getComputedStyle(e).transitionDuration),'0s');checks++;
  for(const [name,p,s,lang,width]of [['home','/','site','ru',1440],['android','/capture','android','ru',390],['windows','/overview','windows','en',1440],['control','/security','control','en',1440],['brands','/brand','library','ru',1440],['icons','/icons','library','en',1440],['light','/','site','en',390]]){
- await page.setViewportSize({width,height:1000});await page.goto(`http://127.0.0.1:4176${p}?surface=${s}&lang=${lang}`);await page.locator('h1').waitFor();if(name==='light')await page.locator('#theme').click();await page.screenshot({path:path.join(output,`${name}.png`),fullPage:true});
+ await page.setViewportSize({width,height:1000});await page.goto(`http://127.0.0.1:4176${p}?surface=${s}&lang=${lang}`);await page.locator('h1').waitFor();await page.evaluate(()=>document.fonts.ready);if(name==='light')await page.locator('#theme').click();await page.screenshot({path:path.join(output,`${name}.png`),fullPage:true});
  }
  assert.deepEqual(errors,[]);
- const evidence={directRouteLocaleViewportChecks:routes,journeyChecks:checks,pageErrors:errors,viewports:[1440,390],locales:['ru','en'],note:'Browser prototype evidence only; no native, physical, owner or release acceptance.'};fs.writeFileSync(path.join(output,'browser-evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence));
+ const evidence={directRouteLocaleViewportChecks:routes,journeyChecks:checks,pageErrors:errors,viewports:[320,390,768,1024,1440],locales:['ru','en'],note:'Browser prototype evidence only; no native, physical, owner or release acceptance.'};fs.writeFileSync(path.join(output,'browser-evidence.json'),JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence));
  }finally{await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1});

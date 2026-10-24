@@ -17,3 +17,4 @@ export function resolveRoute(path,surface='site'){
  const page=pages.find(p=>p.path===clean);
  return page?{...page,found:true}:{path:clean,found:false,title:['Страница не найдена','Page not found']};
 }
+export function parseSurface(value){return ['site','android','windows','control','library'].includes(value)?value:'site';}

@@ -7,3 +7,5 @@
 .sidebar{min-width:0}
 .product-illustration{display:block;width:100%;height:auto;border-radius:12px;margin:0 0 24px}
 body{background:var(--bg);color:var(--text)}
+
+h1,h2,h3{overflow-wrap:anywhere}.empty-price{font-size:clamp(28px,4vw,44px);overflow-wrap:anywhere}

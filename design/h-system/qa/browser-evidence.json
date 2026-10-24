@@ -1,10 +1,13 @@
 {
-  "directRouteLocaleViewportChecks": 276,
-  "journeyChecks": 14,
+  "directRouteLocaleViewportChecks": 690,
+  "journeyChecks": 16,
   "pageErrors": [],
   "viewports": [
-    1440,
-    390
+    320,
+    390,
+    768,
+    1024,
+    1440
   ],
   "locales": [
     "ru",

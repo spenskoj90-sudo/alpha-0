@@ -20,3 +20,8 @@ test('direct public routes resolve distinctly and reject absent routes',()=>{
  for(const p of ['/','/features','/games/world-of-warcraft','/platforms/android','/legal']) assert.equal(resolveRoute(p).path,p);
  assert.equal(resolveRoute('/absent').found,false);
 });
+test('surface identifiers from URLs cannot become HTML attributes', async()=>{
+ const {parseSurface}=await import('../model.mjs');
+ assert.equal(parseSurface('" onmouseover="alert(1)'), 'site');
+ for(const surface of ['site','android','windows','control','library'])assert.equal(parseSurface(surface),surface);
+});

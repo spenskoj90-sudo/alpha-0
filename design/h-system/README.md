@@ -53,7 +53,7 @@ not Node. They are evidence of this authoring pass, not an idempotent full-file 
 ## Verification
 
 ```sh
-node --test design/h-system/tests/model.test.mjs
+node --test design/h-system/tests/*.test.mjs
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/path/to/chromium \
   node design/h-system/tests/browser.cjs
 ```
@@ -61,7 +61,7 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/pat
 If Playwright owns its browser, omit CHROMIUM_EXECUTABLE. Existing repository CI uses
 `web/node_modules/@playwright/test`. `H_QA_OUTPUT` controls screenshot/report output.
 The suite starts its own loopback server on port 4176 and checks all 69 routes in
-RU/EN at 390px and 1440px, internal links and explicit interaction regressions.
+RU/EN at 320/390/768/1024/1440px, internal links and explicit interaction regressions.
 The H Design Preview workflow publishes exact-PR-HEAD source and screenshots as an artifact.
 
 ## Important remaining H work
@@ -74,7 +74,7 @@ This is a substantial first implementation, **not completion of H1–H11**:
   a state label and reusable template alone do not prove finished product UX.
 - Many future game modules deliberately show UNKNOWN/PLANNED structures. They require deeper
   module-specific interaction design; no verified source exists to fill them honestly.
-- Phone/tablet native hierarchy, desktop window behavior, 200% text, 320px and intermediate
+- Phone/tablet native hierarchy, desktop window behavior, 200% text and additional
   breakpoints, all accent/theme combinations and every state need additional visual passes.
 - Figma route studies are component compositions and linked state frames; real focus, Escape,
   history and state transitions are exercised in the browser prototype, not native apps.

@@ -24,7 +24,7 @@ Revoked permission cannot leave observation active; Stop survives navigation; un
 
 ## Execution ledger
 - First vertical pass delivered isolated vector/route/component foundations. Detailed H completion remains open; see design/h-system/HANDOFF.md.
-- Browser 276 route/locale/viewport combinations + 14 scenarios passed; six model/contrast tests passed; repository verification 84/84.
+- Browser 690 route/locale/viewport combinations + 16 scenarios passed; seven model/contrast tests passed; repository verification 84/84.
 - Independent review found a Windows sign-out route defect; fixed and browser-regressed. Named dialogs, focus assertions and internal-link coverage also added.
 - Ruling: retain all current production UI and v3; study source remains separate as explicitly required by the Owner.
 - Figma external MCP limit prevents the final border/focus calibration; saved exact node IDs enable resumption without rediscovery. No purchase or palette request.

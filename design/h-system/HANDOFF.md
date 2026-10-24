@@ -11,14 +11,14 @@ are untouched. AUTOMATIC_EXECUTION_DISABLED remains in force.
 
 ## Results that were actually verified
 
-- Browser: 276 direct route × locale × viewport checks (69 routes × RU/EN ×
-  390/1440), internal links checked against authored routes; no page errors.
-- 14 scenario checks: explicit consent, observation, revoke, persistent Stop,
+- Browser: 690 direct route × locale × viewport checks (69 routes × RU/EN ×
+  320/390/768/1024/1440), internal links checked against authored routes; no page errors.
+- 16 scenario checks: explicit consent, observation, revoke, persistent Stop,
   stale/recovery without resume, MFA rejection/success, denied Admin, update
   failure/rollback-unavailable, Overlay density/Stop, menu/history/locale,
   legal-page section links, named dialogs/Escape/focus return, reduced motion,
   Windows demo exit and resolved light-theme foreground/background.
-- Six model/contrast tests: stop/revoke/stale and direct routing plus AA text token
+- Seven model/contrast tests: stop/revoke/stale and direct routing plus AA text token
   pairs and 3:1 input-boundary pairs in both provisional light/dark themes.
   This is a limited measured token check, not full accessibility certification.
 - `bash verify.sh`: 84 passed / 0 failed locally.
@@ -49,6 +49,12 @@ are untouched. AUTOMATIC_EXECUTION_DISABLED remains in force.
   Waypoint were redrawn before their final exports.
 - Figma paint aliases could display their temporary fallback color: concrete
   fallback colors and explicit provisional modes were repaired and visually checked.
+
+## CI security and expanded-width follow-up
+
+CodeQL identified three high alerts: a negative-only URL-scheme test and two request-dependent filesystem expressions in the local server. The test now uses an HTTP/HTTPS allowlist. The server selects from a trusted startup asset registry; no request is joined into a filesystem path. Traversal and absent-asset requests have browser regressions. URL surface IDs are also allowlisted before template rendering, with a malicious-attribute regression. No scan was suppressed or security gate weakened.
+
+Expanded checks wait for locally bundled fonts before measuring layout. Two genuine 320px defects (the long Admin heading and unannounced price) were corrected with wrapping and responsive type sizing. The additional apparent intermediate-width failures disappeared when measurement waited for font readiness.
 
 ## External limit reached, not an Owner action request
 

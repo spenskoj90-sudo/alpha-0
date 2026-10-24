@@ -2,9 +2,9 @@
   "baseMain": "5e8a2b3a1001b81dad462ab9ceede9299acb8c55",
   "sha256": {
     "ASSET_PROVENANCE.md": "fb0be31560e337e4ccc48e5a6e20eb5bcc397e6a47bed99699e3d738a51ab0df",
-    "HANDOFF.md": "50215b9eb572cd05783070190e0994b2aa91cd83a32113b15494bacf5eb1d6cc",
-    "README.md": "936d21fb94c78315d82b40abf2bbc5d8980a180669fdeb0c0e24678bf44ec133",
-    "app.mjs": "6dfa3de776bd8a64280c39c61c3392b6b0856c14ec489ca0b2276f22fd7bf5a2",
+    "HANDOFF.md": "81ba01498c24c56caa75eb7b4f63e5b641f4547e5c998f4bcb80be20b155c380",
+    "README.md": "e0a06d01912fdf1766fdf0d00012316b1314ebae22916ca8a8cc2c64f4ff295c",
+    "app.mjs": "cb8870a5df3e37e1cad7ae66e586e1bbe6b502ac60e069378d2efdcfb5e68ced",
     "assets/brand/confluence/adaptive-foreground.svg": "e9b5c1b90e2b4d6ff10133899d037f6cd0050f2d4b6121457010b8f793d033bb",
     "assets/brand/confluence/colors.xml": "5724892f17713cefc8e93304902e27dd9e51cd1130d30217d68bfd39ef726679",
     "assets/brand/confluence/favicon.ico": "53af536808c4de877414bedaa35bc9225accc504fe30ceb1dddd50d45bcfe09c",
@@ -162,11 +162,11 @@
     "fonts.css": "3935faa4aafc40be6c75f058e5c346b53d84101b2c6cb60aa4ffdb14403a016a",
     "icons.json": "637185c61beae67c4332667bd5c97566eaf01135d445083b4aff1712e1b93da8",
     "index.html": "4a2344a77675543afe4d5039fae9bf29d0df72bc22959de2f62b058f9ba3f17c",
-    "model.mjs": "e22e05664b698fde550a33c54b7fd766fa0831b164311b92cee9d376ef7b0de1",
-    "serve.py": "617d775190d7c8619602dc0f0c21a5dbb000460d3c0791ec11dd36f46b01a94e",
-    "style.css": "e3680fa76f500b9ea35b548e5c092c47633f100cff4fcdcd5e89add99d9e1157",
-    "tests/browser.cjs": "8f9ecc3b72b61a02f677f46763bcb58e4ade56500a666bf589e3ff3e10e021f7",
+    "model.mjs": "b5cb590f99cbdf7c163a909acd77ffe6fb7953d0ff8473f604812263188b0eec",
+    "serve.py": "bb610d5ce58535870a56f2d9478b52500a7d8eca22972dbad3e02701339067c7",
+    "style.css": "5993b3e533098f7b93f936a529176982fbf9958b0f806552111d5b26b7434205",
+    "tests/browser.cjs": "84242f3a2df09b7570dd1cc06b3ab7548834fc1c35cb0219b49169caf6726eb3",
     "tests/contrast.test.mjs": "38828ec642f664c80b6e13533419e74a3eda2f4a3fd41aba23cc63d3b2f0e2c2",
-    "tests/model.test.mjs": "1e7bf4fdd61b375d73fcd8615758c6b97e53632ba15a4291fb5a1550c9c2e34d"
+    "tests/model.test.mjs": "01a8a21408572b46bf5f49faf8c1ba7fcf21c6ba04f8a0a5f28eca0fbb375e46"
   }
 }

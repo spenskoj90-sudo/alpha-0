@@ -1,11 +1,11 @@
 import {publicPages,productPages,tr} from './content.mjs';
-import {initialState,transition,resolveRoute} from './model.mjs';
+import {initialState,transition,resolveRoute,parseSurface} from './model.mjs';
 const icons=await fetch('/icons.json').then(r=>r.json());
 const brands=await fetch('/brands.json').then(r=>r.json());
 const app=document.querySelector('#app'),dialog=document.querySelector('#dialog');
 dialog.setAttribute('aria-labelledby','dialog-title');
 let lang=new URL(location.href).searchParams.get('lang')==='en'?'en':'ru';
-let surface=new URL(location.href).searchParams.get('surface')||'site';
+let surface=parseSurface(new URL(location.href).searchParams.get('surface'));
 let state={...initialState},density='standard',update='idle',progress=0,updateTimer;
 let study='calm',brand='parallax',theme='dark',reduced=false;
 const L=(ru,en)=>lang==='ru'?ru:en;
@@ -86,7 +86,7 @@ function render(focus=false){
  else if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
  else if(focusEvent)document.querySelector(`[data-event="${focusEvent}"]`)?.focus({preventScroll:true});
 }
-function navigate(path,s=surface){surface=s;history.pushState({},'',url(path,s));render(true);window.scrollTo(0,0);}
+function navigate(path,s=surface){surface=parseSurface(s);history.pushState({},'',url(path,surface));render(true);window.scrollTo(0,0);}
 function announce(message){document.querySelector('#announcer').textContent=message;}
 function openDialog(title,body,actions){dialog.innerHTML=`<h2 id="dialog-title">${title}</h2>${body}<div class="actions">${actions}${btn('close-dialog',L('Отмена','Cancel'))}</div>`;dialog.showModal();}
 function dispatch(event){
@@ -119,5 +119,5 @@ document.addEventListener('click',e=>{
 document.addEventListener('change',e=>{if(e.target.id==='surface')navigate({site:'/',android:'/welcome',windows:'/launcher',control:'/sign-in',library:'/brand'}[e.target.value],e.target.value);if(e.target.id==='study'){study=e.target.value;render();}if(e.target.id==='language-setting'){lang=e.target.value;history.replaceState({},'',url(location.pathname));render();}if(e.target.id==='brand-setting'){brand=e.target.value;render();}if(e.target.id==='reduce-motion'){reduced=e.target.checked;document.body.classList.toggle('reduce',reduced);}});
 document.addEventListener('input',e=>{if(e.target.id==='game-filter'){const visible='world of warcraft'.includes(e.target.value.trim().toLowerCase());document.querySelector('#game-result').hidden=!visible;}});
 document.addEventListener('submit',e=>{if(e.target.id==='auth-form'){e.preventDefault();e.target.reset();dispatch('mfa-dialog');}if(e.target.id==='mfa-form'){e.preventDefault();if(new FormData(e.target).get('code')==='123456'){dialog.close();navigate(surface==='android'?'/home':'/overview');announce(L('Демо вход выполнен. Настоящий сеанс не создан.','Demo sign-in complete. No actual session created.'));}else document.querySelector('#mfa-error').textContent=L('Неверный демо код. Попробуйте 123456.','Incorrect demo code. Try 123456.');}if(e.target.id==='support-form'){e.preventDefault();openDialog(L('Черновик готов','Draft ready'),`<p>${L('Описание проверено локально. Обращение не отправлено.','Description checked locally. No request was sent.')}</p>`,btn('close-dialog',L('Вернуться','Return'),'primary'));}});
-window.addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;surface=q.get('surface')||'site';lang=q.get('lang')==='en'?'en':'ru';render(true);});
+window.addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;surface=parseSurface(q.get('surface'));lang=q.get('lang')==='en'?'en':'ru';render(true);});
 render();

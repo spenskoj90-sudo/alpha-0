@@ -16,14 +16,14 @@ Status: isolated browser prototype; no native/runtime/Owner acceptance inferred.
 - Professions: bounded quantity and illustrative material calculation; no crafting.
 - Quests: local checklist, progress, state retained through SPA history.
 - Economy: independent resource table preferences and fictional accounting structure.
-- Battle: example bars with separate unknown actual frame freshness and disabled execution.
+- Battle: sample-only accessible meters; missing real readings display UNKNOWN without zero-width bars. Actual frame freshness remains unknown and execution disabled.
 
 All examples are invented UI fixtures. Default source state stays UNKNOWN; a named
 switch explicitly enables samples. Talent and quest names, recipe values and fictional
 PvE/rotation steps are masked until opt-in; disabled sample controls cannot mutate drafts.
 Auction/economy row-detail selections are independent. Search invalidates the selected
-row only in its own workspace, avoiding mismatched table/details displays. They are not actual WoW talents, class builds,
-encounters, prices or recommendations. No verified 3.3.5a environment is implied.
+row only in its own workspace, avoiding mismatched table/details displays.
+These examples are not actual WoW talents, class builds, encounters, prices or recommendations. No verified 3.3.5a environment is implied.
 Selections persist only in browser memory across locale/theme/SPA navigation.
 Switching samples off clears local example drafts; switching them on again starts fresh.
 Reload and explicit sign-out also clear local drafts. No localStorage or backend calls.
@@ -44,8 +44,8 @@ not ongoing observation or game execution.
 ## Verification and review
 
 - Existing 690 direct route/locale/width checks and 16 baseline journeys retained.
-- Added 240 module/locale/width/missing-or-sample combinations and 12 workspace journeys.
-- Eleven model/contrast tests, including bounded allocations, independent drafts,
+- Added 240 module/locale/width/missing-or-sample combinations and regression journeys; the CI report records current test counts.
+- Model/contrast tests, including bounded allocations, independent drafts,
   invalid recipe values, table filters and opt-in semantics.
 - Independent review found a background download timer writing to the first generic
   progressbar. New regression reproduces 10/8 talent progress before the fix; the
@@ -53,6 +53,14 @@ not ongoing observation or game execution.
 - Default build/PvP content was adjusted so invented values are not exposed before
   the fixture switch is enabled. User search is escaped before HTML interpolation.
 - Visual samples: qa/workspaces/ (build comparison, talents, auction, tablet, mobile quests).
+
+## Trust-state fidelity improvement
+
+- Per-field provenance is preserved in mixed sample/unknown summary cards: actual
+  balance and character data remain UNKNOWN beside fictional SAMPLE values.
+- Unknown combat health/resource data use non-numeric placeholders, not zero-width
+  bars. Opt-in fictional readings expose labelled accessible meters.
+- Browser regressions guard these distinctions; no real telemetry or game action added.
 
 ## Integration and external boundaries
 

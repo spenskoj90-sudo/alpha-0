@@ -153,6 +153,52 @@ def test_bounded_tick_context_loss_is_latched_before_new_or_duplicate_action(bou
     assert world.turn == 1
 
 
+@pytest.mark.parametrize("boundary", ["FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"])
+def test_host_boundary_event_latches_stop_even_if_context_recovers_between_ticks(boundary):
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED"
+    pipeline.signal_fixture_host_loss(principal, boundary=boundary)
+    assert session.stopped and session.stop_reason == boundary
+    assert session.pending is None and world.turn == 1
+    # The fixture host reports recovery before another tick is polled.
+    world.focus_active = True
+    world.permission_active = True
+    world.session_id = pipeline.session_id
+    pipeline.signal_fixture_host_loss(principal, boundary=boundary)
+    assert session.stop_reason == boundary  # first cause is durable
+    for key, time in (("first", 1000), ("second", 2000)):
+        with pytest.raises(ValueError, match="STOPPED"):
+            pipeline.bounded_fixture_tick(
+                principal, now_ms=time, idempotency_key=key, consent_active=True,
+            )
+    assert world.turn == 1
+
+
+def test_synthetic_host_loss_rejects_foreign_or_invalid_event_without_stopping():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    foreign = replace(principal, device_id="other")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.signal_fixture_host_loss(foreign, boundary="FOCUS_LOST")
+    with pytest.raises(ValueError, match="HOST_BOUNDARY_INVALID"):
+        pipeline.signal_fixture_host_loss(principal, boundary="FOCUS_GAINED")
+    assert not session.stopped and session.stop_reason is None
+    assert world.focus_active and world.permission_active and world.turn == 0
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+
+
+def test_manual_stop_reason_is_not_overwritten_by_later_host_events():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    session.stop("USER_STOP")
+    pipeline.signal_fixture_host_loss(principal, boundary="PERMISSION_REVOKED")
+    assert session.stopped and session.stop_reason == "USER_STOP"
+    assert world.turn == 0
+
+
 def test_bounded_tick_revocation_precedes_idempotent_result_replay():
     pipeline, world, session, principal, _ = setup_pipeline()
     pipeline.bounded_fixture_tick(

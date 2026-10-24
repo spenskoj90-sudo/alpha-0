@@ -6,6 +6,7 @@ entitlement exists here. This bridge only accepts the exact in-memory TurnWorld.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from .knowledge_packs import Evaluation, LoadedPack, evaluate
 from .offline_game_actions import (
@@ -79,6 +80,25 @@ class OfflineTurnPipeline:
             raise ValueError("CONFIRMATION_REQUIRED")
         return self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
                                             idempotency_key=idempotency_key)
+
+    def signal_fixture_host_loss(self, principal: Principal, *,
+                                 boundary: Literal["FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"]) -> None:
+        """A trusted *synthetic* host event stops the lease immediately.
+
+        Unlike sampling host state at the next tick, this catches loss and
+        recovery between ticks. No real OS/game event source is bound here.
+        """
+        if principal != self.session._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        if boundary not in ("FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"):
+            raise ValueError("HOST_BOUNDARY_INVALID")
+        if boundary == "FOCUS_LOST":
+            self.world.focus_active = False
+        elif boundary == "PERMISSION_REVOKED":
+            self.world.permission_active = False
+        # SESSION_CHANGED is a terminal host notification: the synthetic
+        # source need not mutate identity for the lease to be invalidated.
+        self.session.stop(boundary)
 
     def bounded_fixture_tick(self, principal: Principal, *, now_ms: int,
                              idempotency_key: str, consent_active: bool) -> Outcome:

@@ -29,3 +29,18 @@ test('fixture opt-out clears drafts and model disallows hidden sample mutations'
  s=createWorkspace();for(const action of [{type:'compare',id:'balanced'},{type:'quantity',value:7},{type:'item',id:'ore'},{type:'arena',id:'reserve'},{type:'talent',id:'focus',delta:1}])s=reduceWorkspace(s,action);
  assert.deepEqual(s,createWorkspace());
 });
+
+test('distinct market selections, search invalidation, and opt-in phase/rotation',()=>{
+ let s=createWorkspace();
+ for(const a of [{type:'item',module:'auction',id:'ore'},{type:'phase',id:'react'},{type:'rotation',delta:1}])s=reduceWorkspace(s,a);
+ assert.equal(s.tables.auction.selectedItem,null);assert.equal(s.phase,'prepare');assert.equal(s.rotationStep,0);
+ s=reduceWorkspace(s,{type:'sample',value:true});
+ s=reduceWorkspace(s,{type:'item',module:'auction',id:'ore'});
+ assert.equal(s.tables.auction.selectedItem,'ore');assert.equal(s.tables.economy.selectedItem,null);
+ s=reduceWorkspace(s,{type:'item',module:'economy',id:'crystal'});
+ assert.equal(s.tables.auction.selectedItem,'ore');assert.equal(s.tables.economy.selectedItem,'crystal');
+ s=reduceWorkspace(s,{type:'table',module:'auction',field:'query',value:'cloth'});
+ assert.equal(s.tables.auction.selectedItem,null);assert.equal(s.tables.economy.selectedItem,'crystal');
+ s=reduceWorkspace(s,{type:'phase',id:'react'});s=reduceWorkspace(s,{type:'rotation',delta:1});
+ assert.equal(s.phase,'react');assert.equal(s.rotationStep,1);
+});

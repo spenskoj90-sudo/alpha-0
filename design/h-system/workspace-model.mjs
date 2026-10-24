@@ -1,6 +1,6 @@
 const buildIds=['balanced','reserve','mobility'];
 export const talentIds=['focus','reserve','momentum','guard','insight','recovery'];
-export function createWorkspace(){return {sample:false,executionEnabled:false,compare:[],talents:{},quantity:1,quests:[],phase:'prepare',rotationStep:0,selectedItem:null,arenaPlan:'balanced',tables:{auction:{query:'',sort:'price',page:0},economy:{query:'',sort:'name',page:0}}};}
+export function createWorkspace(){return {sample:false,executionEnabled:false,compare:[],talents:{},quantity:1,quests:[],phase:'prepare',rotationStep:0,arenaPlan:'balanced',tables:{auction:{query:'',sort:'price',page:0,selectedItem:null},economy:{query:'',sort:'name',page:0,selectedItem:null}}};}
 export function reduceWorkspace(state,action){
  const s={...state,executionEnabled:false};
  if(action.type==='reset')return createWorkspace();
@@ -13,13 +13,13 @@ export function reduceWorkspace(state,action){
  }
  if(action.type==='quantity'&&s.sample){const value=Number(action.value);return {...s,quantity:Number.isFinite(value)?Math.max(1,Math.min(99,Math.trunc(value))):s.quantity};}
  if(action.type==='quest'&&s.sample&&['survey','collect','return'].includes(action.id))return {...s,quests:s.quests.includes(action.id)?s.quests.filter(id=>id!==action.id):[...s.quests,action.id]};
- if(action.type==='phase'&&['prepare','react','recover'].includes(action.id))return {...s,phase:action.id};
- if(action.type==='rotation')return {...s,rotationStep:Math.max(0,Math.min(3,s.rotationStep+(action.delta===-1?-1:1)))};
+ if(action.type==='phase'&&s.sample&&['prepare','react','recover'].includes(action.id))return {...s,phase:action.id};
+ if(action.type==='rotation'&&s.sample)return {...s,rotationStep:Math.max(0,Math.min(3,s.rotationStep+(action.delta===-1?-1:1)))};
  if(action.type==='arena'&&s.sample&&buildIds.includes(action.id))return {...s,arenaPlan:action.id};
- if(action.type==='item'&&s.sample&&['ore','cloth','herb','crystal','leather','ink'].includes(action.id))return {...s,selectedItem:action.id};
+ if(action.type==='item'&&s.sample&&['auction','economy'].includes(action.module)&&['ore','cloth','herb','crystal','leather','ink'].includes(action.id))return {...s,tables:{...s.tables,[action.module]:{...s.tables[action.module],selectedItem:action.id}}};
  if(action.type==='table'&&['auction','economy'].includes(action.module)){
   const old=s.tables[action.module];const next={...old};
-  if(action.field==='query'){next.query=String(action.value).slice(0,80);next.page=0;}
+  if(action.field==='query'){next.query=String(action.value).slice(0,80);next.page=0;next.selectedItem=null;}
   if(action.field==='sort'&&['price','price-desc','name'].includes(action.value)){next.sort=action.value;next.page=0;}
   if(action.field==='page')next.page=Math.max(0,Math.trunc(Number(action.value)||0));
   return {...s,tables:{...s.tables,[action.module]:next}};

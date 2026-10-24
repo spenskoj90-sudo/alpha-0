@@ -19,7 +19,10 @@ Status: isolated browser prototype; no native/runtime/Owner acceptance inferred.
 - Battle: example bars with separate unknown actual frame freshness and disabled execution.
 
 All examples are invented UI fixtures. Default source state stays UNKNOWN; a named
-switch explicitly enables samples. They are not actual WoW talents, class builds,
+switch explicitly enables samples. Talent and quest names, recipe values and fictional
+PvE/rotation steps are masked until opt-in; disabled sample controls cannot mutate drafts.
+Auction/economy row-detail selections are independent. Search invalidates the selected
+row only in its own workspace, avoiding mismatched table/details displays. They are not actual WoW talents, class builds,
 encounters, prices or recommendations. No verified 3.3.5a environment is implied.
 Selections persist only in browser memory across locale/theme/SPA navigation.
 Switching samples off clears local example drafts; switching them on again starts fresh.

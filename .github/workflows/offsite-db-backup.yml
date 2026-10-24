@@ -33,6 +33,8 @@ jobs:
           S3_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
           AWS_ROLE: ${{ vars.SENTINEL_BACKUP_AWS_ROLE_ARN }}
           AWS_REGION: ${{ vars.SENTINEL_BACKUP_AWS_REGION }}
+          EXPECTED_HOST: ${{ vars.SENTINEL_BACKUP_EXPECTED_HOST }}
+          EXPECTED_DATABASE: ${{ vars.SENTINEL_BACKUP_EXPECTED_DATABASE }}
         run: |
           set -euo pipefail
           test -n "$NEON_URL" || { echo "::error::Backup database secret is not configured"; exit 1; }
@@ -40,6 +42,8 @@ jobs:
           test -n "$S3_BUCKET" || { echo "::error::Backup S3 bucket is not configured"; exit 1; }
           test -n "$AWS_ROLE" || { echo "::error::Backup AWS OIDC role is not configured"; exit 1; }
           test -n "$AWS_REGION" || { echo "::error::Backup AWS region is not configured"; exit 1; }
+          test -n "$EXPECTED_HOST" || { echo "::error::Expected Neon host is not configured"; exit 1; }
+          test -n "$EXPECTED_DATABASE" || { echo "::error::Expected Neon database is not configured"; exit 1; }
 
       - name: Install public-key encryption tool
         run: |
@@ -61,6 +65,8 @@ jobs:
           DATABASE_URL: ${{ secrets.SENTINEL_BACKUP_DATABASE_URL }}
           BACKUP_AGE_RECIPIENT: ${{ vars.SENTINEL_BACKUP_AGE_RECIPIENT }}
           BACKUP_S3_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
+          BACKUP_EXPECTED_HOST: ${{ vars.SENTINEL_BACKUP_EXPECTED_HOST }}
+          BACKUP_EXPECTED_DATABASE: ${{ vars.SENTINEL_BACKUP_EXPECTED_DATABASE }}
         run: bash scripts/offsite_pg_backup.sh
 
       # NEVER upload raw dump, encryption identity, or backup bytes as a GitHub artifact.

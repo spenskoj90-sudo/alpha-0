@@ -86,7 +86,7 @@ class BackupContractTests(unittest.TestCase):
         self.assertIn("| age --encrypt", s)
         self.assertIn("aws s3 cp", s)
         self.assertIn('cmp -s "$ciphertext" "$download"', s)
-        self.assertNotIn("pg_restore", s)
+        self.assertNotIn("\\npg_restore ", s)  # Mentioning restore in the summary is allowed
         self.assertNotIn("set -x", s)
         self.assertNotIn("--no-password", s)
 

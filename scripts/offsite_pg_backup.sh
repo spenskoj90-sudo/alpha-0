@@ -8,6 +8,35 @@ fail() { printf 'backup failure: %s\n' "$1" >&2; exit 1; }
 [[ "${GITHUB_REPOSITORY:-}" == "spenskoj90-sudo/alpha-0" ]] || fail "unexpected repository"
 [[ "${GITHUB_REF:-}" == "refs/heads/main" ]] || fail "protected main is required"
 [[ -n "${DATABASE_URL:-}" ]] || fail "missing unpooled database secret"
+[[ -n "${BACKUP_EXPECTED_HOST:-}" ]] || fail "missing expected Neon branch host"
+[[ -n "${BACKUP_EXPECTED_DATABASE:-}" ]] || fail "missing expected database name"
+# Validate *which* branch is read, without printing or exposing the DSN.
+# Refuse a pooled endpoint, unexpected host or database, or missing TLS.
+python3 - <<'PY'
+import os
+import sys
+from urllib.parse import parse_qs, unquote, urlsplit
+try:
+    u = urlsplit(os.environ["DATABASE_URL"])
+    host = u.hostname or ""
+    name = unquote(u.path.lstrip("/"))
+    q = parse_qs(u.query)
+    ssl = (q.get("sslmode") or [""])[0]
+    ok = (
+        u.scheme in ("postgresql", "postgres")
+        and bool(u.username) and bool(u.password)
+        and host == os.environ["BACKUP_EXPECTED_HOST"]
+        and host.endswith(".neon.tech")
+        and "-pooler" not in host
+        and name == os.environ["BACKUP_EXPECTED_DATABASE"]
+        and ssl in ("require", "verify-ca", "verify-full")
+    )
+except (KeyError, ValueError):
+    ok = False
+if not ok:
+    print("backup failure: source connection identity/TLS does not match expected Neon branch", file=sys.stderr)
+    sys.exit(1)
+PY
 [[ "$DATABASE_URL" == postgres://* || "$DATABASE_URL" == postgresql://* ]] || fail "invalid connection scheme"
 [[ "$DATABASE_URL" != *-pooler* ]] || fail "pooled URLs cannot be used with pg_dump"
 [[ "${BACKUP_AGE_RECIPIENT:-}" =~ ^age1[0-9a-z]{30,}$ ]] || fail "missing or invalid age public recipient"

@@ -1,0 +1,259 @@
+{
+  "schema": "sentinel.design-program.h.v2",
+  "status": "ACTIVE_OWNER_APPROVED_PROGRAM_DESIGN_UNSELECTED",
+  "approvedOn": "2026-10-24",
+  "goal": "Build a genuinely interactive, native-quality multi-platform product design system rather than palette-only or flattened screens",
+  "designSelection": {
+    "selectedId": null,
+    "selectionState": "PENDING",
+    "paletteDecision": "DEFERRED",
+    "legacyShieldRadarS": {
+      "designDirection": "NO_LONGER_SUITABLE_AS_FUTURE_PRIMARY_BRAND",
+      "productionAsset": "KEEP_UNTIL_OWNER_ACCEPTS_VERIFIED_REPLACEMENT"
+    },
+    "productionAuthority": "design/sentinel-design-system.v3.json"
+  },
+  "existingStudies": {
+    "fileUrl": "https://www.figma.com/design/BdF9XW7eYmZrOkdnnH98Jc",
+    "manifest": "design/h-design-studies.v1.json",
+    "role": "VISUAL_STARTING_POINT_NOT_ACCEPTED_PRODUCT_SYSTEM",
+    "ruEnEditableScreens": 40
+  },
+  "workstreams": [
+    {
+      "id": "H1",
+      "name": "BRAND_CORE",
+      "deliverables": [
+        "Brand positioning for game intelligence and controlled assistance, not merely a shield/radar",
+        "3-5 distinct premium symbol constructions (do not simply recolor S)",
+        "Primary mark/wordmark/horizontal/stacked/monochrome/compact variants",
+        "Android adaptive foreground/background/mask/splash and Windows executable/installer/tray/favicon/app symbol",
+        "16/20/24/32/48/72/108px optical-size review and vector source"
+      ]
+    },
+    {
+      "id": "H2",
+      "name": "ICONOGRAPHY",
+      "deliverables": [
+        "One cohesive geometric icon family, grid/stroke/fill/rounding/optical rules",
+        "Home, Games, Intelligence, Assistant, Battle, PvE, PvP, Build, Character, Auction, Trade, Quest, Profession, Resource, Capture, Automation, Overlay, Security, Devices, Voice, Activity, Account, Billing, Updates, Diagnostics, Support, Stop",
+        "16/20/24/32dp-px icon masters and adaptive active/hover/focus/disabled/danger states",
+        "Glyph recognition at small sizes, RU/EN naming, platform-specific system-convention exceptions"
+      ]
+    },
+    {
+      "id": "H3",
+      "name": "FOUNDATIONS",
+      "deliverables": [
+        "Typographic display/body/data scales Cyrillic and Latin",
+        "Color study kept open; semantic state tokens isolated from hue",
+        "Spacing/elevation/surface/geometry/light and dark systems",
+        "Responsive mobile/tablet/desktop grids, density scales and accessible focus styles"
+      ]
+    },
+    {
+      "id": "H4",
+      "name": "COMPONENTS",
+      "deliverables": [
+        "Editable reusable Figma variants with auto-layout and states for buttons, icon buttons, forms, toggles, navigation, tabs, cards, lists, tables, menus, dialogs, filters, breadcrumbs, pagination, alerts, tooltips, charts",
+        "Progress bar/stepper/loading/skeleton/empty/offline/timeout/error/success/unknown/unavailable/stale/denied/revoked/Stop",
+        "Game source, confidence, timestamp, fact/inference/recommendation components",
+        "Behavior and keyboard/touch specs for each interactive component"
+      ]
+    },
+    {
+      "id": "H5",
+      "name": "MOTION_NAVIGATION",
+      "deliverables": [
+        "Explicit page-route graph and history/back handling",
+        "Interactive prototypes for modal, drawer, navigation, capture consent, assistant state, load/restore, Stop and failure recovery",
+        "Purposeful transitions and microinteractions, including reduced-motion alternative",
+        "No decorative pulse that obscures security/game state"
+      ]
+    },
+    {
+      "id": "H6",
+      "name": "ANDROID",
+      "deliverables": [
+        "Native mobile layouts for onboarding, authentication, home, games, game detail, capture permission, observation, recommendations, opt-in assistant, battle status, builds, activity, security, devices, diagnostics, subscription, settings",
+        "Phone and tablet layouts, system bars, adaptive and monochrome app icons, touch/gesture/back behavior",
+        "Unknown/permission refused/offline/stale/game version unsupported and per-app OEM permission flows"
+      ]
+    },
+    {
+      "id": "H7",
+      "name": "WINDOWS_LAUNCHER_OVERLAY",
+      "deliverables": [
+        "Windows launcher, Companion shell, host/game connectors, update/download progress and rollback states",
+        "WoW character/talents/PvE/PvP/auction/professions/quests/economy screen layouts as planned/unverified when appropriate",
+        "Overlay minimal/standard/expanded and voice permissions, Stop/kill switch, action confirmation, degraded/stale data",
+        "Window sizing, high DPI, keyboard and packaged-host visual behavior"
+      ]
+    },
+    {
+      "id": "H8",
+      "name": "WEB_CONTROL",
+      "deliverables": [
+        "Distinct authenticated routes for Overview, Intelligence, Games, Activity, Security, Devices, Account, Subscription, Billing, Settings, Support, Diagnostics and Admin",
+        "Auth/MFA/sessions/role denial/recovery, data loading, empty and error states",
+        "Responsive desktop/tablet/mobile navigation; protected Admin shell distinct from user site",
+        "Tables, filters, charts, keyboard focus, trusted provenance and permission-bound actions"
+      ]
+    },
+    {
+      "id": "H9",
+      "name": "PUBLIC_WEBSITE",
+      "deliverables": [
+        "Real multi-route site architecture, not one long page with faux tabs",
+        "Individual Home, Features, Games, WoW, Android, Companion, How It Works, Security, Pricing, FAQ, Support, About, Downloads, Legal pages",
+        "Distinct hero/section illustrations, meaningful header/footer/route transitions, responsive grids",
+        "SEO/meta/page headings/links, truthful product availability, download gates and mobile nav"
+      ]
+    },
+    {
+      "id": "H10",
+      "name": "ILLUSTRATION_ASSETS",
+      "deliverables": [
+        "High-resolution, nonpixelated and non-stock hero illustrations",
+        "Platform and gameplay process visuals without claiming working automation",
+        "Vector-first diagrams, product previews and device imagery",
+        "Defined asset license/provenance, export matrix and sizes"
+      ]
+    },
+    {
+      "id": "H11",
+      "name": "ACCESSIBILITY_CONSISTENCY",
+      "deliverables": [
+        "WCAG contrast and non-color-only states, screen-reader labels and 48dp Android / 44px Web/Companion targets",
+        "RU/EN text overflow, font scaling, RTL only if required, high contrast/forced colors/reduced motion",
+        "Optical alignment and fidelity pass of every brand/icon/component size",
+        "Cross-platform screenshot comparison, keyboard/TalkBack/NVDA test plans and acceptance evidence"
+      ]
+    }
+  ],
+  "routes": {
+    "android": [
+      "/welcome",
+      "/onboarding",
+      "/sign-in",
+      "/home",
+      "/games",
+      "/games/:id",
+      "/games/:id/observation",
+      "/games/:id/assistant",
+      "/games/:id/builds",
+      "/activity",
+      "/security",
+      "/devices",
+      "/subscription",
+      "/settings",
+      "/diagnostics"
+    ],
+    "windows": [
+      "launcher",
+      "companion/overview",
+      "companion/account",
+      "companion/runtime",
+      "companion/host",
+      "companion/games",
+      "companion/wow/character",
+      "companion/wow/builds",
+      "companion/wow/pve",
+      "companion/wow/pvp",
+      "companion/wow/auction",
+      "companion/wow/professions",
+      "companion/wow/quests",
+      "companion/overlay",
+      "companion/voice",
+      "companion/updates",
+      "companion/diagnostics"
+    ],
+    "webControl": [
+      "/overview",
+      "/intelligence",
+      "/games",
+      "/activity",
+      "/security",
+      "/devices",
+      "/account",
+      "/subscription",
+      "/billing",
+      "/settings",
+      "/support",
+      "/diagnostics",
+      "/admin"
+    ],
+    "publicSite": [
+      "/",
+      "/features",
+      "/games",
+      "/games/world-of-warcraft",
+      "/platforms/android",
+      "/platforms/windows",
+      "/how-it-works",
+      "/security",
+      "/pricing",
+      "/faq",
+      "/support",
+      "/about",
+      "/download",
+      "/legal"
+    ]
+  },
+  "requiredInteractiveStates": [
+    "default",
+    "hover",
+    "focus-visible",
+    "pressed",
+    "selected",
+    "disabled",
+    "loading",
+    "skeleton",
+    "progress",
+    "empty",
+    "success",
+    "warning",
+    "error",
+    "offline",
+    "timeout",
+    "stale",
+    "unknown",
+    "unavailable",
+    "denied",
+    "revoked",
+    "stopped"
+  ],
+  "requiredFlows": [
+    "onboarding_to_sign_in_to_home",
+    "game_discovery_to_exact_version_capability",
+    "capture_permission_to_observation",
+    "game_advisory_to_confirm_each_to_stop",
+    "offline_stale_to_recovery",
+    "companion_update_progress_failure_rollback",
+    "web_session_mfa_denied_recovery",
+    "public_site_multiroute_navigation"
+  ],
+  "invariants": {
+    "automationEnabled": false,
+    "gameActionsRequireExactPermittedEnvironment": true,
+    "noAntiCheatEvasion": true,
+    "operatorPermissionRequired": true,
+    "doNotAdvertiseUnverifiedAsShipped": true,
+    "noProductionDesignSwapWithoutOwner": true,
+    "noReleaseSigningOrDeploymentWithoutOwner": true,
+    "designMustBeEditable": true,
+    "nativeComponentAndKeyboardSpecsRequired": true
+  },
+  "proofStages": [
+    "DESIGN_SOURCE",
+    "PROTOTYPE_INTERACTION",
+    "RESPONSIVE_VISUAL",
+    "ACCESSIBILITY",
+    "OWNER_VISIBLE",
+    "OWNER_ACCEPTED",
+    "NATIVE_IMPLEMENTED",
+    "RUNTIME_TESTED",
+    "RELEASE_ACCEPTED"
+  ],
+  "completion": "Deep design specification and interactive prototype ready for Owner visual review; no style selection or native release readiness implied"
+}

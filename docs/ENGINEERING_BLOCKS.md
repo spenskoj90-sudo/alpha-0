@@ -41,6 +41,10 @@ Five candidates will be compared on the **same** Android Dashboard/Game Assistan
 
 **Block H design-study milestone (2026-10-24):** Figma has five RU and five EN boards across B/C/D/E (40 editable representative screens). See [DESIGN_STUDIES_H_2026-10-24.md](DESIGN_STUDIES_H_2026-10-24.md) and `design/h-design-studies.v1.json`. Owner selection remains PENDING. These comparison studies do not replace native responsive production UX or the active v3 token contract.
 
+## Owner-approved deeper H scope — 2026-10-24
+
+The Owner approved continuing design **without choosing a palette** until logo/app icon, one optical icon family, reusable components, complete screen and route flows, real multi-page Public Website, Android, Windows/Launcher/Overlay, Web Control, illustrations, motion and accessibility are deeply specified and visually reviewable. **H1–H11** now follow [DESIGN_PROGRAM_H_V2.md](DESIGN_PROGRAM_H_V2.md) and `design/h-design-program.v2.json`, replacing the earlier broad H1–H6 subdivision names. Future primary branding is no longer constrained to the bulky shield/radar/S aesthetic, but current production brand assets and v3 remain authoritative until an approved and tested replacement. Existing five Figma palettes are exploration only; no Owner style selection has occurred.
+
 ## Release and evidence boundaries
 
 The workflow contract and protected-main exact-SHA PR/CI checks are unchanged. Keep SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED distinct. Existing `publication` candidate requirements cover Android, packaged Windows Companion, exact WoW L3, voice and Owner-visible accessibility/UX. Routing work by platform does **not** implicitly split the release acceptance profile or waive signing, physical, operator/legal, credentials or Owner-only gates.

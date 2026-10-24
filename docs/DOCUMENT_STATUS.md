@@ -22,6 +22,8 @@
 - `OBSERVABILITY.md` + `../observability/telemetry-contract.v1.json`.
 - `SENTINEL_DECISION_LOG.md` and `CHANGELOG.md` are historical ledgers with current metadata.
 
+- `DESIGN_PROGRAM_H_V2.md` + `../design/h-design-program.v2.json` — **ACTIVE Owner-approved H1–H11 deep product-design program (2026-10-24)**: brand/app icons, one icon language, components/interactions, Android/PC/Web and real multi-page site. Design/brand selection remains pending; v3 production contracts unchanged.
+
 ## Draft visual studies (non-binding)
 
 - `DESIGN_STUDIES_H_2026-10-24.md` + `../design/h-design-studies.v1.json` — five bilingual B/C/D/E Figma directions awaiting Owner selection; ACTIVE production design remains `DESIGN_SYSTEM_V3.md` and its v3 machine contract. A visual study is not a native UI or Owner-accepted release.

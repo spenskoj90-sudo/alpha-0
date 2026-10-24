@@ -8,6 +8,7 @@ on:
       - ".github/workflows/offsite-backup-contract.yml"
       - "scripts/offsite_pg_backup.sh"
       - "scripts/test_offsite_pg_backup_contract.py"
+      - "scripts/test_offsite_pg_backup_simulated.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
   push:
     branches: [main]
@@ -32,4 +33,4 @@ jobs:
         with:
           persist-credentials: false
       - name: Execute tests without credentials or cloud access
-        run: python3 scripts/test_offsite_pg_backup_contract.py
+        run: python3 -m unittest discover -s scripts -p 'test_offsite_pg_backup_*.py' -v

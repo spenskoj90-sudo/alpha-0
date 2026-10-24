@@ -1,0 +1,72 @@
+name: Sentinel Encrypted Cloudflare R2 Backup (manual)
+
+# Inert until explicitly dispatched from protected main after owner provisions
+# R2 private bucket and scoped access, Neon read-only backup role and offline
+# age private identity. Never run this workflow for PRs or forks.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-encrypted-offsite-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout protected main, without stored checkout token
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fail closed when external storage and secrets are unconfigured
+        env:
+          NEON_URL: ${{ secrets.SENTINEL_BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ vars.SENTINEL_BACKUP_AGE_RECIPIENT }}
+          R2_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
+          R2_ENDPOINT: ${{ vars.SENTINEL_BACKUP_R2_ENDPOINT }}
+          R2_ACCESS_KEY: ${{ secrets.SENTINEL_BACKUP_R2_ACCESS_KEY_ID }}
+          R2_SECRET_KEY: ${{ secrets.SENTINEL_BACKUP_R2_SECRET_ACCESS_KEY }}
+          EXPECTED_HOST: ${{ vars.SENTINEL_BACKUP_EXPECTED_HOST }}
+          EXPECTED_DATABASE: ${{ vars.SENTINEL_BACKUP_EXPECTED_DATABASE }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_URL" || { echo "::error::Read-only Neon backup URL is missing"; exit 1; }
+          test -n "$AGE_RECIPIENT" || { echo "::error::age public recipient is missing"; exit 1; }
+          test -n "$R2_BUCKET" || { echo "::error::Cloudflare R2 bucket is missing"; exit 1; }
+          test -n "$R2_ENDPOINT" || { echo "::error::Cloudflare R2 endpoint is missing"; exit 1; }
+          test -n "$R2_ACCESS_KEY" || { echo "::error::R2 scoped access key is missing"; exit 1; }
+          test -n "$R2_SECRET_KEY" || { echo "::error::R2 scoped secret key is missing"; exit 1; }
+          test -n "$EXPECTED_HOST" || { echo "::error::Expected Neon compute host is missing"; exit 1; }
+          test -n "$EXPECTED_DATABASE" || { echo "::error::Expected Neon database name is missing"; exit 1; }
+
+      - name: Install age public-key encryption tool
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age
+          age --version
+          aws --version
+
+      - name: Stream age-encrypted Neon dump to private Cloudflare R2
+        env:
+          DATABASE_URL: ${{ secrets.SENTINEL_BACKUP_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.SENTINEL_BACKUP_AGE_RECIPIENT }}
+          BACKUP_S3_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
+          BACKUP_R2_ENDPOINT: ${{ vars.SENTINEL_BACKUP_R2_ENDPOINT }}
+          BACKUP_EXPECTED_HOST: ${{ vars.SENTINEL_BACKUP_EXPECTED_HOST }}
+          BACKUP_EXPECTED_DATABASE: ${{ vars.SENTINEL_BACKUP_EXPECTED_DATABASE }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.SENTINEL_BACKUP_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SENTINEL_BACKUP_R2_SECRET_ACCESS_KEY }}
+          AWS_REGION: auto
+        run: bash scripts/offsite_pg_backup.sh
+
+      # Never upload database bytes, auth tokens, or age identity to Actions.
+      # Daily schedule and retention are separate, AFTER isolated restore PASS.

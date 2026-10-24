@@ -74,6 +74,10 @@ class TurnWorld:
         self.turn = 0
         self.sequence = 0
         self.fault = fault
+        # Synthetic host context only. These are not claims about a live OS,
+        # capture permission, game focus, or third-party environment.
+        self.focus_active = True
+        self.permission_active = True
 
     def observe(self, now_ms: int) -> Observation:
         canonical = json.dumps({"target": self.target.model_dump(), "session": self.session_id,
@@ -109,6 +113,7 @@ class OfflineActionSession:
         self.gateway = gateway
         self.pending: ActionIntent | None = None
         self.stopped = True
+        self.stop_reason: str | None = None
         self._history: dict[str, tuple[str, Outcome]] = {}
         self._principal: Principal | None = None
         self._last_now = -1
@@ -134,9 +139,14 @@ class OfflineActionSession:
         self._mode = mode
         self._budget = steps
         self._last_now = now_ms
+        self.stop_reason = None
         self.stopped = False
 
     def stop(self, reason: str = "explicit") -> None:
+        # Preserve the first terminal reason. A later cleanup or duplicate
+        # callback must not disguise the boundary that actually stopped work.
+        if not self.stopped:
+            self.stop_reason = reason
         if self.pending is not None:
             request = self.pending
             self._history[request.idempotency_key] = (self._fingerprint(request), Outcome("CANCELLED", "STOPPED"))

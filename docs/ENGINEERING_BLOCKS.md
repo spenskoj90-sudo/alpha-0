@@ -39,6 +39,8 @@ As of the adoption review, Android's Shattered Pixel Dungeon source is a diagnos
 
 Five candidates will be compared on the **same** Android Dashboard/Game Assistant, Windows Companion/WoW Overlay, Web Control and Public Website screens: **Calm Precision** (incumbent Design System v3), **Sentinel Command**, **Tactical Slate**, **Signal Minimal**, **Intelligence Atlas**. Include RU/EN, readable dark/light themes or compatible host mode, device responsiveness, warnings/unknown/Stop, accessibility and actual native interactions. The Owner then approves one; GPT translates it into each platform's native UI. **Until that approval, Design System v3 and its machine token contract remain ACTIVE.** Do not import unfinished Lovable/design-lab work.
 
+**Block H design-study milestone (2026-10-24):** Figma has five RU and five EN boards across B/C/D/E (40 editable representative screens). See [DESIGN_STUDIES_H_2026-10-24.md](DESIGN_STUDIES_H_2026-10-24.md) and `design/h-design-studies.v1.json`. Owner selection remains PENDING. These comparison studies do not replace native responsive production UX or the active v3 token contract.
+
 ## Release and evidence boundaries
 
 The workflow contract and protected-main exact-SHA PR/CI checks are unchanged. Keep SOURCE, BUILD, RUNTIME, OWNER-VISIBLE, OWNER-ACCEPTED and RELEASE-ACCEPTED distinct. Existing `publication` candidate requirements cover Android, packaged Windows Companion, exact WoW L3, voice and Owner-visible accessibility/UX. Routing work by platform does **not** implicitly split the release acceptance profile or waive signing, physical, operator/legal, credentials or Owner-only gates.

@@ -10,6 +10,10 @@
 
 The Owner approved **five** cross-platform design studies under H: **Calm Precision (existing v3)**, Sentinel Command, Tactical Slate, Signal Minimal and Intelligence Atlas. No replacement was selected or Owner-visually accepted. This document and `design/sentinel-design-system.v3.json` **remain the ACTIVE production authority** until an explicitly accepted native migration. Compare candidate UX on the same Android Dashboard/Game Assistant, Windows Companion/WoW Overlay, authenticated Web Control and public Website screens, in RU/EN, with responsive layout, relevant themes, Stop/unknown/degraded states, focus/contrast and accessibility. Designs are required within every platform feature vertical; unfinished external lab work is not automatically imported. See `docs/ENGINEERING_BLOCKS.md`.
 
+## Study evidence, not selection · 2026-10-24
+
+Block H has completed an **editable Figma comparative study**: [40 Russian/English prototype screens and five candidate palettes](DESIGN_STUDIES_H_2026-10-24.md), machine-bound to `design/h-design-studies.v1.json`. Current Design System v3 remains ACTIVE, and none of the four alternatives has been Owner-selected or production-implemented. The study does not certify production UI accessibility, live runtime or physical visual acceptance. Further native translation is gated on one explicit Owner design selection.
+
 ## Reference refresh · 2026-09-27
 
 The latest design-laboratory reference extends the already-adopted v3 foundations without replacing production architecture. The refreshed reference adds explicit interactive studies for **Voice**, **Admin**, **Access**, **Billing** and **Resilience**, plus a detailed cross-platform screen/state inventory and Compose/Electron handoff guidance. The foundational brand artwork, semantic color direction, typography families, low-radius geometry, status grammar and accessibility rules remain compatible with the existing v3 production contract.

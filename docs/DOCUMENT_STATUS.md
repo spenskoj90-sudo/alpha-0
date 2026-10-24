@@ -22,6 +22,10 @@
 - `OBSERVABILITY.md` + `../observability/telemetry-contract.v1.json`.
 - `SENTINEL_DECISION_LOG.md` and `CHANGELOG.md` are historical ledgers with current metadata.
 
+## Draft visual studies (non-binding)
+
+- `DESIGN_STUDIES_H_2026-10-24.md` + `../design/h-design-studies.v1.json` — five bilingual B/C/D/E Figma directions awaiting Owner selection; ACTIVE production design remains `DESIGN_SYSTEM_V3.md` and its v3 machine contract. A visual study is not a native UI or Owner-accepted release.
+
 ## Active architecture/implementation references
 
 Active within their stated scope: `README.md`, `ARCHITECTURE.md`, `ARCHITECTURE_V4.md`, `SENTINEL_MASTER_ARCHITECTURE_v0.3.md`, `SENTINEL_PRODUCT_VISION_CONTEXT.md`, `API.md`, `SECURITY.md`, `SECURITY_WHITEPAPER.md`, `DEPLOYMENT.md`, `DEVELOPER_GUIDE.md`, `CONTRIBUTING.md`, `FTL_POLICY.md`, `QUALITY_COVERAGE_POLICY.md`, `BRANCH_INVENTORY.md`, `PROVIDER_STATUS_MATRIX.md`, `PLATFORM_MODERNIZATION_2026Q3.md`, `SENTINEL_PERFORMANCE_BASELINE.md`, and versioned component/contract documents.

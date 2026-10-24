@@ -30,6 +30,10 @@ The five sample palettes passed a calculated **WCAG 2.1 AA contrast ratio of at 
 
 Current studies are representative **compact cross-platform compositions**: they do not yet include every desktop breakpoint, native Figma component library, physical TalkBack/NVDA testing or clickable runtime. Native screens must later verify minimum Android 48dp and Web/Companion 44px targets, focus, forced colors, reduced motion, RU/EN string wrapping, privacy, unavailable states, and readable Stop/consent. No logo replacement is approved; studies use text SENTINEL, retaining the existing shield/S/signal production asset authority.
 
+## 2026-10-24 Owner refinement — selection postponed
+
+The Owner approved a wider **[H1–H11 design program](DESIGN_PROGRAM_H_V2.md)** before choosing a visual direction. These 40 Figma compact RU/EN comparison screens remain useful preliminary palette studies, but are not enough to request approval. Produce the new brand/app-icon options, coherent icon system, interactive component variants, page navigation and real multi-route Web/Website, Android and PC product architecture first. Existing production shield/S artwork remains installed until a new identity has been accepted and translated; do not mistake creative deprecation for approval to delete a production asset. No visual style or color has been selected.
+
 ## Owner selection and subsequent engineering
 
 The Owner should view both Figma pages and select **exactly one** visual direction (or specify modifications). Selection is currently **PENDING**; v3 **remains ACTIVE** in `design/sentinel-design-system.v3.json`, `docs/DESIGN_SYSTEM_V3.md` and all product apps. No source code or production tokens were changed by these mockups.

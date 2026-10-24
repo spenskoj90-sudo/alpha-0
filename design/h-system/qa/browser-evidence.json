@@ -1,0 +1,17 @@
+{
+  "directRouteLocaleViewportChecks": 690,
+  "journeyChecks": 16,
+  "pageErrors": [],
+  "viewports": [
+    320,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "locales": [
+    "ru",
+    "en"
+  ],
+  "note": "Browser prototype evidence only; no native, physical, owner or release acceptance."
+}

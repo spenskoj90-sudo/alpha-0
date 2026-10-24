@@ -1,0 +1,26 @@
+{
+  "pageId": "13:4",
+  "counts": {
+    "FRAME": 1271,
+    "TEXT": 2814,
+    "COMPONENT": 174,
+    "VECTOR": 633,
+    "INSTANCE": 955,
+    "COMPONENT_SET": 23,
+    "RECTANGLE": 31,
+    "ELLIPSE": 16,
+    "GROUP": 36
+  },
+  "fonts": {
+    "JetBrains Mono Regular": 313,
+    "Onest Bold": 378,
+    "Inter Regular": 1359,
+    "Inter Semi Bold": 764
+  },
+  "screens": 166,
+  "componentSets": 23,
+  "instanceCount": 955,
+  "rasterFilledNodes": [],
+  "prototypeSourceCount": 770,
+  "horizontalOverflow": []
+}

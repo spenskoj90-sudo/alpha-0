@@ -1,0 +1,67 @@
+name: Sentinel Encrypted Offsite Backup (manual)
+
+# Inert until explicitly dispatched on main, with owner-provisioned secrets,
+# AWS OIDC trust policy, S3 bucket, and offline age restore identity.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-encrypted-offsite-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout exact protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Fail closed when external backup is unconfigured
+        env:
+          NEON_URL: ${{ secrets.SENTINEL_BACKUP_DATABASE_URL }}
+          AGE_RECIPIENT: ${{ vars.SENTINEL_BACKUP_AGE_RECIPIENT }}
+          S3_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
+          AWS_ROLE: ${{ vars.SENTINEL_BACKUP_AWS_ROLE_ARN }}
+          AWS_REGION: ${{ vars.SENTINEL_BACKUP_AWS_REGION }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_URL" || { echo "::error::Backup database secret is not configured"; exit 1; }
+          test -n "$AGE_RECIPIENT" || { echo "::error::Backup encryption recipient is not configured"; exit 1; }
+          test -n "$S3_BUCKET" || { echo "::error::Backup S3 bucket is not configured"; exit 1; }
+          test -n "$AWS_ROLE" || { echo "::error::Backup AWS OIDC role is not configured"; exit 1; }
+          test -n "$AWS_REGION" || { echo "::error::Backup AWS region is not configured"; exit 1; }
+
+      - name: Install public-key encryption tool
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age
+          age --version
+          aws --version
+
+      - name: Obtain short-lived S3 permissions using OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ vars.SENTINEL_BACKUP_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.SENTINEL_BACKUP_AWS_REGION }}
+          role-session-name: sentinel-offsite-backup
+
+      - name: Stream encrypted database backup to independent S3
+        env:
+          DATABASE_URL: ${{ secrets.SENTINEL_BACKUP_DATABASE_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.SENTINEL_BACKUP_AGE_RECIPIENT }}
+          BACKUP_S3_BUCKET: ${{ vars.SENTINEL_BACKUP_S3_BUCKET }}
+        run: bash scripts/offsite_pg_backup.sh
+
+      # NEVER upload raw dump, encryption identity, or backup bytes as a GitHub artifact.
+      # Do not add schedule until the destination, encryption and isolated restore are verified.

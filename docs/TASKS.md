@@ -21,6 +21,10 @@
 
 **H:** Five comparison directions have editable RU/EN Figma boards: **40 screens** for B/C/D/E, captured in [`DESIGN_STUDIES_H_2026-10-24.md`](DESIGN_STUDIES_H_2026-10-24.md) and `design/h-design-studies.v1.json`. Token-level contrast pairs are measured, but native device/browser, responsive, forced-color and Owner visual acceptance remain outstanding. **Owner has not selected** a replacement: production v3 stays ACTIVE. **I:** full-suite release and Owner-only publication/production gates remain unchanged.
 
+## Owner-approved H deep-design execution scope — 2026-10-24
+
+**ACTIVE program, not completed design:** [DESIGN_PROGRAM_H_V2.md](DESIGN_PROGRAM_H_V2.md) and `design/h-design-program.v2.json`. The Owner explicitly deferred selecting any of the five color directions; the 40 RU/EN Figma screens are representative studies only. Continue with **H1 Brand Core; H2 Iconography; H3 Foundations; H4 Components; H5 Motion/Navigation; H6 Android; H7 Windows/Launcher/Overlay; H8 Web Control; H9 true multi-route Public Website; H10 Illustrations/Assets; H11 Accessibility/Consistency**. Build reusable editable symbols/components, actual linked navigation/prototype flows and stateful layouts—not flattened pictures, generic pixel-art assets or a one-page marketing poster. Replace the old prominent S/radar/shield only after one new future identity is chosen and validated; currently deployed artwork/v3 tokens stay intact. Do not claim new game automation is running, or change release/signing/production gates. **Next design execution pass:** develop 3–5 new identity/icon concepts, shared icon grammar/component library, interaction/routing map and detailed connected flows across all four user surfaces. Owner review only once meaningfully navigable designs and optical comparisons exist.
+
 ## Completed foundation on main
 
 - [x] GPT-controlled orchestration governance, compact AGENTS context routing, exact-SHA merge gate and repository-first evidence model (#377). Retired GPT-only/tombstone instruction files were removed from the working tree on 2026-09-29; Git history preserves provenance.

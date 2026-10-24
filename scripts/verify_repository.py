@@ -728,6 +728,104 @@ def check_engineering_blocks(checks: Checks) -> None:
     )
 
 
+
+def check_h_design_studies(checks: Checks) -> None:
+    """H mockups are bilingual, comparable and never a production design selection."""
+    study = json.loads(read("design/h-design-studies.v1.json"))
+    spec = read("docs/DESIGN_STUDIES_H_2026-10-24.md")
+    active = json.loads(read("design/sentinel-design-system.v3.json"))
+    routing = json.loads(read("docs/engineering-blocks.v1.json"))
+    checks.require(
+        study.get("schema") == "sentinel.design-studies.h.v1"
+        and study.get("status") == "OWNER_REVIEW_PENDING",
+        "H design study is non-binding and awaits Owner selection",
+    )
+    figma = study.get("figma", {})
+    checks.require(
+        figma.get("fileKey") == "BdF9XW7eYmZrOkdnnH98Jc"
+        and figma.get("url") == "https://www.figma.com/design/BdF9XW7eYmZrOkdnnH98Jc"
+        and set(figma.get("pages", {})) == {"RU", "EN"}
+        and len(figma.get("scenarioTypes", [])) == 4
+        and figma.get("totalEditableScreens") == 40,
+        "H Figma registry binds five RU and five EN four-platform studies",
+    )
+    proposals = study.get("proposals", [])
+    checks.require(
+        [item.get("id") for item in proposals] == [f"H{i:02}" for i in range(1, 6)]
+        and len({item.get("name") for item in proposals}) == 5
+        and all(
+            isinstance(item.get("figma"), dict)
+            and all(re.fullmatch(r"\d+:\d+", item["figma"].get(locale, "")) for locale in ("ru", "en"))
+            for item in proposals
+        ),
+        "H concept identities and editable frame references are complete and stable",
+    )
+    checks.require(
+        len({item["figma"]["ru"] for item in proposals}) == 5
+        and len({item["figma"]["en"] for item in proposals}) == 5,
+        "H comparative designs have distinct paired localized frames",
+    )
+    checks.require(
+        active.get("status") == "ACTIVE"
+        and active.get("schema") == "sentinel.design-system.v3"
+        and study.get("designDecision", {}).get("ownerSelectedId") is None
+        and study.get("designDecision", {}).get("productionAdopted") is False
+        and study.get("activeDesignContract") == "design/sentinel-design-system.v3.json"
+        and routing.get("designStudy", {}).get("ownerSelection") == "PENDING",
+        "active production v3 cannot be replaced by unaccepted Figma studies",
+    )
+    sample = proposals[0].get("colors", {}) if proposals else {}
+    palette = active.get("colors", {}).get("dark", {})
+    pairs = (
+        ("bg", "background"), ("surface", "surface"), ("raised", "raised"),
+        ("text", "text"), ("muted", "muted"), ("accent", "primary"),
+        ("signal", "signal"), ("warning", "warning"),
+    )
+    checks.require(
+        all(sample.get(name) == palette.get(source) for name, source in pairs),
+        "H01 first candidate preserves exact canonical v3 dark color tokens",
+    )
+
+    def luminance(value: str) -> float:
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+            raise ValueError("color is not 24-bit hex")
+        channels = [int(value[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        linear = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in channels]
+        return sum(c * w for c, w in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+    required_contrasts = {
+        "textOnBackground": ("text", "bg"),
+        "mutedOnSurface": ("muted", "surface"),
+        "accentOnBackground": ("accent", "bg"),
+        "signalOnSurface": ("signal", "surface"),
+        "warningOnRaised": ("warning", "raised"),
+    }
+    for item in proposals:
+        c = item["colors"]
+        checks.require(
+            all(
+                abs(
+                    (max(luminance(c[a]), luminance(c[b])) + 0.05)
+                    / (min(luminance(c[a]), luminance(c[b])) + 0.05)
+                    - item.get("tokenContrast", {}).get(label, -100)
+                ) <= 0.011
+                and item.get("tokenContrast", {}).get(label, 0) >= 4.5
+                for label, (a, b) in required_contrasts.items()
+            ),
+            f"{item['id']} five measured accessible token pairs meet 4.5:1",
+        )
+    checks.require(
+        study.get("safety", {}).get("automaticGameExecutionEnabled") is False
+        and study.get("safety", {}).get("operatorAndConsentGatesUnchanged") is True
+        and study.get("safety", {}).get("releaseProfileUnchanged") is True
+        and study.get("safety", {}).get("studyIsNotRuntimeAcceptance") is True
+        and "40 editable" in spec
+        and "Owner" in spec
+        and "DRAFT_FOR_OWNER_REVIEW" in spec,
+        "H visual studies do not expand game authority or claim release acceptance",
+    )
+
+
 def main() -> int:
     checks = Checks()
     check_actions(checks)
@@ -736,6 +834,7 @@ def main() -> int:
     check_versions(checks)
     check_governance(checks)
     check_engineering_blocks(checks)
+    check_h_design_studies(checks)
     print(f"\nPOLICY_PASSED={checks.passes} POLICY_FAILED={len(checks.failures)}")
     if checks.failures:
         print("Repository policy violations:")

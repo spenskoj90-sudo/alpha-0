@@ -4,19 +4,19 @@ export function createWorkspace(){return {sample:false,executionEnabled:false,co
 export function reduceWorkspace(state,action){
  const s={...state,executionEnabled:false};
  if(action.type==='reset')return createWorkspace();
- if(action.type==='sample')return {...s,sample:action.value===true};
- if(action.type==='compare'&&buildIds.includes(action.id))return {...s,compare:s.compare.includes(action.id)?s.compare.filter(id=>id!==action.id):s.compare.length<2?[...s.compare,action.id]:s.compare};
+ if(action.type==='sample')return action.value===true?{...s,sample:true}:createWorkspace();
+ if(action.type==='compare'&&s.sample&&buildIds.includes(action.id))return {...s,compare:s.compare.includes(action.id)?s.compare.filter(id=>id!==action.id):s.compare.length<2?[...s.compare,action.id]:s.compare};
  if(action.type==='talent'&&s.sample&&talentIds.includes(action.id)){
   const current=s.talents[action.id]||0,total=Object.values(s.talents).reduce((a,b)=>a+b,0),delta=action.delta===-1?-1:1;
   if(delta>0&&total>=8)return s;
   return {...s,talents:{...s.talents,[action.id]:Math.max(0,Math.min(3,current+delta))}};
  }
- if(action.type==='quantity'){const value=Number(action.value);return {...s,quantity:Number.isFinite(value)?Math.max(1,Math.min(99,Math.trunc(value))):s.quantity};}
+ if(action.type==='quantity'&&s.sample){const value=Number(action.value);return {...s,quantity:Number.isFinite(value)?Math.max(1,Math.min(99,Math.trunc(value))):s.quantity};}
  if(action.type==='quest'&&s.sample&&['survey','collect','return'].includes(action.id))return {...s,quests:s.quests.includes(action.id)?s.quests.filter(id=>id!==action.id):[...s.quests,action.id]};
  if(action.type==='phase'&&['prepare','react','recover'].includes(action.id))return {...s,phase:action.id};
  if(action.type==='rotation')return {...s,rotationStep:Math.max(0,Math.min(3,s.rotationStep+(action.delta===-1?-1:1)))};
- if(action.type==='arena'&&buildIds.includes(action.id))return {...s,arenaPlan:action.id};
- if(action.type==='item'&&['ore','cloth','herb','crystal','leather','ink'].includes(action.id))return {...s,selectedItem:action.id};
+ if(action.type==='arena'&&s.sample&&buildIds.includes(action.id))return {...s,arenaPlan:action.id};
+ if(action.type==='item'&&s.sample&&['ore','cloth','herb','crystal','leather','ink'].includes(action.id))return {...s,selectedItem:action.id};
  if(action.type==='table'&&['auction','economy'].includes(action.module)){
   const old=s.tables[action.module];const next={...old};
   if(action.field==='query'){next.query=String(action.value).slice(0,80);next.page=0;}

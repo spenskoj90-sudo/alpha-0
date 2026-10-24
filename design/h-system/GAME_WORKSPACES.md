@@ -21,8 +21,9 @@ Status: isolated browser prototype; no native/runtime/Owner acceptance inferred.
 All examples are invented UI fixtures. Default source state stays UNKNOWN; a named
 switch explicitly enables samples. They are not actual WoW talents, class builds,
 encounters, prices or recommendations. No verified 3.3.5a environment is implied.
-Selections persist only in browser memory, including locale/theme/SPA navigation.
-Reload and explicit sign-out clear local drafts. No localStorage or backend calls.
+Selections persist only in browser memory across locale/theme/SPA navigation.
+Switching samples off clears local example drafts; switching them on again starts fresh.
+Reload and explicit sign-out also clear local drafts. No localStorage or backend calls.
 
 ## Layout and control changes
 

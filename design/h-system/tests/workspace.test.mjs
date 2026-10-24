@@ -21,3 +21,11 @@ test('table search, sorting and page bounds do not invent rows',()=>{
  assert.deepEqual(selectRows(rows,{query:'Sample B',sort:'price',page:99,pageSize:1},'en').rows.map(r=>r.id),['b']);
  assert.equal(selectRows(rows,{query:'absent',sort:'price',page:0,pageSize:5},'en').total,0);
 });
+
+test('fixture opt-out clears drafts and model disallows hidden sample mutations',()=>{
+ let s=reduceWorkspace(createWorkspace(),{type:'sample',value:true});
+ for(const action of [{type:'compare',id:'balanced'},{type:'talent',id:'focus',delta:1},{type:'quantity',value:4},{type:'quest',id:'survey'},{type:'item',id:'ore'},{type:'arena',id:'reserve'}])s=reduceWorkspace(s,action);
+ assert.deepEqual(reduceWorkspace(s,{type:'sample',value:false}),createWorkspace());
+ s=createWorkspace();for(const action of [{type:'compare',id:'balanced'},{type:'quantity',value:7},{type:'item',id:'ore'},{type:'arena',id:'reserve'},{type:'talent',id:'focus',delta:1}])s=reduceWorkspace(s,action);
+ assert.deepEqual(s,createWorkspace());
+});

@@ -134,6 +134,35 @@ def test_required_capability_without_status_fails_closed(
     assert result.reason_code == "CAPABILITY_NOT_VERIFIED"
 
 
+@pytest.mark.parametrize("capability,status,reason", [
+    ("command_bridge", None, "CAPABILITY_NOT_VERIFIED"),
+    (None, CapabilityStatus.LIMITED, "REQUIRED_CAPABILITY_MISSING"),
+    (None, None, "REQUIRED_CAPABILITY_MISSING"),
+])
+def test_confirmed_action_cannot_skip_capability_by_omitting_requirements(
+    gateway: ActionGateway, principal: Principal,
+    capability: str | None, status: CapabilityStatus | None, reason: str,
+) -> None:
+    result = gateway.authorize(principal, ActionRequest(
+        action="game:interact", resource="game:target",
+        mode=ActionMode.USER_CONFIRMED,
+        capability=capability, capability_status=status,
+    ))
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == reason
+
+
+def test_advisory_only_flow_without_capability_never_grants_execution(
+    gateway: ActionGateway, principal: Principal,
+) -> None:
+    result = gateway.authorize(principal, ActionRequest(
+        action="game:interact", resource="game:target",
+        mode=ActionMode.RECOMMENDATION,
+    ))
+    assert result.decision is ActionDecision.CONFIRM
+    assert result.reason_code == "USER_CONFIRMATION_REQUIRED"
+
+
 def test_missing_required_capability_is_denied(
     gateway: ActionGateway, principal: Principal
 ) -> None:

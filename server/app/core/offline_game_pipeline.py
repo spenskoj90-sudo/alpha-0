@@ -70,9 +70,41 @@ class OfflineTurnPipeline:
 
     def confirm_fixture_step(self, principal: Principal, reviewed: TurnReview, *,
                              now_ms: int, idempotency_key: str, confirmed: bool) -> Outcome:
-        # A suggestion and/or an existing bounded lease is never a consent click.
+        # User-confirmed mode still requires consent for each individual step.
         if confirmed is not True:
             raise ValueError("CONFIRMATION_REQUIRED")
+        return self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
+                                            idempotency_key=idempotency_key)
+
+    def bounded_fixture_tick(self, principal: Principal, *, now_ms: int,
+                             idempotency_key: str, consent_active: bool) -> Outcome:
+        """One autonomous *offline fixture* tick under an already consented lease.
+
+        A host calls this at most once per permitted interval, returning control
+        between ticks so Stop/revocation can take effect. No platform executor,
+        live source or game I/O is available through this method.
+        """
+        if principal != self.session._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        if self.session.stopped:
+            raise ValueError("STOPPED")
+        if self.session._mode != "BOUNDED_RULE":
+            raise ValueError("BOUNDED_LEASE_REQUIRED")
+        if consent_active is not True:
+            self.session.stop("CONSENT_REVOKED")
+            raise ValueError("CONSENT_REVOKED")
+        try:
+            reviewed = self.review(now_ms=now_ms)
+            return self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
+                                                idempotency_key=idempotency_key)
+        except (ValueError, RuntimeError):
+            # A bounded automatic lease cannot silently resume after failed
+            # freshness, entitlement, authorization, budget or outcome checks.
+            self.session.stop("BOUNDED_TICK_INVALIDATED")
+            raise
+
+    def _dispatch_reviewed_step(self, principal: Principal, reviewed: TurnReview, *,
+                                now_ms: int, idempotency_key: str) -> Outcome:
         if type(reviewed) is not TurnReview or reviewed.session_id != self.session_id:
             raise ValueError("REVIEW_INVALID")
         if type(now_ms) is not int or not 0 <= now_ms - reviewed.observation.observed_ms <= REVIEW_MAX_AGE_MS:

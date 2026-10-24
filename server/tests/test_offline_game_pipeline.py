@@ -63,6 +63,94 @@ def test_three_explicitly_confirmed_turns_have_observed_outcomes():
     assert session.pending is None
 
 
+def test_bounded_fixture_ticks_use_one_lease_and_verify_each_outcome():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    for step in range(3):
+        result = pipeline.bounded_fixture_tick(
+            principal, now_ms=1000 + step * 1000,
+            idempotency_key=f"lease-{step}", consent_active=True,
+        )
+        assert result.outcome == "SUCCEEDED"
+        assert result.observed_sequence == step + 1
+        assert world.turn == step + 1
+        assert session.pending is None
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=4000, idempotency_key="lease-extra", consent_active=True,
+        )
+    assert session.stopped and world.turn == 3
+
+
+def test_bounded_fixture_tick_revoked_consent_latches_stop():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+    with pytest.raises(ValueError, match="CONSENT_REVOKED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=False,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=3000, idempotency_key="third", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+def test_bounded_fixture_tick_stops_after_gateway_entitlement_revocation():
+    grants = ["offline-game-test"]
+    pipeline, world, session, principal, _ = setup_pipeline(
+        entitlements=lambda _: tuple(grants),
+    )
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+    grants.clear()
+    with pytest.raises(ValueError, match="FEATURE_ENTITLEMENT_REQUIRED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=True,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+
+
+def test_bounded_fixture_tick_uses_stop_and_unknown_outcome_as_hard_boundaries():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    session.stop("manual")
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="blocked", consent_active=True,
+        )
+    assert world.turn == 0
+
+    pipeline, world, session, principal, _ = setup_pipeline(fault="missing_outcome")
+    result = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="unknown", consent_active=True,
+    )
+    assert result.outcome == "UNKNOWN" and session.stopped
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="blind-retry", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+def test_bounded_tick_requires_lease_and_cannot_be_revoked_by_foreign_caller():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    stranger = replace(principal, device_id="foreign-device")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.bounded_fixture_tick(
+            stranger, now_ms=1000, idempotency_key="probe", consent_active=False,
+        )
+    assert not session.stopped and world.turn == 0
+    session._mode = "USER_CONFIRMED"
+    with pytest.raises(ValueError, match="BOUNDED_LEASE_REQUIRED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="probe", consent_active=True,
+        )
+    assert world.turn == 0 and session.pending is None
+
+
 def test_no_consent_means_no_queue_or_action():
     pipeline, world, session, principal, _ = setup_pipeline()
     reviewed = pipeline.review(now_ms=1000)

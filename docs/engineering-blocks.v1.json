@@ -49,7 +49,9 @@
       "Intelligence Atlas"
     ],
     "ownerSelection": "PENDING",
-    "productionActiveUntilReplaced": "CALM PRECISION / TRUSTED INTELLIGENCE"
+    "productionActiveUntilReplaced": "CALM PRECISION / TRUSTED INTELLIGENCE",
+    "ownerApprovedDeepProgram": "design/h-design-program.v2.json",
+    "paletteSelectionDeferred": true
   },
   "blocks": [
     {
@@ -186,12 +188,17 @@
       "slug": "DESIGN_SYSTEM",
       "type": "shared",
       "sections": [
-        "H1_FIVE_STUDIES",
-        "H2_OWNER_SELECTION",
-        "H3_TOKENS",
+        "H1_BRAND_CORE",
+        "H2_ICONOGRAPHY",
+        "H3_FOUNDATIONS",
         "H4_COMPONENTS",
-        "H5_NATIVE_TRANSLATION",
-        "H6_ACCESSIBILITY"
+        "H5_MOTION_NAVIGATION",
+        "H6_ANDROID",
+        "H7_WINDOWS_LAUNCHER_OVERLAY",
+        "H8_WEB_CONTROL",
+        "H9_PUBLIC_WEBSITE",
+        "H10_ILLUSTRATION_ASSETS",
+        "H11_ACCESSIBILITY_CONSISTENCY"
       ],
       "paths": [
         "design/",

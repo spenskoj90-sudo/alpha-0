@@ -19,7 +19,7 @@
 
 **C current truth:** packaged Windows/Companion, read-only WoW SavedVariables and bounded Core observation foundations exist, but exact 3.3.5a/private-server L3, host/voice physical and game-action evidence remain unverified. The Owner approved switchable active-assistance development including combat, health/resources, PvE/PvP rotations and nonstandard talents, auction/trade, professions/gathering/crafting, leveling and quests. `AUTOMATIC_EXECUTION_DISABLED` remains in force until an exact permitted game environment, consent, policy/action gates, Stop/revoke and outcome verification are demonstrated.
 
-**H:** Compare Calm Precision v3, Sentinel Command, Tactical Slate, Signal Minimal and Intelligence Atlas; Owner has **not yet selected** a replacement. Active production v3 is unchanged. **I:** full-suite release and Owner-only publication/production gates remain unchanged.
+**H:** Five comparison directions have editable RU/EN Figma boards: **40 screens** for B/C/D/E, captured in [`DESIGN_STUDIES_H_2026-10-24.md`](DESIGN_STUDIES_H_2026-10-24.md) and `design/h-design-studies.v1.json`. Token-level contrast pairs are measured, but native device/browser, responsive, forced-color and Owner visual acceptance remain outstanding. **Owner has not selected** a replacement: production v3 stays ACTIVE. **I:** full-suite release and Owner-only publication/production gates remain unchanged.
 
 ## Completed foundation on main
 

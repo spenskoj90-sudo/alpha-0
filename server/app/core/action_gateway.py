@@ -80,10 +80,12 @@ class ActionGateway:
                 reason_code="AUTOMATIC_EXECUTION_DISABLED",
             )
 
+        # A required capability without an explicit usable status is unverified,
+        # not authorized by the mere presence of its claimed identifier.
         if request.capability_status in {
             CapabilityStatus.UNAVAILABLE,
             CapabilityStatus.UNVERIFIED,
-        }:
+        } or (required and request.capability_status is None):
             return ActionDecisionResult(
                 decision=ActionDecision.DENY,
                 reason_code="CAPABILITY_NOT_VERIFIED",

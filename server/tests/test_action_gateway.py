@@ -111,6 +111,29 @@ def test_unverified_capability_cannot_authorize_action(
     assert result.reason_code == "CAPABILITY_NOT_VERIFIED"
 
 
+@pytest.mark.parametrize("mode", [
+    ActionMode.USER_CONFIRMED,
+    ActionMode.RECOMMENDATION,
+])
+def test_required_capability_without_status_fails_closed(
+    gateway: ActionGateway, principal: Principal, mode: ActionMode
+) -> None:
+    # The name alone is not evidence that an integration is operational.
+    request = ActionRequest(
+        action="game:interact",
+        resource="game:target",
+        mode=mode,
+        capability="command_bridge",
+    )
+    result = gateway.authorize(
+        principal,
+        request,
+        required_capabilities=("command_bridge",),
+    )
+    assert result.decision is ActionDecision.DENY
+    assert result.reason_code == "CAPABILITY_NOT_VERIFIED"
+
+
 def test_missing_required_capability_is_denied(
     gateway: ActionGateway, principal: Principal
 ) -> None:

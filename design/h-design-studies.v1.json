@@ -1,0 +1,190 @@
+{
+  "schema": "sentinel.design-studies.h.v1",
+  "status": "OWNER_REVIEW_PENDING",
+  "date": "2026-10-24",
+  "sourceMainSha": "67b79a451c6508b1d61621097270689e6c9c784f",
+  "activeDesignContract": "design/sentinel-design-system.v3.json",
+  "figma": {
+    "fileKey": "BdF9XW7eYmZrOkdnnH98Jc",
+    "url": "https://www.figma.com/design/BdF9XW7eYmZrOkdnnH98Jc",
+    "pages": {
+      "RU": "0:1",
+      "EN": "4:155"
+    },
+    "scenarioTypes": [
+      "ANDROID_GAME_OBSERVER",
+      "WINDOWS_WOW_COMPANION",
+      "AUTHENTICATED_WEB_CONTROL",
+      "PUBLIC_WEBSITE"
+    ],
+    "totalEditableScreens": 40
+  },
+  "designDecision": {
+    "ownerSelectedId": null,
+    "productionAdopted": false,
+    "productionAuthority": "CALM PRECISION / TRUSTED INTELLIGENCE"
+  },
+  "safety": {
+    "automaticGameExecutionEnabled": false,
+    "operatorAndConsentGatesUnchanged": true,
+    "releaseProfileUnchanged": true,
+    "studyIsNotRuntimeAcceptance": true
+  },
+  "typeSystem": {
+    "display": "Onest",
+    "ui": "Inter",
+    "technical": "JetBrains Mono"
+  },
+  "proposals": [
+    {
+      "id": "H01",
+      "name": "Calm Precision",
+      "status": "ACTIVE_V3",
+      "colors": {
+        "bg": "#061018",
+        "surface": "#0D1B29",
+        "raised": "#13263A",
+        "border": "#29485F",
+        "text": "#E6F1F7",
+        "muted": "#A6B7C5",
+        "accent": "#2DD4FF",
+        "signal": "#00E0C2",
+        "warning": "#F59E0B"
+      },
+      "radius": 7,
+      "figma": {
+        "ru": "3:2",
+        "en": "4:156"
+      },
+      "strength": "Existing trustworthy baseline; restrained hierarchy",
+      "risk": "Less distinctive for game-first moments",
+      "tokenContrast": {
+        "textOnBackground": 16.7,
+        "mutedOnSurface": 8.46,
+        "accentOnBackground": 10.93,
+        "signalOnSurface": 10.32,
+        "warningOnRaised": 7.16
+      }
+    },
+    {
+      "id": "H02",
+      "name": "Sentinel Command",
+      "status": "DRAFT",
+      "colors": {
+        "bg": "#0C121C",
+        "surface": "#151F2C",
+        "raised": "#213044",
+        "border": "#36516B",
+        "text": "#EFF5FA",
+        "muted": "#A5B8CB",
+        "accent": "#88C7FF",
+        "signal": "#45D9C5",
+        "warning": "#F2B85A"
+      },
+      "radius": 4,
+      "figma": {
+        "ru": "3:154",
+        "en": "4:308"
+      },
+      "strength": "Precise operations, clear Windows control and Stop",
+      "risk": "Dense small-screen layouts",
+      "tokenContrast": {
+        "textOnBackground": 17.08,
+        "mutedOnSurface": 8.16,
+        "accentOnBackground": 10.42,
+        "signalOnSurface": 9.48,
+        "warningOnRaised": 7.5
+      }
+    },
+    {
+      "id": "H03",
+      "name": "Tactical Slate",
+      "status": "DRAFT",
+      "colors": {
+        "bg": "#131A1D",
+        "surface": "#202A2B",
+        "raised": "#293837",
+        "border": "#526963",
+        "text": "#ECF5EA",
+        "muted": "#A7BCAF",
+        "accent": "#B5E48C",
+        "signal": "#72DDB5",
+        "warning": "#E6C36F"
+      },
+      "radius": 6,
+      "figma": {
+        "ru": "3:306",
+        "en": "4:460"
+      },
+      "strength": "Game-appropriate, calm tactical context",
+      "risk": "Differentiate intelligence from verified live signal",
+      "tokenContrast": {
+        "textOnBackground": 15.77,
+        "mutedOnSurface": 7.32,
+        "accentOnBackground": 12.1,
+        "signalOnSurface": 8.91,
+        "warningOnRaised": 7.23
+      }
+    },
+    {
+      "id": "H04",
+      "name": "Signal Minimal",
+      "status": "DRAFT",
+      "colors": {
+        "bg": "#F3F7F6",
+        "surface": "#FFFFFF",
+        "raised": "#E8F1EF",
+        "border": "#CDDCD9",
+        "text": "#142E34",
+        "muted": "#527078",
+        "accent": "#116C7B",
+        "signal": "#087B67",
+        "warning": "#995E11"
+      },
+      "radius": 13,
+      "figma": {
+        "ru": "3:458",
+        "en": "4:612"
+      },
+      "strength": "Open Android/Web/public-site readability",
+      "risk": "Requires separately tested low-light overlay variant",
+      "tokenContrast": {
+        "textOnBackground": 13.23,
+        "mutedOnSurface": 5.32,
+        "accentOnBackground": 5.63,
+        "signalOnSurface": 5.2,
+        "warningOnRaised": 4.61
+      }
+    },
+    {
+      "id": "H05",
+      "name": "Intelligence Atlas",
+      "status": "DRAFT",
+      "colors": {
+        "bg": "#10152A",
+        "surface": "#191F3D",
+        "raised": "#252B4C",
+        "border": "#42486F",
+        "text": "#F1F0FF",
+        "muted": "#B8B9D5",
+        "accent": "#B5A8F5",
+        "signal": "#6DD8DC",
+        "warning": "#EFB477"
+      },
+      "radius": 11,
+      "figma": {
+        "ru": "3:610",
+        "en": "4:764"
+      },
+      "strength": "Rich knowledge/replay and build comparisons",
+      "risk": "Extra accent hierarchy can obscure semantic states",
+      "tokenContrast": {
+        "textOnBackground": 16.04,
+        "mutedOnSurface": 8.38,
+        "accentOnBackground": 8.5,
+        "signalOnSurface": 9.59,
+        "warningOnRaised": 7.5
+      }
+    }
+  ]
+}

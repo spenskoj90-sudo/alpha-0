@@ -14,7 +14,8 @@ from app.core.security import AuthorizationEngine, Decision, Policy, Principal
 FIXTURE = Path(__file__).resolve().parents[2] / "scripts/fixtures/offline-turn-knowledge.v1.json"
 
 
-def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=None):
+def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=None,
+                   mode="BOUNDED_RULE"):
     principal = Principal("fixture-user", "fixture-device", frozenset(), frozenset({"offline:write"}))
     policy = Policy(Decision.ALLOW, "offline:advance", "offline:turn-world",
                     scopes=frozenset({"offline:write"}))
@@ -23,8 +24,8 @@ def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=
     ))
     world = TurnWorld("fixture-pipeline", fault=fault)
     session = OfflineActionSession(world, gateway)
-    session.arm(principal, now_ms=1000, expires_ms=11000, mode="BOUNDED_RULE",
-                steps=3, confirmed=True)
+    session.arm(principal, now_ms=1000, expires_ms=11000, mode=mode,
+                steps=3 if mode == "BOUNDED_RULE" else 1, confirmed=True)
     raw = FIXTURE.read_bytes() if change_pack is None else change_pack
     digest = sha256(raw).hexdigest()
     if registry is not None:
@@ -143,12 +144,14 @@ def test_bounded_tick_requires_lease_and_cannot_be_revoked_by_foreign_caller():
             stranger, now_ms=1000, idempotency_key="probe", consent_active=False,
         )
     assert not session.stopped and world.turn == 0
-    session._mode = "USER_CONFIRMED"
+    single, single_world, single_session, single_principal, _ = setup_pipeline(
+        mode="USER_CONFIRMED",
+    )
     with pytest.raises(ValueError, match="BOUNDED_LEASE_REQUIRED"):
-        pipeline.bounded_fixture_tick(
-            principal, now_ms=1000, idempotency_key="probe", consent_active=True,
+        single.bounded_fixture_tick(
+            single_principal, now_ms=1000, idempotency_key="probe", consent_active=True,
         )
-    assert world.turn == 0 and session.pending is None
+    assert single_world.turn == 0 and single_session.pending is None
 
 
 def test_no_consent_means_no_queue_or_action():

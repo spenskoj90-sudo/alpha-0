@@ -1,0 +1,50 @@
+{
+  "confluence": {
+    "name": [
+      "Слияние",
+      "Confluence"
+    ],
+    "idea": [
+      "Два сигнала сходятся в одно решение. Открытый центр — контроль остаётся у игрока.",
+      "Two signals converge into one decision. The open center keeps the player in control."
+    ],
+    "path": "M20 5C9 1 2 9 5 18c2 7 10 10 17 6l-4-5c-4 2-8 0-8-4s4-6 8-5l2-5Z M24 8l4 7-4 7-4-7 4-7Z",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"108\" height=\"108\" viewBox=\"0 0 32 32\" fill=\"#DCE5F2\"><path d=\"M20 5C9 1 2 9 5 18c2 7 10 10 17 6l-4-5c-4 2-8 0-8-4s4-6 8-5l2-5Z M24 8l4 7-4 7-4-7 4-7Z\"/></svg>"
+  },
+  "waypoint": {
+    "name": [
+      "Ориентир",
+      "Waypoint"
+    ],
+    "idea": [
+      "Путь, выбор и следующий шаг. Асимметричный знак направления без образа оружия.",
+      "A path, a choice and the next step. An asymmetric directional mark without weapon imagery."
+    ],
+    "path": "M4 27 12 5c.7-2 3.3-2 4 0l12 22h-8l-6-13-4 13H4Z M13 23h4v4h-4v-4Z",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"108\" height=\"108\" viewBox=\"0 0 32 32\" fill=\"#DCE5F2\"><path d=\"M4 27 12 5c.7-2 3.3-2 4 0l12 22h-8l-6-13-4 13H4Z M13 23h4v4h-4v-4Z\"/></svg>"
+  },
+  "parallax": {
+    "name": [
+      "Параллакс",
+      "Parallax"
+    ],
+    "idea": [
+      "Наблюдение с двух точек зрения. Смещённые линзы соединяют факты и интерпретацию.",
+      "Two viewpoints. Offset lenses connect observed facts and interpretation."
+    ],
+    "path": "M3 15C8 3 20 3 25 15c-5 12-17 12-22 0 M7 18C12 6 24 6 29 18c-5 12-17 12-22 0",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"108\" height=\"108\" viewBox=\"0 0 32 32\" fill=\"none\"><path d=\"M3 15C8 3 20 3 25 15c-5 12-17 12-22 0 M7 18C12 6 24 6 29 18c-5 12-17 12-22 0\" stroke=\"#DCE5F2\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+  },
+  "nexus": {
+    "name": [
+      "Связь",
+      "Nexus"
+    ],
+    "idea": [
+      "Модульная система: игрок в центре, платформы и интеллект вокруг.",
+      "A modular system: the player at the center, platforms and intelligence around it."
+    ],
+    "path": "M16 3 27 9v13l-11 7L5 22V9l11-6 M5 9l11 7 11-7 M16 16v13 M10 12V7m12 5V7",
+    "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"108\" height=\"108\" viewBox=\"0 0 32 32\" fill=\"none\"><path d=\"M16 3 27 9v13l-11 7L5 22V9l11-6 M5 9l11 7 11-7 M16 16v13 M10 12V7m12 5V7\" stroke=\"#DCE5F2\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+  }
+}

@@ -1,0 +1,20 @@
+name: Cross-project CI Budget Tool Contract
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/ci_capacity_report_v22.py
+      - scripts/test_ci_capacity_report_v22.py
+      - .github/workflows/ci-capacity-contract.yml
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Budget estimator offline tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/test_ci_capacity_report_v22.py

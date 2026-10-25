@@ -47,10 +47,19 @@ sentinel="$(find_or_create 'SENTINEL · Engineering')"
 forma="$(find_or_create 'FORMA · Engineering')"
 portfolio="$(find_or_create 'PROJECTS · Portfolio')"
 
-gh project link "$sentinel" --owner "$OWNER" --repo "$OWNER/alpha-0"
-gh project link "$forma" --owner "$OWNER" --repo "$OWNER/forma-fitness-android"
-gh project link "$portfolio" --owner "$OWNER" --repo "$OWNER/alpha-0"
-gh project link "$portfolio" --owner "$OWNER" --repo "$OWNER/forma-fitness-android"
+link_once() {
+  local n="$1" repo="$2" output
+  if ! output="$(gh project link "$n" --owner "$OWNER" --repo "$repo" 2>&1)"; then
+    if [[ "$output" != *"already linked"* ]]; then
+      echo "Unable to link GitHub Project to repository; stop for review" >&2
+      return 1
+    fi
+  fi
+}
+link_once "$sentinel" "$OWNER/alpha-0"
+link_once "$forma" "$OWNER/forma-fitness-android"
+link_once "$portfolio" "$OWNER/alpha-0"
+link_once "$portfolio" "$OWNER/forma-fitness-android"
 
 for issue in 528 529 530; do
   url="https://github.com/$OWNER/alpha-0/issues/$issue"

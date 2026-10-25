@@ -165,33 +165,49 @@ def check_workflow_boundaries(checks: Checks) -> None:
 
     branch_hygiene = workflow_text["branch-hygiene.yml"]
     checks.require(
-        "contents: write" in branch_hygiene and "pull-requests: read" in branch_hygiene,
-        "branch hygiene has only the authority needed for exact-ref deletion and PR verification",
+        "contents: read" in branch_hygiene and ": write" not in branch_hygiene
+        and "persist-credentials: false" in branch_hygiene,
+        "branch review has read-only authority and no persisted Git credentials",
     )
     checks.require(
         "push:\n    branches:\n      - main" in branch_hygiene
+        and "workflow_dispatch:" in branch_hygiene
         and "\n    paths:" not in branch_hygiene,
-        "branch hygiene executes after every protected-main push rather than only inventory/workflow edits",
+        "branch review runs on main and manual requests",
     )
     checks.require(
-        '"docs/BRANCH_INVENTORY.md"' in branch_hygiene
-        and '{"MERGED_EXACT", "PURE_BEHIND", "CONTENT_SUPERSEDED"}' in branch_hygiene,
-        "branch hygiene consumes only the active reconciled inventory classifications",
+        "ref: ${{ github.sha }}" in branch_hygiene
+        and 'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"' in branch_hygiene
+        and 'test "$GITHUB_REF" = "refs/heads/main"' in branch_hygiene,
+        "branch review validates the exact main source identity",
     )
     checks.require(
-        'if [ "$remote_sha" != "$expected_sha" ]' in branch_hygiene
-        and "ref mutation detected" in branch_hygiene
-        and 'git fetch --no-tags origin "refs/heads/$branch"' in branch_hygiene
-        and 'if [ "$fetched_sha" != "$expected_sha" ]' in branch_hygiene
-        and 'protected="$(gh api' in branch_hygiene,
-        "branch hygiene revalidates exact live and fetched tips and refuses protected refs",
+        "gh api --method GET --paginate --slurp" in branch_hygiene
+        and '"REVIEW_REQUIRED"' in branch_hygiene
+        and '"deleted": 0' in branch_hygiene
+        and not any(command in branch_hygiene for command in (
+            "git push", "--delete", "delete_exact_ref", ": write",
+        )),
+        "branch review reports paginated inventory without a deletion path",
     )
-    checks.require(
-        "exact PR-head mismatch" in branch_hygiene
-        and 'merge_sha" = "$GITHUB_SHA' in branch_hygiene
-        and 'head_repo" = "$GITHUB_REPOSITORY' in branch_hygiene,
-        "branch hygiene binds merged and self-cleanup deletion to exact same-repository PR lineage",
-    )
+    for name, text in workflow_text.items():
+        for block in re.findall(r"(?m)^concurrency:\n((?:  .+\n)+)", text):
+            cancellation = re.search(r"cancel-in-progress: (.+)", block)
+            value = cancellation.group(1) if cancellation else "false"
+            checks.require(
+                value in ("false", "${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}"),
+                f"{name} never auto-cancels non-PR runs in progress",
+            )
+            if value != "false":
+                checks.require(
+                    "github.event_name == 'pull_request' && github.run_attempt == 1 && github.event.pull_request.number || github.run_id" in block,
+                    f"{name} isolates pending non-PR runs with a unique run ID",
+                )
+            else:
+                checks.require(
+                    "queue: max" in block or "github.run_id" in block,
+                    f"{name} retains pending runs (bounded queue or unique group)",
+                )
 
 
 def check_web(checks: Checks) -> None:
@@ -915,3 +931,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

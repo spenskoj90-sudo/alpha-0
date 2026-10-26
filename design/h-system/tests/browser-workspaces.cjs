@@ -22,6 +22,24 @@ try{
  await go('/wow/auction');await sample();await page.locator('#work-item-herb').click();await page.locator('.sidebar a[href^="/wow/economy?"]').click();assert.equal(await page.locator('.detail-item').count(),0,'auction selection must not leak to economy');await page.locator('#work-item-crystal').click();await page.goBack();assert.match(await page.locator('.detail-item').innerText(),/Herb sample/);checks++;
  await page.locator('#work-query-auction').fill('Cloth');assert.equal(await page.locator('.detail-item').count(),0,'search must clear stale details');checks++;
  await go('/battle','android','en');assert.equal(await page.locator('.combat-sample [role=meter]').count(),0,'unknown combat readings must not be zero-valued meters');assert.equal(await page.locator('.combat-sample .progress').count(),0);assert.match(await page.locator('.combat-sample').innerText(),/UNKNOWN/);await sample();assert.equal(await page.locator('.combat-sample [role=meter]').count(),2);assert.equal(await page.locator('.combat-sample [role=meter]').first().getAttribute('aria-valuenow'),'72');checks++;
+ // The Stop control must remain in the real document viewport while long Android
+ // workspaces scroll; overflow:hidden on the phone must not trap sticky positioning.
+ for(const width of [390,1024]){
+  await page.setViewportSize({width,height:620});
+  await go('/games/wow/builds','android','en');
+  await sample();
+  await page.evaluate(()=>window.scrollTo({top:460,behavior:'instant'}));
+  const visible=await page.locator('.phone .sticky-stop').evaluate(node=>{
+   const b=node.getBoundingClientRect();
+   return {top:b.top,bottom:b.bottom,viewport:innerHeight,scroll:scrollY,overflow:getComputedStyle(node.closest('.phone')).overflowY};
+  });
+  assert.ok(visible.scroll>300, `Android ${width}: fixture must actually scroll`);
+  assert.equal(visible.overflow,'clip','phone clipping must not create an unused scroll container');
+  assert.ok(visible.top>=0&&visible.bottom<=visible.viewport,`Android ${width}: Stop must stay on-screen after scroll: ${JSON.stringify(visible)}`);
+  await page.locator('.phone .sticky-stop [data-event=stop]').click();
+  assert.match(await page.locator('.phone .sticky-stop').innerText(),/STOPPED/);
+  checks++;
+ }
  // Every module at representative widths, both languages, missing and sample states.
  const routes=['/wow/character','/wow/builds','/wow/talents','/wow/pve','/wow/pvp','/wow/rotations','/wow/auction','/wow/professions','/wow/quests','/wow/economy'];
  for(const width of[320,390,768,1024,1440]){await page.setViewportSize({width,height:1000});for(const lang of['ru','en'])for(const route of routes){await go(route,'windows',lang);for(const on of[false,true]){if(on)await sample();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${width} ${route} ${lang} sample=${on}`);layouts++;}}}

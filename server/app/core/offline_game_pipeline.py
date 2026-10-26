@@ -132,9 +132,17 @@ class OfflineTurnPipeline:
             if prior is not None:
                 if now_ms != prior[0]:
                     raise ValueError("IDEMPOTENCY_CONFLICT")
-                # Cached success is a historical outcome, never fresh authority:
-                # revalidate the trusted gateway before exposing it on a retry.
+                # Cached success is a historical outcome, never fresh authority.
+                # Recheck both policy/entitlements and the currently installed
+                # knowledge-pack revocation state, not just the saved result.
                 self.session.require_fixture_authority(principal)
+                current = self.review(now_ms=now_ms)
+                # The third valid turn naturally has no *next* recommendation;
+                # a completed action may still be replayed without delivery.
+                if not self._recommended(current) and not (
+                    current.evaluation.status == "empty" and current.observation.turn == 3
+                ):
+                    raise ValueError("RECOMMENDATION_UNAVAILABLE")
                 return prior[1]
             reviewed = self.review(now_ms=now_ms)
             result = self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,

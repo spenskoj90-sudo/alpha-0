@@ -216,6 +216,37 @@ def test_bounded_tick_revocation_precedes_idempotent_result_replay():
         )
 
 
+def test_bounded_tick_cached_result_denied_after_knowledge_revocation(tmp_path):
+    pipeline, world, session, principal, registry = setup_pipeline(registry=tmp_path)
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED" and world.turn == 1
+    registry.revoke(pipeline.knowledge.digest)
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+        )
+    assert session.stopped and session.stop_reason == "BOUNDED_TICK_INVALIDATED"
+    assert world.turn == 1  # Revoked pack cannot authorize replay or delivery.
+
+
+def test_bounded_tick_replays_last_success_after_budget_consumed():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    result = None
+    for step in range(3):
+        result = pipeline.bounded_fixture_tick(
+            principal, now_ms=1000 + step * 1000,
+            idempotency_key=f"lease-{step}", consent_active=True,
+        )
+        assert result.outcome == "SUCCEEDED"
+    assert pipeline.review(now_ms=3000).evaluation.status == "empty"
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=3000, idempotency_key="lease-2", consent_active=True,
+    ) == result
+    assert world.turn == 3 and session._steps == 3 and not session.stopped
+
+
 def test_bounded_tick_cached_result_denied_after_entitlement_revocation():
     grants = ["offline-game-test"]
     pipeline, world, session, principal, _ = setup_pipeline(

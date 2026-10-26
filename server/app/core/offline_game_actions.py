@@ -157,6 +157,22 @@ class OfflineActionSession:
     def _fingerprint(request: ActionIntent) -> str:
         return sha256(request.model_dump_json().encode()).hexdigest()
 
+    def require_fixture_authority(self, principal: Principal) -> None:
+        """Refresh policy and entitlement even when replaying a completed fixture tick.
+
+        Replay is informational (never a second delivery), but stale grants must
+        not return an apparently authorized success after revocation.
+        """
+        if self.stopped:
+            raise ValueError("STOPPED")
+        if principal != self._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        decision = self.gateway.authorize(principal, ActionRequest(action="offline:advance", resource="offline:turn-world",
+            mode=ActionMode.USER_CONFIRMED, capability="offline_fixture", capability_status=CapabilityStatus.LIMITED, evidence_level="L2"),
+            required_capabilities=("offline_fixture",), required_entitlements=("offline-game-test",))
+        if decision.decision is not ActionDecision.ALLOW:
+            raise ValueError(decision.reason_code)
+
     def _validate(self, principal: Principal, request: ActionIntent, now_ms: int, *, scheduled_ms: int) -> Observation:
         if type(now_ms) is not int or now_ms < self._last_now:
             raise ValueError("CLOCK_ROLLBACK")
@@ -177,11 +193,7 @@ class OfflineActionSession:
             raise ValueError("BUDGET_EXHAUSTED")
         if now_ms - self._last_delivery < 1000:
             raise ValueError("RATE_LIMIT")
-        decision = self.gateway.authorize(principal, ActionRequest(action="offline:advance", resource="offline:turn-world",
-            mode=ActionMode.USER_CONFIRMED, capability="offline_fixture", capability_status=CapabilityStatus.LIMITED, evidence_level="L2"),
-            required_capabilities=("offline_fixture",), required_entitlements=("offline-game-test",))
-        if decision.decision is not ActionDecision.ALLOW:
-            raise ValueError(decision.reason_code)
+        self.require_fixture_authority(principal)
         # Only accepted context/authority observations may advance the logical clock.
         # Rejected future-dated intents must not lock out a valid later action.
         self._last_now = now_ms

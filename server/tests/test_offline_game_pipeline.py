@@ -216,6 +216,24 @@ def test_bounded_tick_revocation_precedes_idempotent_result_replay():
         )
 
 
+def test_bounded_tick_cached_result_denied_after_entitlement_revocation():
+    grants = ["offline-game-test"]
+    pipeline, world, session, principal, _ = setup_pipeline(
+        entitlements=lambda _: tuple(grants),
+    )
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED" and world.turn == 1
+    grants.clear()
+    with pytest.raises(ValueError, match="FEATURE_ENTITLEMENT_REQUIRED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+        )
+    assert session.stopped and session.stop_reason == "BOUNDED_TICK_INVALIDATED"
+    assert world.turn == 1  # Revoked replay never executes another action.
+
+
 def test_bounded_fixture_tick_revoked_consent_latches_stop():
     pipeline, world, session, principal, _ = setup_pipeline()
     assert pipeline.bounded_fixture_tick(

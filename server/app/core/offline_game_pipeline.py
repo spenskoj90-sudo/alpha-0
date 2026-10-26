@@ -132,6 +132,9 @@ class OfflineTurnPipeline:
             if prior is not None:
                 if now_ms != prior[0]:
                     raise ValueError("IDEMPOTENCY_CONFLICT")
+                # Cached success is a historical outcome, never fresh authority:
+                # revalidate the trusted gateway before exposing it on a retry.
+                self.session.require_fixture_authority(principal)
                 return prior[1]
             reviewed = self.review(now_ms=now_ms)
             result = self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,

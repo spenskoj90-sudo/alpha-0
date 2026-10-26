@@ -6,6 +6,7 @@ entitlement exists here. This bridge only accepts the exact in-memory TurnWorld.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from .knowledge_packs import Evaluation, LoadedPack, evaluate
 from .offline_game_actions import (
@@ -37,6 +38,10 @@ class OfflineTurnPipeline:
         self.session = session
         self.knowledge = knowledge
         self.session_id = world.session_id
+        # A bounded lease has at most three successful ticks. Cache the request
+        # timestamp and observed outcome; a retry never reconstructs a new
+        # ActionIntent from an already advanced world.
+        self._bounded_results: dict[str, tuple[int, Outcome]] = {}
 
     def review(self, *, now_ms: int, locale: str = "en") -> TurnReview:
         if type(now_ms) is not int or now_ms <= 0:
@@ -70,9 +75,88 @@ class OfflineTurnPipeline:
 
     def confirm_fixture_step(self, principal: Principal, reviewed: TurnReview, *,
                              now_ms: int, idempotency_key: str, confirmed: bool) -> Outcome:
-        # A suggestion and/or an existing bounded lease is never a consent click.
+        # User-confirmed mode still requires consent for each individual step.
         if confirmed is not True:
             raise ValueError("CONFIRMATION_REQUIRED")
+        return self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
+                                            idempotency_key=idempotency_key)
+
+    def signal_fixture_host_loss(self, principal: Principal, *,
+                                 boundary: Literal["FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"]) -> None:
+        """A trusted *synthetic* host event stops the lease immediately.
+
+        Unlike sampling host state at the next tick, this catches loss and
+        recovery between ticks. No real OS/game event source is bound here.
+        """
+        if principal != self.session._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        if boundary not in ("FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"):
+            raise ValueError("HOST_BOUNDARY_INVALID")
+        if boundary == "FOCUS_LOST":
+            self.world.focus_active = False
+        elif boundary == "PERMISSION_REVOKED":
+            self.world.permission_active = False
+        # SESSION_CHANGED is a terminal host notification: the synthetic
+        # source need not mutate identity for the lease to be invalidated.
+        self.session.stop(boundary)
+
+    def bounded_fixture_tick(self, principal: Principal, *, now_ms: int,
+                             idempotency_key: str, consent_active: bool) -> Outcome:
+        """One autonomous *offline fixture* tick under an already consented lease.
+
+        A host calls this at most once per permitted interval, returning control
+        between ticks so Stop/revocation can take effect. No platform executor,
+        live source or game I/O is available through this method.
+        """
+        if principal != self.session._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        if self.session.stopped:
+            raise ValueError("STOPPED")
+        if self.session._mode != "BOUNDED_RULE":
+            raise ValueError("BOUNDED_LEASE_REQUIRED")
+        if consent_active is not True:
+            self.session.stop("CONSENT_REVOKED")
+            raise ValueError("CONSENT_REVOKED")
+        try:
+            # Synthetic, trusted-host context is checked even on a duplicate;
+            # restoring focus/permission must not revive a stopped lease.
+            if self.world.session_id != self.session_id or self.world.target != FIXTURE_TARGET:
+                raise ValueError("SESSION_CHANGED")
+            if self.world.focus_active is not True:
+                raise ValueError("FOCUS_LOST")
+            if self.world.permission_active is not True:
+                raise ValueError("PERMISSION_REVOKED")
+            # Principal/lease/consent/context gates precede the cache lookup.
+            # A changed timestamp for the same key is a conflicting request.
+            prior = self._bounded_results.get(idempotency_key)
+            if prior is not None:
+                if now_ms != prior[0]:
+                    raise ValueError("IDEMPOTENCY_CONFLICT")
+                # Cached success is a historical outcome, never fresh authority.
+                # Recheck both policy/entitlements and the currently installed
+                # knowledge-pack revocation state, not just the saved result.
+                self.session.require_fixture_authority(principal)
+                current = self.review(now_ms=now_ms)
+                # The third valid turn naturally has no *next* recommendation;
+                # a completed action may still be replayed without delivery.
+                if not self._recommended(current) and not (
+                    current.evaluation.status == "empty" and current.observation.turn == 3
+                ):
+                    raise ValueError("RECOMMENDATION_UNAVAILABLE")
+                return prior[1]
+            reviewed = self.review(now_ms=now_ms)
+            result = self._dispatch_reviewed_step(principal, reviewed, now_ms=now_ms,
+                                                  idempotency_key=idempotency_key)
+            self._bounded_results[idempotency_key] = (now_ms, result)
+            return result
+        except (ValueError, RuntimeError):
+            # A bounded automatic lease cannot silently resume after failed
+            # freshness, entitlement, authorization, budget or outcome checks.
+            self.session.stop("BOUNDED_TICK_INVALIDATED")
+            raise
+
+    def _dispatch_reviewed_step(self, principal: Principal, reviewed: TurnReview, *,
+                                now_ms: int, idempotency_key: str) -> Outcome:
         if type(reviewed) is not TurnReview or reviewed.session_id != self.session_id:
             raise ValueError("REVIEW_INVALID")
         if type(now_ms) is not int or not 0 <= now_ms - reviewed.observation.observed_ms <= REVIEW_MAX_AGE_MS:

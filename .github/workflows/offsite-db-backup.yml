@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sentinel-encrypted-offsite-backup
+  group: sentinel-encrypted-offsite-backup-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:

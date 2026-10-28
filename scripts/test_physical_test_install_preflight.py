@@ -125,5 +125,26 @@ class PhysicalInstallPreflightTests(unittest.TestCase):
                 evidence_from_artifact(path)
 
 
+    def test_unexpected_artifact_entries_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "artifact.zip"
+            self.artifact(path)
+            with zipfile.ZipFile(path, "a") as archive:
+                archive.writestr("unexpected-alt.apk", b"untrusted alternate package")
+            with self.assertRaisesRegex(ValueError, "UNEXPECTED_ARTIFACT_ENTRIES"):
+                evidence_from_artifact(path)
+
+    def test_known_optional_integrity_sidecars_are_compatible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "artifact.zip"
+            manifest = self.artifact(path)
+            with zipfile.ZipFile(path, "a") as archive:
+                archive.writestr("physical-test-apk.sha256", "synthetic digest sidecar")
+                archive.writestr("physical-test-signer.txt", "synthetic certificate report")
+            actual_manifest, signer = evidence_from_artifact(path)
+            self.assertEqual(actual_manifest["sourceSha"], manifest["sourceSha"])
+            self.assertEqual(signer, NEW)
+
+
 if __name__ == "__main__":
     unittest.main()

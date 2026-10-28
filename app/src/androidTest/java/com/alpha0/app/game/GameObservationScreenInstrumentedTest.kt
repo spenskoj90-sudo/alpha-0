@@ -59,4 +59,23 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-capture-stop").performScrollTo().performClick()
         compose.runOnIdle { assertTrue(stopped) }
     }
+
+    @Test fun journeyExplainsNextStepAndKeepsInputOff() {
+        val observation = mutableStateOf(GameObservationViewState())
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), observation.value, true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Review the disclosure and explicitly agree to this diagnostic session before requesting Android capture.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.")
+            .performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {
+            observation.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.OBSERVING))
+        }
+        compose.onNodeWithText("Wait for a completed OCR frame. Missing or stale values remain UNKNOWN.")
+            .performScrollTo().assertIsDisplayed()
+    }
 }

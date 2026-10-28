@@ -11,6 +11,8 @@ on:
       - "scripts/test_offsite_pg_backup_simulated.py"
       - "scripts/b2_target_contract.py"
       - "scripts/test_b2_target_contract.py"
+      - "scripts/b2_versioned_transfer.py"
+      - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
   push:
     branches: [main]
@@ -22,6 +24,8 @@ on:
       - "scripts/test_offsite_pg_backup_simulated.py"
       - "scripts/b2_target_contract.py"
       - "scripts/test_b2_target_contract.py"
+      - "scripts/b2_versioned_transfer.py"
+      - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
 
 permissions:
@@ -41,3 +45,4 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts -p 'test_offsite_pg_backup_*.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_target_contract.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v

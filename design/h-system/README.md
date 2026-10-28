@@ -21,6 +21,9 @@ The same paths on different surfaces are separate designs, not shared authorizat
 
 **Do not open index.html as file://:** ES modules and JSON assets require the local HTTP server.
 All data and credentials in form journeys must be fictional. No values are sent or stored.
+After simulated Stop, revoke, stale, offline or timeout, the demo requires **fresh
+simulated consent** before observation can be started again. Recovery does not rearm
+observation or grant Android capture permission; this remains a browser-only model.
 There is no production API, actual login, admin authority, checkout, screen capture,
 microphone capture, game input, live game telemetry or download installation.
 

@@ -32,6 +32,19 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 }
 
 internal val ENGLISH = mapOf(
+        "game_journey_title" to "Diagnostic next step",
+    "game_journey_source_status" to "Source UNVERIFIED · OCR UNCALIBRATED",
+    "game_journey_actions_off" to "Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.",
+    "game_journey_install" to "Install the ordinary Shattered Pixel Dungeon game, then reopen this test.",
+    "game_journey_build" to "Use a diagnostic/development build on Android 14 or newer for this source test.",
+    "game_journey_permission" to "Complete or cancel Android's screen-capture chooser; no screen source is attested yet.",
+    "game_journey_wait_source" to "Open the game and wait for visible frames; hidden content is not game-state evidence.",
+    "game_journey_hidden" to "The chosen content is hidden. Return to a visible source; previous numbers are historical only.",
+    "game_journey_wait_ocr" to "Wait for a completed OCR frame. Missing or stale values remain UNKNOWN.",
+    "game_journey_sample" to "Compare the latest processed frame with numbers seen in the game; save one opt-in diagnostic sample.",
+    "game_journey_review" to "The 32-sample limit is reached. Stop and export diagnostics for physical review; this is not calibration approval.",
+    "game_journey_consent" to "Review the disclosure and explicitly agree to this diagnostic session before requesting Android capture.",
+    "game_journey_choose" to "Choose the game screen with Android's system dialog. The chosen application cannot be attested by SENTINEL.",
     "game_knowledge_title" to "Verified game knowledge",
     "game_knowledge_waiting" to "Waiting for a verified target profile",
     "game_knowledge_loading" to "Checking knowledge freshness",
@@ -406,6 +419,19 @@ internal val ENGLISH = mapOf(
 )
 
 internal val RUSSIAN = mapOf(
+        "game_journey_title" to "Следующий шаг диагностики",
+    "game_journey_source_status" to "Источник НЕ ПРОВЕРЕН · OCR НЕ ОТКАЛИБРОВАН",
+    "game_journey_actions_off" to "Ввод в игру: ВЫКЛ. Экран собирает только локальные диагностические данные и не разрешает рекомендации или действия.",
+    "game_journey_install" to "Установите обычную игру Shattered Pixel Dungeon и вернитесь к тесту.",
+    "game_journey_build" to "Для теста источника нужна диагностическая/dev-сборка на Android 14 или новее.",
+    "game_journey_permission" to "Завершите или отмените системный выбор захвата экрана Android; источник пока не подтверждён.",
+    "game_journey_wait_source" to "Откройте игру и дождитесь видимых кадров; скрытое содержимое не подтверждает состояние игры.",
+    "game_journey_hidden" to "Выбранное содержимое скрыто. Вернитесь к видимому источнику; прежние числа — только история.",
+    "game_journey_wait_ocr" to "Дождитесь завершённой обработки кадра OCR. Отсутствующие и устаревшие значения остаются UNKNOWN.",
+    "game_journey_sample" to "Сравните последний обработанный кадр с числами, увиденными в игре, и сохраните один диагностический пример.",
+    "game_journey_review" to "Достигнут предел 32 примеров. Остановите наблюдение и экспортируйте диагностику для проверки; калибровка ещё не одобрена.",
+    "game_journey_consent" to "Прочитайте условия и подтвердите согласие на эту диагностическую сессию перед запросом захвата Android.",
+    "game_journey_choose" to "Выберите экран игры в системном диалоге Android. SENTINEL не может подтвердить выбранное приложение.",
     "game_knowledge_title" to "Проверенные игровые знания",
     "game_knowledge_waiting" to "Ожидание проверенного профиля цели",
     "game_knowledge_loading" to "Проверка актуальности знаний",

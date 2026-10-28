@@ -1,13 +1,14 @@
 import {publicPages,productPages} from './content.mjs';
-export const initialState=Object.freeze({permission:'unknown',observing:false,telemetry:null,status:'unknown',executionEnabled:false,acknowledged:false});
+// Browser-only consent lease; no Android capture or action authority is conferred.
+export const initialState=Object.freeze({permission:'unknown',observing:false,telemetry:null,status:'unknown',executionEnabled:false,acknowledged:false,consentRequired:true});
 export function transition(state,event){
  const next={...state,executionEnabled:false};
- if(event==='grant') return {...next,permission:'granted',status:'ready',observing:false,telemetry:null};
- if(event==='observe'&&state.permission==='granted'&&!['offline','stale'].includes(state.status))return {...next,observing:true,status:'observing',telemetry:null};
- if(event==='revoke')return {...next,permission:'revoked',observing:false,telemetry:null,status:'revoked'};
- if(event==='deny')return {...next,permission:'denied',observing:false,telemetry:null,status:'denied'};
- if(['stop','offline','stale','timeout'].includes(event))return {...next,observing:false,telemetry:null,status:event==='stop'?'stopped':event};
- if(event==='recover')return {...next,observing:false,telemetry:null,status:state.permission==='granted'?'ready':state.permission};
+ if(event==='grant') return {...next,permission:'granted',status:'ready',observing:false,telemetry:null,consentRequired:false};
+ if(event==='observe'&&state.permission==='granted'&&state.consentRequired===false&&state.status==='ready')return {...next,observing:true,status:'observing',telemetry:null};
+ if(event==='revoke')return {...next,permission:'revoked',observing:false,telemetry:null,status:'revoked',consentRequired:true};
+ if(event==='deny')return {...next,permission:'denied',observing:false,telemetry:null,status:'denied',consentRequired:true};
+ if(['stop','offline','stale','timeout'].includes(event))return {...next,observing:false,telemetry:null,status:event==='stop'?'stopped':event,consentRequired:true};
+ if(event==='recover')return {...next,observing:false,telemetry:null,status:state.consentRequired?'stopped':state.permission==='granted'?'ready':state.permission};
  if(event==='confirm')return {...next,acknowledged:true};
  return next;
 }

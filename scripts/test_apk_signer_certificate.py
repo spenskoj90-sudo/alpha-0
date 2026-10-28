@@ -26,3 +26,22 @@ class CertificateReportTest(unittest.TestCase):
         for r in ("", "V2 Signer: certificate SHA-256 digest: bad", f"Other: certificate SHA-256 digest: {S256}", "x"*32769):
             with self.subTest(r=r[:20]), self.assertRaises(ValueError):
                 certificate_digests(r)
+
+    def test_duplicate_certificate_used_by_distinct_signers_is_rejected(self):
+        r = f"V2 Signer #1: certificate SHA-256 digest: {S256}\nV2 Signer #2: certificate SHA-256 digest: {S256}"
+        with self.assertRaisesRegex(ValueError, "UNEXPECTED_SIGNER_INDEX"):
+            certificate_digests(r)
+
+    def test_non_primary_signer_alone_is_rejected(self):
+        r = f"Signer #2 certificate SHA-256 digest: {S256}"
+        with self.assertRaisesRegex(ValueError, "UNEXPECTED_SIGNER_INDEX"):
+            certificate_digests(r)
+
+    def test_second_signer_on_non_digest_line_is_rejected(self):
+        r = f"Signer #1 certificate SHA-256 digest: {S256}\nSigner #2 certificate DN: CN=untrusted"
+        with self.assertRaisesRegex(ValueError, "UNEXPECTED_SIGNER_INDEX"):
+            certificate_digests(r)
+
+    def test_explicit_primary_signer_across_schemes_is_allowed(self):
+        r = f"V2 Signer #1: certificate SHA-256 digest: {S256}\nV3 Signer #1: certificate SHA-256 digest: {S256}"
+        self.assertEqual(certificate_digests(r)["sha256"], S256)

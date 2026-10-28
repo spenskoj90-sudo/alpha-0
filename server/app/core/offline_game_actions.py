@@ -74,6 +74,10 @@ class TurnWorld:
         self.turn = 0
         self.sequence = 0
         self.fault = fault
+        # Synthetic host context only. These are not claims about a live OS,
+        # capture permission, game focus, or third-party environment.
+        self.focus_active = True
+        self.permission_active = True
 
     def observe(self, now_ms: int) -> Observation:
         canonical = json.dumps({"target": self.target.model_dump(), "session": self.session_id,
@@ -109,6 +113,7 @@ class OfflineActionSession:
         self.gateway = gateway
         self.pending: ActionIntent | None = None
         self.stopped = True
+        self.stop_reason: str | None = None
         self._history: dict[str, tuple[str, Outcome]] = {}
         self._principal: Principal | None = None
         self._last_now = -1
@@ -134,9 +139,14 @@ class OfflineActionSession:
         self._mode = mode
         self._budget = steps
         self._last_now = now_ms
+        self.stop_reason = None
         self.stopped = False
 
     def stop(self, reason: str = "explicit") -> None:
+        # Preserve the first terminal reason. A later cleanup or duplicate
+        # callback must not disguise the boundary that actually stopped work.
+        if not self.stopped:
+            self.stop_reason = reason
         if self.pending is not None:
             request = self.pending
             self._history[request.idempotency_key] = (self._fingerprint(request), Outcome("CANCELLED", "STOPPED"))
@@ -146,6 +156,22 @@ class OfflineActionSession:
     @staticmethod
     def _fingerprint(request: ActionIntent) -> str:
         return sha256(request.model_dump_json().encode()).hexdigest()
+
+    def require_fixture_authority(self, principal: Principal) -> None:
+        """Refresh policy and entitlement even when replaying a completed fixture tick.
+
+        Replay is informational (never a second delivery), but stale grants must
+        not return an apparently authorized success after revocation.
+        """
+        if self.stopped:
+            raise ValueError("STOPPED")
+        if principal != self._principal:
+            raise ValueError("PRINCIPAL_MISMATCH")
+        decision = self.gateway.authorize(principal, ActionRequest(action="offline:advance", resource="offline:turn-world",
+            mode=ActionMode.USER_CONFIRMED, capability="offline_fixture", capability_status=CapabilityStatus.LIMITED, evidence_level="L2"),
+            required_capabilities=("offline_fixture",), required_entitlements=("offline-game-test",))
+        if decision.decision is not ActionDecision.ALLOW:
+            raise ValueError(decision.reason_code)
 
     def _validate(self, principal: Principal, request: ActionIntent, now_ms: int, *, scheduled_ms: int) -> Observation:
         if type(now_ms) is not int or now_ms < self._last_now:
@@ -167,11 +193,7 @@ class OfflineActionSession:
             raise ValueError("BUDGET_EXHAUSTED")
         if now_ms - self._last_delivery < 1000:
             raise ValueError("RATE_LIMIT")
-        decision = self.gateway.authorize(principal, ActionRequest(action="offline:advance", resource="offline:turn-world",
-            mode=ActionMode.USER_CONFIRMED, capability="offline_fixture", capability_status=CapabilityStatus.LIMITED, evidence_level="L2"),
-            required_capabilities=("offline_fixture",), required_entitlements=("offline-game-test",))
-        if decision.decision is not ActionDecision.ALLOW:
-            raise ValueError(decision.reason_code)
+        self.require_fixture_authority(principal)
         # Only accepted context/authority observations may advance the logical clock.
         # Rejected future-dated intents must not lock out a valid later action.
         self._last_now = now_ms

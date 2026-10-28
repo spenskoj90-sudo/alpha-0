@@ -257,7 +257,7 @@ internal fun GameObservationPanel(
                     "STOPPED" -> "status_stopped"
                     else -> "game_knowledge_unavailable"
                 }
-                StatusBadge(strings.text(label), if (knowledge.state == "READY") SentinelStatus.ACTIVE else SentinelStatus.PENDING)
+                StatusBadge(strings.text(label), knowledgeUiStatus(knowledge.state))
                 Text(strings.text("game_knowledge_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (knowledge.state == "READY") knowledge.items.forEach { item ->
                     Text(item.text); Text(item.reason, color = MaterialTheme.colorScheme.onSurfaceVariant)

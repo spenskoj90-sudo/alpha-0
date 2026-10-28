@@ -7,6 +7,8 @@ import sys
 MARKER = re.compile(
     r"^(?:V[1-4] Signer(?: #\d+)?:|Signer #\d+) certificate SHA-(256|1) digest: ([0-9a-fA-F]+)$"
 )
+# A repeated fingerprint does not prove that two numbered signers are one signer.
+SIGNER_INDEX = re.compile(r"^(?:V[1-4] )?Signer #([0-9]+)(?=[:\s])")
 
 def certificate_digests(report: str) -> dict[str, str]:
     if not report or len(report) > 32768:
@@ -14,6 +16,9 @@ def certificate_digests(report: str) -> dict[str, str]:
     found = {"256": set(), "1": set()}
     for raw in report.splitlines():
         line = raw.strip()
+        numbered = SIGNER_INDEX.match(line)
+        if numbered and numbered.group(1) != "1":
+            raise ValueError("UNEXPECTED_SIGNER_INDEX")
         match = MARKER.fullmatch(line)
         if match:
             algo, value = match.groups()

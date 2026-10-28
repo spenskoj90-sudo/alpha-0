@@ -62,6 +62,10 @@ def evidence_from_artifact(archive: Path) -> tuple[dict, str]:
         names = zipped.namelist()
         require(len(names) == len(set(names)), "DUPLICATE_ARTIFACT_ENTRIES")
         require(names.count(MANIFEST_IN_ARTIFACT) == names.count(APK_IN_ARTIFACT) == 1, "ARTIFACT_FILES_MISSING")
+        # GitHub upload-artifact publishes two integrity sidecars alongside the APK.
+        # Reject any other member even when the expected APK and manifest are present.
+        allowed = {MANIFEST_IN_ARTIFACT, APK_IN_ARTIFACT, "physical-test-apk.sha256", "physical-test-signer.txt"}
+        require(set(names) <= allowed, "UNEXPECTED_ARTIFACT_ENTRIES")
         manifest_info = zipped.getinfo(MANIFEST_IN_ARTIFACT)
         apk_info = zipped.getinfo(APK_IN_ARTIFACT)
         require(manifest_info.file_size <= MAX_MANIFEST_BYTES, "MANIFEST_TOO_LARGE")

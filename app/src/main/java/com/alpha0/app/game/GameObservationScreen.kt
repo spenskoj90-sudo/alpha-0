@@ -29,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,24 +60,32 @@ fun GameObservationScreen() {
     var installed by remember { mutableStateOf(ShatteredGameProfile.installed(context)) }
     val state by GameObservationRuntime.state.collectAsStateWithLifecycle()
     val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
-    var consent by rememberSaveable { mutableStateOf(false) }
-    var pendingVersion by rememberSaveable { mutableStateOf<Long?>(null) }
-    var pendingVersionName by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingSigner by rememberSaveable { mutableStateOf<String?>(null) }
-    var pending by rememberSaveable { mutableStateOf(false) }
+    var consent by remember { mutableStateOf(false) }
+    var pendingVersion by remember { mutableStateOf<Long?>(null) }
+    var pendingVersionName by remember { mutableStateOf<String?>(null) }
+    var pendingSigner by remember { mutableStateOf<String?>(null) }
+    var pending by remember { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
 
     DisposableEffect(lifecycle, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) installed = ShatteredGameProfile.installed(context)
+            // Leaving the foreground must never keep a prechecked capture-consent control.
+            if (event == Lifecycle.Event.ON_STOP) consent = false
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
+    }
+    // System consent is separate; the checkbox is a short-lived UI acknowledgement only.
+    // A source/session transition or game-install change requires a fresh acknowledgement.
+    LaunchedEffect(installed, state.observation.status, state.observation.reason, state.observation.captureId) {
+        consent = false
     }
     LaunchedEffect(state.observation.lastHealth?.observedAt) {
         while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val wasPending = pending
         pending = false
         consent = false
         val expectedVersion = pendingVersion
@@ -90,6 +97,7 @@ fun GameObservationScreen() {
         val currentInstall = ShatteredGameProfile.installed(context)
         val session = SecureSessionStore().load(context)
         when {
+            !wasPending -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             !GameInstallFence.matches(expectedName, expectedVersion, expectedSigner, currentInstall) ||
                 session?.deviceId.isNullOrBlank() ->
@@ -171,6 +179,15 @@ internal fun GameObservationPanel(
     var expectedMaximum by remember { mutableStateOf("") }
     var sampleCount by remember(captureGame, observation.captureId) { mutableStateOf(campaign.count) }
     var calibrationMessage by remember { mutableStateOf("") }
+    val nextStep = observerNextStep(
+        installed = installed != null,
+        supported = supported,
+        status = observation.status,
+        hasSampleableFrame = CalibrationSamplingGate.canSample(observation, state.installed, installed),
+        consent = consent,
+        pending = pending,
+        sampleCount = sampleCount,
+    )
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -179,6 +196,14 @@ internal fun GameObservationPanel(
         Text(strings.text("game_observer_title"), style = MaterialTheme.typography.headlineLarge)
         Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleLarge)
         Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SentinelCard(kind = SentinelCardKind.CONTENT) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(strings.text("game_journey_title"), style = MaterialTheme.typography.titleMedium)
+                Text(strings.text("game_journey_source_status"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(strings.text(nextStep.stringKey))
+                Text(strings.text("game_journey_actions_off"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         SentinelCard(kind = SentinelCardKind.CONTENT) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (installed == null) {

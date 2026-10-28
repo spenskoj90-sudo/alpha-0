@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from b2_target_contract import validate_target
-from b2_versioned_transfer import KEY, MAX_STAGE_BYTES, TransferRejected
+from b2_versioned_transfer import KEY, MAX_STAGE_BYTES, TransferRejected, validate_staged_age_ciphertext
 
 CHUNK_BYTES = 1024 * 1024
 
@@ -71,11 +71,7 @@ class B2S3Transport:
                     or not KEY.fullmatch(kw["key"])):
                 raise TransferRejected("unsafe B2 upload request")
             source = kw["path"]
-            if not isinstance(source, Path) or not source.is_file() or source.suffix != ".age":
-                raise TransferRejected("preencrypted ciphertext path required")
-            size = source.stat().st_size
-            if size <= 100 or size > self.max_ciphertext_bytes:
-                raise TransferRejected("ciphertext exceeds explicit byte cap")
+            size = validate_staged_age_ciphertext(source, self.max_ciphertext_bytes)
             try:
                 with source.open("rb") as stream:
                     return self._sdk("put_object", Bucket=self.bucket,

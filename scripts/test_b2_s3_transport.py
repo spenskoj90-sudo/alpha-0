@@ -16,7 +16,10 @@ BUCKET = "sentinel-private-b2-test"
 KEY = "sentinel/staging/sentinel-db-20261028T150000Z-" + "a" * 24 + ".pgdump.age"
 VERSION = "4_z_synthetic_not_real"
 OWNER = "synthetic-owner"
-PAYLOAD = b"SYNTHETIC_AGE_CIPHERTEXT_NOT_REAL" * 10
+# Header-only fake fixture, NOT valid/decryptable age ciphertext.
+PAYLOAD = (b"age-encryption.org/v1\n-> X25519 SYNTHETIC_NOT_REAL\n"
+           + b"--- SYNTHETIC_FAKE_MAC\n"
+           + b"SYNTHETIC_AGE_CIPHERTEXT_NOT_REAL" * 10)
 
 
 class FakeS3:
@@ -127,6 +130,21 @@ class B2S3TransportTests(unittest.TestCase):
             with self.assertRaises(TransferRejected):
                 self.reader("list-object-versions", bucket=BUCKET, prefix=prefix, max_keys=max_keys)
         self.assertFalse(self.writer_client.calls or self.reader_client.calls)
+
+    def test_refuse_plaintext_renamed_age_before_any_sdk_operation(self):
+        self.source.write_bytes(b"pg_dump plaintext not encrypted" * 20)
+        with self.assertRaisesRegex(TransferRejected, "binary age v1 header"):
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source)
+        self.assertFalse(self.writer_client.calls)
+
+    def test_refuse_symlink_source_before_any_sdk_operation(self):
+        target = self.root / "real.age"
+        target.write_bytes(PAYLOAD)
+        self.source.unlink()
+        self.source.symlink_to(target)
+        with self.assertRaisesRegex(TransferRejected, "regular local age"):
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source)
+        self.assertFalse(self.writer_client.calls)
 
     def test_refuse_bad_key_and_large_ciphertext_before_upload(self):
         with self.assertRaises(TransferRejected):

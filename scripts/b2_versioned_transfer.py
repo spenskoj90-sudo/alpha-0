@@ -25,6 +25,33 @@ class TransferRejected(ValueError):
     """Fail-closed transport or acceptance requirement."""
 
 
+# Format preflight only: no cryptographic authentication or decryption.
+AGE_V1_STANZA_PREFIX = b"age-encryption.org/v1\n-> "
+
+
+def validate_staged_age_ciphertext(source: pathlib.Path, max_bytes: int) -> int:
+    """Reject obvious plaintext / symlink staging before any B2 operation.
+
+    An age header is not proof of encryption, correct recipients or restore.
+    ASCII armor is deliberately not accepted by this binary-only source draft.
+    """
+    if (not isinstance(source, pathlib.Path) or source.is_symlink()
+            or source.suffix != ".age" or not source.is_file()):
+        raise TransferRejected("regular local age ciphertext file required")
+    if type(max_bytes) is not int or max_bytes <= 100:
+        raise TransferRejected("explicit positive ciphertext cap required")
+    try:
+        size = source.stat().st_size
+        if size <= 100 or size > max_bytes:
+            raise TransferRejected("ciphertext size outside explicit pre-upload cap")
+        with source.open("rb") as stream:
+            if stream.read(len(AGE_V1_STANZA_PREFIX)) != AGE_V1_STANZA_PREFIX:
+                raise TransferRejected("binary age v1 header missing")
+    except OSError:
+        raise TransferRejected("ciphertext metadata or header unavailable") from None
+    return size
+
+
 @dataclass(frozen=True)
 class Receipt:
     key: str
@@ -89,14 +116,14 @@ def stage_and_verify(
         raise TransferRejected("object key must be a fresh non-reusable namespace key")
     if uploader is reader:
         raise TransferRejected("a separately scoped read transport is required")
-    if not ciphertext.is_file() or ciphertext.suffix != ".age":
-        raise TransferRejected("pre-encrypted age ciphertext file required")
-    if download_path.exists() or download_path == ciphertext:
+    size = validate_staged_age_ciphertext(ciphertext, max_ciphertext_bytes)
+    if download_path.exists() or download_path.is_symlink() or download_path == ciphertext:
         raise TransferRejected("download path must be new and independent")
-    size = ciphertext.stat().st_size
-    if size <= 100 or size > max_ciphertext_bytes:
-        raise TransferRejected("ciphertext size outside explicit pre-upload cap")
-    digest = hashlib.file_digest(ciphertext.open("rb"), "sha256").hexdigest()
+    try:
+        with ciphertext.open("rb") as source_stream:
+            digest = hashlib.file_digest(source_stream, "sha256").hexdigest()
+    except OSError:
+        raise TransferRejected("ciphertext could not be read") from None
     _private_bucket(uploader, bucket, expected_owner)
     before, old_hidden = _versions(uploader, bucket, key)
     if before or old_hidden:

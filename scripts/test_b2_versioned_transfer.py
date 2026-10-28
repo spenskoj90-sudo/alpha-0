@@ -16,7 +16,10 @@ BUCKET = "sentinel-private-b2-test"
 OWNER = "synthetic-owner-not-real"
 VERSION = "4_z_synthetic_version"
 KEY = new_unique_key(datetime(2026, 10, 28, tzinfo=timezone.utc), "a" * 24)
-PAYLOAD = b"TEST_ENCRYPTED_CIPHERTEXT_NOT_A_REAL_DATABASE" * 8
+# Synthetic magic-header fixture, NOT valid/decryptable age ciphertext.
+PAYLOAD = (b"age-encryption.org/v1\n-> X25519 SYNTHETIC_NOT_REAL\n"
+           + b"--- SYNTHETIC_FAKE_MAC\n"
+           + b"TEST_ENCRYPTED_CIPHERTEXT_NOT_A_REAL_DATABASE" * 8)
 
 
 class FakeB2:
@@ -136,6 +139,22 @@ class B2VersionedTransferTests(unittest.TestCase):
     def test_no_standing_identity_reuse(self):
         with self.assertRaises(TransferRejected):
             self.go(reader=self.writer)
+        self.assertEqual(self.writer.calls, [])
+
+    def test_misnamed_plaintext_refused_before_remote(self):
+        self.source.write_bytes(b"UNENCRYPTED_PG_DUMP_WITH_FAKE_DOT_AGE_SUFFIX" * 8)
+        with self.assertRaisesRegex(TransferRejected, "binary age v1 header"):
+            self.go()
+        self.assertEqual(self.writer.calls, [])
+        self.assertEqual(self.reader.calls, [])
+
+    def test_ciphertext_symlink_refused_before_remote(self):
+        actual = self.root / "real.age"
+        actual.write_bytes(PAYLOAD)
+        self.source.unlink()
+        self.source.symlink_to(actual)
+        with self.assertRaisesRegex(TransferRejected, "regular local age"):
+            self.go()
         self.assertEqual(self.writer.calls, [])
 
     def test_too_small_ciphertext_refused(self):

@@ -23,6 +23,7 @@ permissions:
 concurrency:
   group: physical-test-update
   cancel-in-progress: false
+  queue: max
 
 env:
   PHYSICAL_TEST_API_BASE_URL: https://sentinel-core-staging.onrender.com

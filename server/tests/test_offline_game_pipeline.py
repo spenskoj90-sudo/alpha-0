@@ -14,7 +14,8 @@ from app.core.security import AuthorizationEngine, Decision, Policy, Principal
 FIXTURE = Path(__file__).resolve().parents[2] / "scripts/fixtures/offline-turn-knowledge.v1.json"
 
 
-def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=None):
+def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=None,
+                   mode="BOUNDED_RULE"):
     principal = Principal("fixture-user", "fixture-device", frozenset(), frozenset({"offline:write"}))
     policy = Policy(Decision.ALLOW, "offline:advance", "offline:turn-world",
                     scopes=frozenset({"offline:write"}))
@@ -23,8 +24,8 @@ def setup_pipeline(*, fault=None, change_pack=None, registry=None, entitlements=
     ))
     world = TurnWorld("fixture-pipeline", fault=fault)
     session = OfflineActionSession(world, gateway)
-    session.arm(principal, now_ms=1000, expires_ms=11000, mode="BOUNDED_RULE",
-                steps=3, confirmed=True)
+    session.arm(principal, now_ms=1000, expires_ms=11000, mode=mode,
+                steps=3 if mode == "BOUNDED_RULE" else 1, confirmed=True)
     raw = FIXTURE.read_bytes() if change_pack is None else change_pack
     digest = sha256(raw).hexdigest()
     if registry is not None:
@@ -61,6 +62,279 @@ def test_three_explicitly_confirmed_turns_have_observed_outcomes():
         assert world.turn == step + 1
     assert pipeline.review(now_ms=4000).evaluation.status == "empty"
     assert session.pending is None
+
+
+def test_bounded_fixture_ticks_use_one_lease_and_verify_each_outcome():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    for step in range(3):
+        result = pipeline.bounded_fixture_tick(
+            principal, now_ms=1000 + step * 1000,
+            idempotency_key=f"lease-{step}", consent_active=True,
+        )
+        assert result.outcome == "SUCCEEDED"
+        assert result.observed_sequence == step + 1
+        assert world.turn == step + 1
+        assert session.pending is None
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=4000, idempotency_key="lease-extra", consent_active=True,
+        )
+    assert session.stopped and world.turn == 3
+
+
+def test_bounded_tick_duplicate_returns_recorded_outcome_without_new_delivery():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    for _ in range(2):
+        assert pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=True,
+        ) == first
+    assert first.outcome == "SUCCEEDED" and world.turn == 1 and not session.stopped
+    second = pipeline.bounded_fixture_tick(
+        principal, now_ms=2000, idempotency_key="second", consent_active=True,
+    )
+    assert second.observed_sequence == 2 and world.turn == 2
+    # Even after an unrelated successful tick, the first request remains stable.
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ) == first
+    assert world.turn == 2 and session._steps == 2
+
+
+def test_bounded_tick_reuse_of_key_with_different_timestamp_stops_lease():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="same", consent_active=True,
+    )
+    with pytest.raises(ValueError, match="IDEMPOTENCY_CONFLICT"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="same", consent_active=True,
+        )
+    assert session.stopped and world.turn == 1
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="same", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+@pytest.mark.parametrize("boundary,reason", [
+    ("focus", "FOCUS_LOST"),
+    ("permission", "PERMISSION_REVOKED"),
+    ("session", "SESSION_CHANGED"),
+])
+def test_bounded_tick_context_loss_is_latched_before_new_or_duplicate_action(boundary, reason):
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED"
+    if boundary == "focus":
+        world.focus_active = False
+    elif boundary == "permission":
+        world.permission_active = False
+    else:
+        world.session_id = "new-session"
+    with pytest.raises(ValueError, match=reason):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=True,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+    # Returning to the old context never silently re-arms the lease.
+    world.focus_active = True
+    world.permission_active = True
+    world.session_id = pipeline.session_id
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+@pytest.mark.parametrize("boundary", ["FOCUS_LOST", "PERMISSION_REVOKED", "SESSION_CHANGED"])
+def test_host_boundary_event_latches_stop_even_if_context_recovers_between_ticks(boundary):
+    pipeline, world, session, principal, _ = setup_pipeline()
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED"
+    pipeline.signal_fixture_host_loss(principal, boundary=boundary)
+    assert session.stopped and session.stop_reason == boundary
+    assert session.pending is None and world.turn == 1
+    # The fixture host reports recovery before another tick is polled.
+    world.focus_active = True
+    world.permission_active = True
+    world.session_id = pipeline.session_id
+    pipeline.signal_fixture_host_loss(principal, boundary=boundary)
+    assert session.stop_reason == boundary  # first cause is durable
+    for key, time in (("first", 1000), ("second", 2000)):
+        with pytest.raises(ValueError, match="STOPPED"):
+            pipeline.bounded_fixture_tick(
+                principal, now_ms=time, idempotency_key=key, consent_active=True,
+            )
+    assert world.turn == 1
+
+
+def test_synthetic_host_loss_rejects_foreign_or_invalid_event_without_stopping():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    foreign = replace(principal, device_id="other")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.signal_fixture_host_loss(foreign, boundary="FOCUS_LOST")
+    with pytest.raises(ValueError, match="HOST_BOUNDARY_INVALID"):
+        pipeline.signal_fixture_host_loss(principal, boundary="FOCUS_GAINED")
+    assert not session.stopped and session.stop_reason is None
+    assert world.focus_active and world.permission_active and world.turn == 0
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+
+
+def test_manual_stop_reason_is_not_overwritten_by_later_host_events():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    session.stop("USER_STOP")
+    pipeline.signal_fixture_host_loss(principal, boundary="PERMISSION_REVOKED")
+    assert session.stopped and session.stop_reason == "USER_STOP"
+    assert world.turn == 0
+
+
+def test_bounded_tick_revocation_precedes_idempotent_result_replay():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    )
+    with pytest.raises(ValueError, match="CONSENT_REVOKED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="first", consent_active=False,
+        )
+    assert session.stopped and world.turn == 1
+    stranger = replace(principal, device_id="not-the-owner")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.bounded_fixture_tick(
+            stranger, now_ms=1000, idempotency_key="first", consent_active=True,
+        )
+
+
+def test_bounded_tick_cached_result_denied_after_knowledge_revocation(tmp_path):
+    pipeline, world, session, principal, registry = setup_pipeline(registry=tmp_path)
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED" and world.turn == 1
+    registry.revoke(pipeline.knowledge.digest)
+    with pytest.raises(ValueError, match="RECOMMENDATION_UNAVAILABLE"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+        )
+    assert session.stopped and session.stop_reason == "BOUNDED_TICK_INVALIDATED"
+    assert world.turn == 1  # Revoked pack cannot authorize replay or delivery.
+
+
+def test_bounded_tick_replays_last_success_after_budget_consumed():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    result = None
+    for step in range(3):
+        result = pipeline.bounded_fixture_tick(
+            principal, now_ms=1000 + step * 1000,
+            idempotency_key=f"lease-{step}", consent_active=True,
+        )
+        assert result.outcome == "SUCCEEDED"
+    assert pipeline.review(now_ms=3000).evaluation.status == "empty"
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=3000, idempotency_key="lease-2", consent_active=True,
+    ) == result
+    assert world.turn == 3 and session._steps == 3 and not session.stopped
+
+
+def test_bounded_tick_cached_result_denied_after_entitlement_revocation():
+    grants = ["offline-game-test"]
+    pipeline, world, session, principal, _ = setup_pipeline(
+        entitlements=lambda _: tuple(grants),
+    )
+    first = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+    )
+    assert first.outcome == "SUCCEEDED" and world.turn == 1
+    grants.clear()
+    with pytest.raises(ValueError, match="FEATURE_ENTITLEMENT_REQUIRED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="cached", consent_active=True,
+        )
+    assert session.stopped and session.stop_reason == "BOUNDED_TICK_INVALIDATED"
+    assert world.turn == 1  # Revoked replay never executes another action.
+
+
+def test_bounded_fixture_tick_revoked_consent_latches_stop():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+    with pytest.raises(ValueError, match="CONSENT_REVOKED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=False,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=3000, idempotency_key="third", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+def test_bounded_fixture_tick_stops_after_gateway_entitlement_revocation():
+    grants = ["offline-game-test"]
+    pipeline, world, session, principal, _ = setup_pipeline(
+        entitlements=lambda _: tuple(grants),
+    )
+    assert pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="first", consent_active=True,
+    ).outcome == "SUCCEEDED"
+    grants.clear()
+    with pytest.raises(ValueError, match="FEATURE_ENTITLEMENT_REQUIRED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="second", consent_active=True,
+        )
+    assert session.stopped and session.pending is None and world.turn == 1
+
+
+def test_bounded_fixture_tick_uses_stop_and_unknown_outcome_as_hard_boundaries():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    session.stop("manual")
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=1000, idempotency_key="blocked", consent_active=True,
+        )
+    assert world.turn == 0
+
+    pipeline, world, session, principal, _ = setup_pipeline(fault="missing_outcome")
+    result = pipeline.bounded_fixture_tick(
+        principal, now_ms=1000, idempotency_key="unknown", consent_active=True,
+    )
+    assert result.outcome == "UNKNOWN" and session.stopped
+    with pytest.raises(ValueError, match="STOPPED"):
+        pipeline.bounded_fixture_tick(
+            principal, now_ms=2000, idempotency_key="blind-retry", consent_active=True,
+        )
+    assert world.turn == 1
+
+
+def test_bounded_tick_requires_lease_and_cannot_be_revoked_by_foreign_caller():
+    pipeline, world, session, principal, _ = setup_pipeline()
+    stranger = replace(principal, device_id="foreign-device")
+    with pytest.raises(ValueError, match="PRINCIPAL_MISMATCH"):
+        pipeline.bounded_fixture_tick(
+            stranger, now_ms=1000, idempotency_key="probe", consent_active=False,
+        )
+    assert not session.stopped and world.turn == 0
+    single, single_world, single_session, single_principal, _ = setup_pipeline(
+        mode="USER_CONFIRMED",
+    )
+    with pytest.raises(ValueError, match="BOUNDED_LEASE_REQUIRED"):
+        single.bounded_fixture_tick(
+            single_principal, now_ms=1000, idempotency_key="probe", consent_active=True,
+        )
+    assert single_world.turn == 0 and single_session.pending is None
 
 
 def test_no_consent_means_no_queue_or_action():

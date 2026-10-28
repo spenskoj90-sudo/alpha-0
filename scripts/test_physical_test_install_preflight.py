@@ -125,5 +125,67 @@ class PhysicalInstallPreflightTests(unittest.TestCase):
                 evidence_from_artifact(path)
 
 
+    def test_unexpected_artifact_entries_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "artifact.zip"
+            self.artifact(path)
+            with zipfile.ZipFile(path, "a") as archive:
+                archive.writestr("unexpected-alt.apk", b"untrusted alternate package")
+            with self.assertRaisesRegex(ValueError, "UNEXPECTED_ARTIFACT_ENTRIES"):
+                evidence_from_artifact(path)
+
+    def test_known_optional_integrity_sidecars_are_compatible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "artifact.zip"
+            manifest = self.artifact(path)
+            with zipfile.ZipFile(path, "a") as archive:
+                archive.writestr("physical-test-apk.sha256", "synthetic digest sidecar")
+                archive.writestr("physical-test-signer.txt", "synthetic certificate report")
+            actual_manifest, signer = evidence_from_artifact(path)
+            self.assertEqual(actual_manifest["sourceSha"], manifest["sourceSha"])
+            self.assertEqual(signer, NEW)
+
+
+    def test_diagnostic_numeric_types_must_not_coerce(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "diag.gz"
+            self.diagnostic(path)
+            with gzip.open(path, "rt") as stream:
+                original = [json.loads(line) for line in stream]
+            for key, wrong, reason in (
+                ("signer_count", True, "AMBIGUOUS_INSTALLED_SIGNER"),
+                ("signer_count", 1.0, "AMBIGUOUS_INSTALLED_SIGNER"),
+                ("installed_version_code", 718.0, "INSTALLED_VERSION_DISAGREEMENT"),
+                ("installed_version_code", "718", "INSTALLED_VERSION_DISAGREEMENT"),
+            ):
+                with self.subTest(key=key, value=wrong):
+                    rows = json.loads(json.dumps(original))
+                    rows[1]["details"][key] = wrong
+                    with gzip.open(path, "wt") as stream:
+                        for row in rows:
+                            stream.write(json.dumps(row) + "\n")
+                    with self.assertRaisesRegex(ValueError, reason):
+                        evidence_from_diagnostics(path)
+
+    def test_update_baseline_cannot_equal_or_exceed_candidate(self):
+        candidate = {
+            "apk": {"versionCode": 719}, "sourceSha": "c" * 40,
+            "apiEnvironment": "staging", "signingMode": "stable-test",
+            "signerLineageVerified": True, "updateCompatible": True,
+            "updateBaselineVersionCode": 718,
+        }
+        self.assertEqual(
+            assess(718, OLD, candidate, OLD)["status"],
+            "ELIGIBLE_FOR_OWNER_DEVICE_CONFIRMATION",
+        )
+        for invalid in (719, 720):
+            with self.subTest(baseline=invalid):
+                candidate["updateBaselineVersionCode"] = invalid
+                self.assertEqual(
+                    assess(718, OLD, candidate, OLD)["reason"],
+                    "UPDATE_BASELINE_NOT_PROVEN",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,8 +8,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: h-design-preview-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.run_attempt == 1 && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
 jobs:
   preview:
     name: Design prototype interaction and routes
@@ -34,7 +34,9 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ github.workspace }}/web/node_modules/@playwright/test
           H_QA_OUTPUT: ${{ runner.temp }}/sentinel-h-qa
-        run: node design/h-system/tests/browser.cjs
+        run: |
+          node design/h-system/tests/browser.cjs
+          node design/h-system/tests/browser-workspaces.cjs
       - name: Upload exact-source prototype and QA
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

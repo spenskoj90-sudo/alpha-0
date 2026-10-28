@@ -1,54 +1,37 @@
-# Sentinel independent backup and recovery — Storage v2.1 (Cloudflare R2)
+# SENTINEL — independent encrypted PostgreSQL 18 backup and restore (G3)
 
-Status: **APPROVED PROVIDER, CODE PREPARED, NOT ACTIVATED**, 2026-10-24.
-This document supersedes the earlier AWS S3/OIDC setup in this PR, **not** the global minimum-necessary Storage Policy v2.0. A prepared exporter, Cloudflare free-tier selection or an on-provider Neon snapshot is NOT an independent verified backup.
+**Governing edition: 28.10.2026. Status: SOURCE_ONLY / G3 OPEN / OFFSITE_NOT_RUN / RESTORE_NOT_RUN.** Canonical cross-product policy: [Unified Regulation](https://docs.google.com/document/d/1furikabuGC5DduHfELkyERXoWiTKbzvDEw5pSojlfvE/edit), [PROJECTS organizational task](https://docs.google.com/document/d/1hlzUCjZ4LejSBW_x3uAA_Bq7dGZoMJQd_73NjJFdN8Q/edit), [G3 Issue #528](https://github.com/spenskoj90-sudo/alpha-0/issues/528). This repository document describes an **unmerged draft**, never live authorization to use credentials or launch a backup.
 
-## Source and preservation
+## Source of truth and preservation
 
-- Current authoritative source: Neon project `royal-butterfly-62116978`, branch `br-lingering-block-b1qa4fcd` (default `main`), PostgreSQL 18 database `sentinel`.
-- Verified direct compute hostname on 2026-10-24: `ep-fragrant-hall-b14yfhj5.c-5.eu-central-1.aws.neon.tech`; check it against the *actual current Neon main branch* immediately before configuring/dispatching export. Never use a pooler host or a different Neon branch.
-- A provider-internal manual snapshot `snap-royal-brook-b1hmsahq` expires **2026-11-07T00:00:00Z**. Its isolated Neon restore preview (`br-proud-lake-b1axiq7m`, auto-expiry 2026-10-31T15:00:00Z) previously matched 53 tables, 11 selected row-count aggregates, and six schema fingerprints. This DOES NOT prove external pg_dump completeness or independent recovery.
-- Do not modify default database, uninstall applications, delete old archives, deactivate legacy providers or close the Sentinel repository as part of the backup preparation.
+- Live database target is the existing SENTINEL Neon EU **PG18** project and its current default branch. Re-read precise project/branch/host/database and source SHA before any operation; historical fixed hostnames are not permanent authority.
+- Historical Neon PG17 rollback, all existing snapshots, saved drill branches and encrypted archives remain preserved. A snapshot or restored branch **inside Neon is not** an independent offsite recovery.
+- An authenticated B2 owner-console readback **on 27.10.2026** found one **empty, private** B2 EU Central bucket, SSE-B2 on, versioning Keep all, no Object Lock. That is historical **CONFIGURED / READBACK_VERIFIED**, **not** live 28.10 account MFA, region, budget, notification, key or recovery verification and **not** an uploaded object. Avoid putting sensitive account identifiers in public GitHub issues.
 
-## Off-provider design
+## Approved destination and code state
 
-- Cloudflare R2 **Standard** bucket, private, created and owned by the Human Owner under their own account; R2 activation and provider billing rules are an explicit owner action. Free usage allowances are not a hard no-charge ceiling: configure spend alerts/caps and review retention.
-- R2 S3-compatible endpoint `https://<32-character-account-id>.r2.cloudflarestorage.com`; jurisdiction-specific endpoints can use the supported suffix (e.g. EU). Script fails closed if the endpoint is not an approved exact Cloudflare R2 pattern.
-- R2 **bucket-scoped Object Read & Write API token** (not general Cloudflare admin key). GitHub Actions secrets `SENTINEL_BACKUP_R2_ACCESS_KEY_ID` and `SENTINEL_BACKUP_R2_SECRET_ACCESS_KEY`. R2 S3 API uses `AWS_REGION=auto`. Limit access to the designated backup bucket only, and rotate credentials after tests. R2 API tokens may be granted broader scope than a prefix; rely on a dedicated bucket for least privilege. Never put credentials in repository files, Google Drive docs, ChatGPT or Actions artifacts.
-- Dedicated Neon **read-only** backup URL via GitHub encrypted secret `SENTINEL_BACKUP_DATABASE_URL`; least-privilege access must cover *all required* schemas including `public` and managed auth objects. Permissions for future tables/extensions must be designed and tested. No production runtime password reuse unless independently approved.
-- Generate an `age` X25519 identity offline; store the **private identity** in independently backed up encrypted custody, away from GitHub/Cloudflare/Neon, with a second recovery copy. Set only the public age recipient in GitHub variables. R2 encrypts storage at rest, but backup confidentiality relies primarily on this client-side age encryption.
-- `pg_dump -Fc --no-owner --no-acl` streams from an ephemeral PostgreSQL 18 client into `age`; plaintext is not stored on the CI runner. `set -euo pipefail` fails on pg_dump/encryption errors. Cloudflare R2 upload and download are checked byte-for-byte before reporting encrypted SHA256, size and object key. **Do not use AWS-only --sse AES256 with R2**.
-- Export is **manual only** on exact `spenskoj90-sudo/alpha-0` repository's `refs/heads/main`. It is deliberately not scheduled and no data is exported by a pull-request workflow. Main-branch secret access and workflow editing must be restricted.
+- **Target: the existing private Backblaze B2 EU Central account and bucket, conditional on current owner-led payment/MFA/recovery checks.** Do not register AWS/R2 again, activate a paid plan, or infer a hard spending cap from a free allowance.
+- `.github/workflows/offsite-db-backup.yml` and `scripts/offsite_pg_backup.sh` are **historical Cloudflare R2 implementations**; they are not authorized B2 transports. Keep the manual R2 job **disabled** until replaced by a separately reviewed B2-specific entrypoint. The legacy script uses `pg_dump --no-owner --no-acl`, which is **not a full role/grant/owner backup** and must never be accepted as G3 completeness evidence.
+- `scripts/b2_target_contract.py` enforces the syntactic EU endpoint/region/bucket/byte-cap contract only. `scripts/b2_versioned_transfer.py` is a credential-free-verifiable, **inert** ciphertext/version/ACL/hash guard. `scripts/b2_s3_transport.py` supplies a **not-wired** B2 S3 call adapter with role-bounded operations, exact endpoint/region, preencrypted source, version-specific readback and client-side byte bounds. Tests use fake clients, not a real B2 account.
+- No B2 workflow, schedule, database export, actual ciphertext upload, access key issuance, restore, or cleanup is authorized by this draft alone.
 
-## Owner setup checklist — no secrets pasted into conversations
+## Required approval and capability gates BEFORE any real upload
 
-1. Activate Cloudflare R2 in the owner's account; check plan, billing settings and region/legal-data requirements. Create one **dedicated private Standard bucket** for encrypted database backups, no public URL/custom public domain and no anonymous reads. Record only the bucket name and region in the owner-approved non-secret asset register.
-2. Create one R2 API token with **Object Read & Write** for that *specific bucket only*. Store secret key and access key in GitHub Actions repository secrets `SENTINEL_BACKUP_R2_ACCESS_KEY_ID` and `SENTINEL_BACKUP_R2_SECRET_ACCESS_KEY` or use a later verified secret-manager injection. Confirm no keys leak into action logs.
-3. Create a read-only dump role with proper access to `public`, `neon_auth` and necessary extensions. Validate the actual direct Neon URL/branch identity and set secret `SENTINEL_BACKUP_DATABASE_URL`. Data access must remain limited to this intended source.
-4. Independently create/export and **test opening** an offline age private identity. Set public GitHub variable `SENTINEL_BACKUP_AGE_RECIPIENT`; never upload the identity itself to GitHub, Drive or R2.
-5. Set non-secret GitHub Actions variables: `SENTINEL_BACKUP_S3_BUCKET` (historical name retained to avoid breaking exporter contract), `SENTINEL_BACKUP_R2_ENDPOINT`, `SENTINEL_BACKUP_EXPECTED_HOST`, `SENTINEL_BACKUP_EXPECTED_DATABASE` (expected `sentinel`). Current endpoint and database must be read back from Neon main before execution.
-6. Review current exact source and PR CI; after a reviewed merge to protected main, run exactly one **manual** workflow dispatch. Validate ciphertext SHA256/length, R2 object existence and negative anonymous-access test. Keep evidence metadata only; never store a plaintext dump or decryption keys in CI artifacts.
-7. If any precondition fails, mark BACKUP_FAILED, do not promote to release readiness, do not remove old backups/snapshots or change production DB.
+1. **G1 independent owner recovery:** separately verify Google/GitHub, Bitwarden EU, Proton and an earlier E2EE object under a *both phones lost* scenario. No OTP, master passphrase, private age identity, permanent signer, plaintext dump or raw database credentials in GitHub/Drive/ChatGPT/phone durable storage. Do not invalidate the sole working session.
+2. **B2 account and budget:** authenticated readback of immutable EU region, private ACL/CORS/replication, versioning, payment methods, real usage limits and notifications (including unbounded API classes), MFA/recovery, prefix-key scope, and safe cost ceiling. Owner approval is needed for any new charge, risky access or credential operation. If caps cannot prevent unapproved charges, stop.
+3. **Provider-native least privilege:** narrowly scoped, revocable/expiring B2 writer and independently provisioned **reader** identities, with actual provider DENY proof outside the intended bucket/prefix and against bucket administration, delete/hide and public sharing. `readBuckets` may be necessary for ACL readback; writer needs only the documented minimum list/write/read-bucket access, reader only list/read, with independently checked limits. Distinct Python client objects do **not** by themselves prove distinct credentials.
+4. **Full PostgreSQL 18 export authority:** verify a separately controlled, time-limited principal that can export **all data** in `public` and managed `neon_auth`, including FORCE RLS objects. Confirm that role membership/grants/default ACLs/owners/extensions/constraints/migrations can be faithfully reproduced. A runtime RLS principal is insufficient; do not disable RLS, weaken cross-tenant policies, or place standing Neon owner credentials in CI. Explicitly solve `pg_dump` versus `pg_dumpall --globals-only`/managed-role export constraints before any real run. Do not rely on `--no-owner` or `--no-acl` for recoverability.
+5. **Cryptography and identity:** full dump stream encrypted with **age before transmission**; private identity stays in independently recoverable E2EE custody away from both phones and repo. Readback must bind exact ciphertext object **version**, byte length, SHA-256, source/cut timestamp and an independently authorized read path. No plaintext dump or private age identity in CI artifacts.
+6. **Controlled source gate:** reviewed exact protected-main SHA, independent reviewer, minimal build/transfer permissions, non-secret account preflight and explicit manual owner operation. No automatic schedule or retention until G3 passes.
 
-## Independent full recovery drill — REQUIRED
+## Independent verification and restore acceptance
 
-Using a **separate, empty PostgreSQL 18 restore environment** and the offline age private identity:
+1. Run exactly one explicitly owner-approved and capped encrypted export, then read back the **same immutable-version identity** with a separate scoped reader; reject missing versions, pre-existing/hide-marker names, any public access, or hash/size mismatch. Neither simulated transfer nor local roundtrip qualifies.
+2. Download offsite ciphertext from another authenticated access path and recover age private identity from independent E2EE custody, verifying integrity. No decryption or SQL against production.
+3. Create a **new, empty PostgreSQL 18 environment outside the main Neon provider**. Verify the target identity against an allowlist and reject any serving or existing DB. Reconstruct globals/roles/ownership/grants/default ACLs and load the full custom dump without suppressing RLS/constraints or silently skipping `neon_auth`. Test actual objects, indexes/extensions, migrations, auth, data aggregates, denied cross-tenant access and application startup. Distinguish source-side privileges from restore-side privileges.
+4. Record metadata-only outcomes: source/target fingerprints, SHA, source timestamp, accepted ciphertext version/size, actual scope/negative tests, RPO, RTO, and any unresolved differences. **RESTORE_PASS requires complete independent replay and comparison**, not only the ability to download/decrypt a file.
+5. Until `RESTORE_PASS` and owner acceptance, retain PG17, snapshots, all versions, archives, signing lineage and historical evidence. Any retention/delete policy or provider cutover is a separate approved gate.
 
-1. Download one encrypted object via a separate tested R2 read path. Verify SHA256 equals export log. Confirm owner can still access the recovery key without dependency on GitHub, Cloudflare or Neon.
-2. Decrypt under temporary encrypted local custody; run `pg_restore --list` without outputting PII or secret values.
-3. Assert the target is **not** Sentinel Neon main/staging or any other serving database. Restore into a fresh empty isolated database using `pg_restore --exit-on-error --no-owner --no-acl`. Never use `--clean` or `--create` against an existing database.
-4. Validate all expected schema objects, extensions, migrations, table row-count aggregates, critical constraints and application smoke tests. Pay particular attention to managed auth schema permissions and ownership; a successful pg_dump process alone is insufficient.
-5. Log anonymized results: date, source fingerprint and snapshot time, ciphertext SHA256, backup object key, RTO and RPO, target identity, tests run, and PASS/FAIL. No records, auth tokens, SQL data values or private keys in Google Drive.
-6. Do not enable scheduled retention or discard old data unless export **and independent restore** pass. Isolated test cleanup requires a separately checked identity and owner-reviewed non-destructive disposal.
+## Local source checks (synthetic only)
 
-## After recovery PASS
-
-- Schedule time-bounded backups with explicit target RPO <=24 hours and periodic alerting on missing exports.
-- Implement and **test** an affordable retention lifecycle target (7 daily, 4 weekly, 3 monthly). R2 API/retention semantics must be verified before implementing any automated delete, and the last verified-good backup must never be deleted.
-- Run monthly isolated restore tests. Include costs/free-usage and security reviews.
-- Review availability of disaster recovery beyond the R2 account itself: the age identity and at least one tested export must remain retrievable after provider-account loss.
-- Re-evaluate public-to-private GitHub transition and all Render integrations independently; GitHub Actions minutes may change after privatization.
-
-## Current blockers
-
-No Cloudflare R2 account connection, bucket, scoped credentials, backup DB secret or offline age identity is verified. Firebase and Infisical are separate approved-but-not-configured components. The repository PR is draft and the job must stay inactive until verified setup. No encrypted offsite object or independent pg_restore PASS exists yet.
+The existing `Offsite Backup Contract` PR workflow executes the R2 legacy contract tests, B2 target/version guard tests, and the isolated B2 S3 adapter tests. Success is **CI_PASS for source contracts only**; runtime billing/credential scope/B2 transfer/restore remain **NOT_RUN**. See Issue #528 for provider readbacks and exact code SHAs.

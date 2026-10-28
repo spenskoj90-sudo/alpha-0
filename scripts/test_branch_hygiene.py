@@ -1,63 +1,77 @@
 #!/usr/bin/env python3
+"""Regression tests for the non-destructive branch review boundary."""
 from __future__ import annotations
 
-import unittest
+import json
+import os
 from pathlib import Path
+import subprocess
+import tempfile
+import textwrap
+import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = (ROOT / ".github" / "workflows" / "branch-hygiene.yml").read_text(encoding="utf-8")
-INVENTORY = (ROOT / "docs" / "BRANCH_INVENTORY.md").read_text(encoding="utf-8")
+WORKFLOW = (ROOT / '.github/workflows/branch-hygiene.yml').read_text(encoding='utf-8')
 
 
 class BranchHygieneWorkflowTests(unittest.TestCase):
-    def test_workflow_runs_after_every_protected_main_push(self) -> None:
+    def test_review_has_no_deletion_or_write_authority(self) -> None:
+        self.assertIn('contents: read', WORKFLOW)
+        self.assertNotIn(': write', WORKFLOW)
+        self.assertIn('persist-credentials: false', WORKFLOW)
+        for forbidden in ('git push', '--delete', 'delete_exact_ref', 'gh api -X', 'pull_request_target'):
+            self.assertNotIn(forbidden, WORKFLOW)
+
+    def test_main_manual_and_exact_source_are_preserved(self) -> None:
+        self.assertIn('workflow_dispatch:', WORKFLOW)
         self.assertIn('branches:\n      - main', WORKFLOW)
-        self.assertNotIn('\n    paths:', WORKFLOW)
+        self.assertIn('cancel-in-progress: false', WORKFLOW)
+        self.assertIn('ref: ${{ github.sha }}', WORKFLOW)
         self.assertIn('test "$GITHUB_REF" = "refs/heads/main"', WORKFLOW)
         self.assertIn('test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', WORKFLOW)
 
-    def test_only_explicit_reconciled_classes_can_be_deleted(self) -> None:
-        self.assertIn('allowed = {"MERGED_EXACT", "PURE_BEHIND", "CONTENT_SUPERSEDED"}', WORKFLOW)
-        self.assertIn('if classification == "ACTIVE":', WORKFLOW)
-        self.assertIn('if not reason.startswith("RECONCILED:"):', WORKFLOW)
-        self.assertNotIn('"UNIQUE_RECONCILE"', WORKFLOW)
-        self.assertNotIn('"UNKNOWN"', WORKFLOW)
-        self.assertIn('"live tip equals exact PR head"', WORKFLOW)
-        self.assertIn("gh api", WORKFLOW)
-        self.assertIn("merged_at", WORKFLOW)
-        self.assertIn("live_head", WORKFLOW)
-        self.assertIn("git merge-base --is-ancestor", WORKFLOW)
+    def run_review(self, *, fail: bool = False) -> subprocess.CompletedProcess[str]:
+        marker = '      - name: Read live branch inventory without mutation\n'
+        self.assertIn(marker, WORKFLOW)
+        step = WORKFLOW.split(marker, 1)[1].split('\n      - name:', 1)[0]
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            fake = temp / 'gh'
+            fake.write_text('#!/usr/bin/env python3\nimport os, sys\n'
+                            'expected = ["api", "--method", "GET", "--paginate", "--slurp", '
+                            '"repos/example/project/branches?per_page=100"]\n'
+                            'assert sys.argv[1:] == expected, sys.argv\n'
+                            'if os.environ.get("FAIL_GH") == "1": sys.exit(23)\n'
+                            'print(os.environ["BRANCH_FIXTURE"])\n', encoding='utf-8')
+            fake.chmod(0o755)
+            fixture = [[{'name': 'main', 'commit': {'sha': 'a' * 40}, 'protected': True}],
+                       [{'name': 'feature/$(touch SHOULD_NOT_EXIST)',
+                         'commit': {'sha': 'b' * 40}, 'protected': False}]]
+            env = dict(os.environ, PATH=directory + os.pathsep + os.environ['PATH'],
+                       RUNNER_TEMP=directory, GITHUB_REPOSITORY='example/project',
+                       BRANCH_FIXTURE=json.dumps(fixture), FAIL_GH='1' if fail else '0')
+            result = subprocess.run(['bash', '-c', script], env=env, cwd=directory,
+                                    capture_output=True, text=True, check=False)
+            self.assertFalse((temp / 'SHOULD_NOT_EXIST').exists())
+            return result
 
-    def test_live_tip_and_protected_ref_mutation_abort_before_deletion(self) -> None:
-        self.assertIn('if [ "$remote_sha" != "$expected_sha" ]', WORKFLOW)
-        self.assertIn("ref mutation detected", WORKFLOW)
-        self.assertIn("exact PR-head mismatch", WORKFLOW)
-        self.assertIn('if [ "$protected" != "false" ]', WORKFLOW)
-        self.assertIn("refusing to delete protected branch", WORKFLOW)
-        self.assertIn('git fetch --no-tags origin "refs/heads/$branch"', WORKFLOW)
-        self.assertIn('if [ "$fetched_sha" != "$expected_sha" ]', WORKFLOW)
-        self.assertIn("fetched ref mutation detected", WORKFLOW)
-        self.assertIn('git push origin --delete "$branch"', WORKFLOW)
-        self.assertNotIn("--force", WORKFLOW)
+    def test_all_pages_are_reported_as_review_required_without_shell_execution(self) -> None:
+        result = self.run_review()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report['status'], 'REVIEW_REQUIRED')
+        self.assertEqual(report['deleted'], 0)
+        self.assertEqual(len(report['branches']), 2)
+        self.assertTrue(report['branches'][0]['protected'])
+        self.assertEqual(report['branches'][1]['name'], 'feature/$(touch SHOULD_NOT_EXIST)')
 
-    def test_inventory_contains_no_unresolved_branch_state(self) -> None:
-        self.assertIn("CONTENT_SUPERSEDED", INVENTORY)
-        self.assertIn("MERGED_EXACT", INVENTORY)
-        self.assertNotIn("| UNIQUE_RECONCILE |", INVENTORY)
-        self.assertNotIn("| UNKNOWN |", INVENTORY)
-        for line in INVENTORY.splitlines():
-            if "| CONTENT_SUPERSEDED |" in line:
-                self.assertIn("| RECONCILED:", line)
-
-    def test_current_merge_branch_cleanup_requires_exact_same_repository_lineage(self) -> None:
-        self.assertIn("Merge pull request #([0-9]+) from", WORKFLOW)
-        self.assertIn("Merge PR #([0-9]+):", WORKFLOW)
-        self.assertIn('merge_sha" = "$GITHUB_SHA"', WORKFLOW)
-        self.assertIn('base_ref" = "main"', WORKFLOW)
-        self.assertIn('head_repo" = "$GITHUB_REPOSITORY"', WORKFLOW)
-        self.assertIn('head_ref" != "main"', WORKFLOW)
-        self.assertIn('delete_exact_ref "$head_ref" "$head_sha"', WORKFLOW)
+    def test_read_failure_is_not_success_or_permission_to_delete(self) -> None:
+        result = self.run_review(fail=True)
+        self.assertEqual(result.returncode, 23)
+        self.assertNotIn('REVIEW_REQUIRED', result.stdout)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
+

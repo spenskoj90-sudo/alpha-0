@@ -12,6 +12,8 @@ on:
       - "scripts/b2_target_contract.py"
       - "scripts/test_b2_target_contract.py"
       - "scripts/b2_versioned_transfer.py"
+      - "scripts/b2_s3_transport.py"
+      - "scripts/test_b2_s3_transport.py"
       - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
   push:
@@ -25,6 +27,8 @@ on:
       - "scripts/b2_target_contract.py"
       - "scripts/test_b2_target_contract.py"
       - "scripts/b2_versioned_transfer.py"
+      - "scripts/b2_s3_transport.py"
+      - "scripts/test_b2_s3_transport.py"
       - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
 
@@ -46,3 +50,4 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_offsite_pg_backup_*.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_target_contract.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_s3_transport.py' -v

@@ -29,6 +29,10 @@
 
 **DESIGN SOURCE / LOCAL BROWSER PROTOTYPE, not H completion:** [`design/h-system/README.md`](../design/h-system/README.md) and [continuation/evidence](../design/h-system/HANDOFF.md). Added four unselected vector identities, 55 unified glyphs, seven vector illustrations, 23 Figma component sets / 108 variants and 166 RU/EN route/state frames. The isolated preview has 14 public pages and 55 product routes; 690 route/locale/viewport combinations and 16 browser scenarios passed locally, with seven model/contrast tests. Source/CI identity follows the hosting PR/commit; this queue is not CI evidence. Production v3, game authority and release gates are unchanged. **Next:** detailed module-specific components/flows, tablet/window breakpoints, full brand/platform compositions and broader visual/native accessibility QA. Figma Starter MCP allowance is exhausted; the final Figma border/focus token refinement remains unapplied, while the browser contrast fix passes. Reuse saved node IDs and source; do not restart the design study or request palette selection.
 
+## H follow-up draft — game workspaces and tablet study
+
+The next isolated pass on base `f81f70da743fa1528b919f198f1a34cf9fdaf5c5` develops 11 distinct fictional game workspaces, local draft controls and an Android tablet shell. See [GAME_WORKSPACES.md](../design/h-system/GAME_WORKSPACES.md). Added 240 module/locale/width/state combinations and 12 browser scenarios; 11 model/contrast tests. Existing 690 route combinations remain covered. Figma synchronization is still blocked by the Starter call allowance, and no new native runtime or Owner acceptance is claimed. Preserve the root daily integration rule: #523 already integrated today; this follow-up is a prepared draft for the next batch, not a second same-day main merge.
+
 ## Completed foundation on main
 
 - [x] GPT-controlled orchestration governance, compact AGENTS context routing, exact-SHA merge gate and repository-first evidence model (#377). Retired GPT-only/tombstone instruction files were removed from the working tree on 2026-09-29; Git history preserves provenance.

@@ -25,6 +25,7 @@ permissions:
 concurrency:
   group: release-candidate
   cancel-in-progress: false
+  queue: max
 
 env:
   SENTINEL_RELEASE_SIGNER_SHA256: "2A:CD:1C:FF:F4:F3:4D:B1:25:0D:3F:6C:81:F0:88:74:93:C4:60:2D:3C:FA:65:31:09:93:C0:58:08:9D:B8:8E"

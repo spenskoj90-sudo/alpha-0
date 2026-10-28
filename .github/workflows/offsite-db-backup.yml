@@ -1,4 +1,4 @@
-name: Sentinel Encrypted Cloudflare R2 Backup (manual)
+name: Sentinel Legacy R2 Backup (DISABLED; do not dispatch)
 
 # Inert until explicitly dispatched from protected main after owner provisions
 # R2 private bucket and scoped access, Neon read-only backup role and offline
@@ -15,7 +15,8 @@ concurrency:
 
 jobs:
   backup:
-    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main'
+    # G3 v2.6: superseded R2 code is deliberately inert; B2 has no approved runtime path.
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && false
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

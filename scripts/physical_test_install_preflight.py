@@ -50,8 +50,8 @@ def evidence_from_diagnostics(archive: Path) -> tuple[int, str]:
     require(start.get("build_type") == "physicalTest", "NOT_PHYSICAL_TEST_BUILD")
     version = start.get("version_code")
     require(type(version) is int and 1 <= version <= 2_100_000_000, "INVALID_INSTALLED_VERSION")
-    require(signer.get("installed_version_code") == version, "INSTALLED_VERSION_DISAGREEMENT")
-    require(signer.get("signer_count") == 1 and signer.get("multiple_signers") is False, "AMBIGUOUS_INSTALLED_SIGNER")
+    require(type(signer.get("installed_version_code")) is int and signer["installed_version_code"] == version, "INSTALLED_VERSION_DISAGREEMENT")
+    require(type(signer.get("signer_count")) is int and signer["signer_count"] == 1 and signer.get("multiple_signers") is False, "AMBIGUOUS_INSTALLED_SIGNER")
     digest = signer.get("signer_cert_sha256")
     require(type(digest) is str and SHA256.fullmatch(digest) is not None, "INVALID_INSTALLED_SIGNER")
     return version, digest
@@ -62,6 +62,10 @@ def evidence_from_artifact(archive: Path) -> tuple[dict, str]:
         names = zipped.namelist()
         require(len(names) == len(set(names)), "DUPLICATE_ARTIFACT_ENTRIES")
         require(names.count(MANIFEST_IN_ARTIFACT) == names.count(APK_IN_ARTIFACT) == 1, "ARTIFACT_FILES_MISSING")
+        # GitHub upload-artifact publishes two integrity sidecars alongside the APK.
+        # Reject any other member even when the expected APK and manifest are present.
+        allowed = {MANIFEST_IN_ARTIFACT, APK_IN_ARTIFACT, "physical-test-apk.sha256", "physical-test-signer.txt"}
+        require(set(names) <= allowed, "UNEXPECTED_ARTIFACT_ENTRIES")
         manifest_info = zipped.getinfo(MANIFEST_IN_ARTIFACT)
         apk_info = zipped.getinfo(APK_IN_ARTIFACT)
         require(manifest_info.file_size <= MAX_MANIFEST_BYTES, "MANIFEST_TOO_LARGE")
@@ -126,6 +130,7 @@ def assess(installed_version: int, installed_signer: str, manifest: dict, candid
     elif (
         type(manifest.get("updateBaselineVersionCode")) is not int
         or manifest["updateBaselineVersionCode"] < installed_version
+        or manifest["updateBaselineVersionCode"] >= version
     ):
         result["reason"] = "UPDATE_BASELINE_NOT_PROVEN"
     else:

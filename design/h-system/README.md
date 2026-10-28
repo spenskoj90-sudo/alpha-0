@@ -21,8 +21,15 @@ The same paths on different surfaces are separate designs, not shared authorizat
 
 **Do not open index.html as file://:** ES modules and JSON assets require the local HTTP server.
 All data and credentials in form journeys must be fictional. No values are sent or stored.
+After simulated Stop, revoke, stale, offline or timeout, the demo requires **fresh
+simulated consent** before observation can be started again. Recovery does not rearm
+observation or grant Android capture permission; this remains a browser-only model.
 There is no production API, actual login, admin authority, checkout, screen capture,
 microphone capture, game input, live game telemetry or download installation.
+
+## Game workspace continuation
+
+[GAME_WORKSPACES.md](GAME_WORKSPACES.md) specifies eleven distinct game layouts, opt-in fictional fixtures, local interactive drafts, table controls and the Android tablet study. New screenshots and evidence are in `qa/workspaces/`. Figma synchronization remains blocked by its Starter call limit.
 
 ## What this pass contains
 
@@ -56,6 +63,8 @@ not Node. They are evidence of this authoring pass, not an idempotent full-file 
 node --test design/h-system/tests/*.test.mjs
 PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/path/to/chromium \
   node design/h-system/tests/browser.cjs
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright CHROMIUM_EXECUTABLE=/optional/path/to/chromium \
+  node design/h-system/tests/browser-workspaces.cjs
 ```
 
 If Playwright owns its browser, omit CHROMIUM_EXECUTABLE. Existing repository CI uses

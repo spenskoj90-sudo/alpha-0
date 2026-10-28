@@ -199,7 +199,7 @@ internal fun GameObservationPanel(
         SentinelCard(kind = SentinelCardKind.CONTENT) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(strings.text("game_journey_title"), style = MaterialTheme.typography.titleMedium)
-                StatusBadge(strings.text("game_journey_source_status"), SentinelStatus.UNAVAILABLE)
+                Text(strings.text("game_journey_source_status"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(strings.text(nextStep.stringKey))
                 Text(strings.text("game_journey_actions_off"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

@@ -32,7 +32,7 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 }
 
 internal val ENGLISH = mapOf(
-        "game_journey_title" to "Diagnostic next step",
+    "game_journey_title" to "Diagnostic next step",
     "game_journey_source_status" to "Source UNVERIFIED · OCR UNCALIBRATED",
     "game_journey_actions_off" to "Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.",
     "game_journey_install" to "Install the ordinary Shattered Pixel Dungeon game, then reopen this test.",
@@ -419,7 +419,7 @@ internal val ENGLISH = mapOf(
 )
 
 internal val RUSSIAN = mapOf(
-        "game_journey_title" to "Следующий шаг диагностики",
+    "game_journey_title" to "Следующий шаг диагностики",
     "game_journey_source_status" to "Источник НЕ ПРОВЕРЕН · OCR НЕ ОТКАЛИБРОВАН",
     "game_journey_actions_off" to "Ввод в игру: ВЫКЛ. Экран собирает только локальные диагностические данные и не разрешает рекомендации или действия.",
     "game_journey_install" to "Установите обычную игру Shattered Pixel Dungeon и вернитесь к тесту.",

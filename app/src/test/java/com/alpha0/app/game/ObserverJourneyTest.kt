@@ -24,7 +24,7 @@ class ObserverJourneyTest {
 
     @Test fun `only completed current frame offers numeric sample`() {
         assertEquals(ObserverNextStep.WAIT_FOR_SOURCE, step(status = ObservationStatus.WAITING))
-        assertEquals(ObserverNextStep.SOURCE_HIDDEN, step(status = ObservationStatus.PAUSED, hasFrame = true))
+        assertEquals(ObserverNextStep.SAVE_COMPARISON, step(status = ObservationStatus.PAUSED, hasFrame = true))
         assertEquals(ObserverNextStep.WAIT_FOR_RECOGNITION, step(status = ObservationStatus.OBSERVING))
         assertEquals(ObserverNextStep.SAVE_COMPARISON, step(status = ObservationStatus.OBSERVING, hasFrame = true))
         assertEquals(ObserverNextStep.REVIEW_CALIBRATION, step(status = ObservationStatus.OBSERVING, hasFrame = true, count = 32))

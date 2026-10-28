@@ -25,6 +25,8 @@ internal fun observerNextStep(
 ): ObserverNextStep = when {
     !installed -> ObserverNextStep.INSTALL_GAME
     !supported -> ObserverNextStep.DIAGNOSTIC_BUILD
+    status == ObservationStatus.PAUSED && sampleCount >= 32 -> ObserverNextStep.REVIEW_CALIBRATION
+    status == ObservationStatus.PAUSED && hasSampleableFrame -> ObserverNextStep.SAVE_COMPARISON
     status == ObservationStatus.PAUSED -> ObserverNextStep.SOURCE_HIDDEN
     status == ObservationStatus.WAITING -> ObserverNextStep.WAIT_FOR_SOURCE
     status == ObservationStatus.OBSERVING && sampleCount >= 32 -> ObserverNextStep.REVIEW_CALIBRATION

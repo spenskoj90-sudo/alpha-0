@@ -57,14 +57,14 @@ On protected-main, the Supply Chain and Packaged Companion workflows also contai
 
 The collector requires and records GitHub artifact metadata for:
 
-- `alpha-0-android-instrumentation-<sha>`;
+- `alpha-0-android-instrumentation-evidence-<sha>`;
 - `block-d-operational-evidence-<sha>`;
 - `sentinel-p1-evidence-<sha>`;
 - `packaged-companion-host-<sha>`;
 - `sentinel-supply-chain-evidence-<sha>`;
-- on pull requests only, `alpha-0-debug-apk-<sha>`.
+- on pull requests only, `alpha-0-debug-ci-evidence-<sha>`.
 
-Each required artifact must:
+The Android artifacts above retain **CI-only hashes/receipts**, not APK bytes. Debug and instrumentation binaries are used inside CI jobs and may never be supplied to physical-device testers.\n\nEach required artifact must:
 
 - exist in the selected exact-SHA workflow run;
 - be non-empty;

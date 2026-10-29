@@ -189,11 +189,13 @@ provenance only, **not an installable APK**. Never direct the Owner to the old
 8. Keep the established test installation and its data unless the Owner
    separately approves removal after independent recoverability verification.
 
-**Active Poco C71 gate:** The installed `com.alpha0.app.physicaltest` vCode
-`100000893` uses an ephemeral signer. Its original private key has not been
-recovered or verified. Therefore no signed APK can presently be declared a
-compatible update, and the installed app must remain unchanged.
-See `docs/ANDROID_PHYSICAL_TEST_UPDATE_CHANNEL.md` for exact signer continuity.
+**Poco C71 — clean-state confirmation (2026-10-29):** The Owner uninstalled
+the old ephemeral diagnostic app. The next install must begin a separately
+backed-up durable signing lineage; no old-key continuity claim remains for
+this phone. Subsequent physical tests **must** update the first stable-signed
+app in place, with preserved local data and Keystore identity. The final
+release package is distinct and needs its own stable, upgradeable lineage.
+See `docs/ANDROID_PHYSICAL_TEST_UPDATE_CHANNEL.md`.
 
 A diagnostic trace is evidence for diagnosis; it is not by itself a PASS. Final release gates remain governed by `docs/FINAL_RELEASE_ACCEPTANCE_V1.md`.
 

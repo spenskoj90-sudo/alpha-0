@@ -98,6 +98,9 @@ jobs:
       - name: Test installed-signer continuity preflight
         run: python -m unittest discover -s scripts -p "test_physical_test_signer_baseline.py" -v
 
+      - name: Test monotonic signed-test version allocator
+        run: python -m unittest discover -s scripts -p "test_physical_test_version.py" -v
+
       - name: Test offline APK update preflight safety guard
         run: python -m unittest discover -s scripts -p "test_physical_test_install_preflight.py" -v
 
@@ -109,7 +112,7 @@ jobs:
           PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}
         run: |
           set -euo pipefail
-          value="$(python scripts/physical_test_version.py --previous-version-code "$PREVIOUS_VERSION_CODE")"
+          value="$(python scripts/physical_test_version.py --previous-version-code "$PREVIOUS_VERSION_CODE" --workflow-run-number "$GITHUB_RUN_NUMBER")"
           echo "SENTINEL_PHYSICAL_TEST_VERSION_CODE=$value" >> "$GITHUB_ENV"
 
       - name: Decode dedicated physical-test keystore

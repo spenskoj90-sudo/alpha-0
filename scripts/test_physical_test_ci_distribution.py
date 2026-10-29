@@ -43,6 +43,42 @@ class PhysicalTestCiDistributionTests(unittest.TestCase):
                 self.assertIn("sentinel-ci-only-physical-test-evidence-", content)
                 self.assertIn("sentinel-physical-test-update-apk-", content)
 
+    def test_signed_channels_require_monotonic_versions(self) -> None:
+        stable = STABLE_WORKFLOW.read_text(encoding="utf-8")
+        release = (ROOT / ".github" / "workflows" / "release-candidate.yml").read_text(encoding="utf-8")
+        routine = ROUTINE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('--workflow-run-number "$GITHUB_RUN_NUMBER"', stable)
+        self.assertIn('test_physical_test_version.py', stable)
+        self.assertIn('test_android_release_version_preflight.py', routine)
+        self.assertIn("previous_release_version_code:", release)
+        self.assertIn("first_release_approved:", release)
+        self.assertIn("Verify release package/version continuity before any key access", release)
+        self.assertIn("Reconfirm release code and lineage before private-key access", release)
+        self.assertIn("--badging-report", release)
+        self.assertLess(release.index("Verify release package/version continuity"),
+                        release.index("Decode release keystore"))
+
+    def test_debug_ci_workflows_never_publish_disposable_apks(self) -> None:
+        for path, marker, name in (
+            (".github/workflows/android-build.yml",
+             "Upload CI-only debug build evidence (never APK bytes)",
+             "alpha-0-debug-ci-evidence-"),
+            (".github/workflows/build.yml",
+             "Upload Android instrumentation CI-only evidence (no APK bytes)",
+             "alpha-0-android-instrumentation-evidence-"),
+        ):
+            with self.subTest(path=path):
+                workflow = (ROOT / path).read_text(encoding="utf-8")
+                self.assertIn(marker, workflow)
+                upload = workflow[workflow.index(marker):]
+                self.assertIn(name, upload)
+                self.assertNotIn("app-debug.apk", upload)
+                self.assertNotIn("app-debug-androidTest.apk", upload)
+        evidence = (ROOT / "scripts/release_evidence.py").read_text(encoding="utf-8")
+        self.assertIn("alpha-0-debug-ci-evidence-{sha}", evidence)
+        self.assertIn("alpha-0-android-instrumentation-evidence-{sha}", evidence)
+        self.assertNotIn("alpha-0-debug-apk-{sha}", evidence)
+
     def test_stable_owner_workflow_remains_separate_and_signer_pinned(self) -> None:
         text = STABLE_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("name: Physical Test Update APK", text)

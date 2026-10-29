@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -189,10 +190,22 @@ internal fun GameObservationPanel(
         sampleCount = sampleCount,
     )
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+    // Stop remains reachable independently of scrolling through calibration and diagnostics.
+    // The foreground notification/system capture controls remain additional Stop routes.
+    Scaffold(
+        bottomBar = {
+            if (active) {
+                PrimaryButton(
+                    strings.text("game_capture_stop"), onStop,
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
+                )
+            }
+        },
+    ) { contentPadding ->
+      Column(
+        Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+      ) {
         Text(strings.text("game_observer_title"), style = MaterialTheme.typography.headlineLarge)
         Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleLarge)
         Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -251,9 +264,7 @@ internal fun GameObservationPanel(
                         Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
                     "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"))
                 }
-                if (active) {
-                    PrimaryButton(strings.text("game_capture_stop"), onStop, Modifier.fillMaxWidth().testTag("game-capture-stop"))
-                } else {
+                if (!active) {
                     Text(strings.text("game_capture_disclosure"))
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -356,5 +367,6 @@ internal fun GameObservationPanel(
             }
         }
         Text(strings.text("game_capture_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

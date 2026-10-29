@@ -45,6 +45,21 @@ PR evidence cannot substitute for this protected-main evidence. A stale successf
 
 ## Release-specific artifact gate
 
+**Permanent release update continuity:** Manual `Release Candidate Artifact`
+dispatch requires `previous_release_version_code` (highest code already
+distributed for `com.alpha0.app` under the selected signer) and an explicit
+`first_release_approved` Owner flag **only when that baseline is zero**.
+Before the release-signing secret is referenced, the workflow checks that
+the source `canonicalVersionCode` is positive, within the Android range and
+**strictly greater** than the supplied baseline; subsequent releases may
+require a reviewed source increment. After signing, `aapt2 dump badging`
+independently proves exact application ID and code. The workflow's
+hard-pinned release certificate remains mandatory. An input baseline is
+Owner-supplied distribution evidence, not proof that no third-party installs
+exist. Never reset the signing lineage or version baseline to make a build
+installable; no production key or publication may be initiated by routine CI.
+
+
 Signing is intentionally separated from routine PR CI, attestation authority and publication:
 
 - `.github/workflows/release-candidate.yml` is manual, must be dispatched from `main`, requires an explicit exact `source_sha`, requires `GITHUB_SHA == source_sha`, and verifies the protected-main `release-evidence.json` attestation plus canonical live evidence in a read-only `presecret` job.

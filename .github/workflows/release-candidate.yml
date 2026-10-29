@@ -7,6 +7,15 @@ on:
         description: "Exact protected-main commit SHA to sign"
         required: true
         type: string
+      previous_release_version_code:
+        description: "Highest distributed versionCode of com.alpha0.app; 0 ONLY for approved first release"
+        required: true
+        type: string
+      first_release_approved:
+        description: "Owner approval for first signing lineage; never use to override an existing install"
+        required: true
+        type: boolean
+        default: false
       api_base_url:
         description: "Exact HTTPS SENTINEL Core origin embedded in the signed APK"
         required: true
@@ -82,6 +91,16 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
 
+      - name: Verify release package/version continuity before any key access
+        env:
+          PREVIOUS_VERSION: ${{ inputs.previous_release_version_code }}
+          FIRST_APPROVED: ${{ inputs.first_release_approved }}
+        run: |
+          set -euo pipefail
+          python scripts/android_release_version_preflight.py \
+            --previous-version-code "$PREVIOUS_VERSION" \
+            --first-release-approved "$FIRST_APPROVED"
+
       - name: Setup Python 3.14.7
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -93,6 +112,7 @@ jobs:
           python scripts/test_release_evidence_supply_chain.py
           python scripts/test_release_lineage.py
           python scripts/test_artifact_attestations.py
+          python -m unittest discover -s scripts -p "test_android_release_version_preflight.py" -v
 
       - name: Verify protected-main release-evidence attestation
         env:
@@ -201,6 +221,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
 
+      - name: Reconfirm release code and lineage before private-key access
+        env:
+          PREVIOUS_VERSION: ${{ inputs.previous_release_version_code }}
+          FIRST_APPROVED: ${{ inputs.first_release_approved }}
+        run: |
+          set -euo pipefail
+          python scripts/android_release_version_preflight.py \
+            --previous-version-code "$PREVIOUS_VERSION" \
+            --first-release-approved "$FIRST_APPROVED"
+
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -259,6 +289,11 @@ jobs:
           aapt="$(find "$ANDROID_SDK_ROOT/build-tools" -maxdepth 2 -type f -name aapt2 | sort -V | tail -1)"
           test -x "$aapt"
           dump="$("$aapt" dump badging "$apk")"
+          printf '%s\n' "$dump" > "$RUNNER_TEMP/sentinel-release-badging.txt"
+          python scripts/android_release_version_preflight.py \
+            --previous-version-code "${{ inputs.previous_release_version_code }}" \
+            --first-release-approved "${{ inputs.first_release_approved }}" \
+            --badging-report "$RUNNER_TEMP/sentinel-release-badging.txt"
           if echo "$dump" | grep -qi "application-debuggable"; then
             echo "APK is debuggable — FAIL"
             exit 1

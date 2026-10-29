@@ -189,13 +189,27 @@ jobs:
       - run: ./gradlew --no-daemon test
       - name: Build instrumentation test APK
         run: ./gradlew --no-daemon assembleDebugAndroidTest
-      - name: Upload Android instrumentation artifacts
+      - name: Record Android instrumentation CI-only build digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk \
+            > android-instrumentation-ci.sha256
+          printf '%s\n' \
+            'CI ONLY: neither the debug APK nor its instrumentation APK is an Owner-installable build.' \
+            'The emulator workflow builds and tests these APKs independently.' \
+            'Owner installation requires a recoverable, pinned, permanently signed distribution.' \
+            > ANDROID_INSTRUMENTATION_CI_ONLY.txt
+
+      - name: Upload Android instrumentation CI-only evidence (no APK bytes)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: alpha-0-android-instrumentation-${{ github.event.pull_request.head.sha || github.sha }}
+          name: alpha-0-android-instrumentation-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            android-instrumentation-ci.sha256
+            ANDROID_INSTRUMENTATION_CI_ONLY.txt
           if-no-files-found: error
 
   android-instrumentation:

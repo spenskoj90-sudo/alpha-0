@@ -95,6 +95,7 @@ class PhysicalTestArtifactTests(unittest.TestCase):
         self.assertFalse(manifest["signerLineageVerified"])
         self.assertFalse(manifest["updateCompatible"])
         self.assertEqual(manifest["workflow"]["name"], "Physical Test APK")
+        self.assertEqual(manifest["artifactName"], f"sentinel-ci-only-physical-test-evidence-{SHA}")
         self.assertEqual(manifest["httpReadTimeoutMs"], 75_000)
         self.assertTrue(manifest["coldStartAware"])
         self.assertEqual(manifest["apk"]["applicationId"], "com.alpha0.app.physicaltest")

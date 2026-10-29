@@ -31,6 +31,18 @@ class PhysicalTestCiDistributionTests(unittest.TestCase):
         self.assertIn('assert manifest["signerLineageVerified"] is False', text[guard:upload])
         self.assertIn("DO NOT INSTALL ON A PHONE", text[guard:upload])
 
+    def test_owner_runbooks_never_direct_install_from_ephemeral_ci(self) -> None:
+        for filename in (
+            "docs/ANDROID_PHYSICAL_TEST_RUNBOOK.md",
+            "docs/DIAGNOSTICS_AND_QUALITY_PROGRAM_V1.md",
+        ):
+            with self.subTest(path=filename):
+                content = (ROOT / filename).read_text(encoding="utf-8")
+                self.assertNotIn("Download `sentinel-physical-test-apk-", content)
+                self.assertNotIn("Remove the test application/data from the device", content)
+                self.assertIn("sentinel-ci-only-physical-test-evidence-", content)
+                self.assertIn("sentinel-physical-test-update-apk-", content)
+
     def test_stable_owner_workflow_remains_separate_and_signer_pinned(self) -> None:
         text = STABLE_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("name: Physical Test Update APK", text)

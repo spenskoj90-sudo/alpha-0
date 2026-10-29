@@ -32,7 +32,7 @@ app/build.gradle.kts now supports a dedicated test signing config through:
 - SENTINEL_PHYSICAL_TEST_KEY_ALIAS
 - SENTINEL_PHYSICAL_TEST_KEY_PASSWORD
 
-The routine `Physical Test APK` workflow remains deliberately secret-free and emits `signingMode=ephemeral-debug` / `updateCompatible=false`.
+The routine `Physical Test APK` workflow remains deliberately secret-free and verifies an ephemeral-debug APK **inside CI only**. It uploads a `sentinel-ci-only-physical-test-evidence-<SHA>` evidence bundle (manifest, signer report, checksum, warning), **not the APK itself**. `signingMode=ephemeral-debug` / `updateCompatible=false` means **never install**. Only the Owner-dispatched stable-update workflow can provide an installable test candidate after certificate continuity is independently proven.
 
 The separate Owner-dispatched `Physical Test Update APK` workflow accepts these dedicated test-only GitHub Actions secrets:
 
@@ -41,7 +41,7 @@ The separate Owner-dispatched `Physical Test Update APK` workflow accepts these 
 - PHYSICAL_TEST_KEY_ALIAS
 - PHYSICAL_TEST_KEY_PASSWORD
 
-If these secrets are absent, the routine CI workflow still builds an ephemeral-debug artifact for validation, but its manifest explicitly reports `updateCompatible=false`; it must not be handed to the Owner as an in-place-update candidate. The stable-update workflow fails closed if its dedicated signing material is unavailable.
+Without these Owner-managed secrets, routine CI still compiles and tests ephemeral-debug bytes but **does not distribute an installable APK**. The stable-update workflow fails closed when its dedicated signer is unavailable or does not match the pinned certificate; do not replace the installed certificate silently.
 
 ## Owner-controlled signing transition
 
@@ -94,7 +94,7 @@ The stable physical-test update workflow is fail-closed against a non-secret rep
 
 The workflow extracts the actual certificate fingerprint with Android `apksigner` and requires exact equality before `signerLineageVerified=true` and `updateCompatible=true` can be emitted. Replacing or rotating the test keystore without deliberately updating this pin therefore cannot silently produce an in-place-update claim.
 
-The routine secret-free diagnostic Physical Test APK also records its actual signer fingerprint, but remains `signingMode=ephemeral-debug` and `updateCompatible=false`. Production signing material is forbidden for this channel.
+The routine secret-free CI build records its actual ephemeral signer fingerprint but uploads **only CI evidence**. It cannot supply a physical-update APK. Production signing material is forbidden for this channel.
 
 ## Installed identity in local diagnostics
 
@@ -177,3 +177,59 @@ against the staged receipt, its exact versionCode and the current package/signer
 compatibility. Changed, removed, stale or unverifiable APK bytes fail closed;
 Android still requests explicit user installation approval. This is not a
 network download channel or a physical Owner-signer compatibility claim.
+
+
+## 2026-10-29 — Poco C71 continuity incident and enforced distribution hold
+
+Physical evidence retained in the Owner's **private** Google Drive confirms an
+existing on-phone diagnostic install `com.alpha0.app.physicaltest`, source
+`7def7527ad0a35b92a389b4e230f24e17a5d9541`, installed
+`versionCode=100000893`, signer certificate SHA-256
+`eb1e54508b7917e0b29ff6b386e05df1b9d9f7a29edf287be7a772aea5702239`.
+It is the **only** SENTINEL test installation the Owner intends to retain.
+
+This came from a historical ephemeral-debug GitHub runner that uploaded an
+installable APK without the corresponding persistent signing private key.
+The old certificate fingerprint, APK and diagnostic export do **not** contain
+the private signing key. Custody of the exact old private key has **not** been
+established. Android rejects same-package updates signed by unrelated keys,
+even if the code, file hash and `versionCode` are otherwise valid. Signature
+rotation also requires authorized old-key lineage, not merely knowledge of a
+certificate fingerprint.
+
+**Block:** no candidate for this Poco may claim update-over-install or
+preservation of its Keystore/session until the *actual old private signer* is
+located in approved custody, pinned, and its certificate reconciled against the
+installed digest. The stable-test workflow's existing pin and version checks
+are necessary but insufficient: its public manifest is not an installed-device
+proof. Never forge `signerLineageVerified`, bypass Android signature checks,
+publish another ephemeral installable APK, or label a new standalone app as an
+update.
+
+**Owner-only fallback if the exact old signer cannot be recovered:** review a
+one-time, explicitly authorized same-package replacement after a verified
+backup/recovery and re-enrollment plan, with transparent loss of the old local
+Android Keystore identity. This is **not** an in-place update and is not
+approved by continued engineering work alone. The Owner specifically rejected
+accumulating parallel testing apps; do not initiate a second package, install,
+uninstall, key rotation, server revoke or credential transfer without a
+separate, concrete authorization.
+
+The Owner-dispatched stable workflow now requires the public
+`installed_signer_sha256` input in addition to `previous_version_code`.
+For an existing installation (`previous_version_code > 0`), this digest must
+exactly match the pinned stable-test certificate *before any signing key is
+accessed*. A different digest or missing installed-certificate evidence fails
+closed. For a genuinely clean first install, use `previous_version_code=0`,
+`installed_signer_sha256=none` and the separate
+`new_identity_approved=true` Owner-only checkbox. That path is explicitly
+**NOT an update** and is **not applicable to the Poco C71 with the existing
+installed app**. These inputs are Owner-supplied assertions, not cryptographic
+device attestation: final on-device signer/update checks remain required.
+
+For future first installs, establish one durable, separately backed-up,
+test-only signing identity *before* delivering the first installable APK.
+Subsequent update artifacts must use that exact signer and a monotonically
+increasing `versionCode`, with emulator retention proof and exact-phone
+upgrade-over-install acceptance. The regular `Physical Test APK` workflow is
+CI-only and excludes APK bytes from upload by construction.

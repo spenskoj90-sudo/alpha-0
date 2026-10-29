@@ -4,15 +4,41 @@ Status: **ACTIVE — pre-production physical acceptance**
 
 This procedure is for the Human Owner testing the isolated Android physical-test build. It does not publish a release or touch production.
 
-## 1. Use the only correct artifact
+## 1. Use only a proven stable-signed update artifact
 
-Use the artifact named `sentinel-physical-test-apk-<FULL_MAIN_SHA>` from a successful **Physical Test APK** workflow on the exact protected `main` SHA being accepted. Do not use `app-debug.apk`, an artifact from a PR head, or an artifact from an older main commit.
+**Installation gate: fail closed.** Routine **Physical Test APK** builds use disposable signing keys.
+Their public artifact is `sentinel-ci-only-physical-test-evidence-<FULL_SHA>`,
+contains **no installable APK**, and must **never** be used on an Owner phone.
+Previous `sentinel-physical-test-apk-*` downloads with
+`signingMode=ephemeral-debug` remain **incompatible** with further update claims.
 
-The ZIP must contain exactly:
+The only Owner-installable candidate is
+`sentinel-physical-test-update-apk-<FULL_MAIN_SHA>` from a successful
+Owner-dispatched **Physical Test Update APK** workflow at the exact protected
+`main` SHA. Publication requires verified custody of the same dedicated test
+signer as the existing installation and a versionCode strictly higher than
+the installed version. The candidate manifest must state
+`signingMode=stable-test`, `signerLineageVerified=true`,
+`updateCompatible=true`, and a baseline covering the installed versionCode.
+These flags are necessary but **never sufficient** without comparing the actual
+installed package and current signer on the phone. No hidden reinstall, signer
+change, second app or data wipe is an acceptable substitute.
+
+The stable-update ZIP must contain:
 
 - `app/build/outputs/apk/physicalTest/app-physicalTest.apk`;
 - `physical-test-apk.sha256`;
-- `physical-test-manifest.json`.
+- `physical-test-manifest.json`;
+- `physical-test-signer.txt`.
+
+**Current Poco C71 hold (2026-10-29):** the installed
+`com.alpha0.app.physicaltest` was signed with an ephemeral certificate from
+source `7def7527ad0a35b92a389b4e230f24e17a5d9541`, versionCode
+`100000893`, certificate SHA-256
+`eb1e54508b7917e0b29ff6b386e05df1b9d9f7a29edf287be7a772aea5702239`.
+No custody of that exact private signer has been demonstrated. **Do not install
+any candidate or remove this app until continuity is established or the
+Owner separately authorizes an explicit recovery/migration decision.**
 
 The manifest must identify:
 
@@ -44,12 +70,12 @@ Prerequisites:
 - working Wi-Fi and, if the subscription permits, mobile data;
 - an email address and a new staging-only password of at least 12 characters, or an existing staging test account.
 
-Never put the password, tokens, private keys or exported diagnostics in a public issue. The test build does not require a production credential or signing key.
+Never put the password, tokens, private keys or exported diagnostics in a public issue. The stable-signed test build uses a dedicated test-only signing key held in approved custody; it must never use a production credential or release signing key.
 
 ## 3. Install and establish build identity
 
 1. If an older physical-test installation exists, preserve it, its Keystore identity and device/session binding. Compare the installed package, current signer certificate and versionCode with the candidate manifest using [the update-channel contract](ANDROID_PHYSICAL_TEST_UPDATE_CHANNEL.md). Missing signer evidence is an unresolved gate. Never uninstall the existing application as a routine workaround for incompatible signing.
-2. Open `app-physicalTest.apk` only on a fresh test device/profile without that package, or after the stable-test manifest and installed certificate/version establish update compatibility. An `ephemeral-debug` artifact with `updateCompatible=false` is CI diagnostic evidence, not an in-place-update candidate. If the old signer is unavailable, the Owner must choose a separate durable test identity/package transition before a new installation is prepared; exporting diagnostics does not preserve Keystore identity.
+2. Open `app-physicalTest.apk` **only after** the exact installed signer fingerprint, package, signed manifest, incremented versionCode and signer custody have all been verified. On Poco C71 the above unresolved ephemeral-signer hold blocks installation entirely. Do **not** uninstall the existing package, silently transfer credentials, or install a different package as a workaround.
 3. Launch **SENTINEL**.
 4. Confirm the permanent compact PHYSICAL TEST identity strip clearly identifies `PHYSICAL TEST`, `STAGING`, the expected version and SHA prefix while leaving normal screen content usable.
 5. Confirm the normal release package, if installed, remains separate. The physical-test package is `com.alpha0.app.physicaltest`.

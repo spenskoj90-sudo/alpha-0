@@ -56,7 +56,7 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-capture-start").assertIsEnabled()
         compose.runOnIdle { state.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.PAUSED)) }
         compose.onNodeWithTag("game-capture-start").assertDoesNotExist()
-        compose.onNodeWithTag("game-capture-stop").performScrollTo().performClick()
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed().performClick()
         compose.runOnIdle { assertTrue(stopped) }
     }
 

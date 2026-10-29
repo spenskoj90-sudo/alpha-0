@@ -39,6 +39,10 @@ class PhysicalTestCiDistributionTests(unittest.TestCase):
         self.assertIn("PHYSICAL_TEST_KEYSTORE_BASE64", text)
         self.assertIn("signing-mode stable-test", text)
         self.assertIn("updateCompatible", text)
+        self.assertIn("installed_signer_sha256:", text)
+        self.assertIn("new_identity_approved:", text)
+        self.assertIn("Enforce installed-certificate match before any signing-key access", text)
+        self.assertIn("scripts/physical_test_signer_baseline.py", text)
 
 
 if __name__ == "__main__":

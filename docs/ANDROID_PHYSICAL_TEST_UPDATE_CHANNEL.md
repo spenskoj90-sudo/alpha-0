@@ -215,6 +215,18 @@ accumulating parallel testing apps; do not initiate a second package, install,
 uninstall, key rotation, server revoke or credential transfer without a
 separate, concrete authorization.
 
+The Owner-dispatched stable workflow now requires the public
+`installed_signer_sha256` input in addition to `previous_version_code`.
+For an existing installation (`previous_version_code > 0`), this digest must
+exactly match the pinned stable-test certificate *before any signing key is
+accessed*. A different digest or missing installed-certificate evidence fails
+closed. For a genuinely clean first install, use `previous_version_code=0`,
+`installed_signer_sha256=none` and the separate
+`new_identity_approved=true` Owner-only checkbox. That path is explicitly
+**NOT an update** and is **not applicable to the Poco C71 with the existing
+installed app**. These inputs are Owner-supplied assertions, not cryptographic
+device attestation: final on-device signer/update checks remain required.
+
 For future first installs, establish one durable, separately backed-up,
 test-only signing identity *before* delivering the first installable APK.
 Subsequent update artifacts must use that exact signer and a monotonically

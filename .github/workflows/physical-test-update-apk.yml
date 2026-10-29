@@ -11,6 +11,15 @@ on:
         description: "Highest versionCode already distributed for the pinned test signer; 0 only for an Owner-approved new identity"
         required: true
         type: string
+      installed_signer_sha256:
+        description: "Actual certificate SHA-256 from the installed phone; 'none' only for an approved first install with no existing package"
+        required: true
+        type: string
+      new_identity_approved:
+        description: "Owner approval for an entirely new test signing identity, NOT an in-place update"
+        required: true
+        type: boolean
+        default: false
       vk_client_id:
         description: "Public VK ID application ID to compile into the callback identity; use 0 when VK is disabled"
         required: false
@@ -31,6 +40,8 @@ env:
   PHYSICAL_TEST_EXPECTED_SIGNER_SHA256: ${{ vars.PHYSICAL_TEST_SIGNER_SHA256 }}
   PHYSICAL_TEST_VK_CLIENT_ID: ${{ inputs.vk_client_id }}
   PHYSICAL_TEST_PREVIOUS_VERSION_CODE: ${{ inputs.previous_version_code }}
+  PHYSICAL_TEST_INSTALLED_SIGNER_SHA256: ${{ inputs.installed_signer_sha256 }}
+  PHYSICAL_TEST_NEW_IDENTITY_APPROVED: ${{ inputs.new_identity_approved }}
 
 jobs:
   build-update-apk:
@@ -63,6 +74,15 @@ jobs:
           ref: ${{ inputs.source_sha }}
           persist-credentials: false
 
+      - name: Enforce installed-certificate match before any signing-key access
+        run: |
+          set -euo pipefail
+          python scripts/physical_test_signer_baseline.py \
+            --previous-version-code "$PHYSICAL_TEST_PREVIOUS_VERSION_CODE" \
+            --installed-signer-sha256 "$PHYSICAL_TEST_INSTALLED_SIGNER_SHA256" \
+            --expected-signer-sha256 "$PHYSICAL_TEST_EXPECTED_SIGNER_SHA256" \
+            --new-identity-approved "$PHYSICAL_TEST_NEW_IDENTITY_APPROVED"
+
       - name: Setup Java 25
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
@@ -74,6 +94,9 @@ jobs:
 
       - name: Test APK certificate report compatibility
         run: python -m unittest discover -s scripts -p "test_apk_signer_certificate.py" -v
+
+      - name: Test installed-signer continuity preflight
+        run: python -m unittest discover -s scripts -p "test_physical_test_signer_baseline.py" -v
 
       - name: Test offline APK update preflight safety guard
         run: python -m unittest discover -s scripts -p "test_physical_test_install_preflight.py" -v

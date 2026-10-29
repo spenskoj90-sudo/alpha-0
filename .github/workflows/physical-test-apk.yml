@@ -66,6 +66,7 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p "test_physical_test_ci_distribution.py" -v
           python -m unittest discover -s scripts -p "test_physical_test_artifact.py" -v
+          python -m unittest discover -s scripts -p "test_physical_test_signer_baseline.py" -v
 
       - name: Run Android unit tests across configured variants
         env:

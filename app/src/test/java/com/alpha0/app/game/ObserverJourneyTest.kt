@@ -30,6 +30,38 @@ class ObserverJourneyTest {
         assertEquals(ObserverNextStep.REVIEW_CALIBRATION, step(status = ObservationStatus.OBSERVING, hasFrame = true, count = 32))
     }
 
+    @Test fun `unverified recent numeric OCR becomes history without a new frame`() {
+        val health = HealthCandidate(12, 20, 0)
+        val observation = ObservationSnapshot(
+            status = ObservationStatus.OBSERVING,
+            captureId = "capture-a", frames = 1,
+            lastFrameAt = 110L, health = health,
+            lastHealth = HealthObservation(health, 110L),
+            lastRecognizedFrameAt = 110L,
+        )
+        assertEquals(HudEvidenceState.RECENT_UNVERIFIED, hudEvidenceState(observation, 110L))
+        assertEquals(HudEvidenceState.RECENT_UNVERIFIED, hudEvidenceState(observation, 5110L))
+        assertEquals(HudEvidenceState.HISTORICAL, hudEvidenceState(observation, 5111L))
+        assertEquals(HudEvidenceState.HISTORICAL, hudEvidenceState(observation.copy(health = null), 111L))
+        assertEquals(HudEvidenceState.HISTORICAL, hudEvidenceState(observation.copy(status = ObservationStatus.PAUSED, health = null), 111L))
+    }
+
+    @Test fun `stopped, unknown and invalid timeline never show a health hypothesis`() {
+        val health = HealthCandidate(12, 20, 0)
+        val snapshot = ObservationSnapshot(
+            status = ObservationStatus.OBSERVING, captureId = "capture-a",
+            frames = 1, lastFrameAt = 110L, health = health,
+            lastHealth = HealthObservation(health, 110L), lastRecognizedFrameAt = 110L,
+        )
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot.copy(status = ObservationStatus.STOPPED), 120L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot.copy(status = ObservationStatus.FAILED), 120L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot.copy(status = ObservationStatus.WAITING), 120L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot.copy(captureId = null), 120L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot.copy(lastHealth = null), 120L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot, 109L))
+        assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot, -1L))
+    }
+
     @Test fun `failed observation never advertises sample or action`() {
         assertEquals(ObserverNextStep.CONSENT, step(status = ObservationStatus.FAILED, hasFrame = true))
         assertEquals(ObserverNextStep.CONSENT, step(status = ObservationStatus.STOPPED, hasFrame = true))

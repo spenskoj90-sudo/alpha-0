@@ -1,38 +1,40 @@
 #!/usr/bin/env python3
-"""Allocate a stable-test APK code above the Owner-confirmed distributed baseline.
+"""Allocate installable physical-test versionCode without wall-clock exhaustion.
 
-Workflow run numbers are scoped to each workflow, so the routine APK counter
-cannot establish an update workflow's version. This does not prove installed
-signer compatibility or authorize signing/custody changes.
+GitHub run number advances within this dedicated signed-update workflow.
+The Owner's highest previously distributed versionCode is an additional floor.
+Routine ephemeral CI has a separate non-installable counter.
 """
 from __future__ import annotations
 
 import argparse
 import re
 import sys
-import time
 
 MAX_VERSION_CODE = 2_100_000_000
+WORKFLOW_VERSION_BASE = 100_000_000
 DECIMAL = re.compile(r"^(?:0|[1-9][0-9]{0,9})$")
 
 
-def allocate(previous: str, epoch: str) -> int:
-    if not DECIMAL.fullmatch(previous) or not DECIMAL.fullmatch(epoch):
-        raise ValueError("version baseline and epoch must be canonical non-negative decimal integers")
-    baseline, timestamp = int(previous), int(epoch)
-    value = max(baseline + 1, timestamp)
-    if timestamp < 1 or value > MAX_VERSION_CODE:
-        raise ValueError("physical-test versionCode would exceed the Android distribution range")
+def allocate(previous: str, workflow_run_number: str) -> int:
+    if not DECIMAL.fullmatch(previous) or not DECIMAL.fullmatch(workflow_run_number):
+        raise ValueError("baseline and workflow run number must be canonical non-negative decimal integers")
+    baseline, run_number = int(previous), int(workflow_run_number)
+    if run_number < 1 or baseline >= MAX_VERSION_CODE:
+        raise ValueError("run number must be positive and baseline must leave versionCode headroom")
+    value = max(baseline + 1, WORKFLOW_VERSION_BASE + run_number)
+    if value > MAX_VERSION_CODE:
+        raise ValueError("physical-test versionCode exceeds the Android distribution range")
     return value
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--previous-version-code", required=True)
-    parser.add_argument("--epoch-seconds", default=str(int(time.time())))
+    parser.add_argument("--workflow-run-number", required=True)
     args = parser.parse_args()
     try:
-        value = allocate(args.previous_version_code, args.epoch_seconds)
+        value = allocate(args.previous_version_code, args.workflow_run_number)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1

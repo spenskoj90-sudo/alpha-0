@@ -197,7 +197,7 @@ even if the code, file hash and `versionCode` are otherwise valid. Signature
 rotation also requires authorized old-key lineage, not merely knowledge of a
 certificate fingerprint.
 
-**Block:** no candidate for this Poco may claim update-over-install or
+**Historical block (superseded for the Owner's Poco C71 by the clean-uninstall confirmation below):** no candidate for this Poco may claim update-over-install or
 preservation of its Keystore/session until the *actual old private signer* is
 located in approved custody, pinned, and its certificate reconciled against the
 installed digest. The stable-test workflow's existing pin and version checks
@@ -223,8 +223,7 @@ accessed*. A different digest or missing installed-certificate evidence fails
 closed. For a genuinely clean first install, use `previous_version_code=0`,
 `installed_signer_sha256=none` and the separate
 `new_identity_approved=true` Owner-only checkbox. That path is explicitly
-**NOT an update** and is **not applicable to the Poco C71 with the existing
-installed app**. These inputs are Owner-supplied assertions, not cryptographic
+**NOT an update** and was **not applicable while the old app remained installed**. These inputs are Owner-supplied assertions, not cryptographic
 device attestation: final on-device signer/update checks remain required.
 
 For future first installs, establish one durable, separately backed-up,
@@ -233,3 +232,41 @@ Subsequent update artifacts must use that exact signer and a monotonically
 increasing `versionCode`, with emulator retention proof and exact-phone
 upgrade-over-install acceptance. The regular `Physical Test APK` workflow is
 CI-only and excludes APK bytes from upload by construction.
+
+
+## 2026-10-29 Owner reset — first durable install only
+
+The Owner has now explicitly confirmed removal of the old ephemeral-signed
+physical-test app from the Poco C71. This replaces the earlier **active**
+installed-package hold for that **specific device**. It does not establish
+that any third-party Android install has been removed or that the signing key
+exists. Do not try to recover, rotate or match the old ephemeral private key
+for this clean phone.
+
+The next physical-test APK may be the **first** installation of a new stable
+test-only signing lineage, *only after* the Owner/PROJECTS signing-custody
+and independent encrypted recovery gates are satisfied. The approved
+first-install workflow inputs are:
+`previous_version_code=0`, `installed_signer_sha256=none`,
+`new_identity_approved=true`. Verify that the package is genuinely
+absent on the target and that the new signer has never distributed a higher
+versionCode. These flags do not create or back up a key.
+
+The stable workflow allocates `versionCode` using the monotonic dedicated
+workflow run number plus the last distributed baseline, **not Unix epoch
+seconds**; future updates keep Android version-code headroom. Carry forward
+the highest signed/distributed versionCode, the signer SHA-256, exact package
+ID and original encrypted key recovery evidence. A successful CI-built APK
+still requires a same-package same-signer **upgrade-over-install** test
+retaining preferences, Android Keystore identity, and session/device binding.
+
+This keeps the existing diagnostic app ID
+`com.alpha0.app.physicaltest`. The shipping release app uses the different
+permanent app ID `com.alpha0.app`; therefore it is **not** an automatic
+update of the physical-test app. Ordinary beta/release testing should use
+the final release package ID and the **same release signing lineage**, ideally
+through Google Play internal testing. No authorization is given here to
+change IDs, production signing, secrets or Play distribution.
+
+There must be no additional owner-installable ephemeral/debug APK,
+regardless of whether it is called a test, staging, candidate or release.

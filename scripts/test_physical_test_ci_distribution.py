@@ -43,6 +43,21 @@ class PhysicalTestCiDistributionTests(unittest.TestCase):
                 self.assertIn("sentinel-ci-only-physical-test-evidence-", content)
                 self.assertIn("sentinel-physical-test-update-apk-", content)
 
+    def test_signed_channels_require_monotonic_versions(self) -> None:
+        stable = STABLE_WORKFLOW.read_text(encoding="utf-8")
+        release = (ROOT / ".github" / "workflows" / "release-candidate.yml").read_text(encoding="utf-8")
+        routine = ROUTINE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('--workflow-run-number "$GITHUB_RUN_NUMBER"', stable)
+        self.assertIn('test_physical_test_version.py', stable)
+        self.assertIn('test_android_release_version_preflight.py', routine)
+        self.assertIn("previous_release_version_code:", release)
+        self.assertIn("first_release_approved:", release)
+        self.assertIn("Verify release package/version continuity before any key access", release)
+        self.assertIn("Reconfirm release code and lineage before private-key access", release)
+        self.assertIn("--badging-report", release)
+        self.assertLess(release.index("Verify release package/version continuity"),
+                        release.index("Decode release keystore"))
+
     def test_stable_owner_workflow_remains_separate_and_signer_pinned(self) -> None:
         text = STABLE_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("name: Physical Test Update APK", text)

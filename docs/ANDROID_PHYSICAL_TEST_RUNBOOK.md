@@ -31,14 +31,19 @@ The stable-update ZIP must contain:
 - `physical-test-manifest.json`;
 - `physical-test-signer.txt`.
 
-**Current Poco C71 hold (2026-10-29):** the installed
-`com.alpha0.app.physicaltest` was signed with an ephemeral certificate from
-source `7def7527ad0a35b92a389b4e230f24e17a5d9541`, versionCode
-`100000893`, certificate SHA-256
-`eb1e54508b7917e0b29ff6b386e05df1b9d9f7a29edf287be7a772aea5702239`.
-No custody of that exact private signer has been demonstrated. **Do not install
-any candidate or remove this app until continuity is established or the
-Owner separately authorizes an explicit recovery/migration decision.**
+**Poco C71 reset acknowledged (2026-10-29):** The Owner explicitly confirmed
+the old `com.alpha0.app.physicaltest` vCode `100000893` installation was
+uninstalled. The lost ephemeral signing lineage is therefore historical on
+that device, **not an update prerequisite for a fresh install**. The next
+physical-test installation is permitted only after PROJECTS/Owner confirms
+one durable test-only signing key, independent encrypted recovery and verified
+certificate pin. Use `previous_version_code=0`,
+`installed_signer_sha256=none`, `new_identity_approved=true` **only** after
+verifying no such package exists on the target device and that no higher
+versionCode has been distributed under the new signer. After the first
+stable-signed install, retain this single app and perform all further tests
+through same-signer, increasing-version upgrades. Do not return to disposable
+signing keys, ever.
 
 The manifest must identify:
 

@@ -172,7 +172,7 @@ def build_manifest(
         "artifactName": (
             f"sentinel-physical-test-update-apk-{source_sha}"
             if signing_mode == "stable-test"
-            else f"sentinel-physical-test-apk-{source_sha}"
+            else f"sentinel-ci-only-physical-test-evidence-{source_sha}"
         ),
         "apk": {
             "fileName": apk.name,

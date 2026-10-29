@@ -155,18 +155,47 @@ After triage, an actionable engineering defect may be represented in GitHub/Line
 
 ## 8. Physical-device workflow
 
-For a real Android acceptance run:
+**One established installation, same package and same signer, upgrade-over-install.**
+The routine **Physical Test APK** workflow is a CI-only smoke build. Its
+`sentinel-ci-only-physical-test-evidence-<sha>` artifact contains checksums and
+provenance only, **not an installable APK**. Never direct the Owner to the old
+`sentinel-physical-test-apk-*` ephemeral artifacts, `app-debug.apk`, or a PR build.
 
-1. Select one exact protected-`main` SHA with a completed MAIN PASS.
-2. Download `sentinel-physical-test-apk-<sha>` from the **Physical Test APK** workflow for that exact SHA.
-3. Verify `physical-test-manifest.json` names the selected repository/SHA, canonical staging origin, `com.alpha0.app.physicaltest` application ID and `FORENSIC_TEST` mode.
-4. Verify the APK against both the manifest SHA-256 and bundled `physical-test-apk.sha256` before installation.
-5. Install the `.physicaltest` application. It can coexist with the release package because its application ID is different.
-6. Execute the physical acceptance procedure normally. Do not weaken device/security controls for the test build.
-7. If behavior is wrong, reproduce it once where safe, then use **Report a problem** and/or **Export full forensic log**. The full forensic export is available only in the physical-test build.
-8. Preserve the exact source SHA, APK SHA-256, manifest, device/OS context and exported log as engineering evidence.
-9. Fix only defects supported by the real evidence, rerun CI, produce a new exact-SHA test APK and repeat the measured scenario.
-10. Remove the test application/data from the device after the acceptance campaign is complete.
+1. Preserve the existing installation, Android Keystore identity, encrypted session,
+   local files, and device binding. **Never uninstall, clear data, install a second
+   test app or re-enroll merely to bypass an Android signature mismatch.**
+2. Select an exact protected-`main` SHA with complete required CI. Use only the
+   dedicated Owner-approved **Physical Test Update APK** workflow's
+   `sentinel-physical-test-update-apk-<FULL_MAIN_SHA>` artifact after its
+   pinned stable signing certificate is compared with the **actual installed**
+   package certificate. Require a strictly higher `versionCode`.
+3. Verify staging origin, `com.alpha0.app.physicaltest` application ID,
+   `FORENSIC_TEST` mode, `signingMode=stable-test`,
+   `signerLineageVerified=true`, `updateCompatible=true`, full source SHA,
+   signer SHA-256, and APK SHA-256 against signed ZIP, manifest, and phone.
+   Owner-supplied certificate metadata is not device attestation.
+4. Install with Android's ordinary **update existing application** flow, not
+   uninstall/reinstall; reject identity mismatch. Confirm retained local
+   preferences, Keystore signing identity, staging session and device proof.
+5. Execute the physical acceptance procedure, record measured behavior and
+   explicitly Stop observation. Do not weaken Android, game or session controls.
+6. Export diagnostic evidence by **Report a problem** / **Export full forensic log**
+   only with explicit Owner consent, retain it privately and keep sensitive
+   identifiers, credentials and raw traces out of public issues.
+7. Preserve the exact source SHA, APK SHA-256, installed/candidate certificates,
+   before/after version codes, Android/OS facts, and private evidence. Fix defects
+   supported by these facts, rerun exact-SHA CI, and repeat an **upgrade**, not a
+   fresh installation.
+8. Keep the established test installation and its data unless the Owner
+   separately approves removal after independent recoverability verification.
+
+**Poco C71 — clean-state confirmation (2026-10-29):** The Owner uninstalled
+the old ephemeral diagnostic app. The next install must begin a separately
+backed-up durable signing lineage; no old-key continuity claim remains for
+this phone. Subsequent physical tests **must** update the first stable-signed
+app in place, with preserved local data and Keystore identity. The final
+release package is distinct and needs its own stable, upgradeable lineage.
+See `docs/ANDROID_PHYSICAL_TEST_UPDATE_CHANNEL.md`.
 
 A diagnostic trace is evidence for diagnosis; it is not by itself a PASS. Final release gates remain governed by `docs/FINAL_RELEASE_ACCEPTANCE_V1.md`.
 

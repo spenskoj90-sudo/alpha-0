@@ -62,6 +62,14 @@ jobs:
       - name: Test offline APK update preflight safety guard
         run: python -m unittest discover -s scripts -p "test_physical_test_install_preflight.py" -v
 
+      - name: Test CI-only artifact distribution and exact signer manifest
+        run: |
+          python -m unittest discover -s scripts -p "test_physical_test_ci_distribution.py" -v
+          python -m unittest discover -s scripts -p "test_physical_test_artifact.py" -v
+          python -m unittest discover -s scripts -p "test_physical_test_signer_baseline.py" -v
+          python -m unittest discover -s scripts -p "test_physical_test_version.py" -v
+          python -m unittest discover -s scripts -p "test_android_release_version_preflight.py" -v
+
       - name: Run Android unit tests across configured variants
         env:
           SENTINEL_API_BASE_URL: ${{ env.PHYSICAL_TEST_API_BASE_URL }}
@@ -105,14 +113,34 @@ jobs:
           test "$(cut -d ' ' -f 1 physical-test-apk.sha256)" = "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["apk"]["sha256"])')"
           test "$(python -c 'import json; print(json.load(open("physical-test-manifest.json"))["signerCertificateSha256"])')" = "$SENTINEL_PHYSICAL_TEST_SIGNER_SHA256"
 
-      - name: Upload exact-SHA physical-test APK
+      - name: Enforce CI-only diagnostic artifact (never distribute an ephemeral APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          manifest = json.load(open("physical-test-manifest.json", encoding="utf-8"))
+          assert manifest["signingMode"] == "ephemeral-debug"
+          assert manifest["updateCompatible"] is False
+          assert manifest["signerLineageVerified"] is False
+          assert manifest["artifactName"].startswith("sentinel-ci-only-physical-test-evidence-")
+          PY
+          printf '%s\n' \
+            'CI-ONLY: NOT AN INSTALLER. DO NOT INSTALL ON A PHONE.' \
+            'The signed APK was built and verified within this disposable workflow runner only.' \
+            'Its ephemeral certificate is not retained for updating an installed application.' \
+            'Physical devices require an Owner-approved stable signing lineage and the Physical Test Update APK workflow.' \
+            'Never uninstall an existing SENTINEL app to work around a signature mismatch.' \
+            > PHYSICAL_TEST_CI_ONLY.txt
+
+      - name: Upload exact-SHA CI-only metadata (exclude APK bytes)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: sentinel-physical-test-apk-${{ github.event.pull_request.head.sha || github.sha }}
+          name: sentinel-ci-only-physical-test-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            app/build/outputs/apk/physicalTest/app-physicalTest.apk
             physical-test-apk.sha256
             physical-test-manifest.json
             physical-test-signer.txt
+            PHYSICAL_TEST_CI_ONLY.txt
           if-no-files-found: error
           retention-days: 90

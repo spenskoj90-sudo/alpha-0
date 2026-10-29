@@ -51,6 +51,16 @@ The primary action must remain visible/reachable on the minimum supported displa
 
 The application contains an Update Center using Google Play In-App Updates. The preferred test and release channel is Google Play Internal Testing followed by the appropriate release track. This gives stable app signing, monotonic `versionCode`, Play-distributed replacement installation and user-confirmed flexible/immediate update flows.
 
+Only the Owner-gated **durable test-signed** physical-test APK is an installable
+diagnostic instrument. Routine ephemeral/debug CI binaries are not distributed.
+The diagnostic `.physicaltest` app and the permanent release app have different
+application IDs and therefore do **not** update one another. Every subsequent
+build within either channel must reuse its respective durable signing certificate
+and advance `versionCode` without uninstalling or losing data. A switch from
+diagnostic to production is not an in-place upgrade and requires explicit Owner
+acceptance; ordinary beta users should use the permanent release app ID via
+the Play test tracks instead.
+
 Sideloaded physical-test APKs remain diagnostic instruments. Android may require Package Installer confirmation and Play Protect evaluation. The application must never disable, bypass or misrepresent those platform protections.
 
 The repository can implement and test the update client, version monotonicity and signing/publication workflow boundaries. Actual Play Console application creation, tester enrollment, signing-key custody, Play service-account credentials and track publication remain Owner actions.

@@ -45,7 +45,7 @@ WORKFLOW_SPECS: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {
         "Build & Test": {
             "jobs": BUILD_JOBS,
             "artifacts": (
-                "alpha-0-android-instrumentation-{sha}",
+                "alpha-0-android-instrumentation-evidence-{sha}",
                 "block-d-operational-evidence-{sha}",
             ),
         },
@@ -71,7 +71,7 @@ WORKFLOW_SPECS: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {
         "Build & Test": {
             "jobs": BUILD_JOBS,
             "artifacts": (
-                "alpha-0-android-instrumentation-{sha}",
+                "alpha-0-android-instrumentation-evidence-{sha}",
                 "block-d-operational-evidence-{sha}",
             ),
         },
@@ -94,7 +94,7 @@ WORKFLOW_SPECS: dict[str, dict[str, dict[str, tuple[str, ...]]]] = {
         },
         "ALPHA-0 Android CI": {
             "jobs": ("Build Android APK",),
-            "artifacts": ("alpha-0-debug-apk-{sha}",),
+            "artifacts": ("alpha-0-debug-ci-evidence-{sha}",),
         },
     },
 }

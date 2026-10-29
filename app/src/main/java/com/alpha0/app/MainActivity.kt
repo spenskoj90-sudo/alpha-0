@@ -75,6 +75,7 @@ import com.alpha0.app.quality.QualityReportApi
 import com.alpha0.app.quality.QualityReportScreen
 import com.alpha0.app.security.DeviceIdentity
 import com.alpha0.app.security.SecureSessionStore
+import com.alpha0.app.security.keystoreIo
 import com.alpha0.app.settings.SettingsScreen
 import com.alpha0.app.ui.AppLanguage
 import com.alpha0.app.ui.AppPreferences
@@ -88,6 +89,7 @@ import com.alpha0.app.ui.SentinelTheme
 import com.alpha0.app.ui.SentinelTopBar
 import com.alpha0.app.ui.rememberAppStrings
 import com.alpha0.app.update.UpdateScreen
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -278,6 +280,8 @@ private fun SentinelApplicationUi(
     var activeSession by remember { mutableStateOf(initialSession) }
     var refreshComplete by remember { mutableStateOf(initialSession == null) }
     var pendingMfaRecoveryCodes by remember { mutableStateOf<List<String>?>(null) }
+    var loginHandoffPending by remember { mutableStateOf(false) }
+    var deviceProofHandoffPending by remember { mutableStateOf(false) }
 
     LaunchedEffect(initialSession?.refreshToken) {
         var rotationBoundaryResolved = false
@@ -565,10 +569,33 @@ private fun SentinelApplicationUi(
                         federatedCallbackUri = federatedCallbackUri,
                         onFederatedCallbackConsumed = onFederatedCallbackConsumed,
                     ) { authenticated ->
-                        sessionStore.save(activity, authenticated.accessToken, authenticated.refreshToken)
-                        activeSession = sessionStore.load(activity)
-                        diagnostics.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")
-                        navController.navigate("device-setup") { popUpTo("login") { inclusive = true } }
+                        if (!loginHandoffPending) {
+                            loginHandoffPending = true
+                            rotationScope.launch {
+                                try {
+                                    // Never publish a session or navigate before encrypted persistence finishes.
+                                    val stored = keystoreIo {
+                                        sessionStore.save(activity, authenticated.accessToken, authenticated.refreshToken)
+                                        sessionStore.load(activity)
+                                    }
+                                    if (stored != null) {
+                                        activeSession = stored
+                                        diagnostics.info("AUTH", "LOGIN_SUCCESS", "SUCCESS")
+                                        navController.navigate("device-setup") { popUpTo("login") { inclusive = true } }
+                                    } else {
+                                        diagnostics.warn("AUTH", "SESSION_PERSISTENCE", "FAILURE",
+                                            errorCode = "SESSION_UNAVAILABLE")
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (failure: Exception) {
+                                    diagnostics.error("AUTH", "SESSION_PERSISTENCE", "FAILURE",
+                                        errorCode = failure.javaClass.simpleName)
+                                } finally {
+                                    loginHandoffPending = false
+                                }
+                            }
+                        }
                     }
                 }
                 composable("device-setup") {
@@ -579,10 +606,32 @@ private fun SentinelApplicationUi(
                         }
                     } else {
                         DeviceSetupScreen(current.accessToken, deviceIdentity, deviceApi) { proven ->
-                            sessionStore.save(activity, proven.accessToken, proven.refreshToken, proven.deviceId)
-                            activeSession = sessionStore.load(activity)
-                            diagnostics.info("DEVICE", "PROOF_SUCCESS", "SUCCESS")
-                            navController.navigate("home") { popUpTo("device-setup") { inclusive = true } }
+                            if (!deviceProofHandoffPending) {
+                                deviceProofHandoffPending = true
+                                rotationScope.launch {
+                                    try {
+                                        val stored = keystoreIo {
+                                            sessionStore.save(activity, proven.accessToken, proven.refreshToken, proven.deviceId)
+                                            sessionStore.load(activity)
+                                        }
+                                        if (stored?.deviceId == proven.deviceId) {
+                                            activeSession = stored
+                                            diagnostics.info("DEVICE", "PROOF_SUCCESS", "SUCCESS")
+                                            navController.navigate("home") { popUpTo("device-setup") { inclusive = true } }
+                                        } else {
+                                            diagnostics.warn("DEVICE", "SESSION_PERSISTENCE", "FAILURE",
+                                                errorCode = "DEVICE_SESSION_UNAVAILABLE")
+                                        }
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        diagnostics.error("DEVICE", "SESSION_PERSISTENCE", "FAILURE",
+                                            errorCode = failure.javaClass.simpleName)
+                                    } finally {
+                                        deviceProofHandoffPending = false
+                                    }
+                                }
+                            }
                         }
                     }
                 }

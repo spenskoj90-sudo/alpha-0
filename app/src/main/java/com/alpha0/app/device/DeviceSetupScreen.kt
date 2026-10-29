@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.alpha0.app.security.DeviceIdentity
+import com.alpha0.app.security.keystoreIo
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
@@ -47,10 +49,18 @@ fun DeviceSetupScreen(
     val strings = LocalAppStrings.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val identity = remember { deviceIdentity.getIdentityInfo() }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var identity by remember(deviceIdentity) { mutableStateOf<DeviceIdentity.IdentityInfo?>(null) }
+    LaunchedEffect(deviceIdentity) {
+        // Creating an EC keypair can block the main thread for a noticeable interval.
+        try {
+            identity = keystoreIo { deviceIdentity.getIdentityInfo() }
+        } catch (_: Exception) {
+            error = "IDENTITY_UNAVAILABLE"
+        }
+    }
     var pendingBind by remember { mutableStateOf<DeviceApi.BindResult?>(null) }
     var batteryOptimizationIgnored by remember { mutableStateOf(BatteryOptimization.isIgnored(context)) }
 
@@ -79,9 +89,12 @@ fun DeviceSetupScreen(
             SentinelCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(strings.text("step_identity"), style = MaterialTheme.typography.labelLarge)
-                    Text(strings.text("identity_ready"), style = MaterialTheme.typography.titleMedium)
-                    DataText(identity.fingerprint)
-                    DataText(identity.algorithm)
+                    Text(strings.text(if (identity == null) "loading" else "identity_ready"),
+                        style = MaterialTheme.typography.titleMedium)
+                    identity?.let { loaded ->
+                        DataText(loaded.fingerprint)
+                        DataText(loaded.algorithm)
+                    }
                     Text(strings.text("setup_privacy"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -133,17 +146,19 @@ fun DeviceSetupScreen(
             PrimaryButton(
                 text = strings.text(if (pendingBind == null) "bind_device" else "retry_proof"),
                 onClick = {
-                    busy = true
-                    error = null
-                    scope.launch {
-                        val existingBinding = pendingBind
+                    val selectedIdentity = identity
+                    if (selectedIdentity != null) {
+                        busy = true
+                        error = null
+                        scope.launch {
+                            val existingBinding = pendingBind
                         val bound = if (existingBinding == null) {
                             when (val bind = withContext(Dispatchers.IO) {
                                 api.bind(
                                     accessToken = accessToken,
                                     platform = "android",
                                     publicKeyDerB64 = deviceIdentity.getPublicKeyDerBase64(),
-                                    fingerprintSha256 = identity.fingerprint
+                                    fingerprintSha256 = selectedIdentity.fingerprint
                                 )
                             }) {
                                 is DeviceApi.Result.Success -> {
@@ -188,9 +203,10 @@ fun DeviceSetupScreen(
                                 error = proof.message
                             }
                         }
+                        }
                     }
                 },
-                enabled = !busy,
+                enabled = !busy && identity != null,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (busy) {

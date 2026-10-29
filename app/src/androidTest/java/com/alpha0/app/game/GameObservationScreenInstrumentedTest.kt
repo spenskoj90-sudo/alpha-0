@@ -60,6 +60,24 @@ class GameObservationScreenInstrumentedTest {
         compose.runOnIdle { assertTrue(stopped) }
     }
 
+    @Test fun localSignerMetadataNeverClaimsPublisherOrCaptureSource() {
+        val install = mutableStateOf(StockGameInstall("fixture", 1, "a".repeat(64)))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install.value, GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Installed game package: com.shatteredpixel.shatteredpixeldungeon")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            "Installed APK signer detected locally; publisher identity and selected capture app remain UNVERIFIED.",
+        ).performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { install.value = StockGameInstall("fixture", 1) }
+        compose.onNodeWithText("Installed APK signer UNKNOWN. Game version and capture-source identity are not verified.")
+            .performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun stopRemainsVisibleWithoutScrollingWhenCalibrationIsBelowFold() {
         val state = mutableStateOf(GameObservationViewState(
             ObservationSnapshot(status = ObservationStatus.OBSERVING, frames = 8),

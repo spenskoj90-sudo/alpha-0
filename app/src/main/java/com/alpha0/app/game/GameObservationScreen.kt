@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.security.SecureSessionStore
+import com.alpha0.app.ui.DangerButton
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
@@ -195,7 +196,7 @@ internal fun GameObservationPanel(
     Scaffold(
         bottomBar = {
             if (active) {
-                PrimaryButton(
+                DangerButton(
                     strings.text("game_capture_stop"), onStop,
                     Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
                 )
@@ -223,7 +224,10 @@ internal fun GameObservationPanel(
                     StatusBadge(strings.text("status_unavailable"), SentinelStatus.UNAVAILABLE)
                     Text(strings.text("game_install_missing"))
                 } else {
+                    Text(strings.text("game_install_package", ShatteredGameProfile.PACKAGE))
                     Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
+                    Text(strings.text(if (installed.signerSha256 == null) "game_install_signer_unknown" else "game_install_signer_observed"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(strings.text("game_capture_source_unverified"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SecondaryButton(strings.text("game_capture_launch"), onLaunch, Modifier.fillMaxWidth())
                 }

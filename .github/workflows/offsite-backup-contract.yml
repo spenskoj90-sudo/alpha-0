@@ -14,6 +14,8 @@ on:
       - "scripts/b2_versioned_transfer.py"
       - "scripts/b2_atomic_download.py"
       - "scripts/test_b2_atomic_download.py"
+      - "scripts/pg18_export_readiness.py"
+      - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
       - "scripts/b2_s3_transport.py"
@@ -33,6 +35,8 @@ on:
       - "scripts/b2_versioned_transfer.py"
       - "scripts/b2_atomic_download.py"
       - "scripts/test_b2_atomic_download.py"
+      - "scripts/pg18_export_readiness.py"
+      - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
       - "scripts/b2_s3_transport.py"
@@ -60,4 +64,5 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_s3_transport.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_atomic_download.py' -v
+          python3 -m unittest discover -s scripts -p 'test_pg18_export_readiness.py' -v
           python3 -m unittest discover -s scripts -p 'test_pg18_restore_inventory.py' -v

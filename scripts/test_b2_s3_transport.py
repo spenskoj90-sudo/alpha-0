@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,6 +21,7 @@ OWNER = "synthetic-owner"
 PAYLOAD = (b"age-encryption.org/v1\n-> X25519 SYNTHETIC_NOT_REAL\n"
            + b"--- SYNTHETIC_FAKE_MAC\n"
            + b"SYNTHETIC_AGE_CIPHERTEXT_NOT_REAL" * 10)
+HASH = hashlib.sha256(PAYLOAD).hexdigest()
 
 
 class FakeS3:
@@ -83,7 +85,7 @@ class B2S3TransportTests(unittest.TestCase):
         self.assertEqual(written["VersionId"], VERSION)
         self.assertEqual(reader("list-object-versions", bucket=BUCKET, prefix=KEY, max_keys=10)["Versions"][0]["VersionId"], VERSION)
         self.assertEqual(reader("head-object", bucket=BUCKET, key=KEY, version_id=VERSION)["ContentLength"], len(PAYLOAD))
-        downloaded = reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
+        downloaded = reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertEqual(downloaded["VersionId"], VERSION)
         self.assertEqual(self.output.read_bytes(), PAYLOAD)
         allowed = {"get_bucket_acl", "list_object_versions", "put_object", "head_object", "get_object"}
@@ -95,7 +97,7 @@ class B2S3TransportTests(unittest.TestCase):
 
     def test_writer_cannot_download_and_reader_cannot_upload(self):
         with self.assertRaises(TransferRejected):
-            self.writer("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
+            self.writer("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         with self.assertRaises(TransferRejected):
             self.reader("put-object", bucket=BUCKET, key=KEY, path=self.source)
         self.assertFalse(self.writer_client.calls or self.reader_client.calls)
@@ -164,11 +166,11 @@ class B2S3TransportTests(unittest.TestCase):
     def test_refuse_preexisting_destination_and_symlink(self):
         self.output.write_bytes(b"already exists")
         with self.assertRaises(TransferRejected):
-            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
+            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.output.unlink()
         self.output.symlink_to(self.source)
         with self.assertRaises(TransferRejected):
-            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
+            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.reader_client.calls)
 
     def test_concurrent_destination_creation_does_not_delete_other_file(self):
@@ -187,7 +189,7 @@ class B2S3TransportTests(unittest.TestCase):
                                 region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
         with self.assertRaises(TransferRejected):
             reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
-                   output_path=self.output)
+                   output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertEqual(self.output.read_bytes(), b"UNRELATED_FILE_MUST_SURVIVE")
 
     def test_replaced_destination_during_failed_stream_is_preserved(self):
@@ -199,7 +201,6 @@ class B2S3TransportTests(unittest.TestCase):
         class ReplacingStream(io.BytesIO):
             def read(self, n=-1):
                 if self.tell() == len(PAYLOAD):
-                    output_path.unlink()
                     output_path.write_bytes(b"REPLACEMENT_FILE_MUST_SURVIVE")
                     raise OSError("synthetic late transport failure")
                 return super().read(n)
@@ -214,13 +215,40 @@ class B2S3TransportTests(unittest.TestCase):
                                 region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
         with self.assertRaises(TransferRejected):
             reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
-                   output_path=self.output)
+                   output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertEqual(self.output.read_bytes(), b"REPLACEMENT_FILE_MUST_SURVIVE")
+
+    def test_corrupt_readback_is_never_published(self):
+        class CorruptS3(FakeS3):
+            def get_object(self, **kwargs):
+                result = super().get_object(**kwargs)
+                result["Body"] = io.BytesIO(PAYLOAD[:-1] + b"X")
+                return result
+        bad = B2S3Transport(CorruptS3(), role="reader", endpoint=ENDPOINT,
+                            region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
+        with self.assertRaises(TransferRejected):
+            bad("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
+                output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
+        self.assertFalse(self.output.exists())
+        self.assertFalse(list(self.root.glob(".*.part")))
+
+    def test_short_readback_is_never_published(self):
+        class ShortS3(FakeS3):
+            def get_object(self, **kwargs):
+                result = super().get_object(**kwargs)
+                result["Body"] = io.BytesIO(PAYLOAD[:-3])
+                return result
+        bad = B2S3Transport(ShortS3(), role="reader", endpoint=ENDPOINT,
+                            region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
+        with self.assertRaises(TransferRejected):
+            bad("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
+                output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
+        self.assertFalse(self.output.exists())
 
     def test_download_byte_cap_does_not_leave_partial_file(self):
         self.writer_client.state["bytes"] = b"Z" * 10001
         with self.assertRaises(TransferRejected):
-            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
+            self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.output.exists())
 
     def test_legacy_r2_manual_job_explicitly_inert(self):

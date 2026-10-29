@@ -1,6 +1,7 @@
 """Offline safety tests for the inert B2 versioned ciphertext transport."""
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import tempfile
 import unittest
@@ -53,7 +54,9 @@ class FakeB2:
             if self.state.get("corrupt"):
                 payload = payload[:-1] + bytes([payload[-1] ^ 1])
             args["output_path"].write_bytes(payload)
-            return {"VersionId": self.state.get("download_version", VERSION)}
+            return {"VersionId": self.state.get("download_version", VERSION),
+                    "sha256": hashlib.sha256(payload).hexdigest(),
+                    "size_bytes": len(payload)}
         raise AssertionError(f"unexpected or destructive S3 operation: {operation}")
 
 

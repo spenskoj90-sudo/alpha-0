@@ -7,15 +7,12 @@ synthetic clients only; they are NOT proof of provider authorization or backup.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
+from b2_atomic_download import DownloadRejected, SHA256, publish_verified_ciphertext
 from b2_target_contract import validate_target
 from b2_versioned_transfer import KEY, MAX_STAGE_BYTES, TransferRejected, validate_staged_age_ciphertext
-
-CHUNK_BYTES = 1024 * 1024
-
 
 class B2S3Transport:
     """Restrict a preconfigured S3 client to one role and five exact operations.
@@ -87,11 +84,19 @@ class B2S3Transport:
                              Key=key, VersionId=version)
 
         if operation == "get-object" and self.role == "reader":
-            key, version = self._read_key_version(kw,
-                                                   {"bucket", "key", "version_id", "output_path"})
+            key, version = self._read_key_version(
+                kw, {"bucket", "key", "version_id", "output_path",
+                     "expected_sha256", "expected_bytes"})
             destination = kw["output_path"]
-            if not isinstance(destination, Path) or destination.exists() or destination.is_symlink():
-                raise TransferRejected("download destination must be a new file")
+            expected_sha256 = kw["expected_sha256"]
+            expected_bytes = kw["expected_bytes"]
+            if (not isinstance(destination, Path)
+                    or not isinstance(expected_sha256, str)
+                    or not SHA256.fullmatch(expected_sha256)
+                    or type(expected_bytes) is not int or expected_bytes <= 100
+                    or expected_bytes > self.max_ciphertext_bytes
+                    or destination.exists() or destination.is_symlink()):
+                raise TransferRejected("pinned ciphertext and new destination required")
             response = self._sdk("get_object", Bucket=self.bucket,
                                  Key=key, VersionId=version)
             body = response.get("Body") if isinstance(response, dict) else None
@@ -99,38 +104,16 @@ class B2S3Transport:
                     or response.get("VersionId") != version):
                 self._close(body)
                 raise TransferRejected("unverified B2 version stream")
-            total = 0
-            created_identity = None
             try:
-                # "xb" is atomic exclusive creation. Never remove a file
-                # created by another actor after the initial path precheck.
-                with destination.open("xb") as output:
-                    created = os.fstat(output.fileno())
-                    created_identity = (created.st_dev, created.st_ino)
-                    while True:
-                        chunk = body.read(CHUNK_BYTES)
-                        if not chunk:
-                            break
-                        if not isinstance(chunk, bytes):
-                            raise TransferRejected("unexpected B2 download payload type")
-                        total += len(chunk)
-                        if total > self.max_ciphertext_bytes:
-                            raise TransferRejected("download exceeded explicit byte cap")
-                        output.write(chunk)
-            except Exception:
-                # A failed "xb" or a replaced path is NOT ours to unlink.
-                # Preserve the original failure even if cleanup is denied.
-                if created_identity is not None:
-                    try:
-                        current = destination.lstat()
-                        if (current.st_dev, current.st_ino) == created_identity:
-                            destination.unlink()
-                    except OSError:
-                        pass
-                raise TransferRejected("B2 ciphertext download incomplete or over cap") from None
+                verified = publish_verified_ciphertext(
+                    body, destination, expected_sha256=expected_sha256,
+                    expected_bytes=expected_bytes,
+                    max_ciphertext_bytes=self.max_ciphertext_bytes)
+            except DownloadRejected:
+                raise TransferRejected("ciphertext readback or publication failed") from None
             finally:
                 self._close(body)
-            return {"VersionId": response["VersionId"]}
+            return {"VersionId": version, **verified}
 
         # No delete, hide, public ACL update, bucket mutation or unversioned read.
         raise TransferRejected("operation unavailable to scoped B2 transport")

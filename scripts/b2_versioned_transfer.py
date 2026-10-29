@@ -144,9 +144,11 @@ def stage_and_verify(
     if head.get("VersionId") != version or head.get("ContentLength") != size:
         raise TransferRejected("version-specific HEAD mismatch")
     result = reader("get-object", bucket=bucket, key=key, version_id=version,
-                    output_path=download_path)
-    if result.get("VersionId") != version or not download_path.is_file():
-        raise TransferRejected("version-specific ciphertext download failed")
+                    output_path=download_path, expected_sha256=digest,
+                    expected_bytes=size)
+    if (result.get("VersionId") != version or result.get("sha256") != digest
+            or result.get("size_bytes") != size or not download_path.is_file()):
+        raise TransferRejected("verified version-specific ciphertext download failed")
     if download_path.stat().st_size != size:
         raise TransferRejected("remote ciphertext length differs from source")
     with download_path.open("rb") as stream:

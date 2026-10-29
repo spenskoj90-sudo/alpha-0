@@ -242,15 +242,21 @@ internal fun GameObservationPanel(
                     ObservationStatus.WAITING -> "game_capture_waiting"
                     ObservationStatus.OBSERVING -> "game_capture_active"
                     ObservationStatus.PAUSED -> "game_capture_paused"
+                    ObservationStatus.FAILED -> "status_failed"
                     else -> "status_stopped"
                 }
                 StatusBadge(strings.text(label), when (observation.status) {
                     ObservationStatus.OBSERVING -> SentinelStatus.ACTIVE
                     ObservationStatus.WAITING -> SentinelStatus.PENDING
                     ObservationStatus.PAUSED -> SentinelStatus.WARNING
+                    ObservationStatus.FAILED -> SentinelStatus.FAILED
                     else -> SentinelStatus.STOPPED
                 })
                 Text(strings.text("game_capture_summary", observation.frames))
+                if (active && hudEvidenceState(observation, now) == HudEvidenceState.UNKNOWN) {
+                    Text(strings.text("game_capture_evidence_unknown"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 observation.lastOcrLatencyMs?.let { latency ->
                     Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -264,6 +270,9 @@ internal fun GameObservationPanel(
                     }
                     Text(strings.text("game_capture_ocr_metrics_note"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (observation.status == ObservationStatus.FAILED) {
+                    Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
                 }
                 when (observation.reason) {
                     "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
@@ -307,10 +316,16 @@ internal fun GameObservationPanel(
                 }
             }
         }
-        observation.lastHealth?.let { last ->
+        val hudEvidence = hudEvidenceState(observation, now)
+        if (hudEvidence != HudEvidenceState.UNKNOWN) observation.lastHealth?.let { last ->
             SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DataText("INFERENCE")
+                    StatusBadge(
+                        strings.text(if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED)
+                            "game_capture_evidence_recent" else "game_capture_evidence_historical"),
+                        if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED) SentinelStatus.WARNING else SentinelStatus.UNAVAILABLE,
+                    )
                     Text(strings.text("game_capture_health", last.candidate.current, last.candidate.maximum, last.candidate.shield))
                     Text(strings.text("game_capture_age", maxOf(0, (now - last.observedAt) / 1000)))
                     Text(strings.text("game_capture_hypothesis"), color = MaterialTheme.colorScheme.onSurfaceVariant)

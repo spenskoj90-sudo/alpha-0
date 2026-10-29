@@ -33,6 +33,7 @@ import com.alpha0.app.security.keystoreIo
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
+import com.alpha0.app.ui.SecondaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
 import kotlinx.coroutines.CancellationException
@@ -54,7 +55,9 @@ fun DeviceSetupScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var identity by remember(deviceIdentity) { mutableStateOf<DeviceIdentity.IdentityInfo?>(null) }
-    LaunchedEffect(deviceIdentity) {
+    var identityAttempt by remember(deviceIdentity) { mutableStateOf(0) }
+    LaunchedEffect(deviceIdentity, identityAttempt) {
+        if (identity == null) error = null
         // Creating an EC keypair can block the main thread for a noticeable interval.
         try {
             identity = keystoreIo { deviceIdentity.getIdentityInfo() }
@@ -101,6 +104,9 @@ fun DeviceSetupScreen(
                     identity?.let { loaded ->
                         DataText(loaded.fingerprint)
                         DataText(loaded.algorithm)
+                    }
+                    if (identity == null && error == "IDENTITY_UNAVAILABLE") {
+                        SecondaryButton(strings.text("retry"), { identityAttempt += 1 }, Modifier.fillMaxWidth())
                     }
                     Text(strings.text("setup_privacy"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

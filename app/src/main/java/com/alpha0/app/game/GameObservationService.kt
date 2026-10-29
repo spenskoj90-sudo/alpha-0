@@ -308,7 +308,10 @@ class GameObservationService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) = finish("TASK_REMOVED")
-    override fun onDestroy() { finish("SERVICE_DESTROYED"); super.onDestroy() }
+    override fun onDestroy() {
+        finish(observationStopReasonOnDestroy(GameObservationRuntime.session.snapshot))
+        super.onDestroy()
+    }
     private fun now() = SystemClock.elapsedRealtime()
 
     private fun notificationStrings(): AppStrings {

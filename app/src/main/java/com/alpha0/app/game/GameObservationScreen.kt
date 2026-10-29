@@ -177,10 +177,13 @@ internal fun GameObservationPanel(
     }
     val campaign = campaignRun.campaign
     val campaignId = campaignRun.campaignId
-    var expectedCurrent by remember { mutableStateOf("") }
-    var expectedMaximum by remember { mutableStateOf("") }
-    var sampleCount by remember(captureGame, observation.captureId) { mutableStateOf(campaign.count) }
-    var calibrationMessage by remember { mutableStateOf("") }
+    // Manual ground truth belongs to exactly one capture campaign. A stopped/revoked
+    // capture must not leave editable values or a misleading "saved" message in a
+    // new session, even if the Compose panel itself survives.
+    var expectedCurrent by remember(campaignId) { mutableStateOf("") }
+    var expectedMaximum by remember(campaignId) { mutableStateOf("") }
+    var sampleCount by remember(campaignId) { mutableStateOf(campaign.count) }
+    var calibrationMessage by remember(campaignId) { mutableStateOf("") }
     val nextStep = observerNextStep(
         installed = installed != null,
         supported = supported,
@@ -328,8 +331,8 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_calibration_since_ocr", timing.afterOcrMs / 1000))
                 }
                 Text(strings.text("game_calibration_timing_note"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-current"))
+                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-maximum"))
                 SecondaryButton(strings.text("game_calibration_save"), {
                     var writeFailed = false
                     // Recheck the live session and installed APK at the actual Save boundary.

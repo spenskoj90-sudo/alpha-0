@@ -171,6 +171,52 @@ class B2S3TransportTests(unittest.TestCase):
             self.reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output)
         self.assertFalse(self.reader_client.calls)
 
+    def test_concurrent_destination_creation_does_not_delete_other_file(self):
+        # A different actor creates the destination after the initial
+        # exists() check, before our exclusive "xb" open.
+        self.writer_client.state["bytes"] = PAYLOAD
+        output_path = self.output
+
+        class RacingS3(FakeS3):
+            def get_object(self, **kwargs):
+                output_path.write_bytes(b"UNRELATED_FILE_MUST_SURVIVE")
+                return super().get_object(**kwargs)
+
+        client = RacingS3(self.writer_client.state)
+        reader = B2S3Transport(client, role="reader", endpoint=ENDPOINT,
+                                region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
+        with self.assertRaises(TransferRejected):
+            reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
+                   output_path=self.output)
+        self.assertEqual(self.output.read_bytes(), b"UNRELATED_FILE_MUST_SURVIVE")
+
+    def test_replaced_destination_during_failed_stream_is_preserved(self):
+        # If the path is replaced while our own open file is still streaming,
+        # never unlink the replacement on a later read failure.
+        self.writer_client.state["bytes"] = PAYLOAD
+        output_path = self.output
+
+        class ReplacingStream(io.BytesIO):
+            def read(self, n=-1):
+                if self.tell() == len(PAYLOAD):
+                    output_path.unlink()
+                    output_path.write_bytes(b"REPLACEMENT_FILE_MUST_SURVIVE")
+                    raise OSError("synthetic late transport failure")
+                return super().read(n)
+
+        class ReplacingS3(FakeS3):
+            def get_object(self, **kwargs):
+                self._call("get_object", **kwargs)
+                return {"VersionId": VERSION, "Body": ReplacingStream(PAYLOAD)}
+
+        client = ReplacingS3(self.writer_client.state)
+        reader = B2S3Transport(client, role="reader", endpoint=ENDPOINT,
+                                region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
+        with self.assertRaises(TransferRejected):
+            reader("get-object", bucket=BUCKET, key=KEY, version_id=VERSION,
+                   output_path=self.output)
+        self.assertEqual(self.output.read_bytes(), b"REPLACEMENT_FILE_MUST_SURVIVE")
+
     def test_download_byte_cap_does_not_leave_partial_file(self):
         self.writer_client.state["bytes"] = b"Z" * 10001
         with self.assertRaises(TransferRejected):

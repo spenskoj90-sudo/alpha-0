@@ -7,6 +7,7 @@ synthetic clients only; they are NOT proof of provider authorization or backup.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -99,8 +100,13 @@ class B2S3Transport:
                 self._close(body)
                 raise TransferRejected("unverified B2 version stream")
             total = 0
+            created_identity = None
             try:
+                # "xb" is atomic exclusive creation. Never remove a file
+                # created by another actor after the initial path precheck.
                 with destination.open("xb") as output:
+                    created = os.fstat(output.fileno())
+                    created_identity = (created.st_dev, created.st_ino)
                     while True:
                         chunk = body.read(CHUNK_BYTES)
                         if not chunk:
@@ -112,7 +118,15 @@ class B2S3Transport:
                             raise TransferRejected("download exceeded explicit byte cap")
                         output.write(chunk)
             except Exception:
-                destination.unlink(missing_ok=True)
+                # A failed "xb" or a replaced path is NOT ours to unlink.
+                # Preserve the original failure even if cleanup is denied.
+                if created_identity is not None:
+                    try:
+                        current = destination.lstat()
+                        if (current.st_dev, current.st_ino) == created_identity:
+                            destination.unlink()
+                    except OSError:
+                        pass
                 raise TransferRejected("B2 ciphertext download incomplete or over cap") from None
             finally:
                 self._close(body)

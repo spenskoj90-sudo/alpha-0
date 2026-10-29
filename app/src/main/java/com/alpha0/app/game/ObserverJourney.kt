@@ -36,3 +36,21 @@ internal fun observerNextStep(
     !consent -> ObserverNextStep.CONSENT
     else -> ObserverNextStep.CHOOSE_SOURCE
 }
+
+
+/** UI-only classification of OCR evidence, never game-health truth or action authority.
+ * Historical OCR can remain in diagnostics after the app becomes hidden; it must
+ * not be relabelled as live when recognition misses or the clock moves backwards.
+ */
+internal enum class HudEvidenceState { UNKNOWN, RECENT_UNVERIFIED, HISTORICAL }
+
+internal fun hudEvidenceState(snapshot: ObservationSnapshot, now: Long): HudEvidenceState {
+    if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED) ||
+        snapshot.captureId.isNullOrBlank() || now < 0) return HudEvidenceState.UNKNOWN
+    val last = snapshot.lastHealth ?: return HudEvidenceState.UNKNOWN
+    if (last.observedAt < 0 || now < last.observedAt) return HudEvidenceState.UNKNOWN
+    val fresh = snapshot.status == ObservationStatus.OBSERVING &&
+        snapshot.health == last.candidate && snapshot.lastRecognizedFrameAt == last.observedAt &&
+        snapshot.lastFrameAt == last.observedAt && now - last.observedAt <= 5000L
+    return if (fresh) HudEvidenceState.RECENT_UNVERIFIED else HudEvidenceState.HISTORICAL
+}

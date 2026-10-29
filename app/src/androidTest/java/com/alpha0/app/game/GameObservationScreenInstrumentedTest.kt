@@ -3,11 +3,13 @@ package com.alpha0.app.game
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.SentinelTheme
@@ -98,6 +100,39 @@ class GameObservationScreenInstrumentedTest {
             )
         }
         compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+    }
+
+    @Test fun numericCalibrationFormClearsOnStopAndFreshCapture() {
+        val active = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.PAUSED, captureId = "capture-a"),
+            StockGameInstall("fixture", 1),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), active.value, true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-calibration-current")
+            .performScrollTo().performTextInput("15")
+        compose.onNodeWithTag("game-calibration-maximum")
+            .performScrollTo().performTextInput("20")
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("15")
+        compose.runOnIdle {
+            active.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED), StockGameInstall("fixture", 1),
+            )
+        }
+        // The previous capture's typed private comparison must not survive Stop.
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
+        compose.onNodeWithTag("game-calibration-maximum").assertTextContains("", substring = false)
+        compose.runOnIdle {
+            active.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-b"),
+                StockGameInstall("fixture", 1),
+            )
+        }
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
     }
 
     @Test fun journeyExplainsNextStepAndKeepsInputOff() {

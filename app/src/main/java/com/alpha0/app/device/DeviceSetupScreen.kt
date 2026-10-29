@@ -35,6 +35,7 @@ import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
 import com.alpha0.app.ui.SentinelCard
 import com.alpha0.app.ui.SentinelColors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +58,8 @@ fun DeviceSetupScreen(
         // Creating an EC keypair can block the main thread for a noticeable interval.
         try {
             identity = keystoreIo { deviceIdentity.getIdentityInfo() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
             error = "IDENTITY_UNAVAILABLE"
         }
@@ -89,7 +92,11 @@ fun DeviceSetupScreen(
             SentinelCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(strings.text("step_identity"), style = MaterialTheme.typography.labelLarge)
-                    Text(strings.text(if (identity == null) "loading" else "identity_ready"),
+                    Text(strings.text(when {
+                        identity != null -> "identity_ready"
+                        error == "IDENTITY_UNAVAILABLE" -> "status_unavailable"
+                        else -> "loading"
+                    }),
                         style = MaterialTheme.typography.titleMedium)
                     identity?.let { loaded ->
                         DataText(loaded.fingerprint)
@@ -152,57 +159,57 @@ fun DeviceSetupScreen(
                         error = null
                         scope.launch {
                             val existingBinding = pendingBind
-                        val bound = if (existingBinding == null) {
-                            when (val bind = withContext(Dispatchers.IO) {
-                                api.bind(
-                                    accessToken = accessToken,
-                                    platform = "android",
-                                    publicKeyDerB64 = deviceIdentity.getPublicKeyDerBase64(),
-                                    fingerprintSha256 = selectedIdentity.fingerprint
-                                )
-                            }) {
-                                is DeviceApi.Result.Success -> {
-                                    pendingBind = bind.value
-                                    bind.value
+                            val bound = if (existingBinding == null) {
+                                when (val bind = withContext(Dispatchers.IO) {
+                                    api.bind(
+                                        accessToken = accessToken,
+                                        platform = "android",
+                                        publicKeyDerB64 = deviceIdentity.getPublicKeyDerBase64(),
+                                        fingerprintSha256 = selectedIdentity.fingerprint
+                                    )
+                                }) {
+                                    is DeviceApi.Result.Success -> {
+                                        pendingBind = bind.value
+                                        bind.value
+                                    }
+                                    is DeviceApi.Result.Failure -> {
+                                        busy = false
+                                        error = bind.message
+                                        return@launch
+                                    }
                                 }
-                                is DeviceApi.Result.Failure -> {
-                                    busy = false
-                                    error = bind.message
-                                    return@launch
+                            } else {
+                                when (val renewed = withContext(Dispatchers.IO) {
+                                    api.challenge(accessToken, existingBinding.deviceId)
+                                }) {
+                                    is DeviceApi.ChallengeResult.Success -> {
+                                        existingBinding.copy(challenge = renewed.challenge).also { pendingBind = it }
+                                    }
+                                    is DeviceApi.ChallengeResult.Failure -> {
+                                        busy = false
+                                        error = "CHALLENGE_RENEWAL_${renewed.message}"
+                                        return@launch
+                                    }
                                 }
                             }
-                        } else {
-                            when (val renewed = withContext(Dispatchers.IO) {
-                                api.challenge(accessToken, existingBinding.deviceId)
-                            }) {
-                                is DeviceApi.ChallengeResult.Success -> {
-                                    existingBinding.copy(challenge = renewed.challenge).also { pendingBind = it }
-                                }
-                                is DeviceApi.ChallengeResult.Failure -> {
-                                    busy = false
-                                    error = "CHALLENGE_RENEWAL_${renewed.message}"
-                                    return@launch
-                                }
-                            }
-                        }
 
-                        when (val proof = withContext(Dispatchers.IO) {
-                            api.prove(bound.deviceId, bound.challenge, deviceIdentity)
-                        }) {
-                            is DeviceApi.ProofResult.Success -> {
-                                pendingBind = null
-                                busy = false
-                                onBound(proof.value)
+                            when (val proof = withContext(Dispatchers.IO) {
+                                api.prove(bound.deviceId, bound.challenge, deviceIdentity)
+                            }) {
+                                is DeviceApi.ProofResult.Success -> {
+                                    pendingBind = null
+                                    busy = false
+                                    onBound(proof.value)
+                                }
+                                is DeviceApi.ProofResult.Failure -> {
+                                    // Keep the bound device. The next retry obtains a fresh one-time
+                                    // challenge before signing, so a transient failure cannot create
+                                    // an unnecessary second device registration.
+                                    pendingBind = bound
+                                    busy = false
+                                    error = proof.message
+                                }
                             }
-                            is DeviceApi.ProofResult.Failure -> {
-                                // Keep the bound device. The next retry obtains a fresh one-time
-                                // challenge before signing, so a transient failure cannot create
-                                // an unnecessary second device registration.
-                                pendingBind = bound
-                                busy = false
-                                error = proof.message
-                            }
-                        }
                         }
                     }
                 },

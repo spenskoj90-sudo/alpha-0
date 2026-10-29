@@ -135,6 +135,33 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
     }
 
+    @Test fun recentOcrHypothesisDegradesToHistoryThenDisappearsOnStop() {
+        val health = HealthCandidate(8, 20, 0)
+        val snapshot = ObservationSnapshot(
+            status = ObservationStatus.OBSERVING, captureId = "capture-a",
+            frames = 1, lastFrameAt = 110L, health = health,
+            lastHealth = HealthObservation(health, 110L),
+            lastRecognizedFrameAt = 110L,
+        )
+        val state = mutableStateOf(GameObservationViewState(snapshot, StockGameInstall("fixture", 1)))
+        val now = mutableStateOf(111L)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), state.value, true, false, false, now.value,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Recent OCR hypothesis · NOT verified game state")
+            .performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { now.value = 5111L }
+        compose.onNodeWithText("Historical OCR only · NOT current health")
+            .performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {
+            state.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.STOPPED))
+        }
+        compose.onNodeWithText("Historical OCR only · NOT current health").assertDoesNotExist()
+    }
+
     @Test fun journeyExplainsNextStepAndKeepsInputOff() {
         val observation = mutableStateOf(GameObservationViewState())
         compose.setContent {

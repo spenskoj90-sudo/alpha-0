@@ -60,6 +60,28 @@ class GameObservationScreenInstrumentedTest {
         compose.runOnIdle { assertTrue(stopped) }
     }
 
+    @Test fun stopRemainsVisibleWithoutScrollingWhenCalibrationIsBelowFold() {
+        val state = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.OBSERVING, frames = 8),
+        ))
+        var stops = 0
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), state.value, true, false, false, 100,
+                    {}, {}, { stops++ }, {})
+            }
+        }
+        // A screen-filling diagnostic/calibration column must not push Stop off screen.
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertTrue(stops == 1) }
+        compose.runOnIdle {
+            state.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED),
+            )
+        }
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+    }
+
     @Test fun journeyExplainsNextStepAndKeepsInputOff() {
         val observation = mutableStateOf(GameObservationViewState())
         compose.setContent {

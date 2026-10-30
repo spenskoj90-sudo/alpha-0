@@ -278,21 +278,17 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_capture_ocr_metrics_note"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                // Exactly one message per failure, announced without repeating on every OCR tick.
-                when (observation.reason) {
-                    "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"),
-                        modifier = Modifier.politeStatusSemantics())
-                    "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE",
-                    "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
-                        Text(strings.text("game_capture_failed"),
-                            modifier = Modifier.assertiveStatusSemantics().testTag("game-observer-error"),
-                            color = MaterialTheme.colorScheme.error)
-                    "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"),
-                        modifier = Modifier.politeStatusSemantics())
-                    else -> if (observation.status == ObservationStatus.FAILED)
-                        Text(strings.text("game_capture_failed"),
-                            modifier = Modifier.assertiveStatusSemantics().testTag("game-observer-error"),
-                            color = MaterialTheme.colorScheme.error)
+                // The session has already stopped. Explain *why* it stopped, with
+                // exactly one accessible notice; never suggest a blind resume.
+                observerStopNotice(observation)?.let { notice ->
+                    Text(
+                        strings.text(notice.stringKey),
+                        modifier = (if (notice.urgent) Modifier.assertiveStatusSemantics()
+                            else Modifier.politeStatusSemantics())
+                            .testTag(if (notice.urgent) "game-observer-error" else "game-observer-notice"),
+                        color = if (notice.urgent) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 if (!active) {
                     Text(strings.text("game_capture_disclosure"))

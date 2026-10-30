@@ -124,6 +124,8 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-calibration-maximum")
             .performScrollTo().performTextInput("20")
         compose.onNodeWithTag("game-calibration-current").assertTextContains("15")
+        // Even while the numeric field owns IME focus, the user's Stop remains reachable.
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed()
         compose.runOnIdle {
             active.value = GameObservationViewState(
                 ObservationSnapshot(status = ObservationStatus.STOPPED), StockGameInstall("fixture", 1),

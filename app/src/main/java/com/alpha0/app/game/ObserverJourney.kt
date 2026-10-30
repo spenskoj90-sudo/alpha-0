@@ -49,8 +49,14 @@ internal fun hudEvidenceState(snapshot: ObservationSnapshot, now: Long): HudEvid
         snapshot.captureId.isNullOrBlank() || now < 0) return HudEvidenceState.UNKNOWN
     val last = snapshot.lastHealth ?: return HudEvidenceState.UNKNOWN
     if (last.observedAt < 0 || now < last.observedAt) return HudEvidenceState.UNKNOWN
+    // Recent evidence requires one fully completed callback for the current frame,
+    // including coherent capture/completion clocks. Displayed values alone do not
+    // prove a callback happened (nor do these checks attest the selected game).
+    val timing = CalibrationSamplingGate.timing(snapshot, now)
     val fresh = snapshot.status == ObservationStatus.OBSERVING &&
         snapshot.health == last.candidate && snapshot.lastRecognizedFrameAt == last.observedAt &&
-        snapshot.lastFrameAt == last.observedAt && now - last.observedAt <= 5000L
+        snapshot.lastFrameAt == last.observedAt &&
+        snapshot.lastCompletedFrameAt == last.observedAt &&
+        timing != null && timing.frameAgeMs <= 5000L
     return if (fresh) HudEvidenceState.RECENT_UNVERIFIED else HudEvidenceState.HISTORICAL
 }

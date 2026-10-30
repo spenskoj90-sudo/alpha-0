@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,6 +44,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.security.SecureSessionStore
+import com.alpha0.app.ui.DangerButton
+import com.alpha0.app.ui.assertiveStatusSemantics
+import com.alpha0.app.ui.politeStatusSemantics
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
@@ -175,10 +181,13 @@ internal fun GameObservationPanel(
     }
     val campaign = campaignRun.campaign
     val campaignId = campaignRun.campaignId
-    var expectedCurrent by remember { mutableStateOf("") }
-    var expectedMaximum by remember { mutableStateOf("") }
-    var sampleCount by remember(captureGame, observation.captureId) { mutableStateOf(campaign.count) }
-    var calibrationMessage by remember { mutableStateOf("") }
+    // Manual ground truth belongs to exactly one capture campaign. A stopped/revoked
+    // capture must not leave editable values or a misleading "saved" message in a
+    // new session, even if the Compose panel itself survives.
+    var expectedCurrent by remember(campaignId) { mutableStateOf("") }
+    var expectedMaximum by remember(campaignId) { mutableStateOf("") }
+    var sampleCount by remember(campaignId) { mutableStateOf(campaign.count) }
+    var calibrationMessage by remember(campaignId) { mutableStateOf("") }
     val nextStep = observerNextStep(
         installed = installed != null,
         supported = supported,
@@ -189,10 +198,25 @@ internal fun GameObservationPanel(
         sampleCount = sampleCount,
     )
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+    // Stop remains reachable independently of scrolling through calibration and diagnostics.
+    // The foreground notification/system capture controls remain additional Stop routes.
+    Scaffold(
+        bottomBar = {
+            if (active) {
+                DangerButton(
+                    strings.text("game_capture_stop"), onStop,
+                    // Keep emergency Stop above gesture/navigation bars and the numeric IME
+                    // while the user is comparing a captured HUD value.
+                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                        .padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
+                )
+            }
+        },
+    ) { contentPadding ->
+      Column(
+        Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+      ) {
         Text(strings.text("game_observer_title"), style = MaterialTheme.typography.headlineLarge)
         Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleLarge)
         Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -210,7 +234,10 @@ internal fun GameObservationPanel(
                     StatusBadge(strings.text("status_unavailable"), SentinelStatus.UNAVAILABLE)
                     Text(strings.text("game_install_missing"))
                 } else {
+                    Text(strings.text("game_install_package", ShatteredGameProfile.PACKAGE))
                     Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
+                    Text(strings.text(if (installed.signerSha256 == null) "game_install_signer_unknown" else "game_install_signer_observed"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(strings.text("game_capture_source_unverified"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SecondaryButton(strings.text("game_capture_launch"), onLaunch, Modifier.fillMaxWidth())
                 }
@@ -222,15 +249,21 @@ internal fun GameObservationPanel(
                     ObservationStatus.WAITING -> "game_capture_waiting"
                     ObservationStatus.OBSERVING -> "game_capture_active"
                     ObservationStatus.PAUSED -> "game_capture_paused"
+                    ObservationStatus.FAILED -> "status_failed"
                     else -> "status_stopped"
                 }
                 StatusBadge(strings.text(label), when (observation.status) {
                     ObservationStatus.OBSERVING -> SentinelStatus.ACTIVE
                     ObservationStatus.WAITING -> SentinelStatus.PENDING
                     ObservationStatus.PAUSED -> SentinelStatus.WARNING
+                    ObservationStatus.FAILED -> SentinelStatus.FAILED
                     else -> SentinelStatus.STOPPED
-                })
+                }, Modifier.politeStatusSemantics().testTag("game-observation-state"))
                 Text(strings.text("game_capture_summary", observation.frames))
+                if (active && hudEvidenceState(observation, now) == HudEvidenceState.UNKNOWN) {
+                    Text(strings.text("game_capture_evidence_unknown"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 observation.lastOcrLatencyMs?.let { latency ->
                     Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -245,15 +278,19 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_capture_ocr_metrics_note"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                when (observation.reason) {
-                    "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
-                    "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
-                        Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
-                    "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"))
+                // The session has already stopped. Explain *why* it stopped, with
+                // exactly one accessible notice; never suggest a blind resume.
+                observerStopNotice(observation)?.let { notice ->
+                    Text(
+                        strings.text(notice.stringKey),
+                        modifier = (if (notice.urgent) Modifier.assertiveStatusSemantics()
+                            else Modifier.politeStatusSemantics())
+                            .testTag(if (notice.urgent) "game-observer-error" else "game-observer-notice"),
+                        color = if (notice.urgent) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                if (active) {
-                    PrimaryButton(strings.text("game_capture_stop"), onStop, Modifier.fillMaxWidth().testTag("game-capture-stop"))
-                } else {
+                if (!active) {
                     Text(strings.text("game_capture_disclosure"))
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -289,10 +326,19 @@ internal fun GameObservationPanel(
                 }
             }
         }
-        observation.lastHealth?.let { last ->
+        val hudEvidence = hudEvidenceState(observation, now)
+        if (hudEvidence != HudEvidenceState.UNKNOWN) observation.lastHealth?.let { last ->
             SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DataText("INFERENCE")
+                    // Long safety labels must wrap at 200% font scaling, not ellipsize.
+                    Text(
+                        strings.text(if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED)
+                            "game_capture_evidence_recent" else "game_capture_evidence_historical"),
+                        modifier = Modifier.politeStatusSemantics().testTag("game-hud-evidence-status"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(strings.text("game_capture_health", last.candidate.current, last.candidate.maximum, last.candidate.shield))
                     Text(strings.text("game_capture_age", maxOf(0, (now - last.observedAt) / 1000)))
                     Text(strings.text("game_capture_hypothesis"), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -313,8 +359,8 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_calibration_since_ocr", timing.afterOcrMs / 1000))
                 }
                 Text(strings.text("game_calibration_timing_note"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-current"))
+                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-maximum"))
                 SecondaryButton(strings.text("game_calibration_save"), {
                     var writeFailed = false
                     // Recheck the live session and installed APK at the actual Save boundary.
@@ -356,5 +402,6 @@ internal fun GameObservationPanel(
             }
         }
         Text(strings.text("game_capture_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

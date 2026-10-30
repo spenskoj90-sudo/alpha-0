@@ -148,6 +148,8 @@ class GameObservationScreenInstrumentedTest {
             frames = 1, lastFrameAt = 110L, health = health,
             lastHealth = HealthObservation(health, 110L),
             lastRecognizedFrameAt = 110L,
+            lastCompletedFrameSequence = 1L, lastCompletedFrameAt = 110L,
+            lastCompletedOcrAt = 111L, lastOcrLatencyMs = 1L,
         )
         val state = mutableStateOf(GameObservationViewState(snapshot, StockGameInstall("fixture", 1)))
         val now = mutableStateOf(111L)

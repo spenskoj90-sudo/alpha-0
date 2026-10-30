@@ -192,6 +192,53 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
     }
 
+    @Test fun revokedCaptureShowsOneAssertiveReasonAndNoStopOrLiveEvidence() {
+        val snapshot = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "CAPTURE_REVOKED"),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), snapshot.value, true, false, false, 200,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onAllNodesWithTag("game-observer-error").assertCountEquals(1)
+        compose.onNodeWithTag("game-observer-error").performScrollTo()
+            .assertTextContains("Android ended screen sharing or its permission was revoked.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+        compose.onNodeWithTag("game-hud-evidence-status").assertDoesNotExist()
+        compose.runOnIdle {
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "USER_STOP"),
+            )
+        }
+        compose.onNodeWithTag("game-observer-error").assertDoesNotExist()
+    }
+
+    @Test fun expiredCaptureAndInvalidSessionShowDistinctRecoveryNotices() {
+        val snapshot = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "TIME_LIMIT"),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), snapshot.value, true, false, false, 200,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-observer-notice").performScrollTo()
+            .assertTextContains("The five-minute test ended.")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.runOnIdle {
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "SESSION_CHECK_TIMEOUT"),
+            )
+        }
+        compose.onNodeWithTag("game-observer-notice").assertDoesNotExist()
+        compose.onNodeWithTag("game-observer-error").performScrollTo()
+            .assertTextContains("account session or installed game could not be verified")
+    }
+
     @Test fun longHistoricalOcrWarningExposesFullAccessibleText() {
         val health = HealthCandidate(4, 20, 0)
         val paused = GameObservationViewState(ObservationSnapshot(

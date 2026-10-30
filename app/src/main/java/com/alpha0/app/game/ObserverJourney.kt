@@ -60,3 +60,27 @@ internal fun hudEvidenceState(snapshot: ObservationSnapshot, now: Long): HudEvid
         timing != null && timing.frameAgeMs <= 5000L
     return if (fresh) HudEvidenceState.RECENT_UNVERIFIED else HudEvidenceState.HISTORICAL
 }
+
+
+/** Display-only cause of a stopped diagnostic capture, never permission to retry.
+ * The service/session already failed closed; this only makes the reason visible.
+ * Unknown termination reasons must not be presented as an intentional user Stop.
+ */
+internal data class ObserverStopNotice(val stringKey: String, val urgent: Boolean)
+
+internal fun observerStopNotice(snapshot: ObservationSnapshot): ObserverStopNotice? {
+    if (snapshot.status != ObservationStatus.STOPPED && snapshot.status != ObservationStatus.FAILED)
+        return null
+    return when (snapshot.reason) {
+        "USER_STOP" -> if (snapshot.status == ObservationStatus.STOPPED) null
+            else ObserverStopNotice("game_capture_failed", true)
+        "CONSENT_CANCELLED" -> ObserverStopNotice("game_capture_cancelled", false)
+        "TIME_LIMIT" -> ObserverStopNotice("game_capture_time_limit", false)
+        "CAPTURE_REVOKED" -> ObserverStopNotice("game_capture_revoked", true)
+        "SCREEN_LOCKED", "TASK_REMOVED" -> ObserverStopNotice("game_capture_background_stop", true)
+        "SESSION_CLOSED", "SESSION_CHECK_FAILED", "SESSION_CHECK_TIMEOUT",
+        "SESSION_OR_GAME_UNAVAILABLE", "GAME_CHANGED" ->
+            ObserverStopNotice("game_capture_session_stop", true)
+        else -> ObserverStopNotice("game_capture_failed", true)
+    }
+}

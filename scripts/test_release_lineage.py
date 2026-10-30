@@ -321,7 +321,20 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertIn("release_lineage.py verify-binding", presecret_block)
         self.assertIn("GITHUB_TOKEN: ${{ github.token }}", presecret_block)
         signing_block = rc.split("  release-candidate:", 1)[1]
+        secret_job = signing_block.split("  attest-release-candidate:", 1)[0]
+        signing_header = secret_job.split("    steps:", 1)[0]
+        self.assertIn("    environment: sentinel-release-signing\n", signing_header)
+        self.assertIn("    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n", signing_header)
+        self.assertEqual(rc.count("    environment: sentinel-release-signing\n"), 1)
         self.assertIn("ANDROID_KEYSTORE_BASE64", signing_block)
+        for key_name in (
+            "ANDROID_KEYSTORE_BASE64", "ANDROID_KEYSTORE_PASSWORD",
+            "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
+        ):
+            self.assertIn("secrets." + key_name, secret_job)
+            self.assertNotIn("secrets." + key_name, presecret_block)
+            self.assertNotIn("secrets." + key_name,
+                             rc.split("  attest-release-candidate:", 1)[1])
         self.assertIn("release_lineage.py create-candidate", signing_block)
         self.assertGreaterEqual(rc.count("write_release_presecret_binding.sh"), 2)
 

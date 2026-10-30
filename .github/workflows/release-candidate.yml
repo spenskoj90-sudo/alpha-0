@@ -163,6 +163,10 @@ jobs:
   release-candidate:
     name: Build and retain verified signed release APK
     needs: presecret
+    # Source gate is necessary but not sufficient: Owner must configure the
+    # actual protected environment and move secrets out of repository scope.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    environment: sentinel-release-signing
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:

@@ -1,0 +1,73 @@
+name: Offsite Backup Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/offsite-db-backup.yml"
+      - ".github/workflows/offsite-backup-contract.yml"
+      - "scripts/offsite_pg_backup.sh"
+      - "scripts/test_offsite_pg_backup_contract.py"
+      - "scripts/test_offsite_pg_backup_simulated.py"
+      - "scripts/b2_target_contract.py"
+      - "scripts/test_b2_target_contract.py"
+      - "scripts/b2_versioned_transfer.py"
+      - "scripts/b2_atomic_download.py"
+      - "scripts/test_b2_atomic_download.py"
+      - "scripts/pg18_role_graph_contract.py"
+      - "scripts/test_pg18_role_graph_contract.py"
+      - "scripts/pg18_export_readiness.py"
+      - "scripts/test_pg18_export_readiness.py"
+      - "scripts/pg18_restore_inventory.py"
+      - "scripts/test_pg18_restore_inventory.py"
+      - "scripts/b2_s3_transport.py"
+      - "scripts/test_b2_s3_transport.py"
+      - "scripts/test_b2_versioned_transfer.py"
+      - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/offsite-db-backup.yml"
+      - ".github/workflows/offsite-backup-contract.yml"
+      - "scripts/offsite_pg_backup.sh"
+      - "scripts/test_offsite_pg_backup_contract.py"
+      - "scripts/test_offsite_pg_backup_simulated.py"
+      - "scripts/b2_target_contract.py"
+      - "scripts/test_b2_target_contract.py"
+      - "scripts/b2_versioned_transfer.py"
+      - "scripts/b2_atomic_download.py"
+      - "scripts/test_b2_atomic_download.py"
+      - "scripts/pg18_role_graph_contract.py"
+      - "scripts/test_pg18_role_graph_contract.py"
+      - "scripts/pg18_export_readiness.py"
+      - "scripts/test_pg18_export_readiness.py"
+      - "scripts/pg18_restore_inventory.py"
+      - "scripts/test_pg18_restore_inventory.py"
+      - "scripts/b2_s3_transport.py"
+      - "scripts/test_b2_s3_transport.py"
+      - "scripts/test_b2_versioned_transfer.py"
+      - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate offline backup contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Execute tests without credentials or cloud access
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_offsite_pg_backup_*.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_target_contract.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_s3_transport.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_atomic_download.py' -v
+          python3 -m unittest discover -s scripts -p 'test_pg18_role_graph_contract.py' -v
+          python3 -m unittest discover -s scripts -p 'test_pg18_export_readiness.py' -v
+          python3 -m unittest discover -s scripts -p 'test_pg18_restore_inventory.py' -v

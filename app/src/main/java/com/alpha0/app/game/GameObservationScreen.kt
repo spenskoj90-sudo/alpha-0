@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -203,7 +205,10 @@ internal fun GameObservationPanel(
             if (active) {
                 DangerButton(
                     strings.text("game_capture_stop"), onStop,
-                    Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
+                    // Keep emergency Stop above gesture/navigation bars and the numeric IME
+                    // while the user is comparing a captured HUD value.
+                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                        .padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
                 )
             }
         },

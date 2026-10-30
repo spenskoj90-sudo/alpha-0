@@ -92,6 +92,36 @@ class ObserverJourneyTest {
         assertEquals(HudEvidenceState.UNKNOWN, hudEvidenceState(snapshot, -1L))
     }
 
+    @Test fun `capture termination reasons map to visible safe recovery notices`() {
+        val stopped = ObservationSnapshot(status = ObservationStatus.STOPPED)
+        assertEquals(null, observerStopNotice(stopped))
+        assertEquals(null, observerStopNotice(stopped.copy(status = ObservationStatus.OBSERVING,
+            reason = "CAPTURE_REVOKED")))
+        val cancelled = observerStopNotice(stopped.copy(reason = "CONSENT_CANCELLED"))
+        assertEquals("game_capture_cancelled", cancelled?.stringKey)
+        assertEquals(false, cancelled?.urgent)
+        assertEquals("game_capture_time_limit",
+            observerStopNotice(stopped.copy(reason = "TIME_LIMIT"))?.stringKey)
+        assertEquals("game_capture_revoked",
+            observerStopNotice(stopped.copy(reason = "CAPTURE_REVOKED"))?.stringKey)
+        listOf("SCREEN_LOCKED", "TASK_REMOVED").forEach { reason ->
+            assertEquals("game_capture_background_stop",
+                observerStopNotice(stopped.copy(reason = reason))?.stringKey)
+        }
+        listOf("SESSION_CLOSED", "SESSION_CHECK_FAILED", "SESSION_CHECK_TIMEOUT",
+            "SESSION_OR_GAME_UNAVAILABLE", "GAME_CHANGED").forEach { reason ->
+            assertEquals(ObserverStopNotice("game_capture_session_stop", true),
+                observerStopNotice(stopped.copy(reason = reason)))
+        }
+        listOf("CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE",
+            "CLOCK_INVALID", "CAPTURE_UNKNOWN", "SERVICE_DESTROYED").forEach { reason ->
+            assertEquals(ObserverStopNotice("game_capture_failed", true),
+                observerStopNotice(stopped.copy(reason = reason)))
+        }
+        assertEquals(ObserverStopNotice("game_capture_failed", true),
+            observerStopNotice(stopped.copy(status = ObservationStatus.FAILED)))
+    }
+
     @Test fun `failed observation never advertises sample or action`() {
         assertEquals(ObserverNextStep.CONSENT, step(status = ObservationStatus.FAILED, hasFrame = true))
         assertEquals(ObserverNextStep.CONSENT, step(status = ObservationStatus.STOPPED, hasFrame = true))

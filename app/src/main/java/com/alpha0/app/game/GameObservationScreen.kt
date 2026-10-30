@@ -43,6 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.security.SecureSessionStore
 import com.alpha0.app.ui.DangerButton
+import com.alpha0.app.ui.assertiveStatusSemantics
+import com.alpha0.app.ui.politeStatusSemantics
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
@@ -251,7 +253,7 @@ internal fun GameObservationPanel(
                     ObservationStatus.PAUSED -> SentinelStatus.WARNING
                     ObservationStatus.FAILED -> SentinelStatus.FAILED
                     else -> SentinelStatus.STOPPED
-                })
+                }, Modifier.politeStatusSemantics().testTag("game-observation-state"))
                 Text(strings.text("game_capture_summary", observation.frames))
                 if (active && hudEvidenceState(observation, now) == HudEvidenceState.UNKNOWN) {
                     Text(strings.text("game_capture_evidence_unknown"),
@@ -271,14 +273,21 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_capture_ocr_metrics_note"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (observation.status == ObservationStatus.FAILED) {
-                    Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
-                }
+                // Exactly one message per failure, announced without repeating on every OCR tick.
                 when (observation.reason) {
-                    "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
-                    "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
-                        Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
-                    "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"))
+                    "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"),
+                        modifier = Modifier.politeStatusSemantics())
+                    "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE",
+                    "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
+                        Text(strings.text("game_capture_failed"),
+                            modifier = Modifier.assertiveStatusSemantics().testTag("game-observer-error"),
+                            color = MaterialTheme.colorScheme.error)
+                    "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"),
+                        modifier = Modifier.politeStatusSemantics())
+                    else -> if (observation.status == ObservationStatus.FAILED)
+                        Text(strings.text("game_capture_failed"),
+                            modifier = Modifier.assertiveStatusSemantics().testTag("game-observer-error"),
+                            color = MaterialTheme.colorScheme.error)
                 }
                 if (!active) {
                     Text(strings.text("game_capture_disclosure"))
@@ -321,10 +330,13 @@ internal fun GameObservationPanel(
             SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DataText("INFERENCE")
-                    StatusBadge(
+                    // Long safety labels must wrap at 200% font scaling, not ellipsize.
+                    Text(
                         strings.text(if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED)
                             "game_capture_evidence_recent" else "game_capture_evidence_historical"),
-                        if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED) SentinelStatus.WARNING else SentinelStatus.UNAVAILABLE,
+                        modifier = Modifier.politeStatusSemantics().testTag("game-hud-evidence-status"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(strings.text("game_capture_health", last.candidate.current, last.candidate.maximum, last.candidate.shield))
                     Text(strings.text("game_capture_age", maxOf(0, (now - last.observedAt) / 1000)))

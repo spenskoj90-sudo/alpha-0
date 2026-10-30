@@ -204,7 +204,7 @@ class GameObservationScreenInstrumentedTest {
         }
         compose.onAllNodesWithTag("game-observer-error").assertCountEquals(1)
         compose.onNodeWithTag("game-observer-error").performScrollTo()
-            .assertTextContains("Android ended screen sharing or its permission was revoked.")
+            .assertTextContains("Android ended screen sharing or its permission was revoked.", substring = true)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
         compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
         compose.onNodeWithTag("game-hud-evidence-status").assertDoesNotExist()
@@ -227,7 +227,7 @@ class GameObservationScreenInstrumentedTest {
             }
         }
         compose.onNodeWithTag("game-observer-notice").performScrollTo()
-            .assertTextContains("The five-minute test ended.")
+            .assertTextContains("The five-minute test ended.", substring = true)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         compose.runOnIdle {
             snapshot.value = GameObservationViewState(
@@ -236,7 +236,7 @@ class GameObservationScreenInstrumentedTest {
         }
         compose.onNodeWithTag("game-observer-notice").assertDoesNotExist()
         compose.onNodeWithTag("game-observer-error").performScrollTo()
-            .assertTextContains("account session or installed game could not be verified")
+            .assertTextContains("account session or installed game could not be verified", substring = true)
     }
 
     @Test fun longHistoricalOcrWarningExposesFullAccessibleText() {

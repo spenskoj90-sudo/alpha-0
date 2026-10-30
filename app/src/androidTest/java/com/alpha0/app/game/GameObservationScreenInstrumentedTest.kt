@@ -1,6 +1,12 @@
 package com.alpha0.app.game
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
@@ -160,6 +166,44 @@ class GameObservationScreenInstrumentedTest {
             state.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.STOPPED))
         }
         compose.onNodeWithText("Historical OCR only · NOT current health").assertDoesNotExist()
+    }
+
+    @Test fun captureFailureAnnouncesExactlyOneErrorAndAccessibleState() {
+        val failed = GameObservationViewState(ObservationSnapshot(
+            status = ObservationStatus.FAILED, reason = "CAPTURE_RESIZE_FAILED",
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), failed, true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-observation-state").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+        )
+        compose.onAllNodesWithTag("game-observer-error").assertCountEquals(1)
+        compose.onNodeWithTag("game-observer-error").performScrollTo().assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive)
+        )
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+    }
+
+    @Test fun longHistoricalOcrWarningExposesFullAccessibleText() {
+        val health = HealthCandidate(4, 20, 0)
+        val paused = GameObservationViewState(ObservationSnapshot(
+            status = ObservationStatus.PAUSED, captureId = "capture-a",
+            frames = 1, lastHealth = HealthObservation(health, 110L),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), paused, true, false, false, 5111,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-hud-evidence-status").performScrollTo()
+            .assertTextContains("Historical OCR only · NOT current health")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed()
     }
 
     @Test fun journeyExplainsNextStepAndKeepsInputOff() {

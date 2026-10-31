@@ -56,6 +56,9 @@ internal object SignedUpdateFeed {
         if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.rawUserInfo != null ||
             uri.rawQuery != null || uri.rawFragment != null || (uri.port != -1 && uri.port != 443) ||
             uri.rawPath.isNullOrBlank() || !uri.rawPath.startsWith("/") || uri.normalize() != uri ||
+            uri.rawPath != uri.path ||
+            uri.path.split('/').any { it == "." || it == ".." } ||
+            uri.path.contains('\\') ||
             uri.isOpaque || uri.host.endsWith(".") || uri.host.contains("%")
         ) return null
         return uri

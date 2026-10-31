@@ -147,13 +147,10 @@ fun UpdateScreen() {
                 SentinelCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(strings.text("update_feed_intro"), style = MaterialTheme.typography.titleMedium)
-                        if (BuildConfig.SENTINEL_UPDATE_FEED_URL.isBlank() ||
-                            BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY.isBlank()
-                        ) {
-                            Text(strings.text("update_feed_unconfigured"),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            PrimaryButton(
+                        val feedConfigured =
+                            BuildConfig.SENTINEL_UPDATE_FEED_URL.isNotBlank() &&
+                                BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY.isNotBlank()
+                        PrimaryButton(
                                 text = strings.text("check_updates"),
                                 onClick = {
                                     if (!feedChecking && !feedDownloading) {
@@ -172,9 +169,13 @@ fun UpdateScreen() {
                                         }
                                     }
                                 },
-                                enabled = !feedChecking && !feedDownloading && !localInstalling && !localChecking,
+                                enabled = feedConfigured && !feedChecking && !feedDownloading &&
+                                    !localInstalling && !localChecking,
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                        if (!feedConfigured) {
+                            Text(strings.text("update_feed_unconfigured"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (feedChecking) {
                             CircularProgressIndicator()
@@ -203,7 +204,8 @@ fun UpdateScreen() {
                                             }
                                         }
                                     },
-                                    enabled = !feedChecking && !feedDownloading && !localChecking && !localInstalling,
+                                    enabled = !feedChecking && !feedDownloading && !localChecking &&
+                                        !localInstalling && localResult !is LocalApkUpdate.Result.Ready,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }

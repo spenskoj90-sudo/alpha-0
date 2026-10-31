@@ -63,8 +63,9 @@ class SignedUpdateFeedTest {
     ) = SignedUpdateFeed.verify(document, key, source, app, installedVersion, installedSigner)
 
     @Test fun validSameCertificateNewerVersionHasVerifiedRussianReleaseNotes() {
-        val ready = assertNotNull(verify())
-        assertEquals(pkg, ready.packageName)
+        val ready = verify()
+        assertNotNull(ready)
+        assertEquals(pkg, ready!!.packageName)
         assertEquals(100000895L, ready.versionCode)
         assertEquals(notes, ready.whatsNew)
         assertEquals(sha256, ready.apkSha256)

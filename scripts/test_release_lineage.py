@@ -326,10 +326,11 @@ class ReleaseLineageTests(unittest.TestCase):
         self.assertIn("    environment: sentinel-release-signing\n", signing_header)
         self.assertIn("    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'\n", signing_header)
         self.assertEqual(rc.count("    environment: sentinel-release-signing\n"), 1)
+        self.assertNotIn("secrets.ANDROID_", rc)
         self.assertIn("ANDROID_KEYSTORE_BASE64", signing_block)
         for key_name in (
-            "ANDROID_KEYSTORE_BASE64", "ANDROID_KEYSTORE_PASSWORD",
-            "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
+            "SENTINEL_RELEASE_KEYSTORE_BASE64", "SENTINEL_RELEASE_KEYSTORE_PASSWORD",
+            "SENTINEL_RELEASE_KEY_ALIAS", "SENTINEL_RELEASE_KEY_PASSWORD",
         ):
             self.assertIn("secrets." + key_name, secret_job)
             self.assertNotIn("secrets." + key_name, presecret_block)

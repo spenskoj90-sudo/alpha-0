@@ -6,8 +6,10 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/legacy_signer_check.py"
@@ -47,7 +49,7 @@ class LegacySignerCheckTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_check(self, kind="PKCS12", *, overrides=None, expected=None):
+    def run_check(self, kind="PKCS12", *, overrides=None, expected=None, memory="safe"):
         blob, pin = self.fixtures[kind]
         env = {"PATH": os.environ["PATH"], "LANG": "C.UTF-8",
                "GITHUB_REPOSITORY": "spenskoj90-sudo/alpha-0",
@@ -60,7 +62,8 @@ class LegacySignerCheckTests(unittest.TestCase):
         env.update(overrides or {})
         before = set(Path("/dev/shm").glob("sentinel-key-check-*"))
         result = subprocess.run([
-            "python", str(SCRIPT), "--source-sha", SHA,
+            "python", str(Path(__file__).resolve()), "--synthetic-worker", memory,
+            "--source-sha", SHA,
             "--expected-certificate-sha256", expected or pin,
         ], env=env, capture_output=True, text=True, timeout=60)
         self.assertEqual(before, set(Path("/dev/shm").glob("sentinel-key-check-*")), "temporary key material leaked")
@@ -70,7 +73,7 @@ class LegacySignerCheckTests(unittest.TestCase):
 
     def test_pkcs12_proves_key_use_without_exporting_key_or_signing_apk(self):
         result = self.run_check()
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         evidence = json.loads(result.stdout)
         self.assertEqual(evidence["status"], "PASS")
         self.assertEqual(evidence["certificateSha256"], self.fixtures["PKCS12"][1])
@@ -114,6 +117,53 @@ class LegacySignerCheckTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(json.loads(result.stdout)["stage"], "input")
 
+    def test_active_swap_is_refused_before_any_temporary_key_file(self):
+        result = self.run_check(memory="active-swap")
+        self.assertEqual(result.returncode, 1)
+        evidence = json.loads(result.stdout)
+        self.assertEqual(evidence["stage"], "memory-preflight")
+        self.assertEqual(evidence.get("memoryPolicyReason"), "active-swap")
+        self.assertNotIn("keystoreSha256", evidence)
+
+    def test_non_tmpfs_storage_is_refused_before_any_temporary_key_file(self):
+        result = self.run_check(memory="disk")
+        self.assertEqual(result.returncode, 1)
+        evidence = json.loads(result.stdout)
+        self.assertEqual(evidence["stage"], "memory-preflight")
+        self.assertEqual(evidence.get("memoryPolicyReason"), "tmpfs-required")
+        self.assertNotIn("keystoreSha256", evidence)
+
+
+def synthetic_worker():
+    """Control only kernel metadata reads; run real checker/tools on synthetic keys.
+
+    This test helper is never called by the real-key workflow step. Production
+    has no environment variable or command-line switch to bypass memory policy.
+    """
+    import legacy_signer_check
+    sys.argv.pop(1)
+    mode = sys.argv.pop(1)
+    if mode not in {"safe", "active-swap", "disk"}:
+        raise ValueError("invalid synthetic environment")
+    original_read = Path.read_text
+
+    def kernel_fixture(path, *args, **kwargs):
+        if str(path) == "/proc/swaps":
+            return "Filename Type Size Used Priority\n" + ("/synthetic-swap file 1024 0 -2\n" if mode == "active-swap" else "")
+        if str(path) == "/proc/self/mountinfo":
+            fs_type = "ext4" if mode == "disk" else "tmpfs"
+            return "1 0 0:1 / " + str(Path("/dev/shm").resolve()) + " rw - " + fs_type + " synthetic rw\n"
+        return original_read(path, *args, **kwargs)
+
+    with patch.object(Path, "read_text", kernel_fixture):
+        return legacy_signer_check.main()
+
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--synthetic-worker"]:
+        raise SystemExit(synthetic_worker())
+    print("SYNTHETIC_TEST_HOST_MEMORY=" + json.dumps({
+        "activeSwap": len(Path("/proc/swaps").read_text().splitlines()) > 1,
+        "shmResolved": str(Path("/dev/shm").resolve()),
+    }), flush=True)
     unittest.main()

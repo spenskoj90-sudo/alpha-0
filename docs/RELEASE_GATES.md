@@ -55,7 +55,10 @@ the exact checker source; read back `sentinel-release-signing` main-only/reviewe
 bypass policy; obtain the specific owner authorization for checking the existing
 key; supply the frozen workflow `main` SHA and explicit acknowledgement. The
 workflow cannot run this check from a PR/feature branch and rejects stale SHA
-before any secret reference.
+before any secret reference. It disables swap on its disposable runner and checks
+tmpfs before the real-secret step; the checker independently enforces both again.
+Routine CI uses only synthetic keys with controlled kernel-metadata fixtures and
+explicit negative swap/disk tests, not real keys or a production-policy bypass.
 
 The checker supports existing JKS and PKCS12 without conversion. It requires
 tmpfs/no active swap/core dumps disabled, confines temporary material to RAM,

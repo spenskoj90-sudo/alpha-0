@@ -54,6 +54,12 @@ jobs:
           java-version: '21'
       - name: Test the checker with ephemeral synthetic keys only
         run: python scripts/test_legacy_signer_check.py
+      - name: Prepare ephemeral RAM before any real signing secret is referenced
+        run: |
+          set -euo pipefail
+          sudo swapoff --all
+          test "$(wc -l < /proc/swaps)" -eq 1
+          test "$(findmnt -n -o FSTYPE -T /dev/shm)" = tmpfs
       - name: Check existing key against the preserved production certificate
         env:
           LEGACY_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

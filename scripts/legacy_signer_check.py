@@ -31,10 +31,11 @@ def validate_context(source_sha, env):
 
 def require_memory_storage():
     mounts = Path("/proc/self/mountinfo").read_text().splitlines()
-    if not any(" /dev/shm " in line and " - tmpfs " in line for line in mounts):
-        raise CheckFailed()
+    shm = str(Path("/dev/shm").resolve(strict=True))
+    if not any(line.split()[4] == shm and line.split(" - ", 1)[1].split()[0] == "tmpfs" for line in mounts):
+        raise CheckFailed("tmpfs-required")
     if len(Path("/proc/swaps").read_text().splitlines()) != 1:
-        raise CheckFailed()
+        raise CheckFailed("active-swap")
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 
@@ -102,6 +103,10 @@ def check(source_sha, expected_pin):
             if request_key != cert_key or hashlib.sha256(key.read_bytes()).hexdigest() != evidence["keystoreSha256"]:
                 raise CheckFailed()
             evidence.update(status="PASS", stage="complete", privateKeyProof="PASS")
+    except CheckFailed as error:
+        # Only these fixed, non-secret environment diagnoses may be emitted.
+        if str(error) in {"tmpfs-required", "active-swap"}:
+            evidence["memoryPolicyReason"] = str(error)
     except Exception:
         # Command errors can contain aliases, paths or credentials: never print them.
         pass

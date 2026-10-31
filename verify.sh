@@ -102,6 +102,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py
+  check 'Legacy signer checker synthetic-only invariants' python scripts/test_legacy_signer_check.py
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
   check 'Design system invariants' python scripts/test_design_system.py
   check 'Telemetry contract invariants' python scripts/test_telemetry_contract.py

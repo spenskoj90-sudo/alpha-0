@@ -28,11 +28,16 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
     "typescript": "6.0.3",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "minimatch": "file:./vendor/minimatch-legacy-compat"
   },
   "overrides": {
     "@next/eslint-plugin-next": {
       "fast-glob": "npm:tinyglobby@0.2.17"
+    },
+    "minimatch": "$minimatch",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
     }
   }
 }

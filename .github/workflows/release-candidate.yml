@@ -163,6 +163,10 @@ jobs:
   release-candidate:
     name: Build and retain verified signed release APK
     needs: presecret
+    # Source gate is necessary but not sufficient: Owner must configure the
+    # actual protected environment and move secrets out of repository scope.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    environment: sentinel-release-signing
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -233,7 +237,7 @@ jobs:
 
       - name: Decode release keystore
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.SENTINEL_RELEASE_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
           set +x
@@ -254,9 +258,9 @@ jobs:
       - name: Assemble signed release APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/sentinel-release.jks
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.SENTINEL_RELEASE_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.SENTINEL_RELEASE_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.SENTINEL_RELEASE_KEY_PASSWORD }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
           SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}

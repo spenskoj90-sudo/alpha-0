@@ -28,6 +28,20 @@ val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .orElse("")
     .get()
     .trim()
+val updateFeedUrl = providers.environmentVariable("SENTINEL_UPDATE_FEED_URL").orElse("").get().trim()
+val updateFeedKey = providers.environmentVariable("SENTINEL_UPDATE_FEED_VERIFYING_KEY").orElse("").get().trim()
+// Both are PUBLIC build-time values. Empty means no online update authority.
+if (updateFeedUrl.isNotEmpty() != updateFeedKey.isNotEmpty()) {
+    error("Signed-update URL and verifying public key must be configured together")
+}
+if (updateFeedUrl.isNotEmpty()) {
+    val uri = runCatching { URI(updateFeedUrl) }.getOrElse { error("Invalid signed-update HTTPS URL") }
+    if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.rawUserInfo != null ||
+        uri.rawQuery != null || uri.rawFragment != null || uri.rawPath.isNullOrBlank() ||
+        uri.normalize() != uri || (uri.port != -1 && uri.port != 443) ||
+        !Regex("[A-Za-z0-9+/]+={0,2}").matches(updateFeedKey)
+    ) error("Signed-update feed requires a strict HTTPS URL and base64 public key")
+}
 val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
 val canonicalVersionCode = 10007
 val physicalTestVersionCodeRaw = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_VERSION_CODE")
@@ -149,6 +163,8 @@ android {
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")
+        buildConfigField("String", "SENTINEL_UPDATE_FEED_URL", "\"$updateFeedUrl\"")
+        buildConfigField("String", "SENTINEL_UPDATE_FEED_VERIFYING_KEY", "\"$updateFeedKey\"")
         buildConfigField("String", "SENTINEL_RUNTIME_ENVIRONMENT", "\"$runtimeEnvironment\"")
         buildConfigField("int", "SENTINEL_HTTP_READ_TIMEOUT_MS", "15000")
     }

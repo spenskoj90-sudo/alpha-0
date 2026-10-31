@@ -27,6 +27,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.ui.DataText
@@ -56,11 +59,15 @@ fun UpdateScreen() {
     var localInstalling by remember { mutableStateOf(false) }
     var localResult by remember { mutableStateOf<LocalApkUpdate.Result?>(null) }
     var installOutcome by remember { mutableStateOf<LocalApkUpdate.InstallOutcome?>(null) }
+    var feedChecking by remember { mutableStateOf(false) }
+    var feedDownloading by remember { mutableStateOf(false) }
+    var feedResult by remember { mutableStateOf<FeedUpdateClient.Check?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null && !localChecking) {
             localChecking = true
             localResult = null
             installOutcome = null
+            feedResult = null
             scope.launch {
                 try {
                     localResult = LocalApkUpdate.stage(context, selected)
@@ -137,13 +144,93 @@ fun UpdateScreen() {
         }
         if (diagnostic) {
             item {
+                SentinelCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(strings.text("update_feed_intro"), style = MaterialTheme.typography.titleMedium)
+                        val feedConfigured =
+                            BuildConfig.SENTINEL_UPDATE_FEED_URL.isNotBlank() &&
+                                BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY.isNotBlank()
+                        PrimaryButton(
+                                text = strings.text("check_updates"),
+                                onClick = {
+                                    if (!feedChecking && !feedDownloading) {
+                                        feedChecking = true
+                                        feedResult = null
+                                        localResult = null
+                                        installOutcome = null
+                                        scope.launch {
+                                            try {
+                                                feedResult = FeedUpdateClient.check(context,
+                                                    BuildConfig.SENTINEL_UPDATE_FEED_URL,
+                                                    BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY)
+                                            } finally {
+                                                feedChecking = false
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = feedConfigured && !feedChecking && !feedDownloading &&
+                                    !localInstalling && !localChecking,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        if (!feedConfigured) {
+                            Text(strings.text("update_feed_unconfigured"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (feedChecking) {
+                            CircularProgressIndicator()
+                            Text(strings.text("update_feed_checking"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
+                        when (val checked = feedResult) {
+                            is FeedUpdateClient.Check.Available -> {
+                                Text(strings.text("update_feed_available", checked.release.versionCode),
+                                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                                Text(strings.text("update_feed_whats_new"),
+                                    style = MaterialTheme.typography.titleSmall)
+                                Text(checked.release.whatsNew)
+                                PrimaryButton(
+                                    text = strings.text("update_feed_download"),
+                                    onClick = {
+                                        if (!feedDownloading && !localInstalling) {
+                                            feedDownloading = true
+                                            localResult = null
+                                            scope.launch {
+                                                try {
+                                                    localResult = FeedUpdateClient.download(context, checked.release)
+                                                } finally {
+                                                    feedDownloading = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    enabled = !feedChecking && !feedDownloading && !localChecking &&
+                                        !localInstalling && localResult !is LocalApkUpdate.Result.Ready,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            FeedUpdateClient.Check.NotConfigured -> Text(strings.text("update_feed_unconfigured"))
+                            FeedUpdateClient.Check.Unavailable -> Text(strings.text("update_feed_unavailable"),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                            null -> Unit
+                        }
+                        if (feedDownloading) {
+                            CircularProgressIndicator()
+                            Text(strings.text("update_feed_downloading"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
+                    }
+                }
+            }
+            item {
                 Text(strings.text("update_local_intro"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item {
                 PrimaryButton(
                     text = strings.text("update_local_choose"),
                     onClick = { picker.launch(arrayOf("*/*")) },
-                    enabled = !localChecking && !localInstalling,
+                    enabled = !localChecking && !localInstalling && !feedChecking && !feedDownloading,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

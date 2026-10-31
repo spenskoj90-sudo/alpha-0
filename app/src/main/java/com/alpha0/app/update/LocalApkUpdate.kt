@@ -65,6 +65,11 @@ internal object LocalApkUpdate {
         } ?: emptyList()
     }
 
+    /** Local, observed installed signer: never a claimed publisher or release lineage. */
+    internal fun installedSignerSha256(context: Context): String? = runCatching {
+        signers(installedInfo(context)).singleOrNull()
+    }.getOrNull()
+
     private fun policyCheck(context: Context, file: File): ApkUpdatePolicy.BlockReason? {
         val candidate = candidateInfo(context, file) ?: throw IllegalArgumentException("INVALID_APK")
         val installed = installedInfo(context)

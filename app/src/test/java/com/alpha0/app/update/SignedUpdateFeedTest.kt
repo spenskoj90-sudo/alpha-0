@@ -95,6 +95,7 @@ class SignedUpdateFeedTest {
         assertNull(verify(document = envelope(manifest(version = "100000893"))))
         assertNull(verify(installedSigner = "c".repeat(64)))
         assertNull(verify(installedVersion = 100000895))
+        assertNull(verify(installedVersion = Long.MAX_VALUE))
     }
 
     @Test fun nonHttpsCrossOriginAndRedirectableUrlAreRejected() {
@@ -103,6 +104,8 @@ class SignedUpdateFeedTest {
         assertNull(verify(document = envelope(manifest(apkUrl = "http://updates.example.org/android/a.apk"))))
         assertNull(verify(document = envelope(manifest(apkUrl = "https://elsewhere.example.org/android/a.apk"))))
         assertNull(verify(document = envelope(manifest(apkUrl = "https://updates.example.org/../a.apk"))))
+        assertNull(verify(document = envelope(manifest(apkUrl = "https://updates.example.org/android/%2e%2e/a.apk"))))
+        assertNull(verify(document = envelope(manifest(apkUrl = "https://updates.example.org/android/a%2fb.apk"))))
         assertNull(verify(document = envelope(manifest(apkUrl = "https://updates.example.org/android/a.apk?tag=v2"))))
     }
 

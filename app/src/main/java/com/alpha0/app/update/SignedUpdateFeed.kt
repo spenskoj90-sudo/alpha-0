@@ -109,7 +109,7 @@ internal object SignedUpdateFeed {
             val notes = strictUtf8(notesBytes)
             val apkUri = httpsUri(apkUrl) ?: return null
             if (!packagePattern.matches(app) || app != installedPackage ||
-                version !in (installedVersionCode + 1)..2_100_000_000L ||
+                version <= installedVersionCode || version > 2_100_000_000L ||
                 signer != installedSignerSha256 || !hexDigest.matches(sha256) ||
                 notes.isBlank() || notes.any { it.code < 32 && it != '\n' } ||
                 origin.host != apkUri.host || origin.port != apkUri.port ||

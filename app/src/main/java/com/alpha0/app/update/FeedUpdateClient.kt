@@ -59,9 +59,7 @@ internal object FeedUpdateClient {
                 ?: return@withContext Check.Unavailable
             val installedVersion = runCatching {
                 val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    context.packageManager.getPackageInfo(context.packageName, 0.toLong().let {
-                        android.content.pm.PackageManager.PackageInfoFlags.of(it)
-                    })
+                    context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0L))
                 } else {
                     @Suppress("DEPRECATION")
                     context.packageManager.getPackageInfo(context.packageName, 0)

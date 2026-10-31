@@ -24,25 +24,26 @@ class LegacySignerCheckTests(unittest.TestCase):
         cls.directory = Path(cls.tmp.name)
         cls.password = "synthetic-only-" + os.urandom(16).hex()
         cls.alias = "synthetic-check-only"
-        password_file = cls.directory / "password"
-        password_file.write_text(cls.password)
-        password_file.chmod(0o600)
+        # Disposable test credentials go only to keytool's child environment;
+        # do not persist a cleartext password file, even for synthetic fixtures.
+        keytool_env = {"PATH": os.environ["PATH"], "LANG": "C.UTF-8",
+                       "SYNTHETIC_STORE_PASSWORD": cls.password}
         cls.fixtures = {}
         for kind in ("PKCS12", "JKS"):
             key = cls.directory / kind
             cert = cls.directory / (kind + ".der")
             subprocess.run([
                 "keytool", "-genkeypair", "-noprompt", "-storetype", kind,
-                "-keystore", str(key), "-storepass:file", str(password_file),
-                "-keypass:file", str(password_file), "-alias", cls.alias,
+                "-keystore", str(key), "-storepass:env", "SYNTHETIC_STORE_PASSWORD",
+                "-keypass:env", "SYNTHETIC_STORE_PASSWORD", "-alias", cls.alias,
                 "-keyalg", "RSA", "-keysize", "2048", "-validity", "1",
                 "-dname", "CN=Synthetic Test Only",
-            ], check=True, capture_output=True)
+            ], check=True, capture_output=True, env=keytool_env)
             subprocess.run([
                 "keytool", "-exportcert", "-keystore", str(key),
-                "-storepass:file", str(password_file), "-alias", cls.alias,
+                "-storepass:env", "SYNTHETIC_STORE_PASSWORD", "-alias", cls.alias,
                 "-file", str(cert),
-            ], check=True, capture_output=True)
+            ], check=True, capture_output=True, env=keytool_env)
             cls.fixtures[kind] = (key.read_bytes(), hashlib.sha256(cert.read_bytes()).hexdigest())
 
     @classmethod
@@ -81,6 +82,12 @@ class LegacySignerCheckTests(unittest.TestCase):
         self.assertFalse(evidence["apkSigned"])
         self.assertFalse(evidence["keyExported"])
         self.assertEqual(evidence["custodyRestore"], "NOT_RUN")
+
+    def test_fixture_files_do_not_contain_cleartext_password(self):
+        for fixture in self.directory.iterdir():
+            with self.subTest(fixture=fixture.name):
+                self.assertFalse(self.password.encode() in fixture.read_bytes(),
+                                 "cleartext credential persisted in a synthetic fixture")
 
     def test_legacy_jks_is_supported_without_conversion_or_mutation(self):
         result = self.run_check("JKS")

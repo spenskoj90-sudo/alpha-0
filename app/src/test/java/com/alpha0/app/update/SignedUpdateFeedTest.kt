@@ -118,6 +118,35 @@ class SignedUpdateFeedTest {
         assertNull(verify(document = envelope(manifest(message = "\u0000bad"))))
     }
 
+    @Test fun signedReleaseNotesRejectBidiSpoofingControlsAndUnboundedLines() {
+        val attackMessages = listOf(
+            "Update verified\u202E: fake version",
+            "Trusted\u2066APK",
+            "Trusted\u0007APK",
+            "Trusted\u0085APK",
+            (1..13).joinToString("\n") { "line $it" },
+        )
+        for (notes in attackMessages) {
+            assertNull("Unsafe release notes must fail closed",
+                verify(document = envelope(manifest(message = notes))))
+        }
+        assertNotNull(verify(document = envelope(
+            manifest(message = "Обновлены проверки ✅\nСохранены данные"))))
+    }
+
+    @Test fun invalidFeedUrlsAreBlockedBeforeNetworkAccess() {
+        val invalid = listOf(
+            "http://updates.example.org/android/latest.feed",
+            "https://updates.example.org/../latest.feed",
+            "https://updates.example.org/android/%2e%2e/latest.feed",
+            "https://updates.example.org/android/latest.feed?x=1",
+        )
+        for (url in invalid) {
+            org.junit.Assert.assertFalse(SignedUpdateFeed.acceptsHttpsUrl(url))
+        }
+        org.junit.Assert.assertTrue(SignedUpdateFeed.acceptsHttpsUrl(feedUrl))
+    }
+
     @Test fun unsignedOrMissingReleaseNotesCannotBeTreatedAsVerified() {
         assertNull(verify(document = envelope(manifest(message = ""))))
         assertNull(verify(document = envelope(manifest(message = "  "))))

@@ -45,6 +45,7 @@ internal object FeedUpdateClient {
             while (true) {
                 val n = source.read(buffer)
                 if (n < 0) break
+                if (n == 0) throw IllegalArgumentException("STREAM_NO_PROGRESS")
                 if (bytes.size() + n > maxBytes) throw IllegalArgumentException("TOO_LARGE")
                 bytes.write(buffer, 0, n)
             }
@@ -68,14 +69,10 @@ internal object FeedUpdateClient {
             }.getOrNull() ?: return@withContext Check.Unavailable
             var conn: HttpsURLConnection? = null
             try {
-                // SignedUpdateFeed enforces HTTPS, fixed origin and valid manifest.
-                // This preflight also prevents making an unauthenticated HTTP request.
-                val uri = java.net.URI(feedUrl)
-                if (uri.scheme != "https" || uri.host.isNullOrBlank() ||
-                    uri.rawUserInfo != null || uri.rawFragment != null ||
-                    uri.rawQuery != null || uri.normalize() != uri ||
-                    (uri.port != -1 && uri.port != 443)
-                ) return@withContext Check.Unavailable
+                // Reuse the exact signed-manifest URL policy before any network request.
+                if (!SignedUpdateFeed.acceptsHttpsUrl(feedUrl)) {
+                    return@withContext Check.Unavailable
+                }
                 conn = connection(feedUrl)
                 val data = readBounded(conn, FEED_CAP_BYTES)
                 val release = SignedUpdateFeed.verify(
@@ -100,6 +97,12 @@ internal object FeedUpdateClient {
             var temporary: File? = null
             var conn: HttpsURLConnection? = null
             try {
+                // A future caller must never make a request using an unchecked offer.
+                if (release.packageName != context.packageName ||
+                    !SignedUpdateFeed.acceptsHttpsUrl(release.apkUrl) ||
+                    !release.apkUrl.endsWith(".apk") ||
+                    !Regex("[0-9a-f]{64}").matches(release.apkSha256)
+                ) return@withContext LocalApkUpdate.Result.Failed
                 val dir = File(context.cacheDir, "sentinel_feed_download")
                 if (!dir.isDirectory && !dir.mkdirs()) return@withContext LocalApkUpdate.Result.Failed
                 val temp = File.createTempFile("verified-", ".apk", dir)
@@ -116,6 +119,7 @@ internal object FeedUpdateClient {
                         while (true) {
                             val n = input.read(buffer)
                             if (n < 0) break
+                            if (n == 0) throw IllegalArgumentException("STREAM_NO_PROGRESS")
                             size += n.toLong()
                             if (size > APK_CAP_BYTES) throw IllegalArgumentException("APK_TOO_LARGE")
                             output.write(buffer, 0, n)

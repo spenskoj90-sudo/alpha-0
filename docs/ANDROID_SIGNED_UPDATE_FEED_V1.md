@@ -30,7 +30,7 @@ The signed manifest is exactly seven UTF-8 lines **plus final LF** in this order
     apkSha256=<64 lowercase hex>
     whatsNewBase64=<base64url-unpadded UTF-8 notes>
 
-Every value above is an EXAMPLE, not a release, actual host, accepted certificate, installed app or owner decision. Notes must be non-empty, printable Unicode (optional LF), at most 1024 UTF-8 bytes. Manifest cap 4096 bytes; feed cap 8192 bytes; APK cap 256 MiB. No extra/duplicate/out-of-order fields. URLs must have HTTPS and same exact feed origin, no credentials/query/fragment, no normalized path traversal, and an .apk path. No redirects or http fallback.
+Every value above is an EXAMPLE, not a release, actual host, accepted certificate, installed app or owner decision. Notes must be non-empty, at most 1024 UTF-8 bytes and at most 12 lines. C0/C1 controls (except LF) and Unicode bidi-direction override/isolate controls are prohibited to prevent spoofed or screen-filling release announcements. Manifest cap 4096 bytes; feed cap 8192 bytes; APK cap 256 MiB. No extra/duplicate/out-of-order fields. URLs must have HTTPS and same exact feed origin, no credentials/query/fragment, no normalized path traversal, and an .apk path. No redirects or http fallback.
 
 ## Configuration and trust
 

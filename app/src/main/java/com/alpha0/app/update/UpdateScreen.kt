@@ -27,6 +27,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.ui.DataText
@@ -175,11 +178,13 @@ fun UpdateScreen() {
                         }
                         if (feedChecking) {
                             CircularProgressIndicator()
-                            Text(strings.text("update_feed_checking"))
+                            Text(strings.text("update_feed_checking"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                         }
                         when (val checked = feedResult) {
                             is FeedUpdateClient.Check.Available -> {
-                                Text(strings.text("update_feed_available", checked.release.versionCode))
+                                Text(strings.text("update_feed_available", checked.release.versionCode),
+                                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                                 Text(strings.text("update_feed_whats_new"),
                                     style = MaterialTheme.typography.titleSmall)
                                 Text(checked.release.whatsNew)
@@ -204,12 +209,14 @@ fun UpdateScreen() {
                             }
                             FeedUpdateClient.Check.NotConfigured -> Text(strings.text("update_feed_unconfigured"))
                             FeedUpdateClient.Check.Unavailable -> Text(strings.text("update_feed_unavailable"),
-                                color = MaterialTheme.colorScheme.error)
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                             null -> Unit
                         }
                         if (feedDownloading) {
                             CircularProgressIndicator()
-                            Text(strings.text("update_feed_downloading"))
+                            Text(strings.text("update_feed_downloading"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                         }
                     }
                 }

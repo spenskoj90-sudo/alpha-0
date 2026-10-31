@@ -64,6 +64,25 @@ internal object SignedUpdateFeed {
         return uri
     }
 
+    /** Reject malformed feed URLs before network access, not only after signature verification. */
+    internal fun acceptsHttpsUrl(value: String): Boolean = try {
+        httpsUri(value) != null
+    } catch (_: java.net.URISyntaxException) {
+        false
+    } catch (_: IllegalArgumentException) {
+        false
+    }
+
+    /** A signed announcement must not visually spoof trust indicators or fill the screen. */
+    private fun acceptableNotes(value: String): Boolean =
+        value.isNotBlank() && value.lineSequence().take(13).count() <= 12 &&
+            value.none { char ->
+                val code = char.code
+                (code < 32 && char != '\n') || code in 0x7f..0x9f ||
+                    code == 0x061c || code in 0x200e..0x200f ||
+                    code in 0x202a..0x202e || code in 0x2066..0x2069
+            }
+
     /** Reject malformed, unsigned, replayed, cross-origin or different-signer offers. */
     fun verify(
         feedBytes: ByteArray,
@@ -111,7 +130,7 @@ internal object SignedUpdateFeed {
             if (!packagePattern.matches(app) || app != installedPackage ||
                 version <= installedVersionCode || version > 2_100_000_000L ||
                 signer != installedSignerSha256 || !hexDigest.matches(sha256) ||
-                notes.isBlank() || notes.any { it.code < 32 && it != '\n' } ||
+                !acceptableNotes(notes) ||
                 origin.host != apkUri.host || origin.port != apkUri.port ||
                 !apkUri.rawPath.endsWith(".apk")
             ) return null

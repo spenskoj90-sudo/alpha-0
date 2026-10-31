@@ -130,12 +130,17 @@ internal object FeedUpdateClient {
                 ) return@withContext LocalApkUpdate.Result.Failed
 
                 val staged = LocalApkUpdate.stage(context, Uri.fromFile(temp))
-                if (staged is LocalApkUpdate.Result.Ready &&
-                    staged.versionCode == release.versionCode &&
-                    staged.sha256 == release.apkSha256
-                ) staged else {
-                    if (staged is LocalApkUpdate.Result.Ready) staged.file.delete()
-                    LocalApkUpdate.Result.Failed
+                when (staged) {
+                    is LocalApkUpdate.Result.Ready -> {
+                        if (staged.versionCode == release.versionCode && staged.sha256 == release.apkSha256) {
+                            staged
+                        } else {
+                            staged.file.delete()
+                            LocalApkUpdate.Result.Failed
+                        }
+                    }
+                    is LocalApkUpdate.Result.Blocked -> staged
+                    LocalApkUpdate.Result.Failed -> LocalApkUpdate.Result.Failed
                 }
             } catch (cancel: CancellationException) {
                 throw cancel

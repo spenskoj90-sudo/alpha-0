@@ -1,0 +1,70 @@
+name: SENTINEL legacy signer identity check
+
+# No APK, key export, backup or secret migration. Requires reviewed main + owner gate.
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Frozen exact main SHA containing this reviewed workflow
+        required: true
+        type: string
+      acknowledge_existing_key_check:
+        description: Owner authorizes checking the existing key only; no replacement or release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-legacy-signer-check
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  verify-existing-signer:
+    if: >-
+      github.repository == 'spenskoj90-sudo/alpha-0' &&
+      github.repository_id == '1328718401' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.acknowledge_existing_key_check == true
+    environment: sentinel-release-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Reject stale source before any signing secret is referenced
+        env:
+          REQUESTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REQUESTED_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$REQUESTED_SOURCE_SHA" = "$GITHUB_SHA"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Test the checker with ephemeral synthetic keys only
+        run: python scripts/test_legacy_signer_check.py
+      - name: Check existing key against the preserved production certificate
+        env:
+          LEGACY_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          LEGACY_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          LEGACY_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          LEGACY_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_CERTIFICATE_SHA256: 2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db88e
+        run: |
+          set -euo pipefail
+          set +x
+          ulimit -c 0
+          python scripts/legacy_signer_check.py \
+            --source-sha "$GITHUB_SHA" \
+            --expected-certificate-sha256 "$EXPECTED_CERTIFICATE_SHA256"

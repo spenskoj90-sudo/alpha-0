@@ -45,6 +45,31 @@ PR evidence cannot substitute for this protected-main evidence. A stale successf
 
 ## Release-specific artifact gate
 
+### Existing SENTINEL key verification before custody migration
+
+`legacy-signer-check.yml` is a separate manual, protected-main, owner-reviewed
+identity check for the preserved repository-scoped `ANDROID_KEYSTORE_*` /
+`ANDROID_KEY_*` values. It does not sign an APK, replace a key, export a private
+key, upload artifacts or migrate secret scopes. Before dispatch: review and merge
+the exact checker source; read back `sentinel-release-signing` main-only/reviewer/
+bypass policy; obtain the specific owner authorization for checking the existing
+key; supply the frozen workflow `main` SHA and explicit acknowledgement. The
+workflow cannot run this check from a PR/feature branch and rejects stale SHA
+before any secret reference.
+
+The checker supports existing JKS and PKCS12 without conversion. It requires
+tmpfs/no active swap/core dumps disabled, confines temporary material to RAM,
+compares the DER certificate with the unchanged production pin and verifies a
+fresh CSR signature plus its public-key match to that certificate. Tool output,
+aliases, passwords, subject names and CSR bytes are never published; only the
+public certificate/keystore digests and bounded PASS/FAIL stage are printed.
+Temporary files are removed on normal success/failure; runner termination still
+depends on GitHub's ephemeral runner teardown. A matching-key PASS does not prove
+historical third-party distribution or independent custody restore. A mismatch
+is a hard stop: preserve the old values and investigate; never reset the pin.
+Two independently encrypted owner-managed recovery copies and their separate
+restores remain mandatory before any release-signer provisioning or APK signing.
+
 **Permanent release update continuity:** Manual `Release Candidate Artifact`
 dispatch requires `previous_release_version_code` (highest code already
 distributed for `com.alpha0.app` under the selected signer) and an explicit

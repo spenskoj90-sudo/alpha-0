@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
@@ -100,21 +100,39 @@ def web_components(path: Path) -> list[dict[str, Any]]:
     if not isinstance(packages, dict):
         raise ValueError("Web lockfile packages map missing")
     components = []
-    seen: set[tuple[str, str, str]] = set()
+    seen: dict[tuple[str, str, str], dict[str, Any]] = {}
     for package_key, item in packages.items():
         if not isinstance(item, dict):
             continue
-        name = _npm_name(str(package_key))
-        if not name:
+        installed_name = _npm_name(str(package_key))
+        if not installed_name:
             continue
+        local_source = None
+        if item.get("link") is True:
+            target = item.get("resolved")
+            if (not isinstance(target, str) or not target
+                    or not re.fullmatch(r"[A-Za-z0-9@._/-]+", target)
+                    or PurePosixPath(target).is_absolute()
+                    or str(PurePosixPath(target)) != target
+                    or ".." in PurePosixPath(target).parts):
+                raise ValueError("Web lockfile local link has an unsafe target")
+            target_item = packages.get(target)
+            if not isinstance(target_item, dict) or target_item.get("link") is True:
+                raise ValueError("Web lockfile local link target missing or chained")
+            if not target_item.get("name"):
+                raise ValueError("Web lockfile local component lacks its actual name")
+            local_source = target
+            item = target_item
+        # npm aliases retain the registry package's name in metadata. Inventories
+        # must identify the actual component, not the import alias/directory name.
+        name = str(item.get("name", installed_name)).strip()
+        if not re.fullmatch(r"(?:@[a-z0-9._-]+/)?[a-z0-9._-]+", name):
+            raise ValueError("Web lockfile component has an invalid package name")
         version = str(item.get("version", "")).strip()
         if not version:
             raise ValueError(f"Web lockfile component {name!r} lacks an exact version")
         scope = "excluded" if item.get("dev") is True else "required"
         key = (name, version, scope)
-        if key in seen:
-            continue
-        seen.add(key)
         component = _component(
             ecosystem="web-lockfile",
             name=name,
@@ -125,6 +143,16 @@ def web_components(path: Path) -> list[dict[str, Any]]:
         integrity = item.get("integrity")
         if isinstance(integrity, str) and integrity:
             component["properties"].append({"name": "sentinel:npm-integrity", "value": integrity})
+        if name != installed_name:
+            component["properties"].append({"name": "sentinel:npm-import-alias", "value": installed_name})
+        if local_source:
+            component["properties"].append({"name": "sentinel:npm-local-source", "value": local_source})
+        if key in seen:
+            for prop in component["properties"]:
+                if prop not in seen[key]["properties"]:
+                    seen[key]["properties"].append(prop)
+            continue
+        seen[key] = component
         components.append(component)
     if not components:
         raise ValueError("Web lockfile inventory is empty")

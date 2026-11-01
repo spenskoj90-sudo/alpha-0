@@ -1,0 +1,195 @@
+name: "Sentinel Infisical OIDC canary (manual; no real secrets)"
+
+# Deliberately inert until reviewed and merged to protected main. No PR/fork secrets.
+on:
+  workflow_dispatch:
+  # PR event is a NEGATIVE cross-context canary only. Never run positive test on PR.
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/infisical-oidc-canary.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-infisical-oidc-canary-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  oidc-canary:
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Verify immutable workload identity, exchange OIDC JWT without printing credentials
+        shell: bash
+        env:
+          CANARY_IDENTITY_ID: "dcf17c97-db32-4b0f-b8e5-4eab29b5e183"
+          EXPECTED_ISS: "https://token.actions.githubusercontent.com"
+          EXPECTED_SUB: "repo:spenskoj90-sudo@314939603/alpha-0@1328718401:ref:refs/heads/main"
+          EXPECTED_AUD: "https://github.com/spenskoj90-sudo"
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          def reject(reason):
+              print("FAIL CLOSED: " + reason)
+              raise SystemExit(1)
+
+          # These values are provided by the runner, not stored in a repository secret.
+          request_url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL")
+          request_credential = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+          if not request_url or not request_credential:
+              reject("GitHub OIDC workload identity unavailable")
+          if not request_url.startswith("https://"):
+              reject("OIDC request URL is not HTTPS")
+          audience = os.environ["EXPECTED_AUD"]
+          separator = "&" if "?" in request_url else "?"
+          target_url = request_url + separator + urllib.parse.urlencode({"audience": audience})
+          req = urllib.request.Request(
+              target_url, headers={"Authorization": "Bearer " + request_credential}
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  jwt = json.load(resp).get("value", "")
+          except Exception:
+              reject("could not acquire GitHub OIDC token")
+          pieces = jwt.split(".")
+          if len(pieces) != 3:
+              reject("malformed GitHub OIDC token")
+          try:
+              body = pieces[1] + "=" * ((-len(pieces[1])) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(body))
+          except Exception:
+              reject("malformed OIDC claims")
+          expected = {
+              "iss": os.environ["EXPECTED_ISS"],
+              "sub": os.environ["EXPECTED_SUB"],
+              "repository_id": "1328718401",
+              "repository_owner_id": "314939603",
+              "ref": "refs/heads/main",
+              "event_name": "workflow_dispatch",
+          }
+          for key, value in expected.items():
+              if str(claims.get(key)) != value:
+                  reject("unexpected OIDC claim: " + key)
+          if claims.get("aud") != audience:
+              reject("unexpected OIDC audience")
+          if not jwt or len(jwt) > 65536:
+              reject("JWT is missing or implausibly long")
+          print("PASS: GitHub immutable OIDC claims verified (no JWT logged)")
+
+          # No secrets are present in this identity. Do not output the issued token.
+          data = json.dumps({
+              "identityId": os.environ["CANARY_IDENTITY_ID"], "jwt": jwt
+          }).encode()
+          login_request = urllib.request.Request(
+              "https://app.infisical.com/api/v1/auth/oidc-auth/login",
+              data=data, method="POST",
+              headers={"Content-Type": "application/json", "Accept": "application/json"},
+          )
+          try:
+              with urllib.request.urlopen(login_request, timeout=20) as resp:
+                  reply = json.load(resp)
+          except urllib.error.HTTPError as ex:
+              reject("Infisical rejected GitHub OIDC (HTTP " + str(ex.code) + ")")
+          except Exception:
+              reject("Infisical OIDC exchange failed")
+          ttl = reply.get("expiresIn")
+          if not reply.get("accessToken") or not isinstance(ttl, (float, int)) or not 0 < ttl <= 600:
+              reject("Infisical token missing or TTL outside 10-minute policy")
+          # Never display response, token, JWT, request URL, or any secret.
+          print("PASS: Infisical OIDC exchange returned bounded 10-minute canary token")
+          PY
+
+  deny-untrusted-pr-context:
+    name: Reject PR-context OIDC token (no real secrets)
+    # Only same-repo, specifically this review branch; never run on forks.
+    if: >-
+      github.repository == 'spenskoj90-sudo/alpha-0' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'security/infisical-oidc-canary-20261026'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Expect Infisical to DENY a PR-context JWT
+        shell: bash
+        env:
+          CANARY_IDENTITY_ID: "dcf17c97-db32-4b0f-b8e5-4eab29b5e183"
+          EXPECTED_AUD: "https://github.com/spenskoj90-sudo"
+          PROTECTED_MAIN_SUB: "repo:spenskoj90-sudo@314939603/alpha-0@1328718401:ref:refs/heads/main"
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          def fail(message):
+              print("FAIL CLOSED: " + message)
+              raise SystemExit(1)
+
+          url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL")
+          credential = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+          if not url or not url.startswith("https://") or not credential:
+              fail("PR OIDC runner context unavailable")
+          audience = os.environ["EXPECTED_AUD"]
+          url += ("&" if "?" in url else "?") + urllib.parse.urlencode({"audience": audience})
+          try:
+              request = urllib.request.Request(url, headers={"Authorization": "Bearer " + credential})
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  jwt = json.load(response).get("value", "")
+              pieces = jwt.split(".")
+              if len(pieces) != 3:
+                  fail("invalid OIDC JWT structure")
+              encoded = pieces[1] + "=" * (-len(pieces[1]) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(encoded))
+          except Exception:
+              fail("could not acquire or parse GitHub PR OIDC identity")
+          if (claims.get("iss") != "https://token.actions.githubusercontent.com"
+                  or claims.get("aud") != audience
+                  or str(claims.get("repository_id")) != "1328718401"
+                  or str(claims.get("repository_owner_id")) != "314939603"
+                  or claims.get("event_name") != "pull_request"
+                  or claims.get("sub") == os.environ["PROTECTED_MAIN_SUB"]):
+              fail("unexpected OIDC PR claims or not distinguishable from protected main")
+          print("PASS: PR-context token differs from the protected main identity")
+          payload = json.dumps({"identityId": os.environ["CANARY_IDENTITY_ID"], "jwt": jwt}).encode()
+          req = urllib.request.Request(
+              "https://app.infisical.com/api/v1/auth/oidc-auth/login",
+              data=payload, method="POST",
+              headers={"Content-Type": "application/json", "Accept": "application/json"},
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=20) as response:
+                  # Never print response. Any 2xx must be treated as policy FAILURE.
+                  response.read(1)
+              fail("Infisical unexpectedly accepted a PR-context OIDC JWT")
+          except urllib.error.HTTPError as err:
+              if err.code in (401, 403):
+                  print("PASS: Infisical explicitly DENIED PR-context OIDC token")
+              else:
+                  fail("OIDC exchange failed unexpectedly (HTTP " + str(err.code) + ")")
+          except Exception:
+              fail("OIDC denial could not be verified")
+          PY

@@ -3,12 +3,12 @@
 This is product source and an explicit wire contract, **not** an authorized or configured distribution, new Android signing lineage, or physical acceptance. Shared custody, signing environment, historical certificate review and recovery are Owner/PROJECTS gates (existing issue #532 and draft PR #558). The separate Android observer/Stop PR is #557.
 
 ## User journey
-1. Diagnostic Android Updates shows Check for updates only when a public feed URL and public verifying key are configured. Unconfigured builds show a clear blocked explanation and retain existing manual APK preflight.
+1. Diagnostic APK and the explicitly selected `signedRelease` non-Play release variant show **Check for updates**. Without both build-pinned public values the button is disabled and states NOT_CONFIGURED; manual APK preflight remains diagnostic-only.
 2. Click fetches HTTPS feed with redirects disabled and a size limit, then verifies detached ECDSA P-256 signature against a build-pinned public key. Candidate package, versionCode strictly higher than installed, observed current APK signer fingerprint and same HTTPS origin are checked before showing the signed What's new.
 3. Explicit Download click fetches a size-limited APK without redirects and verifies SHA-256; LocalApkUpdate stages a private copy, independently rechecks package, versionCode and certificate.
 4. Explicit Install click rechecks staged APK hash and identity and launches Android's normal system installer. No silent installation, uninstall, data erase, forced key rotation or retry bypass.
 
-Google Play release builds retain their existing Play-managed in-app update path.
+Google Play `release` builds retain their existing Play-managed in-app update path. The separate `signedRelease` build type keeps `com.alpha0.app`, the release signer and production security settings, but selects the signed-feed UI. Only `signedRelease` and `physicalTest` manifest overlays request `REQUEST_INSTALL_PACKAGES`; Play release does not. Android still requires explicit unknown-app-source permission and system-installer confirmation. A Play build installed from another store does not silently switch to an unpinned feed.
 
 ## Exact detached-signature wire format
 

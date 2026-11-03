@@ -53,7 +53,9 @@ fun UpdateScreen() {
     val activity = context.findActivity()
     val manager = remember(context) { AppUpdateManagerFactory.create(context) }
     var state by remember { mutableStateOf(UpdateState.IDLE) }
-    val diagnostic = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic"
+    val channel = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
+    val diagnostic = UpdateChannelPolicy.allowsLocalApkSelection(channel)
+    val usesSignedFeed = UpdateChannelPolicy.allowsSignedFeed(channel)
     val scope = rememberCoroutineScope()
     var localChecking by remember { mutableStateOf(false) }
     var localInstalling by remember { mutableStateOf(false) }
@@ -80,6 +82,7 @@ fun UpdateScreen() {
     val channelLabel = when (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL) {
         "play" -> strings.text("channel_play")
         "diagnostic" -> strings.text("channel_diagnostic")
+        "signed_feed" -> strings.text("channel_signed_feed")
         "development" -> strings.text("channel_development")
         else -> BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
     }
@@ -142,7 +145,7 @@ fun UpdateScreen() {
                 }
             }
         }
-        if (diagnostic) {
+        if (usesSignedFeed) {
             item {
                 SentinelCard {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -174,7 +177,7 @@ fun UpdateScreen() {
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         if (!feedConfigured) {
-                            Text(strings.text("update_feed_unconfigured"),
+                            Text(strings.text(if (diagnostic) "update_feed_unconfigured" else "update_feed_unconfigured_release"),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (feedChecking) {
@@ -209,7 +212,7 @@ fun UpdateScreen() {
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
-                            FeedUpdateClient.Check.NotConfigured -> Text(strings.text("update_feed_unconfigured"))
+                            FeedUpdateClient.Check.NotConfigured -> Text(strings.text(if (diagnostic) "update_feed_unconfigured" else "update_feed_unconfigured_release"))
                             FeedUpdateClient.Check.Unavailable -> Text(strings.text("update_feed_unavailable"),
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -223,6 +226,7 @@ fun UpdateScreen() {
                     }
                 }
             }
+            if (diagnostic) {
             item {
                 Text(strings.text("update_local_intro"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -306,6 +310,7 @@ fun UpdateScreen() {
                     )
                     null -> Unit
                 }
+            }
             }
         } else {
         item {

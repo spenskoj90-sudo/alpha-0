@@ -226,6 +226,12 @@ android {
             manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth"
             buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth\"")
         }
+        // Non-Play production build: same ID, release signer, production hardening.
+        create("signedRelease") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"signed_feed\"")
+        }
     }
 
     if (physicalTestStableSigningConfigured) {

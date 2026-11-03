@@ -7,4 +7,8 @@ internal object UpdateChannelPolicy {
 
     fun allowsLocalApkSelection(channel: String): Boolean =
         channel == "diagnostic"
+
+    /** Share verified APK install/permission controls without exposing the manual picker. */
+    fun showsStagedInstall(channel: String): Boolean =
+        allowsSignedFeed(channel)
 }

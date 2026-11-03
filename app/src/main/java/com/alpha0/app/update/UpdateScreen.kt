@@ -238,8 +238,12 @@ fun UpdateScreen() {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            }
+            // A verified feed download must expose the same stage/permission/system-installer
+            // flow as a user-selected diagnostic APK; only the file picker is diagnostic.
+            if (UpdateChannelPolicy.showsStagedInstall(channel)) {
             item {
-                if (localChecking) {
+                if (diagnostic && localChecking) {
                     CircularProgressIndicator()
                     Text(strings.text("update_local_checking"))
                 }

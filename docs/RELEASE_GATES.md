@@ -45,6 +45,34 @@ PR evidence cannot substitute for this protected-main evidence. A stale successf
 
 ## Release-specific artifact gate
 
+### Existing SENTINEL key verification before custody migration
+
+`legacy-signer-check.yml` is a separate manual, protected-main, owner-reviewed
+identity check for the preserved repository-scoped `ANDROID_KEYSTORE_*` /
+`ANDROID_KEY_*` values. It does not sign an APK, replace a key, export a private
+key, upload artifacts or migrate secret scopes. Before dispatch: review and merge
+the exact checker source; read back `sentinel-release-signing` main-only/reviewer/
+bypass policy; obtain the specific owner authorization for checking the existing
+key; supply the frozen workflow `main` SHA and explicit acknowledgement. The
+workflow cannot run this check from a PR/feature branch and rejects stale SHA
+before any secret reference. It disables swap on its disposable runner and checks
+tmpfs before the real-secret step; the checker independently enforces both again.
+Routine CI uses only synthetic keys with controlled kernel-metadata fixtures and
+explicit negative swap/disk tests, not real keys or a production-policy bypass.
+
+The checker supports existing JKS and PKCS12 without conversion. It requires
+tmpfs/no active swap/core dumps disabled, confines temporary material to RAM,
+compares the DER certificate with the unchanged production pin and verifies a
+fresh CSR signature plus its public-key match to that certificate. Tool output,
+aliases, passwords, subject names and CSR bytes are never published; only the
+public certificate/keystore digests and bounded PASS/FAIL stage are printed.
+Temporary files are removed on normal success/failure; runner termination still
+depends on GitHub's ephemeral runner teardown. A matching-key PASS does not prove
+historical third-party distribution or independent custody restore. A mismatch
+is a hard stop: preserve the old values and investigate; never reset the pin.
+Two independently encrypted owner-managed recovery copies and their separate
+restores remain mandatory before any release-signer provisioning or APK signing.
+
 **Permanent release update continuity:** Manual `Release Candidate Artifact`
 dispatch requires `previous_release_version_code` (highest code already
 distributed for `com.alpha0.app` under the selected signer) and an explicit
@@ -64,6 +92,7 @@ Signing is intentionally separated from routine PR CI, attestation authority and
 
 - `.github/workflows/release-candidate.yml` is manual, must be dispatched from `main`, requires an explicit exact `source_sha`, requires `GITHUB_SHA == source_sha`, and verifies the protected-main `release-evidence.json` attestation plus canonical live evidence in a read-only `presecret` job.
 - The signing job has `needs: presecret`, repeats the attestation/live binding checks before the first signing-secret reference, then builds and verifies the signed non-debuggable APK.
+- **Owner-gated environment (SOURCE_ONLY until provider readback):** The secret-consuming signing job must require `sentinel-release-signing` and an exact `main` manual dispatch. Before merging or provisioning any real key, verify this environment exists with Owner-approved required reviewers, `main`-only deployment policy and bypass restrictions. Check reviewer self-approval feasibility for the actual account. Use only the dedicated `SENTINEL_RELEASE_KEYSTORE_BASE64`, `SENTINEL_RELEASE_KEYSTORE_PASSWORD`, `SENTINEL_RELEASE_KEY_ALIAS` and `SENTINEL_RELEASE_KEY_PASSWORD` secret names, exclusively at environment scope. The workflow must never fall back to legacy repository-scoped `ANDROID_*` values. The build still receives its expected `ANDROID_*` process variables from the dedicated secrets. Verify that the new names have no repository/organization duplicates; names alone do not enforce scope. Preserve legacy values until their custody and consumers are verified and their controlled retirement is separately approved. GitHub automatically creating an environment *without protection rules* does **not** constitute authorization. Never dispatch signed candidate or move a permanent keystore until provider rules, key recovery and the existing certificate lineage have been verified. This workflow/source change does not establish production signing readiness.
 - The signed artifact is retained as `sentinel-release-candidate-<sha>` and contains the APK plus `sentinel.release-candidate.v1` and pre-secret lineage evidence.
 - The signing job exports hashes of those exact three files. A separate downstream job receives no keystore/password secrets; it rechecks those hashes and creates GitHub/Sigstore provenance for the APK and both lineage documents.
 - Release keystore values and signing custody remain Owner-only. A successful debug PR build or non-secret main attestation is not signed-release evidence.

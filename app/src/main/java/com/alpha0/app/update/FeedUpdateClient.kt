@@ -3,6 +3,7 @@ package com.alpha0.app.update
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import com.alpha0.app.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,7 +23,8 @@ internal object FeedUpdateClient {
     private const val APK_CAP_BYTES = 256L * 1024 * 1024
 
     sealed interface Check {
-        data class Available(val release: SignedUpdateFeed.Release) : Check
+        /** Exact signed bytes are retained only in process memory for download-time revalidation. */
+        data class Available(val release: SignedUpdateFeed.Release, val signedFeedBytes: ByteArray) : Check
         data class Current(val versionCode: Long) : Check
         data object NotConfigured : Check
         data object Unavailable : Check
@@ -54,20 +56,24 @@ internal object FeedUpdateClient {
         }
     }
 
+    private fun installedVersionCode(context: Context): Long? = runCatching {
+        val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageInfo(
+                context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0L),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }
+        info.longVersionCode
+    }.getOrNull()
+
     suspend fun check(context: Context, feedUrl: String, verifyingKey: String): Check =
         withContext(Dispatchers.IO) {
             if (feedUrl.isBlank() || verifyingKey.isBlank()) return@withContext Check.NotConfigured
             val signer = LocalApkUpdate.installedSignerSha256(context)
                 ?: return@withContext Check.Unavailable
-            val installedVersion = runCatching {
-                val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0L))
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.packageManager.getPackageInfo(context.packageName, 0)
-                }
-                info.longVersionCode
-            }.getOrNull() ?: return@withContext Check.Unavailable
+            val installedVersion = installedVersionCode(context) ?: return@withContext Check.Unavailable
             var conn: HttpsURLConnection? = null
             try {
                 // Reuse the exact signed-manifest URL policy before any network request.
@@ -83,7 +89,7 @@ internal object FeedUpdateClient {
                 // Only a valid, pinned and signed equal-version manifest can show CURRENT.
                 // Older releases fail verification; an equal-version APK cannot be downloaded here.
                 if (release.versionCode == installedVersion) Check.Current(installedVersion)
-                else Check.Available(release)
+                else Check.Available(release, data.copyOf())
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) {
@@ -94,19 +100,27 @@ internal object FeedUpdateClient {
         }
 
     /**
-     * Download only from the verified manifest's same-origin HTTPS URL. Recheck
-     * hash, version, installed signer and package via LocalApkUpdate before READY.
+     * A release description alone cannot authorize a network request. Reverify
+     * the exact signed offer with the build-pinned feed key and the CURRENT
+     * installed package/version/signer before opening the APK connection.
+     * LocalApkUpdate independently checks the downloaded APK before READY.
      */
-    suspend fun download(context: Context, release: SignedUpdateFeed.Release): LocalApkUpdate.Result =
+    suspend fun download(context: Context, offer: Check.Available): LocalApkUpdate.Result =
         withContext(Dispatchers.IO) {
             var temporary: File? = null
             var conn: HttpsURLConnection? = null
             try {
-                // A future caller must never make a request using an unchecked offer.
-                if (release.packageName != context.packageName ||
-                    !SignedUpdateFeed.acceptsHttpsUrl(release.apkUrl) ||
-                    !release.apkUrl.endsWith(".apk") ||
-                    !Regex("[0-9a-f]{64}").matches(release.apkSha256)
+                val release = offer.release
+                val signer = LocalApkUpdate.installedSignerSha256(context)
+                    ?: return@withContext LocalApkUpdate.Result.Failed
+                val version = installedVersionCode(context)
+                    ?: return@withContext LocalApkUpdate.Result.Failed
+                if (!SignedUpdateFeed.authenticDownloadOffer(
+                        offer.signedFeedBytes, release,
+                        BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY,
+                        BuildConfig.SENTINEL_UPDATE_FEED_URL,
+                        context.packageName, version, signer,
+                    )
                 ) return@withContext LocalApkUpdate.Result.Failed
                 val dir = File(context.cacheDir, "sentinel_feed_download")
                 if (!dir.isDirectory && !dir.mkdirs()) return@withContext LocalApkUpdate.Result.Failed

@@ -155,6 +155,37 @@ class SignedUpdateFeedTest {
             manifest(message = "Обновлены проверки ✅\nСохранены данные"))))
     }
 
+    @Test fun downloadRequiresSameSignedEnvelopePinnedOriginAndLiveInstalledIdentity() {
+        val signedBytes = envelope()
+        val displayed = verify(document = signedBytes)!!
+        fun accepted(
+            bytes: ByteArray = signedBytes,
+            release: SignedUpdateFeed.Release = displayed,
+            pin: String = keyPin,
+            origin: String = feedUrl,
+            version: Long = 100000894,
+            cert: String = signer,
+            app: String = pkg,
+        ) = SignedUpdateFeed.authenticDownloadOffer(
+            bytes, release, pin, origin, app, version, cert,
+        )
+
+        org.junit.Assert.assertTrue(accepted())
+        // Even a valid signed update cannot authorize a DIFFERENT displayed URL or digest.
+        org.junit.Assert.assertFalse(accepted(release = displayed.copy(
+            apkUrl = "https://updates.example.org/android/other.apk",
+        )))
+        org.junit.Assert.assertFalse(accepted(release = displayed.copy(apkSha256 = "c".repeat(64))))
+        org.junit.Assert.assertFalse(accepted(bytes = envelope(tamperSignature = true)))
+        org.junit.Assert.assertFalse(accepted(bytes = envelope(manifest(version = "100000896"))))
+        org.junit.Assert.assertFalse(accepted(pin = ""))
+        org.junit.Assert.assertFalse(accepted(origin = "https://other.example.org/android/latest.feed"))
+        org.junit.Assert.assertFalse(accepted(version = 100000895))
+        org.junit.Assert.assertFalse(accepted(version = Long.MAX_VALUE))
+        org.junit.Assert.assertFalse(accepted(cert = "c".repeat(64)))
+        org.junit.Assert.assertFalse(accepted(app = "com.other.app"))
+    }
+
     @Test fun invalidFeedUrlsAreBlockedBeforeNetworkAccess() {
         val invalid = listOf(
             "http://updates.example.org/android/latest.feed",

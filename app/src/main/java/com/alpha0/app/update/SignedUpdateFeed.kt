@@ -83,6 +83,25 @@ internal object SignedUpdateFeed {
                     code in 0x202a..0x202e || code in 0x2066..0x2069
             }
 
+    /**
+     * Download-time authorization: the displayed release must equal the
+     * exact, newly verified signed announcement under the compiled-in pin
+     * and the currently installed package/version/certificate. Equality of
+     * plain Release fields without this envelope is never sufficient.
+     */
+    internal fun authenticDownloadOffer(
+        feedBytes: ByteArray,
+        displayedRelease: Release,
+        verifyingKeyDerBase64: String,
+        feedUrl: String,
+        installedPackage: String,
+        installedVersionCode: Long,
+        installedSignerSha256: String,
+    ): Boolean = verify(
+        feedBytes, verifyingKeyDerBase64, feedUrl,
+        installedPackage, installedVersionCode, installedSignerSha256,
+    ) == displayedRelease
+
     /** Reject malformed, unsigned, replayed, cross-origin or different-signer offers. */
     fun verify(
         feedBytes: ByteArray,

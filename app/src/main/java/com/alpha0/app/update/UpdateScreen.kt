@@ -204,7 +204,7 @@ fun UpdateScreen() {
                                             localResult = null
                                             scope.launch {
                                                 try {
-                                                    localResult = FeedUpdateClient.download(context, checked.release)
+                                                    localResult = FeedUpdateClient.download(context, checked)
                                                 } finally {
                                                     feedDownloading = false
                                                 }

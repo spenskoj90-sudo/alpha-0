@@ -51,11 +51,14 @@ fun UpdateScreen() {
     val strings = LocalAppStrings.current
     val context = LocalContext.current
     val activity = context.findActivity()
-    val manager = remember(context) { AppUpdateManagerFactory.create(context) }
     var state by remember { mutableStateOf(UpdateState.IDLE) }
     val channel = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
     val diagnostic = UpdateChannelPolicy.allowsLocalApkSelection(channel)
     val usesSignedFeed = UpdateChannelPolicy.allowsSignedFeed(channel)
+    val manager = remember(context, channel) {
+        if (UpdateChannelPolicy.usesPlayManager(channel)) AppUpdateManagerFactory.create(context)
+        else null
+    }
     val scope = rememberCoroutineScope()
     var localChecking by remember { mutableStateOf(false) }
     var localInstalling by remember { mutableStateOf(false) }
@@ -101,13 +104,17 @@ fun UpdateScreen() {
         }
     }
     DisposableEffect(manager, installListener) {
-        manager.registerListener(installListener)
-        onDispose { manager.unregisterListener(installListener) }
+        manager?.registerListener(installListener)
+        onDispose { manager?.unregisterListener(installListener) }
     }
 
     fun check() {
+        val playManager = manager ?: run {
+            state = UpdateState.PLAY_REQUIRED
+            return
+        }
         state = UpdateState.CHECKING
-        manager.appUpdateInfo
+        playManager.appUpdateInfo
             .addOnSuccessListener { info ->
                 if (info.installStatus() == InstallStatus.DOWNLOADED) {
                     state = UpdateState.READY_TO_INSTALL
@@ -116,7 +123,7 @@ fun UpdateScreen() {
                 ) {
                     state = UpdateState.AVAILABLE
                     if (activity != null) {
-                        manager.startUpdateFlowForResult(
+                        playManager.startUpdateFlowForResult(
                             info,
                             launcher,
                             AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
@@ -325,7 +332,7 @@ fun UpdateScreen() {
             val readyToInstall = state == UpdateState.READY_TO_INSTALL
             PrimaryButton(
                 text = strings.text(if (readyToInstall) "install_update" else "check_updates"),
-                onClick = { if (readyToInstall) manager.completeUpdate() else check() },
+                onClick = { if (readyToInstall) manager?.completeUpdate() else check() },
                 enabled = state != UpdateState.CHECKING,
                 modifier = Modifier.fillMaxWidth(),
             ) {

@@ -5,6 +5,9 @@ internal object UpdateChannelPolicy {
     fun allowsSignedFeed(channel: String): Boolean =
         channel == "diagnostic" || channel == "signed_feed"
 
+    /** Signed-feed channels must not initialize or register Google Play update listeners. */
+    fun usesPlayManager(channel: String): Boolean = !allowsSignedFeed(channel)
+
     fun allowsLocalApkSelection(channel: String): Boolean =
         channel == "diagnostic"
 

@@ -71,6 +71,27 @@ class SignedUpdateFeedTest {
         assertEquals(sha256, ready.apkSha256)
     }
 
+    @Test fun sameVersionIsOnlyAcceptedForVerifiedCurrentStatusNeverForAnUpdateOffer() {
+        assertNull(verify(installedVersion = 100000895))
+        val current = SignedUpdateFeed.verify(
+            envelope(), keyPin, feedUrl, pkg, 100000895, signer,
+            allowInstalledVersionForStatus = true,
+        )
+        assertEquals(100000895L, current?.versionCode)
+        assertNull(SignedUpdateFeed.verify(
+            envelope(manifest(version = "100000893")), keyPin, feedUrl, pkg, 100000894, signer,
+            allowInstalledVersionForStatus = true,
+        ))
+        assertNull(SignedUpdateFeed.verify(
+            envelope(tamperSignature = true), keyPin, feedUrl, pkg, 100000895, signer,
+            allowInstalledVersionForStatus = true,
+        ))
+        assertNull(SignedUpdateFeed.verify(
+            envelope(manifest(cert = "c".repeat(64))), keyPin, feedUrl, pkg, 100000895, signer,
+            allowInstalledVersionForStatus = true,
+        ))
+    }
+
     @Test fun missingOrIncorrectPinnedKeyIsRejected() {
         assertNull(verify(key = ""))
         val different = KeyPairGenerator.getInstance("EC").run {

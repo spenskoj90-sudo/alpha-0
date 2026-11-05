@@ -91,6 +91,8 @@ internal object SignedUpdateFeed {
         installedPackage: String,
         installedVersionCode: Long,
         installedSignerSha256: String,
+        // Only the feed status check may opt in: equal version is never a downloadable update.
+        allowInstalledVersionForStatus: Boolean = false,
     ): Release? {
         if (feedBytes.isEmpty() || feedBytes.size > MAX_FEED_BYTES ||
             installedVersionCode <= 0 || !hexDigest.matches(installedSignerSha256) ||
@@ -128,7 +130,9 @@ internal object SignedUpdateFeed {
             val notes = strictUtf8(notesBytes)
             val apkUri = httpsUri(apkUrl) ?: return null
             if (!packagePattern.matches(app) || app != installedPackage ||
-                version <= installedVersionCode || version > 2_100_000_000L ||
+                (version < installedVersionCode ||
+                    (version == installedVersionCode && !allowInstalledVersionForStatus)) ||
+                version > 2_100_000_000L ||
                 signer != installedSignerSha256 || !hexDigest.matches(sha256) ||
                 !acceptableNotes(notes) ||
                 origin.host != apkUri.host || origin.port != apkUri.port ||

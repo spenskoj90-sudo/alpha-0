@@ -186,6 +186,10 @@ fun UpdateScreen() {
                                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                         }
                         when (val checked = feedResult) {
+                            is FeedUpdateClient.Check.Current -> Text(
+                                strings.text("update_feed_current", checked.versionCode),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            )
                             is FeedUpdateClient.Check.Available -> {
                                 Text(strings.text("update_feed_available", checked.release.versionCode),
                                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })

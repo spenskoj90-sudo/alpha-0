@@ -23,6 +23,7 @@ internal object FeedUpdateClient {
 
     sealed interface Check {
         data class Available(val release: SignedUpdateFeed.Release) : Check
+        data class Current(val versionCode: Long) : Check
         data object NotConfigured : Check
         data object Unavailable : Check
     }
@@ -77,8 +78,12 @@ internal object FeedUpdateClient {
                 val data = readBounded(conn, FEED_CAP_BYTES)
                 val release = SignedUpdateFeed.verify(
                     data, verifyingKey, feedUrl, context.packageName, installedVersion, signer,
+                    allowInstalledVersionForStatus = true,
                 ) ?: return@withContext Check.Unavailable
-                Check.Available(release)
+                // Only a valid, pinned and signed equal-version manifest can show CURRENT.
+                // Older releases fail verification; an equal-version APK cannot be downloaded here.
+                if (release.versionCode == installedVersion) Check.Current(installedVersion)
+                else Check.Available(release)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: Exception) {

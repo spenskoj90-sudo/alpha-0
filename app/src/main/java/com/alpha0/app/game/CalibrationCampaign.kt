@@ -32,7 +32,7 @@ class CalibrationCampaign {
     private var missingOcr = 0
     private var delayedAtSave = 0
 
-    fun comparisonSummary() = CalibrationComparisonSummary(
+    internal fun comparisonSummary() = CalibrationComparisonSummary(
         count, exactPairs, differentPairs, missingOcr, delayedAtSave,
     )
     private val savedFrames = mutableSetOf<CalibrationFrameId>()

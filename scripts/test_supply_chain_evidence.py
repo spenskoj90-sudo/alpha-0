@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from supply_chain_evidence import build_evidence, canonical_digest, verify_evidence
+from supply_chain_evidence import build_evidence, canonical_digest, verify_evidence, web_components
 
 SHA = "a" * 40
 REPO = "spenskoj90-sudo/alpha-0"
@@ -86,6 +86,46 @@ class SupplyChainEvidenceTests(unittest.TestCase):
         app = json.loads((self.out / manifest["application"]["sbom"]["path"]).read_text(encoding="utf-8"))
         versions = {(item["name"], item["version"]) for item in app["components"]}
         self.assertIn(("androidx.activity:activity-compose", "1.10.1"), versions)
+
+    def test_local_link_and_registry_alias_keep_actual_identity_and_version(self):
+        path = self.root / "package-lock.json"
+        lock = json.loads(path.read_text())
+        lock["packages"].update({
+            "node_modules/minimatch": {"link": True, "resolved": "vendor/compat"},
+            "vendor/compat": {"name": "@sentinel/minimatch-legacy-compat", "version": "1.0.0", "dev": True},
+            "node_modules/parser/node_modules/minimatch": {"version": "11.0.1", "dev": True, "integrity": "sha512-actual"},
+            "node_modules/minimatch-modern": {"name": "minimatch", "version": "11.0.1", "dev": True, "integrity": "sha512-actual"},
+        })
+        path.write_text(json.dumps(lock))
+        components = {item["name"]: item for item in web_components(path)}
+        self.assertEqual(components["@sentinel/minimatch-legacy-compat"]["version"], "1.0.0")
+        self.assertEqual(components["@sentinel/minimatch-legacy-compat"]["scope"], "excluded")
+        self.assertEqual(components["minimatch"]["version"], "11.0.1")
+        self.assertEqual(components["minimatch"]["purl"], "pkg:npm/minimatch@11.0.1")
+        self.assertIn({"name": "sentinel:npm-integrity", "value": "sha512-actual"}, components["minimatch"]["properties"])
+        self.assertIn({"name": "sentinel:npm-import-alias", "value": "minimatch-modern"}, components["minimatch"]["properties"])
+        self.assertNotIn("minimatch-modern", components)
+        # The complete build/verify contract must include rather than skip local code.
+        self.build()
+        verify_evidence(self.out, expected_sha=SHA)
+
+    def test_local_link_missing_unsafe_cyclic_or_unversioned_target_fails_closed(self):
+        path = self.root / "package-lock.json"
+        original = json.loads(path.read_text())
+        for resolved, target in (
+            ("vendor/missing", None), ("../outside", {"version": "1.0.0"}),
+            ("/absolute", {"version": "1.0.0"}), ("vendor/../compat", {"version": "1.0.0"}),
+            ("vendor/compat", {"link": True, "resolved": "node_modules/minimatch"}),
+            ("vendor/compat", {"name": "@sentinel/compat"}),
+        ):
+            with self.subTest(resolved=resolved, target=target):
+                lock = json.loads(json.dumps(original))
+                lock["packages"]["node_modules/minimatch"] = {"link": True, "resolved": resolved}
+                if target is not None:
+                    lock["packages"][resolved] = target
+                path.write_text(json.dumps(lock))
+                with self.assertRaises(ValueError):
+                    web_components(path)
 
     def test_sbom_tampering_fails(self):
         manifest = self.build()

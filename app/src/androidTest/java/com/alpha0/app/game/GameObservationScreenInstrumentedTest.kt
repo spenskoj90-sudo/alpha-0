@@ -38,6 +38,28 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithText("Review defense").assertDoesNotExist()
     }
 
+    @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {
+        val install = StockGameInstall("fixture", 1)
+        GameObservationRuntime.calibration.clear()
+        val c = GameObservationRuntime.calibration.forCapture("review-fixture", install).campaign
+        assertTrue(c.record("9", "20", HealthObservation(HealthCandidate(9, 20, 0), 100),
+            120, CalibrationFrameId("review-fixture", 1), 100) != null)
+        assertTrue(c.record("10", "20", null, 200,
+            CalibrationFrameId("review-fixture", 2), 200) != null)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install,
+                    GameObservationViewState(ObservationSnapshot(
+                        status = ObservationStatus.WAITING, captureId = "review-fixture"), install),
+                    true, false, false, 300, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-calibration-review-counts").performScrollTo()
+            .assertTextContains("matching 1 · different 0 · OCR missing 1", substring = true)
+        compose.onNodeWithText("Waiting for a verified target profile").performScrollTo().assertIsDisplayed()
+        GameObservationRuntime.calibration.clear()
+    }
+
     @Test fun missingGameCannotStartCaptureEvenWithConsent() {
         compose.setContent {
             SentinelTheme(AppThemeMode.LIGHT) {

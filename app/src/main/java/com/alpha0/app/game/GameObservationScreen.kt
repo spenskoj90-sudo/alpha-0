@@ -397,6 +397,15 @@ internal fun GameObservationPanel(
                     }
                 }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSample(observation, state.installed, installed) && sampleCount < 32)
                 Text(strings.text("game_calibration_count", sampleCount))
+                if (sampleCount > 0) {
+                    val review = campaign.comparisonSummary()
+                    Text(strings.text("game_calibration_review_counts",
+                        review.exactPairs, review.differentPairs, review.missingOcr),
+                        modifier = Modifier.testTag("game-calibration-review-counts"))
+                    Text(strings.text("game_calibration_review_delay", review.delayedAtSave, review.saved))
+                    Text(strings.text("game_calibration_review_scope"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (calibrationMessage.isNotBlank()) Text(strings.text(calibrationMessage))
                 Text(strings.text("game_calibration_action_gate"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

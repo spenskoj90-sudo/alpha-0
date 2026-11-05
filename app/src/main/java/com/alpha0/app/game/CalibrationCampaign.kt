@@ -16,8 +16,25 @@ data class CalibrationSample(
     val capturedAtMs: Long,
     val savedAtMs: Long,
 )
+/** Process-local review counts, never frame-time accuracy or game-source proof. */
+internal data class CalibrationComparisonSummary(
+    val saved: Int,
+    val exactPairs: Int,
+    val differentPairs: Int,
+    val missingOcr: Int,
+    val delayedAtSave: Int,
+)
+
 class CalibrationCampaign {
     var count = 0; private set
+    private var exactPairs = 0
+    private var differentPairs = 0
+    private var missingOcr = 0
+    private var delayedAtSave = 0
+
+    fun comparisonSummary() = CalibrationComparisonSummary(
+        count, exactPairs, differentPairs, missingOcr, delayedAtSave,
+    )
     private val savedFrames = mutableSetOf<CalibrationFrameId>()
     private var boundCaptureId: String? = null
     private var lastSavedFrameSequence = 0L
@@ -57,6 +74,14 @@ class CalibrationCampaign {
         lastSavedAt = now
         savedFrames.add(frameId)
         count++
+        // Only persisted, user-entered pairs are counted; matching does not
+        // prove the captured game or the true HUD value at acquisition time.
+        when {
+            sample.observed == null -> missingOcr++
+            sample.observed.current == sample.current && sample.observed.maximum == sample.maximum -> exactPairs++
+            else -> differentPairs++
+        }
+        if (sample.ageMs > 5_000L) delayedAtSave++
         return sample
     }
 }

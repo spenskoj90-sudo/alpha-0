@@ -35,6 +35,10 @@ def pinned_ciphertext_snapshot(source: Path, max_bytes: int,
         raise TransferRejected("pinned ciphertext length, hash and path required")
     if not all(hasattr(os, name) for name in ("O_NOFOLLOW", "O_NONBLOCK", "O_CLOEXEC", "geteuid")):
         raise TransferRejected("no safe no-follow ciphertext staging support")
+    # Preserve the explicit no-symlink diagnostic. O_NOFOLLOW still protects
+    # against replacements occurring after this check.
+    if source.is_symlink():
+        raise TransferRejected("regular local age ciphertext file required")
     try:
         parent = source.parent.lstat()
         if (not stat.S_ISDIR(parent.st_mode)
@@ -44,15 +48,14 @@ def pinned_ciphertext_snapshot(source: Path, max_bytes: int,
         fd = os.open(source, flags)
         with os.fdopen(fd, "rb") as stream:
             meta = os.fstat(stream.fileno())
-            if (not stat.S_ISREG(meta.st_mode)
-                    or meta.st_size != expected_bytes
-                    or meta.st_size > max_bytes):
+            if not stat.S_ISREG(meta.st_mode) or meta.st_size > max_bytes:
                 raise TransferRejected("regular pinned ciphertext file required")
             snapshot = stream.read(max_bytes + 1)
+        if not snapshot.startswith(AGE_V1_STANZA_PREFIX):
+            raise TransferRejected("binary age v1 header missing")
         if (len(snapshot) != expected_bytes
-                or not snapshot.startswith(AGE_V1_STANZA_PREFIX)
                 or hashlib.sha256(snapshot).hexdigest() != expected_sha256):
-            raise TransferRejected("pinned ciphertext changed or binary age v1 header missing")
+            raise TransferRejected("pinned ciphertext changed")
     except (OSError, ValueError) as exc:
         if isinstance(exc, TransferRejected):
             raise

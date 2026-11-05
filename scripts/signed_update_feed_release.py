@@ -18,6 +18,9 @@ from urllib.parse import urlsplit
 MAX_APK = 256 * 1024 * 1024
 # Existing independently checked release signer; a new lineage needs a source+Owner gate.
 APPROVED_SIGNER = "2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db88e"
+# Known signed Play candidate for this same application and signing lineage.
+# A later signed or distributed candidate raises the independently reviewed floor.
+KNOWN_SIGNED_VERSION_FLOOR = 10007
 FINGERPRINT = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE = re.compile(r"^package: name='([^']+)' versionCode='([0-9]+)'", re.MULTILINE)
 CERT = re.compile(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F:]{64,95})")
@@ -70,7 +73,7 @@ def make(args):
     if origin != url(args.apk_url, apk=True):
         raise ValueError("APK must use the feed's exact HTTPS origin")
     expected = args.expected_signer.lower().replace(":", "")
-    if expected != APPROVED_SIGNER or not FINGERPRINT.fullmatch(expected) or args.previous_version < 0:
+    if expected != APPROVED_SIGNER or not FINGERPRINT.fullmatch(expected) or args.previous_version < KNOWN_SIGNED_VERSION_FLOOR:
         raise ValueError("invalid release signer or baseline")
     apk = Path(args.apk)
     if not apk.is_file() or not 0 < apk.stat().st_size <= MAX_APK:

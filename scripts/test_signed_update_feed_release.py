@@ -114,6 +114,14 @@ class OfflineFeedProducerTests(unittest.TestCase):
             make(self.args)
         self.assertFalse(self.args.output.exists())
 
+    def test_known_signed_baseline_cannot_be_reset(self):
+        for baseline in (-1, 0, 10006):
+            with self.subTest(baseline=baseline):
+                self.args.previous_version = baseline
+                with self.assertRaisesRegex(ValueError, "baseline"):
+                    make(self.args)
+                self.assertFalse(self.args.output.exists())
+
     def test_apk_modified_during_external_inspection_never_gets_signed(self):
         self.aapt2.write_text(
             "#!/bin/sh\nprintf 'replaced-by-different-APK' > \"$3\"\n"

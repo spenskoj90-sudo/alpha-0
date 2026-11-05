@@ -22,7 +22,14 @@ class OfflineFeedProducerTests(unittest.TestCase):
         self.signer = APPROVED_SIGNER
         self.aapt2 = self.p / "aapt2"
         self.apksigner = self.p / "apksigner"
-        self.aapt2.write_text("#!/bin/sh\nprintf \"package: name='com.alpha0.app' versionCode='10008' versionName='v2'\\n\"\n")
+        self.aapt2.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$2\" = permissions ]; then\n"
+            "  printf \"uses-permission: name='android.permission.REQUEST_INSTALL_PACKAGES'\\n\"\n"
+            "else\n"
+            "  printf \"package: name='com.alpha0.app' versionCode='10008' versionName='v2'\\n\"\n"
+            "fi\n"
+        )
         self.apksigner.write_text("#!/bin/sh\nprintf 'Signer #1 certificate SHA-256 digest: " + self.signer + "\\n'\n")
         self.aapt2.chmod(0o700)
         self.apksigner.chmod(0o700)
@@ -60,6 +67,22 @@ class OfflineFeedProducerTests(unittest.TestCase):
         self.assertNotEqual(0, bad.returncode)
         with self.assertRaises(FileExistsError):
             make(self.args)
+
+    def test_signed_release_rejects_debuggable_or_missing_installer_permission(self):
+        self.aapt2.write_text(
+            "#!/bin/sh\n"
+            "printf \"package: name='com.alpha0.app' versionCode='10008'\\n\"\n"
+        )
+        with self.assertRaisesRegex(ValueError, "installer permission"):
+            make(self.args)
+        self.assertFalse(self.args.output.exists())
+        self.aapt2.write_text(
+            "#!/bin/sh\n"
+            "printf \"package: name='com.alpha0.app' versionCode='10008'\\napplication-debuggable\\n\"\n"
+        )
+        with self.assertRaisesRegex(ValueError, "must not be debuggable"):
+            make(self.args)
+        self.assertFalse(self.args.output.exists())
 
     def test_identity_and_signer_fail_closed(self):
         self.args.previous_version = 10008

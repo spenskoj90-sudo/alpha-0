@@ -21,6 +21,7 @@ APPROVED_SIGNER = "2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db
 FINGERPRINT = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE = re.compile(r"^package: name='([^']+)' versionCode='([0-9]+)'", re.MULTILINE)
 CERT = re.compile(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F:]{64,95})")
+INSTALL_PERMISSION = re.compile(r"(?m)^uses-permission:\s+name='android\.permission\.REQUEST_INSTALL_PACKAGES'(?:\s|$)")
 
 
 def tool(args, *, data=None):
@@ -87,6 +88,8 @@ def make(args):
     if not package or package.group(1) != "com.alpha0.app":
         raise ValueError("APK package does not match the existing application ID")
     version = int(package.group(2))
+    if re.search(r"(?m)^application-debuggable(?:\s|$)", badging):
+        raise ValueError("signedRelease APK must not be debuggable")
     if not args.previous_version < version <= 2_100_000_000:
         raise ValueError("release version must strictly exceed distributed baseline")
     signatures = CERT.findall(tool([args.apksigner, "verify", "--print-certs", str(apk)]).decode("ascii", "strict"))
@@ -94,6 +97,11 @@ def make(args):
         raise ValueError("APK must carry the separately approved single signing certificate")
     if apk_sha256() != initial_hash:
         raise ValueError("APK bytes changed during identity inspection")
+    permissions = tool([args.aapt2, "dump", "permissions", str(apk)]).decode("utf-8", "strict")
+    if not INSTALL_PERMISSION.search(permissions):
+        raise ValueError("signedRelease APK must declare installer permission")
+    if apk_sha256() != initial_hash:
+        raise ValueError("APK bytes changed during manifest permission inspection")
     pin = base64.b64decode(args.verifying_key, validate=True)
     public = tool(["openssl", "pkey", "-in", str(args.feed_private_key), "-pubout", "-outform", "DER"])
     if not hmac.compare_digest(public, pin):

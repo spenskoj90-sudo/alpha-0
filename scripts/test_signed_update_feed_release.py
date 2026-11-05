@@ -75,6 +75,16 @@ class OfflineFeedProducerTests(unittest.TestCase):
             make(self.args)
         self.assertFalse(self.args.output.exists())
 
+    def test_apk_modified_during_external_inspection_never_gets_signed(self):
+        self.aapt2.write_text(
+            "#!/bin/sh\nprintf 'replaced-by-different-APK' > \"$3\"\n"
+            "printf \"package: name='com.alpha0.app' versionCode='10008'\\n\"\n"
+        )
+        self.aapt2.chmod(0o700)
+        with self.assertRaisesRegex(ValueError, "APK bytes changed"):
+            make(self.args)
+        self.assertFalse(self.args.output.exists())
+
     def test_bad_urls_keys_and_notes_never_produce_feed(self):
         self.args.apk_url = "https://evil.example.org/file.apk"
         with self.assertRaisesRegex(ValueError, "exact HTTPS origin"):

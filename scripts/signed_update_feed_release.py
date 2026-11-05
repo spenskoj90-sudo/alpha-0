@@ -73,6 +73,15 @@ def make(args):
     apk = Path(args.apk)
     if not apk.is_file() or not 0 < apk.stat().st_size <= MAX_APK:
         raise ValueError("APK size outside allowed bounds")
+    # Hash the candidate before invoking external inspection tools; reject a
+    # workspace race that changes the inspected file before feed signing.
+    def apk_sha256():
+        digest = hashlib.sha256()
+        with apk.open("rb") as source:
+            for block in iter(lambda: source.read(65536), b""):
+                digest.update(block)
+        return digest.hexdigest()
+    initial_hash = apk_sha256()
     badging = tool([args.aapt2, "dump", "badging", str(apk)]).decode("utf-8", "strict")
     package = PACKAGE.search(badging)
     if not package or package.group(1) != "com.alpha0.app":
@@ -83,10 +92,8 @@ def make(args):
     signatures = CERT.findall(tool([args.apksigner, "verify", "--print-certs", str(apk)]).decode("ascii", "strict"))
     if len(signatures) != 1 or signatures[0].lower().replace(":", "") != expected:
         raise ValueError("APK must carry the separately approved single signing certificate")
-    digest = hashlib.sha256()
-    with apk.open("rb") as source:
-        for block in iter(lambda: source.read(65536), b""):
-            digest.update(block)
+    if apk_sha256() != initial_hash:
+        raise ValueError("APK bytes changed during identity inspection")
     pin = base64.b64decode(args.verifying_key, validate=True)
     public = tool(["openssl", "pkey", "-in", str(args.feed_private_key), "-pubout", "-outform", "DER"])
     if not hmac.compare_digest(public, pin):
@@ -97,7 +104,7 @@ def make(args):
     note_b64 = notes(Path(args.notes).read_bytes())
     manifest = ("SENTINEL-UPDATE-v1\npackage=com.alpha0.app\n"
                 f"versionCode={version}\ncertificateSha256={expected}\n"
-                f"apkUrl={args.apk_url}\napkSha256={digest.hexdigest()}\n"
+                f"apkUrl={args.apk_url}\napkSha256={initial_hash}\n"
                 f"whatsNewBase64={note_b64}\n").encode("utf-8")
     if len(manifest) > 4096:
         raise ValueError("manifest exceeds bounded wire format")
@@ -106,12 +113,15 @@ def make(args):
     wire = b"SENTINEL-SIGNED-FEED-v1\n" + encode(manifest) + b"\n" + encode(signature) + b"\n"
     if len(wire) > 8192:
         raise ValueError("signed feed exceeds bounded wire format")
+    # Reject changes made while signing or preparing output as well.
+    if apk_sha256() != initial_hash:
+        raise ValueError("APK bytes changed before signed-feed output")
     # Local artifact only; refuse replacing a prior manifest/feed silently.
     with open(args.output, "xb") as output:
         output.write(wire)
         output.flush()
         os.fsync(output.fileno())
-    return digest.hexdigest()
+    return initial_hash
 
 
 def main(argv=None):

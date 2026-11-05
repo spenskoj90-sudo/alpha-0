@@ -32,6 +32,18 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 }
 
 internal val ENGLISH = mapOf(
+    "game_calibration_review_counts" to "Post-hoc numeric comparisons: matching %d · different %d · OCR missing %d",
+    "game_calibration_review_delay" to "Saved over 5 seconds after frame: %d / %d",
+    "game_calibration_review_scope" to "These user-entered comparisons are NOT frame-time ground truth or validated recognition accuracy. Capture app remains UNVERIFIED; no game recommendations or actions are authorized.",
+    "game_install_package" to "Installed game package: %s",
+    "game_install_signer_observed" to "Installed APK signer detected locally; publisher identity and selected capture app remain UNVERIFIED.",
+    "game_install_signer_unknown" to "Installed APK signer UNKNOWN. Game version and capture-source identity are not verified.",
+    "game_capture_revoked" to "Android ended screen sharing or its permission was revoked. Observation is OFF. A new session requires fresh consent.",
+    "game_capture_background_stop" to "Observation stopped when the screen locked or SENTINEL's task ended. Screen sharing is OFF; fresh consent is required.",
+    "game_capture_session_stop" to "Observation stopped because the account session or installed game could not be verified. Check the session and game before granting fresh consent.",
+    "game_capture_evidence_unknown" to "Current health: UNKNOWN. No fresh completed OCR candidate is available.",
+    "game_capture_evidence_recent" to "Recent OCR hypothesis · NOT verified game state",
+    "game_capture_evidence_historical" to "Historical OCR only · NOT current health",
     "game_journey_title" to "Diagnostic next step",
     "game_journey_source_status" to "Source UNVERIFIED · OCR UNCALIBRATED",
     "game_journey_actions_off" to "Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.",
@@ -429,6 +441,18 @@ internal val ENGLISH = mapOf(
 )
 
 internal val RUSSIAN = mapOf(
+    "game_calibration_review_counts" to "Сравнения после кадра: совпали %d · различаются %d · OCR не распознал %d",
+    "game_calibration_review_delay" to "Сохранено позднее 5 сек. после кадра: %d / %d",
+    "game_calibration_review_scope" to "Ручные сравнения НЕ доказывают точность OCR в момент кадра. Приложение-источник НЕ ПОДТВЕРЖДЕНО; рекомендации и действия в игре недоступны.",
+    "game_install_package" to "Пакет установленной игры: %s",
+    "game_install_signer_observed" to "Подпись установленного APK обнаружена локально; издатель и выбранное для захвата приложение НЕ ПОДТВЕРЖДЕНЫ.",
+    "game_install_signer_unknown" to "Подпись установленного APK НЕИЗВЕСТНА. Версия игры и источник захвата не подтверждены.",
+    "game_capture_revoked" to "Android завершил трансляцию экрана или отозвал разрешение. Наблюдение ВЫКЛ. Для новой сессии требуется повторное согласие.",
+    "game_capture_background_stop" to "Наблюдение остановлено после блокировки экрана или завершения задачи SENTINEL. Захват ВЫКЛ.; для новой сессии нужно согласие.",
+    "game_capture_session_stop" to "Наблюдение остановлено: не удалось подтвердить аккаунт или установленную игру. Проверьте сессию и игру перед новым согласием.",
+    "game_capture_evidence_unknown" to "Текущее здоровье: НЕИЗВЕСТНО. Нет свежих обработанных данных OCR.",
+    "game_capture_evidence_recent" to "Недавняя гипотеза OCR · состояние игры НЕ ПОДТВЕРЖДЕНО",
+    "game_capture_evidence_historical" to "Только история OCR · НЕ текущее здоровье",
     "game_journey_title" to "Следующий шаг диагностики",
     "game_journey_source_status" to "Источник НЕ ПРОВЕРЕН · OCR НЕ ОТКАЛИБРОВАН",
     "game_journey_actions_off" to "Ввод в игру: ВЫКЛ. Экран собирает только локальные диагностические данные и не разрешает рекомендации или действия.",

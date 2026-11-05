@@ -92,6 +92,15 @@ class SignedUpdateFeedTest {
         ))
     }
 
+    @Test fun pinnedPublicKeyMustUseNistP256NotAnotherEcCurve() {
+        val nonP256 = KeyPairGenerator.getInstance("EC").run {
+            initialize(ECGenParameterSpec("secp384r1"))
+            generateKeyPair()
+        }
+        assertNull(verify(key = Base64.getEncoder().encodeToString(nonP256.public.encoded)))
+        assertNotNull(verify())
+    }
+
     @Test fun missingOrIncorrectPinnedKeyIsRejected() {
         assertNull(verify(key = ""))
         val different = KeyPairGenerator.getInstance("EC").run {

@@ -30,7 +30,7 @@ class OfflineFeedProducerTests(unittest.TestCase):
             "  printf \"package: name='com.alpha0.app' versionCode='10008' versionName='v2'\\n\"\n"
             "fi\n"
         )
-        self.apksigner.write_text("#!/bin/sh\nprintf 'Signer #1 certificate SHA-256 digest: " + self.signer + "\\n'\n")
+        self.apksigner.write_text("#!/bin/sh\nprintf 'Verified using v2 scheme (APK Signature Scheme v2): true\\nSigner #1 certificate SHA-256 digest: " + self.signer + "\\n'\n")
         self.aapt2.chmod(0o700)
         self.apksigner.chmod(0o700)
         self.private = self.p / "feed-key.pem"
@@ -41,7 +41,8 @@ class OfflineFeedProducerTests(unittest.TestCase):
         self.args = SimpleNamespace(apk=self.apk, notes=self.notes, aapt2=str(self.aapt2),
             apksigner=str(self.apksigner), feed_url="https://updates.example.org/android/feed.txt",
             apk_url="https://updates.example.org/android/sentinel-v2.apk", expected_signer=self.signer,
-            previous_version=10007, feed_private_key=self.private,
+            previous_version=10007, expected_apk_sha256=hashlib.sha256(self.apk.read_bytes()).hexdigest(),
+            feed_private_key=self.private,
             verifying_key=base64.b64encode(der).decode("ascii"), output=self.p / "feed.txt")
 
     def test_wire_matches_android_contract_and_real_signature(self):
@@ -67,6 +68,21 @@ class OfflineFeedProducerTests(unittest.TestCase):
         self.assertNotEqual(0, bad.returncode)
         with self.assertRaises(FileExistsError):
             make(self.args)
+
+    def test_real_artifact_digest_and_modern_apk_signature_required(self):
+        correct = self.args.expected_apk_sha256
+        self.args.expected_apk_sha256 = "0" * 64
+        with self.assertRaisesRegex(ValueError, "independently attested"):
+            make(self.args)
+        self.args.expected_apk_sha256 = correct
+        self.apksigner.write_text(
+            "#!/bin/sh\n"
+            "printf 'Verified using v1 scheme (JAR signing): true\\n"
+            "Signer #1 certificate SHA-256 digest: " + self.signer + "\\n'\n"
+        )
+        with self.assertRaisesRegex(ValueError, "embedded v2 or v3"):
+            make(self.args)
+        self.assertFalse(self.args.output.exists())
 
     def test_signed_release_rejects_debuggable_or_missing_installer_permission(self):
         self.aapt2.write_text(

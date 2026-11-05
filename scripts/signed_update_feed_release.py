@@ -21,6 +21,7 @@ APPROVED_SIGNER = "2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db
 FINGERPRINT = re.compile(r"[0-9a-f]{64}\Z")
 PACKAGE = re.compile(r"^package: name='([^']+)' versionCode='([0-9]+)'", re.MULTILINE)
 CERT = re.compile(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F:]{64,95})")
+MODERN_APK_SIGNATURE = re.compile(r"(?m)^Verified using v(?:2|3(?:\.1)?) scheme .*: true$")
 INSTALL_PERMISSION = re.compile(r"(?m)^uses-permission:\s+name='android\.permission\.REQUEST_INSTALL_PACKAGES'(?:\s|$)")
 
 
@@ -83,6 +84,8 @@ def make(args):
                 digest.update(block)
         return digest.hexdigest()
     initial_hash = apk_sha256()
+    if not FINGERPRINT.fullmatch(args.expected_apk_sha256) or initial_hash != args.expected_apk_sha256:
+        raise ValueError("APK bytes must match independently attested candidate digest")
     badging = tool([args.aapt2, "dump", "badging", str(apk)]).decode("utf-8", "strict")
     package = PACKAGE.search(badging)
     if not package or package.group(1) != "com.alpha0.app":
@@ -92,9 +95,12 @@ def make(args):
         raise ValueError("signedRelease APK must not be debuggable")
     if not args.previous_version < version <= 2_100_000_000:
         raise ValueError("release version must strictly exceed distributed baseline")
-    signatures = CERT.findall(tool([args.apksigner, "verify", "--print-certs", str(apk)]).decode("ascii", "strict"))
+    signature_report = tool([args.apksigner, "verify", "--verbose", "--print-certs", str(apk)]).decode("ascii", "strict")
+    signatures = CERT.findall(signature_report)
     if len(signatures) != 1 or signatures[0].lower().replace(":", "") != expected:
         raise ValueError("APK must carry the separately approved single signing certificate")
+    if not MODERN_APK_SIGNATURE.search(signature_report):
+        raise ValueError("APK must verify with embedded v2 or v3 signature scheme")
     if apk_sha256() != initial_hash:
         raise ValueError("APK bytes changed during identity inspection")
     permissions = tool([args.aapt2, "dump", "permissions", str(apk)]).decode("utf-8", "strict")
@@ -135,7 +141,7 @@ def make(args):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     for key in ("apk", "aapt2", "apksigner", "feed-url", "apk-url", "notes",
-                "feed-private-key", "verifying-key", "expected-signer", "output"):
+                "feed-private-key", "verifying-key", "expected-signer", "expected-apk-sha256", "output"):
         p.add_argument("--" + key, required=True, type=Path if key in ("apk", "notes", "feed-private-key", "output") else str)
     p.add_argument("--previous-version", type=int, required=True)
     args = p.parse_args(argv)

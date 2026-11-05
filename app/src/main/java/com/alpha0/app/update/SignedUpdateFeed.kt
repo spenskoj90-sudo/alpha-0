@@ -5,9 +5,12 @@ import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
+import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.interfaces.ECPublicKey
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
@@ -62,6 +65,18 @@ internal object SignedUpdateFeed {
             uri.isOpaque || uri.host.endsWith(".") || uri.host.contains("%")
         ) return null
         return uri
+    }
+
+    /** Require NIST P-256 itself, not merely some other curve with a 256-bit field. */
+    private fun isNamedP256(key: ECPublicKey): Boolean {
+        val parameters = AlgorithmParameters.getInstance("EC")
+        parameters.init(ECGenParameterSpec("secp256r1"))
+        val expected = parameters.getParameterSpec(ECParameterSpec::class.java)
+        val actual = key.params
+        return actual.curve == expected.curve &&
+            actual.generator == expected.generator &&
+            actual.order == expected.order &&
+            actual.cofactor == expected.cofactor
     }
 
     /** Reject malformed feed URLs before network access, not only after signature verification. */
@@ -126,7 +141,7 @@ internal object SignedUpdateFeed {
             val key = KeyFactory.getInstance("EC").generatePublic(
                 X509EncodedKeySpec(Base64.getDecoder().decode(verifyingKeyDerBase64)),
             ) as? ECPublicKey ?: return null
-            if (key.params.curve.field.fieldSize != 256) return null
+            if (!isNamedP256(key)) return null
             val verifier = Signature.getInstance("SHA256withECDSA")
             verifier.initVerify(key)
             verifier.update(manifestBytes)

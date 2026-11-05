@@ -45,7 +45,9 @@ Never bundle signing private keys, APK keystores, provider tokens or recovery se
 `scripts/signed_update_feed_release.py` is the offline producer for the exact
 Android wire format above. It requires an **already signed** APK, the real Android
 SDK `aapt2` and `apksigner` binaries, the highest approved distributed
-`versionCode`, existing `com.alpha0.app` signer fingerprint, a reviewed
+`versionCode`, the independently attested exact APK SHA-256, existing
+`com.alpha0.app` signer fingerprint, an embedded verified APK signature
+scheme v2/v3, a reviewed
 UTF-8 notes file, an exact HTTPS feed/APK origin, an approved **public** P-256
 SPKI pin, and an Owner-controlled **separate** P-256 feed private-key file.
 It never creates/exports keys, uploads artifacts, updates a server or invokes

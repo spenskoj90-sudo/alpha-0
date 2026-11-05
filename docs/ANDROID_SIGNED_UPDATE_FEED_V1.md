@@ -40,5 +40,32 @@ Both public build fields default to empty, and are required together:
 
 Never bundle signing private keys, APK keystores, provider tokens or recovery secrets. The feed verifying key and APK signing certificate are independent. Historical SENTINEL signer and distributed APK lineage MUST be checked before actual signed APK delivery. An empty, inaccessible or invalid feed is **NOT_CONFIGURED / UNAVAILABLE**, not proof of latest version.
 
+## Offline feed creation (SOURCE_ONLY; NOT a publication authorization)
+
+`scripts/signed_update_feed_release.py` is the offline producer for the exact
+Android wire format above. It requires an **already signed** APK, the real Android
+SDK `aapt2` and `apksigner` binaries, the highest approved distributed
+`versionCode`, existing `com.alpha0.app` signer fingerprint, a reviewed
+UTF-8 notes file, an exact HTTPS feed/APK origin, an approved **public** P-256
+SPKI pin, and an Owner-controlled **separate** P-256 feed private-key file.
+It never creates/exports keys, uploads artifacts, updates a server or invokes
+Android installation. Its output file must not already exist. It rejects a
+different installed-package lineage, wrong APK signer, non-increasing version,
+different HTTPS origin, malformed notes, or a feed key not matching the pin.
+
+The signer pin is fixed to the currently verified existing release identity in
+source; changing that pin requires independent certificate-lineage and Owner
+review. The manifest signature key is distinct from the Android APK signer.
+A signed release-candidate may be processed only **after** the dedicated
+release-signing/restore/Owner gates permit producing and retaining that APK.
+The current release-candidate workflow still builds Play `release`, not
+`signedRelease`; no non-Play artifact/feed publication is established.
+
+`python scripts/test_signed_update_feed_release.py` exercises real OpenSSL
+P-256 signing and tamper checks against **synthetic APK metadata**. These tests
+cannot establish a real `apksigner` result, actual package bytes, a hosted
+HTTPS feed or the same-cert over-install on either Owner device. Production
+manifest generation and publication remain **NOT_RUN**.
+
 ## Evidence gate
 Source/unit regressions cover tampering, wrong key, different signer, package mismatch, rollback, invalid source, malformed fields and notes. Android CI/emulator is supplemental. Before any release, require explicit owner-controlled signing/recovery acceptance, then an opt-in same-cert v1→v2 over-install without data deletion on **Infinix Zero 30** and **Poco C71**. Capture installed package, versionCode, signer, source SHA, retained local data, user consent and real device UX/accessibility. Both real-device upgrades remain **NOT_RUN** until actually performed.

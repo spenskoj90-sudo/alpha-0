@@ -93,7 +93,8 @@ if command -v python >/dev/null 2>&1; then
     scripts/test_telemetry_contract.py scripts/test_provider_runtime_state.py scripts/test_branch_hygiene.py \
     scripts/final_release_acceptance.py scripts/test_final_release_acceptance.py \
     scripts/physical_test_artifact.py scripts/test_physical_test_artifact.py \
-    scripts/staging_surface_smoke.py scripts/test_staging_surface_smoke.py
+    scripts/staging_surface_smoke.py scripts/test_staging_surface_smoke.py \
+    scripts/signed_update_feed_release.py scripts/test_signed_update_feed_release.py
   check 'Android product shell invariants' python scripts/test_android_product_shell.py
   check 'Change classification invariants' python scripts/test_change_classification.py
   check 'Exact-SHA orchestration harness invariants' python scripts/test_sentinel_orchestration.py
@@ -102,6 +103,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py
+  check 'Offline signed feed P-256 contract (synthetic APK identity)' python scripts/test_signed_update_feed_release.py
   check 'Legacy signer checker synthetic-only invariants' python scripts/test_legacy_signer_check.py
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py
   check 'Design system invariants' python scripts/test_design_system.py

@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from b2_atomic_download import DownloadRejected, SHA256, publish_verified_ciphertext
+from b2_upload_snapshot import pinned_ciphertext_snapshot
 from b2_target_contract import validate_target
-from b2_versioned_transfer import KEY, MAX_STAGE_BYTES, TransferRejected, validate_staged_age_ciphertext
+from b2_versioned_transfer import KEY, MAX_STAGE_BYTES, TransferRejected
 
 class B2S3Transport:
     """Restrict a preconfigured S3 client to one role and five exact operations.
@@ -64,19 +65,19 @@ class B2S3Transport:
                              Prefix=kw["prefix"], MaxKeys=10)
 
         if operation == "put-object" and self.role == "writer":
-            if (set(kw) != {"bucket", "key", "path"}
+            if (set(kw) != {"bucket", "key", "path", "expected_sha256", "expected_bytes"}
                     or not isinstance(kw["key"], str)
                     or not KEY.fullmatch(kw["key"])):
                 raise TransferRejected("unsafe B2 upload request")
-            source = kw["path"]
-            size = validate_staged_age_ciphertext(source, self.max_ciphertext_bytes)
-            try:
-                with source.open("rb") as stream:
-                    return self._sdk("put_object", Bucket=self.bucket,
-                                     Key=kw["key"], Body=stream,
-                                     ContentLength=size, ContentType="application/octet-stream")
-            except (OSError, ValueError):
-                raise TransferRejected("encrypted source could not be read") from None
+            snapshot = pinned_ciphertext_snapshot(
+                kw["path"], self.max_ciphertext_bytes,
+                kw["expected_sha256"], kw["expected_bytes"])
+            # Only preverified immutable bytes enter the S3 SDK; a mutable
+            # filesystem path or stream must never cross the PUT boundary.
+            return self._sdk("put_object", Bucket=self.bucket,
+                             Key=kw["key"], Body=snapshot,
+                             ContentLength=len(snapshot),
+                             ContentType="application/octet-stream")
 
         if operation == "head-object" and self.role == "reader":
             key, version = self._read_key_version(kw, {"bucket", "key", "version_id"})

@@ -128,7 +128,8 @@ def stage_and_verify(
     before, old_hidden = _versions(uploader, bucket, key)
     if before or old_hidden:
         raise TransferRejected("object key already used; refusing overwrite or hidden generation")
-    response = uploader("put-object", bucket=bucket, key=key, path=ciphertext)
+    response = uploader("put-object", bucket=bucket, key=key, path=ciphertext,
+                        expected_sha256=digest, expected_bytes=size)
     version = response.get("VersionId") if isinstance(response, dict) else None
     try:
         require_version_id(version)

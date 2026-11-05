@@ -48,7 +48,8 @@ class FakeS3:
 
     def put_object(self, **kwargs):
         self._call("put_object", **{k: v for k, v in kwargs.items() if k != "Body"})
-        self.state["bytes"] = kwargs["Body"].read()
+        body = kwargs["Body"]
+        self.state["bytes"] = body if isinstance(body, bytes) else body.read()
         return {"VersionId": VERSION}
 
     def head_object(self, **kwargs):
@@ -81,7 +82,7 @@ class B2S3TransportTests(unittest.TestCase):
         acl = writer("get-bucket-acl", bucket=BUCKET)
         self.assertEqual(acl["Owner"]["ID"], OWNER)
         self.assertEqual(writer("list-object-versions", bucket=BUCKET, prefix=KEY, max_keys=10)["Versions"], [])
-        written = writer("put-object", bucket=BUCKET, key=KEY, path=self.source)
+        written = writer("put-object", bucket=BUCKET, key=KEY, path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertEqual(written["VersionId"], VERSION)
         self.assertEqual(reader("list-object-versions", bucket=BUCKET, prefix=KEY, max_keys=10)["Versions"][0]["VersionId"], VERSION)
         self.assertEqual(reader("head-object", bucket=BUCKET, key=KEY, version_id=VERSION)["ContentLength"], len(PAYLOAD))
@@ -99,7 +100,7 @@ class B2S3TransportTests(unittest.TestCase):
         with self.assertRaises(TransferRejected):
             self.writer("get-object", bucket=BUCKET, key=KEY, version_id=VERSION, output_path=self.output, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         with self.assertRaises(TransferRejected):
-            self.reader("put-object", bucket=BUCKET, key=KEY, path=self.source)
+            self.reader("put-object", bucket=BUCKET, key=KEY, path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.writer_client.calls or self.reader_client.calls)
 
     def test_never_allow_delete_hide_public_acl_or_unversioned_get(self):
@@ -127,7 +128,7 @@ class B2S3TransportTests(unittest.TestCase):
 
     def test_refuse_cross_bucket_and_unscoped_listing(self):
         with self.assertRaises(TransferRejected):
-            self.writer("put-object", bucket="other-bucket", key=KEY, path=self.source)
+            self.writer("put-object", bucket="other-bucket", key=KEY, path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         for prefix, max_keys in (("sentinel/", 10), (KEY, 1000)):
             with self.assertRaises(TransferRejected):
                 self.reader("list-object-versions", bucket=BUCKET, prefix=prefix, max_keys=max_keys)
@@ -136,7 +137,7 @@ class B2S3TransportTests(unittest.TestCase):
     def test_refuse_plaintext_renamed_age_before_any_sdk_operation(self):
         self.source.write_bytes(b"pg_dump plaintext not encrypted" * 20)
         with self.assertRaisesRegex(TransferRejected, "binary age v1 header"):
-            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source)
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.writer_client.calls)
 
     def test_refuse_symlink_source_before_any_sdk_operation(self):
@@ -145,16 +146,46 @@ class B2S3TransportTests(unittest.TestCase):
         self.source.unlink()
         self.source.symlink_to(target)
         with self.assertRaisesRegex(TransferRejected, "regular local age"):
-            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source)
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.writer_client.calls)
 
     def test_refuse_bad_key_and_large_ciphertext_before_upload(self):
         with self.assertRaises(TransferRejected):
-            self.writer("put-object", bucket=BUCKET, key="../unsafe", path=self.source)
+            self.writer("put-object", bucket=BUCKET, key="../unsafe", path=self.source, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         large = self.root / "large.age"
         large.write_bytes(b"Z" * 10001)
         with self.assertRaises(TransferRejected):
-            self.writer("put-object", bucket=BUCKET, key=KEY, path=large)
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=large, expected_sha256=HASH, expected_bytes=len(PAYLOAD))
+        self.assertFalse(self.writer_client.calls)
+
+
+    def test_stale_pin_rejects_same_size_source_replacement_before_s3(self):
+        self.source.write_bytes(PAYLOAD[:-1] + b"X")
+        with self.assertRaises(TransferRejected):
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source,
+                        expected_sha256=HASH, expected_bytes=len(PAYLOAD))
+        self.assertFalse(self.writer_client.calls)
+
+    def test_post_validation_mutation_cannot_change_sdk_body(self):
+        path = self.source
+
+        class MutatingS3(FakeS3):
+            def put_object(self, **kwargs):
+                path.write_bytes(b"Z" * len(PAYLOAD))
+                return super().put_object(**kwargs)
+
+        fake = MutatingS3()
+        writer = B2S3Transport(fake, role="writer", endpoint=ENDPOINT,
+                               region=REGION, bucket=BUCKET, max_ciphertext_bytes=10000)
+        writer("put-object", bucket=BUCKET, key=KEY, path=self.source,
+               expected_sha256=HASH, expected_bytes=len(PAYLOAD))
+        self.assertEqual(fake.state["bytes"], PAYLOAD)
+
+    def test_non_private_staging_rejected_before_s3(self):
+        self.root.chmod(0o755)
+        with self.assertRaises(TransferRejected):
+            self.writer("put-object", bucket=BUCKET, key=KEY, path=self.source,
+                        expected_sha256=HASH, expected_bytes=len(PAYLOAD))
         self.assertFalse(self.writer_client.calls)
 
     def test_version_required_before_head_and_get(self):

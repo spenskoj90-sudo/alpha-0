@@ -44,7 +44,11 @@ class FakeB2:
         if operation == "put-object":
             if self.role != "writer":
                 raise AssertionError("reader cannot upload")
-            self.state["object"] = args["path"].read_bytes()
+            payload = args["path"].read_bytes()
+            if (len(payload) != args["expected_bytes"]
+                    or hashlib.sha256(payload).hexdigest() != args["expected_sha256"]):
+                raise TransferRejected("pinned ciphertext changed before synthetic PUT")
+            self.state["object"] = payload
             return {"VersionId": self.state.get("upload_version", VERSION)}
         if operation == "head-object":
             return {"VersionId": self.state.get("head_version", VERSION),
@@ -89,6 +93,25 @@ class B2VersionedTransferTests(unittest.TestCase):
             "list-object-versions", "head-object", "get-object"])
         self.assertTrue(all(x not in self.writer.calls + self.reader.calls
                             for x in ("delete-object", "delete-objects", "put-bucket-acl")))
+
+    def test_put_receives_exact_original_sha_and_length_pins(self):
+        self.go()
+        self.assertEqual(self.state["object"], PAYLOAD)
+
+    def test_changed_source_after_preflight_fails_before_synthetic_put(self):
+        source = self.source
+        state = self.state
+
+        class MutatingB2(FakeB2):
+            def __call__(self, operation, **args):
+                if operation == "list-object-versions" and "object" not in state:
+                    source.write_bytes(PAYLOAD[:-1] + b"X")
+                return super().__call__(operation, **args)
+
+        self.writer = MutatingB2(self.state, "writer")
+        with self.assertRaises(TransferRejected):
+            self.go()
+        self.assertNotIn("object", self.state)
 
     def test_wrong_owner_fails_before_upload(self):
         with self.assertRaises(TransferRejected):

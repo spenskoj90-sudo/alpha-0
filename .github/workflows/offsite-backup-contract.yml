@@ -21,6 +21,8 @@ on:
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
       - "scripts/b2_s3_transport.py"
+      - "scripts/b2_upload_snapshot.py"
+      - "scripts/test_b2_upload_snapshot.py"
       - "scripts/test_b2_s3_transport.py"
       - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
@@ -44,6 +46,8 @@ on:
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
       - "scripts/b2_s3_transport.py"
+      - "scripts/b2_upload_snapshot.py"
+      - "scripts/test_b2_upload_snapshot.py"
       - "scripts/test_b2_s3_transport.py"
       - "scripts/test_b2_versioned_transfer.py"
       - "docs/OFFSITE_BACKUP_AND_RECOVERY_V2.md"
@@ -67,6 +71,7 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_b2_target_contract.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_s3_transport.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_upload_snapshot.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_atomic_download.py' -v
           python3 -m unittest discover -s scripts -p 'test_pg18_role_graph_contract.py' -v
           python3 -m unittest discover -s scripts -p 'test_pg18_export_readiness.py' -v

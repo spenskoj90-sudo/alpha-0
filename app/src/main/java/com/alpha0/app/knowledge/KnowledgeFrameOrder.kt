@@ -16,6 +16,12 @@ internal class KnowledgeFrameOrder {
         blocked = true
     }
 
+    @Synchronized fun isBlocked(operation: Long): Boolean = epoch == operation && blocked
+
+    @Synchronized fun rejectMissingAfterObservation(operation: Long) {
+        if (epoch == operation && last != null) blocked = true
+    }
+
     @Synchronized fun accepts(operation: Long, value: TrustedKnowledgeObservation, now: Long, maxAge: Long): Boolean {
         if (epoch != null && operation < epoch!!) return false
         if (epoch != operation) { epoch = operation; last = null; lastNow = -1; blocked = false }

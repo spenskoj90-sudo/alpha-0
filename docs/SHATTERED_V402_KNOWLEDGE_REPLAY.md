@@ -52,3 +52,9 @@ None of these freshness checks can create source identity. Enabling a real adapt
 still requires independently supportable exact target/package/signer/version/source/
 session proof plus licensed real frames, calibration, reviewed challenge/inventory
 recognition and actual outcome evaluation. Do not substitute synthetic fixture proof.
+
+The presentation passes every non-null observation through the cache fence; a
+foreign source cannot bypass invalidation and revive an older recommendation.
+Before the first observation it reports a waiting state; loss after an accepted
+observation latches the epoch unavailable until the session is cleared. These
+are synthetic lifecycle guarantees, not proof of selected-game identity.

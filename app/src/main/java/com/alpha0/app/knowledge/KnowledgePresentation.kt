@@ -38,8 +38,14 @@ internal class KnowledgePresentation(private val getBinding: () -> TrustedKnowle
         val status = stored.status()
         if (status.state != "READY") return if (last.state in setOf("DENIED", "UNAVAILABLE", "LOADING")) last else KnowledgeViewState("UNAVAILABLE")
         val observation = getObservation()
-        val items = if (observation?.binding == current && observation.sourceId == current.sourceId) stored.evaluate(observation, locale()) else emptyList()
-        return if (running.get() && getBinding() == current) KnowledgeViewState("READY", items) else KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE")
+        val items = if (observation == null) {
+            stored.observationUnavailable()
+            emptyList()
+        } else stored.evaluate(observation, locale())
+        if (!running.get() || getBinding() != current) return KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE")
+        if (stored.observationBlocked()) return KnowledgeViewState("UNAVAILABLE")
+        if (observation == null) return KnowledgeViewState("WAITING_FOR_VERIFIED_OBSERVATION")
+        return KnowledgeViewState("READY", items)
     }
     fun start() = synchronized(lifecycle) {
         if (closed.get()) return@synchronized

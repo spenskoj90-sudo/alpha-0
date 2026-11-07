@@ -226,6 +226,14 @@ internal class KnowledgeCache(private val directory: File, private val authority
             throw KnowledgeFailure("KNOWLEDGE_INVALID")
         } finally { if (requestBudget != null) budget.compareAndSet(requestBudget, null); pending.set(false) }
     }
+    fun observationBlocked(): Boolean {
+        val lease = active ?: return false
+        return lease.epoch == epoch.get() && frameOrder.isBlocked(lease.epoch)
+    }
+    fun observationUnavailable() {
+        val lease = active ?: return
+        if (lease.epoch == epoch.get()) frameOrder.rejectMissingAfterObservation(lease.epoch)
+    }
     fun evaluate(observation: TrustedKnowledgeObservation, locale: String): List<KnowledgeRecommendation> {
         val lease = active ?: return emptyList()
         if (lease.epoch != epoch.get() || status().state != "READY") return emptyList()

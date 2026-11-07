@@ -313,6 +313,7 @@ internal fun GameObservationPanel(
                 Text(strings.text("game_knowledge_title"), style = MaterialTheme.typography.titleMedium)
                 val label = when (knowledge.state) {
                     "WAITING_FOR_VERIFIED_PROFILE" -> "game_knowledge_waiting"
+                    "WAITING_FOR_VERIFIED_OBSERVATION" -> "game_knowledge_observation_waiting"
                     "LOADING" -> "game_knowledge_loading"
                     "READY" -> "game_knowledge_ready"
                     "DENIED" -> "game_knowledge_denied"

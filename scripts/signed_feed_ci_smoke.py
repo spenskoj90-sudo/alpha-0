@@ -2,6 +2,7 @@
 """Real Android tool smoke, EPHEMERAL TEST KEYS, never release evidence/upload."""
 import base64
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -58,6 +59,13 @@ def main():
                 feed.require(str(error) == 'single existing signer required', 'unexpected real APK rejection')
             else:
                 raise ValueError('CI signer was accepted as protected release signer')
+            receipt = dict(schema='sentinel.signed-feed-ci-receipt.v1', status='CI_ONLY',
+                sourceSha=sha, channel='signed_feed', versionCode=code,
+                apkSha256=compiled['apkSha256'], compiledPayloadSha256=compiled['compiledPayloadSha256'],
+                ephemeralCertificateSha256=cert_hash, protectedSignerVerified=False,
+                installableArtifactRetained=False, productionPublished=False)
+            Path('signed-feed-ci-receipt.json').write_text(json.dumps(receipt, sort_keys=True) + '\n')
+            print('SIGNED_FEED_CI_RECEIPT ' + json.dumps(receipt, sort_keys=True))
             print('PASS real APK aapt2/permissions/non-debuggable/typed DEX/source/channel/feed/P-256 and ephemeral v2/v3; release signer rejected')
             print('SYNTHETIC CI ONLY: protected signing/attestation/publication/physical acceptance NOT_RUN')
         finally:

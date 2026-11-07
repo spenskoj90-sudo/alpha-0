@@ -61,6 +61,7 @@ jobs:
           name: alpha-0-debug-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             android-debug-ci.sha256
+            signed-feed-ci-receipt.json
             ANDROID_DEBUG_CI_ONLY.txt
           if-no-files-found: error
           retention-days: 14

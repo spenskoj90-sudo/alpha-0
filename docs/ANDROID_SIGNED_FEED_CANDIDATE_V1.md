@@ -84,3 +84,9 @@ They establish rejection contracts, not a real protected signed APK or attestati
 A protected-main run is deliberately NOT_RUN: no signing dispatch is authorized.
 Real approved signedRelease bytes, origin/SPKI, hosted feed, physical same-cert
 upgrade/data retention, native TalkBack and OWNER_ACCEPTED remain separate gates.
+
+Ordinary Android CI additionally exercises real SDK aapt2/apksigner and the actual
+minified signedRelease DEX using disposable test-only keys. It explicitly rejects
+that certificate as the protected signer. Only `signed-feed-ci-receipt.json`
+(source/APK/payload/certificate hashes, CI_ONLY and false publication/lineage claims)
+is retained alongside the existing CI evidence; the installable test APK is deleted.

@@ -228,12 +228,17 @@ internal class KnowledgeCache(private val directory: File, private val authority
     }
     fun evaluate(observation: TrustedKnowledgeObservation, locale: String): List<KnowledgeRecommendation> {
         val lease = active ?: return emptyList()
-        if (lease.epoch != epoch.get() || status().state != "READY" || observation.binding != lease.binding || observation.sourceId != lease.binding.sourceId) return emptyList()
+        if (lease.epoch != epoch.get() || status().state != "READY") return emptyList()
+        if (observation.binding != lease.binding || observation.sourceId != lease.binding.sourceId) {
+            frameOrder.reject(lease.epoch); return emptyList()
+        }
         val mono = monotonicClock(); val wall = wallClock()
         val now = maxOf(wall, lease.serverTime + mono - lease.started)
         if (now >= lease.pack.validUntilMs || observation.observedAtMs <= 0 || observation.observedAtMs > now ||
             now - observation.observedAtMs > lease.pack.maxStateAgeMs || observation.observedMonotonicMs < 0 ||
-            observation.observedMonotonicMs > mono || mono - observation.observedMonotonicMs > lease.pack.maxStateAgeMs) return emptyList()
+            observation.observedMonotonicMs > mono || mono - observation.observedMonotonicMs > lease.pack.maxStateAgeMs) {
+            frameOrder.reject(lease.epoch); return emptyList()
+        }
         if (!frameOrder.accepts(lease.epoch, observation, mono, lease.pack.maxStateAgeMs)) return emptyList()
         if (records[key(lease.binding.profile)]?.digest != lease.pack.digest) return emptyList()
         val result = lease.pack.evaluate(observation.signals, locale, observation.observedAtMs)

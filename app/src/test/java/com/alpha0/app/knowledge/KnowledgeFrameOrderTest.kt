@@ -39,6 +39,22 @@ class KnowledgeFrameOrderTest {
         assertFalse(guard.accepts(1, frame(3, 140), 129, 1000))
         assertFalse(guard.accepts(1, frame(3, 120), 140, 1000))
     }
+    @Test fun invalidFrameBlocksPreviouslyAcceptedAndNewFramesUntilNewEpoch() {
+        val guard = KnowledgeFrameOrder()
+        assertTrue(guard.accepts(1, frame(), 110, 1000))
+        assertFalse(guard.accepts(1, frame().copy(signals = mapOf("health" to 0.2)), 111, 1000))
+        assertFalse(guard.accepts(1, frame(), 112, 1000))
+        assertFalse(guard.accepts(1, frame(2, 120), 130, 1000))
+        assertTrue(guard.accepts(2, frame(2, 120), 130, 1000))
+    }
+    @Test fun lateOldEpochCannotClearNewEpochRejection() {
+        val guard = KnowledgeFrameOrder()
+        assertTrue(guard.accepts(2, frame(), 110, 1000))
+        guard.reject(2)
+        assertFalse(guard.accepts(1, frame(), 110, 1000))
+        assertFalse(guard.accepts(2, frame(), 111, 1000))
+        assertTrue(guard.accepts(3, frame(), 112, 1000))
+    }
     @Test fun differentLeaseEpochDoesNotTransferFrameAuthority() {
         val guard = KnowledgeFrameOrder(); assertTrue(guard.accepts(1, frame(2, 120), 130, 1000))
         // The cache, not this ordering guard, separately requires a new trusted

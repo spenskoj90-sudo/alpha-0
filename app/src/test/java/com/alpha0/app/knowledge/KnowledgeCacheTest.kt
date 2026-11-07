@@ -43,6 +43,22 @@ class KnowledgeCacheTest {
             assertTrue(cache.evaluate(observation(1500), "en").isEmpty())
         } finally { cache.close(); directory.deleteRecursively() }
     }
+    @Test fun invalidSourceCannotRestorePreviousAdviceWithoutNewEpoch() {
+        val directory = Files.createTempDirectory("knowledge-source-fence-").toFile()
+        val transport = FixtureTransport().apply { reply = manifest(raw) }
+        val cache = KnowledgeCache(directory, "fixture-origin", transport, { 1500L }, { 10L })
+        try {
+            cache.refresh(binding())
+            assertEquals(1, cache.evaluate(observation(), "en").size)
+            assertTrue(cache.evaluate(observation(source = "foreign-source"), "en").isEmpty())
+            assertTrue(cache.evaluate(observation(), "en").isEmpty())
+            cache.refresh(binding())
+            assertTrue(cache.evaluate(observation(), "en").isEmpty())
+            cache.clear()
+            cache.refresh(binding())
+            assertEquals(1, cache.evaluate(observation(), "en").size)
+        } finally { cache.close(); directory.deleteRecursively() }
+    }
     @Test fun restartRevalidatesDigestAndRequiresNewAuthenticatedLease() {
         val directory = Files.createTempDirectory("knowledge-test-").toFile()
         val transport = FixtureTransport().apply { reply = manifest(raw) }

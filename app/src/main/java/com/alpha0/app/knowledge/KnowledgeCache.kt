@@ -38,7 +38,24 @@ interface KnowledgeDistributionTransport {
 
 // These values come only from the main/service-owned reviewed adapter closure.
 // Game UI/client source_verified assertions never construct the shipped binding.
-internal data class TrustedKnowledgeBinding(val profile: KnowledgeProfile, val sourceId: String, val sessionId: String, val authority: String)
+/** Exact identity inside a service-owned binding, never an installed-package or
+ * OCR claim. No shipped attestor currently issues one for MediaProjection. */
+internal data class KnowledgeTargetIdentity(val packageName: String, val certificateSha256: String,
+    val versionName: String, val versionCode: Long, val upstreamSourceSha: String) {
+    init {
+        require(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+").matches(packageName))
+        require(Regex("[0-9a-f]{64}").matches(certificateSha256))
+        require(versionName.isNotBlank() && versionName.length <= 64 && versionCode in 1..2100000000L)
+        require(Regex("[0-9a-f]{40}").matches(upstreamSourceSha))
+    }
+}
+internal data class TrustedKnowledgeBinding(val profile: KnowledgeProfile, val sourceId: String,
+    val sessionId: String, val authority: String, val target: KnowledgeTargetIdentity) {
+    init {
+        require(profile.patch == target.versionName)
+        require(sourceId.isNotBlank() && sourceId.length <= 128 && sessionId.isNotBlank() && sessionId.length <= 128)
+    }
+}
 internal data class TrustedKnowledgeObservation(val binding: TrustedKnowledgeBinding, val sourceId: String,
     val observedAtMs: Long, val signals: Map<String, Any?>, val observedMonotonicMs: Long,
     val frameId: String, val frameSequence: Long, val frameCapturedMonotonicMs: Long, val ocrCompletedMonotonicMs: Long)

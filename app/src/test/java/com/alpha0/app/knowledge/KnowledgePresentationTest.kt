@@ -23,7 +23,7 @@ class KnowledgePresentationTest {
     @Test fun lateFetchAfterStopCannotPublishReadyAndRestartNeedsFreshManifest() {
         val entered = CountDownLatch(1); val finish = CountDownLatch(1); val fetched = CountDownLatch(1)
         val raw = KnowledgeFixture.bytes(); val digest = KnowledgeFixture.digest(raw)
-        val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source-a", "session-a", "http://127.0.0.1")
+        val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source-a", "session-a", "http://127.0.0.1", KnowledgeFixture.target)
         val directory = Files.createTempDirectory("presentation").toFile()
         val transport = object : KnowledgeDistributionTransport {
             override fun manifest(profile: KnowledgeProfile, knownDigest: String?, budget: KnowledgeBudget): JSONObject {

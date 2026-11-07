@@ -39,6 +39,11 @@ Production capture stays DEBUG-gated; no mechanistic DEBUG replacement or action
 authority is introduced. OFF/Advisory/Confirm/Bounded consent, permission, Stop,
 action-grade proof and outcome gates remain independent and default-deny.
 
+The service binding now requires exact package, certificate digest, versionName,
+versionCode and upstream source SHA in addition to target profile/source/session.
+These are immutable service-owned values; their type validation never grants trust.
+No shipped producer creates them from installed metadata or OCR.
+
 The consumer now additionally binds ordered frame ID/sequence and frame/OCR
 monotonic timestamps. Future, stale, reordered, changed duplicate-frame and
 inconsistent OCR records yield no advice. Stop/revoke/session changes retain cache

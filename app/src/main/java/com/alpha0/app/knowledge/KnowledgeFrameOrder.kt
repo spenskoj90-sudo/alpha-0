@@ -11,7 +11,7 @@ internal class KnowledgeFrameOrder {
 
     @Synchronized fun accepts(operation: Long, value: TrustedKnowledgeObservation, now: Long, maxAge: Long): Boolean {
         if (epoch != operation) { epoch = operation; last = null; lastNow = -1 }
-        if (now < 0 || now < lastNow || value.frameSequence <= 0 || value.frameId.isBlank() ||
+        if (now < 0 || now < lastNow || value.frameSequence <= 0 || value.frameId.isBlank() || value.frameId.length > 128 || value.sourceId != value.binding.sourceId ||
             value.frameCapturedMonotonicMs < 0 || value.ocrCompletedMonotonicMs < value.frameCapturedMonotonicMs ||
             value.observedMonotonicMs != value.ocrCompletedMonotonicMs || value.ocrCompletedMonotonicMs > now ||
             now - value.frameCapturedMonotonicMs > maxAge) return false

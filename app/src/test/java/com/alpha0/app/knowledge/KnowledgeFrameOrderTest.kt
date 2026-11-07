@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class KnowledgeFrameOrderTest {
-    private val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source", "session", "origin")
+    private val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source", "session", "origin", KnowledgeFixture.target)
     private fun frame(sequence: Long = 1, at: Long = 100) = TrustedKnowledgeObservation(binding, "source",
         1000 + at, mapOf("health" to 0.1), at + 10, "frame-$sequence", sequence, at, at + 10)
     @Test fun monotonicFramesAndImmutableRepeatedRenderingAreAllowed() {
@@ -17,6 +17,10 @@ class KnowledgeFrameOrderTest {
         for (bad in listOf(frame().copy(sourceId = "foreign"),
                 frame().copy(binding = binding.copy(sessionId = "foreign")),
                 frame().copy(binding = binding.copy(sourceId = "other")),
+                frame().copy(binding = binding.copy(target = binding.target.copy(packageName = "foreign.game"))),
+                frame().copy(binding = binding.copy(target = binding.target.copy(certificateSha256 = "c".repeat(64)))),
+                frame().copy(binding = binding.copy(target = binding.target.copy(versionCode = 2))),
+                frame().copy(binding = binding.copy(target = binding.target.copy(upstreamSourceSha = "d".repeat(40)))),
                 frame().copy(signals = mapOf("health" to 0.2)),
                 frame().copy(frameId = "changed"), frame().copy(observedAtMs = 999),
                 frame().copy(ocrCompletedMonotonicMs = 109), frame().copy(frameSequence = 0))) {

@@ -215,6 +215,7 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
     require(binding['schema'] == BINDING_SCHEMA and binding['repository'] == REPOSITORY and
             binding['sourceRef'] == 'refs/heads/main' and binding['channel'] == 'signed_feed' and
             binding['distribution'] == 'non_play', 'non-Play binding')
+    require(apk.is_file() and 0 < apk.stat().st_size <= play.MAX_APK_BYTES, 'bounded APK bytes')
     before = digest(apk.read_bytes())
     if not unsigned:
         verify_signature(apk, apksigner)
@@ -251,10 +252,10 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
     if not unsigned:
         require(binding.get('compiledPayloadSha256') == payload_digest, 'presecret compiled payload mismatch')
     require(digest(apk.read_bytes()) == before, 'APK changed during inspection')
-    return {'schema': SCHEMA, 'repository': REPOSITORY, 'sourceSha': binding['sourceSha'],
+    return {'schema': 'sentinel.signed-feed-compiled-payload.v1' if unsigned else SCHEMA, 'repository': REPOSITORY, 'sourceSha': binding['sourceSha'],
         'sourceRef': 'refs/heads/main', 'channel': 'signed_feed', 'distribution': 'non_play',
         'apkFile': APK, 'apkSha256': before, 'apkSize': apk.stat().st_size,
-        'package': 'com.alpha0.app', 'signer': APPROVED_SIGNER, 'versionCode': code,
+        'package': 'com.alpha0.app', 'signer': None if unsigned else APPROVED_SIGNER, 'versionCode': code,
         'bindingSha256': digest(canonical(binding)), 'compiledPayloadSha256': payload_digest}
 
 

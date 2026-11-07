@@ -40,6 +40,8 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace assembleDebug
       - name: Run Unit Tests
         run: ./gradlew --no-daemon --stacktrace test
+      - name: Verify real non-Play compiled APK with disposable test keys (never distribute)
+        run: python3 scripts/signed_feed_ci_smoke.py
       - name: Verify APK exists
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - name: Create non-installable debug build receipt

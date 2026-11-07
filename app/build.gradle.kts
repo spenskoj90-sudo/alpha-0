@@ -71,6 +71,10 @@ val physicalTestStableSigningConfigured = physicalTestSigningValues.all { it.isN
 if (physicalTestSigningValues.any { it.isNotEmpty() } && !physicalTestStableSigningConfigured) {
     error("Physical-test signing must provide path, store password, alias, and key password together")
 }
+val telegramClientId = providers.environmentVariable("SENTINEL_TELEGRAM_CLIENT_ID").orElse("0").get().trim()
+if (!Regex("0|[1-9][0-9]{0,19}").matches(telegramClientId)) {
+    error("Invalid public Telegram OAuth client ID")
+}
 val vkClientId = providers.environmentVariable("SENTINEL_VK_CLIENT_ID")
     .orElse("0")
     .get()
@@ -161,6 +165,8 @@ android {
         manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
         manifestPlaceholders["vkRedirectScheme"] = "vk$vkClientId"
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
+        buildConfigField("String", "SENTINEL_TELEGRAM_CLIENT_ID", "\"$telegramClientId\"")
+        buildConfigField("String", "SENTINEL_VK_CLIENT_ID", "\"$vkClientId\"")
         buildConfigField("String", "SENTINEL_GOOGLE_CLIENT_ID", "\"$googleClientId\"")
         buildConfigField("String", "SENTINEL_VK_REDIRECT_URI", "\"vk$vkClientId://vk.ru/blank.html\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")

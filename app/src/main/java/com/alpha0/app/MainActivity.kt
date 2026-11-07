@@ -191,6 +191,8 @@ class MainActivity : ComponentActivity() {
             callbackScheme = BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME,
             vkRedirectUri = BuildConfig.SENTINEL_VK_REDIRECT_URI,
             googleClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_GOOGLE_CLIENT_ID else null,
+            telegramClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_TELEGRAM_CLIENT_ID else null,
+            vkClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_VK_CLIENT_ID else null,
         )
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }

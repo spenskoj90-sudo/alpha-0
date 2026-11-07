@@ -20,7 +20,7 @@ by this PR. Missing approval deliberately blocks signing. The exact fields are:
 - `schema`: `sentinel.signed-feed-approval.v1`; `status`: `APPROVED`;
 - `reviewIssue`: 532; `channel`: `signed_feed`; `package`: `com.alpha0.app`;
 - `signer`: `2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db88e`;
-- independently approved `apiBaseUrl` (strict HTTPS origin) and `vkClientId` (canonical decimal, `0` when disabled); fallback is empty and OAuth callback scheme is fixed to `com.alpha0.app.auth`;
+- independently approved `apiBaseUrl` (strict HTTPS origin) and `vkClientId` and `telegramClientId` (canonical decimal, `0` when disabled), plus `googleClientId` (empty when disabled); fallback is empty and OAuth callback scheme is fixed to `com.alpha0.app.auth`;
 - independently approved exact `feedUrl` and Base64 named P-256 DER SPKI `verifyingKey`;
 - independently reconciled `highestIssuedVersionCode` (at least 10007);
 - `baselineSourceSha` and `baselineApkSha256` for the independently retained baseline.
@@ -97,3 +97,11 @@ not dispatch inputs. Actual DEX constants for Core URL, empty fallback, the
 generic callback scheme, and exact VK redirect are compared to that policy
 before signer access and again by the consumer. Google challenge client IDs are compared with the reviewed DEX-pinned `googleClientId` before Credential Manager is invoked. An empty pin disables Google for signed_feed; other channels retain their existing server-managed behavior. Core provider settings still require separate verification. No real origin or
 OAuth ID is approved by these changes.
+
+For signed_feed, reviewed `telegramClientId` and `vkClientId` are also retained
+in DEX and compared against the provider catalogue. Zero disables a provider.
+Before opening a browser, the actual authorization URL must match the pinned
+client ID, exact provider endpoint/redirect, state, expected scope and SHA-256
+PKCE challenge, and contain no duplicate or extra query parameters. Telegram's
+nonce must match state. Other channels retain their existing behavior. Provider
+server-side credentials and deployment are separate gates.

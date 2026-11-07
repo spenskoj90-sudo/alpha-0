@@ -16,6 +16,8 @@ class FederatedAuthCoordinator(
     private val callbackScheme: String,
     private val vkRedirectUri: String,
     private val googleClientIdPin: String? = null,
+    private val telegramClientIdPin: String? = null,
+    private val vkClientIdPin: String? = null,
     private val stateStore: FederatedAuthStateStore = FederatedAuthStateStore(),
     private val credentialManager: CredentialManager = CredentialManager.create(context),
 ) {
@@ -47,10 +49,10 @@ class FederatedAuthCoordinator(
 
     fun isProviderCompatible(status: AuthApi.ProviderStatus): Boolean = when (status.provider) {
         "google" -> googleClientIdAllowed(googleClientIdPin, status.clientId)
-        "telegram" -> true
+        "telegram" -> browserClientIdAllowed(telegramClientIdPin, status.clientId)
         "vk" -> {
             val clientId = status.clientId
-            clientId != null && vkRedirectUri == "vk$clientId://vk.ru/blank.html"
+            clientId != null && browserClientIdAllowed(vkClientIdPin, clientId) && vkRedirectUri == "vk$clientId://vk.ru/blank.html"
         }
         else -> false
     }
@@ -120,6 +122,10 @@ class FederatedAuthCoordinator(
         if (normalized !in setOf("telegram", "vk")) {
             return BrowserLaunchResult.Failure("AUTH_PROVIDER_UNSUPPORTED")
         }
+        val browserPin = if (normalized == "telegram") telegramClientIdPin else vkClientIdPin
+        if (browserPin != null && !browserClientIdAllowed(browserPin, browserPin)) {
+            return BrowserLaunchResult.Failure("AUTH_PROVIDER_NOT_CONFIGURED")
+        }
         if (operation !in setOf("login", "link")) {
             return BrowserLaunchResult.Failure("AUTH_OPERATION_INVALID")
         }
@@ -138,6 +144,10 @@ class FederatedAuthCoordinator(
                 if (uri.scheme != "https" || uri.host != expectedHost) {
                     return BrowserLaunchResult.Failure("AUTH_PROVIDER_ENDPOINT_INVALID")
                 }
+                val redirect = if (normalized == "vk") vkRedirectUri else "$callbackScheme://callback"
+                if (browserPin != null && !trustedBrowserAuthorization(
+                        start.authorizationUrl, normalized, browserPin, redirect, start.state, start.codeVerifier
+                    )) return BrowserLaunchResult.Failure("AUTH_PROVIDER_ENDPOINT_INVALID")
                 stateStore.save(
                     context,
                     FederatedAuthStateStore.Pending(

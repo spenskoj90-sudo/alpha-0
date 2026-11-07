@@ -72,12 +72,14 @@ class GameObservationService : Service() {
 
         override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
             val id = sessionId ?: return
+            if (!isVisible) com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
             GameObservationRuntime.session.visibility(id, isVisible, now())
             GameObservationRuntime.publish()
         }
 
         override fun onCapturedContentResize(width: Int, height: Int) {
             if (stopping) return
+            com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
             sessionId?.let { GameObservationRuntime.session.invalidate(it); GameObservationRuntime.publish() }
             val size = CaptureSize.fit(width, height) ?: return finish("INVALID_CAPTURE_SIZE")
             try {

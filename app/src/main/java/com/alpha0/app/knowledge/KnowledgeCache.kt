@@ -40,7 +40,8 @@ interface KnowledgeDistributionTransport {
 // Game UI/client source_verified assertions never construct the shipped binding.
 internal data class TrustedKnowledgeBinding(val profile: KnowledgeProfile, val sourceId: String, val sessionId: String, val authority: String)
 internal data class TrustedKnowledgeObservation(val binding: TrustedKnowledgeBinding, val sourceId: String,
-    val observedAtMs: Long, val signals: Map<String, Any?>, val observedMonotonicMs: Long)
+    val observedAtMs: Long, val signals: Map<String, Any?>, val observedMonotonicMs: Long,
+    val frameId: String, val frameSequence: Long, val frameCapturedMonotonicMs: Long, val ocrCompletedMonotonicMs: Long)
 data class KnowledgeCacheStatus(val state: String, val digest: String? = null, val remainingLeaseMs: Long? = null, val actionAuthority: Boolean = false)
 
 /** No lease survives restart. A trusted manifest precedes every cache reuse;
@@ -58,6 +59,7 @@ internal class KnowledgeCache(private val directory: File, private val authority
     @Volatile private var records = mutableMapOf<String, Record>()
     @Volatile private var active: Lease? = null
     private val epoch = AtomicLong(0)
+    private val frameOrder = KnowledgeFrameOrder()
     private val budget = AtomicReference<KnowledgeBudget?>()
     private var stateInvalid = false
     @Volatile private var closed = false
@@ -215,6 +217,7 @@ internal class KnowledgeCache(private val directory: File, private val authority
         if (now >= lease.pack.validUntilMs || observation.observedAtMs <= 0 || observation.observedAtMs > now ||
             now - observation.observedAtMs > lease.pack.maxStateAgeMs || observation.observedMonotonicMs < 0 ||
             observation.observedMonotonicMs > mono || mono - observation.observedMonotonicMs > lease.pack.maxStateAgeMs) return emptyList()
+        if (!frameOrder.accepts(lease.epoch, observation, mono, lease.pack.maxStateAgeMs)) return emptyList()
         if (records[key(lease.binding.profile)]?.digest != lease.pack.digest) return emptyList()
         val result = lease.pack.evaluate(observation.signals, locale, observation.observedAtMs)
         return if (lease.epoch == epoch.get()) result else emptyList()

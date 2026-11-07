@@ -27,7 +27,7 @@ class KnowledgeCacheTest {
         override fun delta(profile: KnowledgeProfile, destination: String, base: String, budget: KnowledgeBudget): JSONObject = throw KnowledgeFailure("KNOWLEDGE_DELTA_UNAVAILABLE")
     }
     private fun binding() = TrustedKnowledgeBinding(KnowledgeFixture.profile, "fixture-source", "session-a", "fixture-origin")
-    private fun observation(time: Long = 1500, source: String = "fixture-source", monotonic: Long = 10L) = TrustedKnowledgeObservation(binding(), source, time, mapOf("health" to 0.2), monotonic)
+    private fun observation(time: Long = 1500, source: String = "fixture-source", monotonic: Long = 10L) = TrustedKnowledgeObservation(binding(), source, time, mapOf("health" to 0.2), monotonic, "fixture-frame-$monotonic", monotonic + 1, monotonic, monotonic)
     @Test fun leaseSubtractsAllNetworkTimeAndUsesMonotonicFreshness() {
         val directory = Files.createTempDirectory("knowledge-test-").toFile()
         val transport = FixtureTransport().apply { reply = manifest(raw) }

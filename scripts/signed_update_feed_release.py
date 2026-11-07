@@ -69,6 +69,8 @@ def notes(data):
 
 
 def make(args):
+    # Internal crypto/wire primitive. Production CLI authenticates the candidate
+    # with signed_feed_candidate.fetch before this function can access a key.
     origin = url(args.feed_url)
     if origin != url(args.apk_url, apk=True):
         raise ValueError("APK must use the feed's exact HTTPS origin")
@@ -144,11 +146,30 @@ def make(args):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     for key in ("apk", "aapt2", "apksigner", "feed-url", "apk-url", "notes",
-                "feed-private-key", "verifying-key", "expected-signer", "expected-apk-sha256", "output"):
+                "feed-private-key", "verifying-key", "expected-signer", "output"):
         p.add_argument("--" + key, required=True, type=Path if key in ("apk", "notes", "feed-private-key", "output") else str)
     p.add_argument("--previous-version", type=int, required=True)
+    p.add_argument("--candidate-source-sha", required=True)
+    p.add_argument("--candidate-run-id", required=True, type=int)
     args = p.parse_args(argv)
-    make(args)
+    # Hashes supplied by a caller are not provenance. Fetch all real bytes from
+    # authenticated GitHub metadata, verify exact-source attestations, inspect
+    # the compiled APK, and independently revalidate protected-main approval.
+    from signed_feed_candidate import fetch, document, APK, BINDING
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        directory = Path(tmp) / "verified-signed-feed"
+        candidate = fetch(args.candidate_source_sha, args.candidate_run_id,
+                          directory, args.aapt2, args.apksigner)
+        policy = document((directory / BINDING).read_bytes())["policy"]
+        if (args.feed_url != policy["feedUrl"] or args.verifying_key != policy["verifyingKey"]
+                or args.previous_version != policy["highestIssuedVersionCode"]
+                or args.expected_signer != policy["signer"]
+                or Path(args.apk).read_bytes() != (directory / APK).read_bytes()):
+            raise ValueError("feed inputs differ from independently approved candidate")
+        args.apk = directory / APK
+        args.expected_apk_sha256 = candidate["apkSha256"]
+        make(args)
     print("PASS: offline signed feed written; publication, signing custody and device upgrade NOT_RUN")
 
 

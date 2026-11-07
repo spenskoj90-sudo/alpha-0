@@ -160,3 +160,27 @@ A block is complete only when all applicable dimensions are addressed: implement
 ### Scope discipline
 
 The Owner approved development of optional bounded active assistance; do not silently enable autonomous combat, claim unsupported game/version/operator permission, or perform release/live deployment merely to make the roadmap look complete. Exact-environment capabilities remain `UNVERIFIED` until L3 evidence exists. Continue independent engineering when one external stream is blocked.
+
+## PR #559 B/I → B/G source checkpoint · 2026-11-07
+
+- Dedicated non-Play candidate/presecret/compiled-DEX/attestation consumer contract:
+  [ANDROID_SIGNED_FEED_CANDIDATE_V1.md](ANDROID_SIGNED_FEED_CANDIDATE_V1.md).
+  Existing Play candidate/publication/final acceptance byte contracts preserved.
+  Source-selected versionCode 10008 must still exceed separately reconciled ledger.
+- PROJECTS #532 approval record is intentionally absent. No production origin/SPKI,
+  permanent feed key or new signed APK is authorized by this source package.
+  Historical signer and A+B RESTORE_PASS are unchanged; no protected dispatch,
+  signing, release, deploy, merge, purchases or phone installation performed.
+- Exact upstream v4.0.2 / v922 source-rule replay and timestamp defense:
+  [SHATTERED_V402_KNOWLEDGE_REPLAY.md](SHATTERED_V402_KNOWLEDGE_REPLAY.md).
+  Test-only pack distinguishes Pharmacophobia and known inventory. Real source
+  binding remains unavailable/null, production capture DEBUG-gated, action authority
+  disabled. Synthetic replays are not real-game calibration/outcome evidence.
+- Next coherent B/G package: independently supportable selected-source identity
+  feasibility plus licensed exact-version real frame/challenge/inventory ground
+  truth and offline evaluation; no production trust from projection/OCR alone.
+  B/I runtime continues only after separate approved origin/SPKI/ledger and Owner
+  signing gate, then real same-cert/data-retention/native acceptance on both phones.
+- Full mandatory A–I scope and final acceptance remain open. Local toolchain
+  limitation: AGP 9.4.1 resolution failed before Android compilation; exact-source
+  GitHub CI and later runtime/physical evidence must be recorded independently.

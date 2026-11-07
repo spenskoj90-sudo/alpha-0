@@ -43,7 +43,7 @@ if (updateFeedUrl.isNotEmpty()) {
     ) error("Signed-update feed requires a strict HTTPS URL and base64 public key")
 }
 val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
-val canonicalVersionCode = 10007
+val canonicalVersionCode = 10008
 val physicalTestVersionCodeRaw = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_VERSION_CODE")
     .orElse(canonicalVersionCode.toString())
     .get()
@@ -229,6 +229,7 @@ android {
         // Non-Play production build: same ID, release signer, production hardening.
         create("signedRelease") {
             initWith(getByName("release"))
+            proguardFiles("signed-feed-proguard.pro")
             matchingFallbacks += listOf("release")
             buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"signed_feed\"")
         }

@@ -103,6 +103,7 @@ if command -v python >/dev/null 2>&1; then
   check 'Release evidence invariants' python scripts/test_release_evidence.py
   check 'Release supply-chain evidence invariants' python scripts/test_release_evidence_supply_chain.py
   check 'Release lineage invariants' python scripts/test_release_lineage.py
+  check 'Non-Play attested candidate boundaries (synthetic fixtures)' python scripts/test_signed_feed_candidate.py
   check 'Offline signed feed P-256 contract (synthetic APK identity)' python scripts/test_signed_update_feed_release.py
   check 'Legacy signer checker synthetic-only invariants' python scripts/test_legacy_signer_check.py
   check 'Artifact attestation invariants' python scripts/test_artifact_attestations.py

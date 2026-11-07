@@ -74,3 +74,12 @@ manifest generation and publication remain **NOT_RUN**.
 
 ## Evidence gate
 Source/unit regressions cover tampering, wrong key, different signer, package mismatch, rollback, invalid source, malformed fields and notes. Android CI/emulator is supplemental. Before any release, require explicit owner-controlled signing/recovery acceptance, then an opt-in same-cert v1→v2 over-install without data deletion on **Infinix Zero 30** and **Poco C71**. Capture installed package, versionCode, signer, source SHA, retained local data, user consent and real device UX/accessibility. Both real-device upgrades remain **NOT_RUN** until actually performed.
+
+
+## Authenticated candidate boundary
+
+The production producer CLI now requires the dedicated non-Play GitHub run and
+source SHA; a caller hash is no longer accepted. See
+[ANDROID_SIGNED_FEED_CANDIDATE_V1.md](ANDROID_SIGNED_FEED_CANDIDATE_V1.md) for the
+separate presecret, compiled APK, attestation and Owner approval contract. Older
+`--expected-apk-sha256` invocation examples are superseded. No publication is enabled.

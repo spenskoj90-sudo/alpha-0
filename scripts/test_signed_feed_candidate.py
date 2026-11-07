@@ -59,12 +59,14 @@ class CandidateTests(unittest.TestCase):
         public = subprocess.check_output(['openssl', 'pkey', '-in', str(key), '-pubout', '-outform', 'DER'])
         self.policy = dict(schema='sentinel.signed-feed-approval.v1', status='APPROVED',
             channel='signed_feed', package='com.alpha0.app', signer=feed.APPROVED_SIGNER,
-            feedUrl='https://example.org/android/feed.txt', verifyingKey=base64.b64encode(public).decode(),
+            apiBaseUrl='https://core.example.org', vkClientId='123', feedUrl='https://example.org/android/feed.txt', verifyingKey=base64.b64encode(public).decode(),
             highestIssuedVersionCode=10007, baselineSourceSha='a'*40, baselineApkSha256='b'*64, reviewIssue=532)
         self.binding = dict(schema=feed.BINDING_SCHEMA, repository=feed.REPOSITORY, sourceSha='c'*40,
             sourceRef='refs/heads/main', channel='signed_feed', distribution='non_play', policy=self.policy, versionCode=10008)
         self.fields = dict(APPLICATION_ID='com.alpha0.app', DEBUG=False, VERSION_CODE=10008,
             SENTINEL_SOURCE_SHA='c'*40, SENTINEL_DISTRIBUTION_CHANNEL='signed_feed',
+            SENTINEL_API_BASE_URL=self.policy['apiBaseUrl'], SENTINEL_API_FALLBACK_BASE_URL='',
+            SENTINEL_AUTH_CALLBACK_SCHEME='com.alpha0.app.auth', SENTINEL_VK_REDIRECT_URI='vk123://vk.ru/blank.html',
             SENTINEL_UPDATE_FEED_URL=self.policy['feedUrl'], SENTINEL_UPDATE_FEED_VERIFYING_KEY=self.policy['verifyingKey'])
         self.apk = self.root / feed.APK
         self.write_apk()
@@ -89,6 +91,10 @@ class CandidateTests(unittest.TestCase):
         self.assertIn('--v2-signing-enabled true --v3-signing-enabled true', workflow)
         self.assertNotIn('assembleRelease', workflow)
         self.assertNotIn('sentinel-release-candidate-', workflow)
+        self.assertNotIn('inputs.api_base_url', workflow)
+        self.assertNotIn('inputs.vk_client_id', workflow)
+        self.assertIn('["apiBaseUrl"]', workflow)
+        self.assertIn('["vkClientId"]', workflow)
         self.assertIn('needs: presecret', workflow)
         self.assertIn('needs: signed-feed', workflow)
         self.assertNotIn('contents: write', workflow)
@@ -139,7 +145,7 @@ class CandidateTests(unittest.TestCase):
                 self.signature = report
                 with self.assertRaises(ValueError): self.inspect()
     def test_policy_denials(self):
-        for key, value in [('status','PENDING'), ('channel','play'), ('verifyingKey',''), ('feedUrl','http://example.org/feed'), ('highestIssuedVersionCode',10006)]:
+        for key, value in [('apiBaseUrl','http://core.example.org'), ('apiBaseUrl','https://core.example.org/path'), ('vkClientId','01'), ('status','PENDING'), ('channel','play'), ('verifyingKey',''), ('feedUrl','http://example.org/feed'), ('highestIssuedVersionCode',10006)]:
             policy = dict(self.policy); policy[key] = value
             with self.subTest(key=key), self.assertRaises(ValueError): feed.approval(policy)
     def test_binding_alias(self):

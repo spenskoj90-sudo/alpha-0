@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import release_lineage as play
 from apk_signer_certificate import certificate_digests
@@ -69,13 +70,18 @@ def attest(path, sha, workflow=WORKFLOW):
 def approval(value):
     require(set(value) == {'schema', 'status', 'channel', 'package', 'signer',
         'feedUrl', 'verifyingKey', 'highestIssuedVersionCode', 'baselineSourceSha',
-        'baselineApkSha256', 'reviewIssue'}, 'approval fields')
+        'baselineApkSha256', 'reviewIssue', 'apiBaseUrl', 'vkClientId'}, 'approval fields')
     require(value['schema'] == 'sentinel.signed-feed-approval.v1' and
             value['status'] == 'APPROVED' and value['reviewIssue'] == 532,
             'separate PROJECTS approval required')
     require(value['channel'] == 'signed_feed' and value['package'] == 'com.alpha0.app'
             and value['signer'] == APPROVED_SIGNER, 'approval identity')
     url(value['feedUrl'])
+    origin = value['apiBaseUrl']
+    require(isinstance(origin, str) and bool(re.fullmatch(r'https://[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::443)?', origin)), 'approved Core HTTPS origin')
+    parsed = urlsplit(origin)
+    require(parsed.hostname is not None and all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in parsed.hostname.split('.')), 'approved Core host')
+    require(isinstance(value['vkClientId'], str) and bool(re.fullmatch(r'0|[1-9][0-9]{0,19}', value['vkClientId'])), 'approved VK client ID')
     require(type(value['highestIssuedVersionCode']) is int and
             10007 <= value['highestIssuedVersionCode'] < 2100000000, 'independent ledger floor')
     require(bool(re.fullmatch('[0-9a-f]{40}', value['baselineSourceSha'])) and
@@ -244,6 +250,10 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
     expected = {'APPLICATION_ID': 'com.alpha0.app', 'DEBUG': False,
         'VERSION_CODE': code, 'SENTINEL_SOURCE_SHA': binding['sourceSha'],
         'SENTINEL_DISTRIBUTION_CHANNEL': 'signed_feed',
+        'SENTINEL_API_BASE_URL': policy['apiBaseUrl'],
+        'SENTINEL_API_FALLBACK_BASE_URL': '',
+        'SENTINEL_AUTH_CALLBACK_SCHEME': 'com.alpha0.app.auth',
+        'SENTINEL_VK_REDIRECT_URI': 'vk' + policy['vkClientId'] + '://vk.ru/blank.html',
         'SENTINEL_UPDATE_FEED_URL': policy['feedUrl'],
         'SENTINEL_UPDATE_FEED_VERIFYING_KEY': policy['verifyingKey']}
     require(all(constants[0].get(key) == value for key, value in expected.items()),

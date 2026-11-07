@@ -7,14 +7,6 @@ on:
         description: Exact protected-main SHA with separately reviewed PROJECTS approval
         required: true
         type: string
-      api_base_url:
-        description: Approved HTTPS Core origin
-        required: true
-        type: string
-      vk_client_id:
-        description: Public VK ID (0 when disabled)
-        default: "0"
-        type: string
 
 permissions:
   actions: read
@@ -64,8 +56,6 @@ jobs:
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
-          SENTINEL_API_BASE_URL: ${{ inputs.api_base_url }}
-          SENTINEL_VK_CLIENT_ID: ${{ inputs.vk_client_id }}
           SENTINEL_RUNTIME_ENVIRONMENT: release-candidate
         run: |
           set -euo pipefail
@@ -75,6 +65,9 @@ jobs:
             -keyalg RSA -keysize 2048 -validity 1 >/dev/null 2>&1
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/presecret.jks"
           export ANDROID_KEYSTORE_PASSWORD=isolated-only ANDROID_KEY_ALIAS=isolated ANDROID_KEY_PASSWORD=isolated-only
+          export SENTINEL_API_BASE_URL="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["apiBaseUrl"])')"
+          export SENTINEL_VK_CLIENT_ID="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["vkClientId"])')"
+          export SENTINEL_API_FALLBACK_BASE_URL=""
           export SENTINEL_UPDATE_FEED_URL="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["feedUrl"])')"
           export SENTINEL_UPDATE_FEED_VERIFYING_KEY="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["verifyingKey"])')"
           bash ./gradlew --no-daemon assembleSignedRelease

@@ -34,7 +34,7 @@ def main():
         feed.require(cert_hash != feed.APPROVED_SIGNER, 'CI must never have release signer')
         policy = dict(schema='sentinel.signed-feed-approval.v1', status='APPROVED', reviewIssue=532,
             channel='signed_feed', package='com.alpha0.app', signer=feed.APPROVED_SIGNER,
-            feedUrl='https://ci.invalid/synthetic/feed.txt', verifyingKey=base64.b64encode(public).decode(),
+            apiBaseUrl='https://ci.invalid', vkClientId='123', feedUrl='https://ci.invalid/synthetic/feed.txt', verifyingKey=base64.b64encode(public).decode(),
             highestIssuedVersionCode=10007, baselineSourceSha='0'*40, baselineApkSha256='0'*64)
         # This fixture is not passed to approved_source or any secret/provenance
         # gate. Its APPROVED value only satisfies the low-level parser schema.
@@ -43,7 +43,8 @@ def main():
             sourceRef='refs/heads/main', channel='signed_feed', distribution='non_play', policy=policy, versionCode=code)
         env = dict(os.environ, ANDROID_KEYSTORE_PATH=str(keystore), ANDROID_KEYSTORE_PASSWORD='isolated-only',
             ANDROID_KEY_ALIAS='isolated', ANDROID_KEY_PASSWORD='isolated-only',
-            SENTINEL_SOURCE_SHA=sha, SENTINEL_API_BASE_URL='https://ci.invalid',
+            SENTINEL_SOURCE_SHA=sha, SENTINEL_API_BASE_URL=policy['apiBaseUrl'],
+            SENTINEL_API_FALLBACK_BASE_URL='', SENTINEL_VK_CLIENT_ID=policy['vkClientId'],
             SENTINEL_UPDATE_FEED_URL=policy['feedUrl'], SENTINEL_UPDATE_FEED_VERIFYING_KEY=policy['verifyingKey'])
         apk = Path('app/build/outputs/apk/signedRelease/app-signedRelease.apk')
         try:

@@ -20,6 +20,7 @@ by this PR. Missing approval deliberately blocks signing. The exact fields are:
 - `schema`: `sentinel.signed-feed-approval.v1`; `status`: `APPROVED`;
 - `reviewIssue`: 532; `channel`: `signed_feed`; `package`: `com.alpha0.app`;
 - `signer`: `2acd1cfff4f34db1250d3f6c81f0887493c4602d3cfa65310993c058089db88e`;
+- independently approved `apiBaseUrl` (strict HTTPS origin) and `vkClientId` (canonical decimal, `0` when disabled); fallback is empty and OAuth callback scheme is fixed to `com.alpha0.app.auth`;
 - independently approved exact `feedUrl` and Base64 named P-256 DER SPKI `verifyingKey`;
 - independently reconciled `highestIssuedVersionCode` (at least 10007);
 - `baselineSourceSha` and `baselineApkSha256` for the independently retained baseline.
@@ -90,3 +91,11 @@ minified signedRelease DEX using disposable test-only keys. It explicitly reject
 that certificate as the protected signer. Only `signed-feed-ci-receipt.json`
 (source/APK/payload/certificate hashes, CI_ONLY and false publication/lineage claims)
 is retained alongside the existing CI evidence; the installable test APK is deleted.
+
+The Core origin and VK client ID are read only from the reviewed source policy,
+not dispatch inputs. Actual DEX constants for Core URL, empty fallback, the
+generic callback scheme, and exact VK redirect are compared to that policy
+before signer access and again by the consumer. Google client IDs and provider
+configuration are supplied dynamically by Core; this contract pins their HTTPS
+source and does not claim to attest their server-side values. No real origin or
+OAuth ID is approved by these changes.

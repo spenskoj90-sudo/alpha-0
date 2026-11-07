@@ -6,6 +6,28 @@ import org.junit.Test
 class CalibrationCampaignTest {
     private fun frame(sequence: Long, capture: String = "capture") = CalibrationFrameId(capture, sequence)
 
+    @Test fun `post hoc review includes exact mismatched missing and delayed samples`() {
+        val c = CalibrationCampaign()
+        assertEquals(CalibrationComparisonSummary(0, 0, 0, 0, 0), c.comparisonSummary())
+        // Synthetic reducer fixtures, not verified real-game evidence.
+        assertNotNull(c.record("9", "20", HealthObservation(HealthCandidate(9, 20, 2), 100), 120, frame(1), 100))
+        assertNotNull(c.record("10", "20", HealthObservation(HealthCandidate(9, 20, 0), 200), 220, frame(2), 200))
+        assertNotNull(c.record("11", "20", null, 300, frame(3), 300))
+        assertNotNull(c.record("11", "20", HealthObservation(HealthCandidate(11, 20, 0), 400), 5_401, frame(4), 400))
+        assertEquals(CalibrationComparisonSummary(4, 2, 1, 1, 1), c.comparisonSummary())
+        assertNull(c.record("11", "20", null, 5_402, frame(4), 400))
+        assertEquals(CalibrationComparisonSummary(4, 2, 1, 1, 1), c.comparisonSummary())
+    }
+
+    @Test fun `failed persistence never increments review results`() {
+        val c = CalibrationCampaign()
+        val sample = HealthObservation(HealthCandidate(9, 20, 0), 100)
+        assertNull(c.record("9", "20", sample, 110, frame(1), 100) { false })
+        assertEquals(CalibrationComparisonSummary(0, 0, 0, 0, 0), c.comparisonSummary())
+        assertNotNull(c.record("9", "20", sample, 111, frame(1), 100) { true })
+        assertEquals(CalibrationComparisonSummary(1, 1, 0, 0, 0), c.comparisonSummary())
+    }
+
     @Test fun `missing and stale samples remain in the denominator`() {
         val campaign = CalibrationCampaign()
         assertNull(campaign.record("-1", "20", null, 100, frame(1), 100))

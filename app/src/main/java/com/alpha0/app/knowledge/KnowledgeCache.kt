@@ -38,9 +38,27 @@ interface KnowledgeDistributionTransport {
 
 // These values come only from the main/service-owned reviewed adapter closure.
 // Game UI/client source_verified assertions never construct the shipped binding.
-internal data class TrustedKnowledgeBinding(val profile: KnowledgeProfile, val sourceId: String, val sessionId: String, val authority: String)
+/** Exact identity inside a service-owned binding, never an installed-package or
+ * OCR claim. No shipped attestor currently issues one for MediaProjection. */
+internal data class KnowledgeTargetIdentity(val packageName: String, val certificateSha256: String,
+    val versionName: String, val versionCode: Long, val upstreamSourceSha: String) {
+    init {
+        require(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+").matches(packageName))
+        require(Regex("[0-9a-f]{64}").matches(certificateSha256))
+        require(versionName.isNotBlank() && versionName.length <= 64 && versionCode in 1..2100000000L)
+        require(Regex("[0-9a-f]{40}").matches(upstreamSourceSha))
+    }
+}
+internal data class TrustedKnowledgeBinding(val profile: KnowledgeProfile, val sourceId: String,
+    val sessionId: String, val authority: String, val target: KnowledgeTargetIdentity) {
+    init {
+        require(profile.patch == target.versionName)
+        require(sourceId.isNotBlank() && sourceId.length <= 128 && sessionId.isNotBlank() && sessionId.length <= 128)
+    }
+}
 internal data class TrustedKnowledgeObservation(val binding: TrustedKnowledgeBinding, val sourceId: String,
-    val observedAtMs: Long, val signals: Map<String, Any?>, val observedMonotonicMs: Long)
+    val observedAtMs: Long, val signals: Map<String, Any?>, val observedMonotonicMs: Long,
+    val frameId: String, val frameSequence: Long, val frameCapturedMonotonicMs: Long, val ocrCompletedMonotonicMs: Long)
 data class KnowledgeCacheStatus(val state: String, val digest: String? = null, val remainingLeaseMs: Long? = null, val actionAuthority: Boolean = false)
 
 /** No lease survives restart. A trusted manifest precedes every cache reuse;
@@ -58,6 +76,7 @@ internal class KnowledgeCache(private val directory: File, private val authority
     @Volatile private var records = mutableMapOf<String, Record>()
     @Volatile private var active: Lease? = null
     private val epoch = AtomicLong(0)
+    private val frameOrder = KnowledgeFrameOrder()
     private val budget = AtomicReference<KnowledgeBudget?>()
     private var stateInvalid = false
     @Volatile private var closed = false
@@ -207,14 +226,28 @@ internal class KnowledgeCache(private val directory: File, private val authority
             throw KnowledgeFailure("KNOWLEDGE_INVALID")
         } finally { if (requestBudget != null) budget.compareAndSet(requestBudget, null); pending.set(false) }
     }
+    fun observationBlocked(): Boolean {
+        val lease = active ?: return false
+        return lease.epoch == epoch.get() && frameOrder.isBlocked(lease.epoch)
+    }
+    fun observationUnavailable() {
+        val lease = active ?: return
+        if (lease.epoch == epoch.get()) frameOrder.rejectMissingAfterObservation(lease.epoch)
+    }
     fun evaluate(observation: TrustedKnowledgeObservation, locale: String): List<KnowledgeRecommendation> {
         val lease = active ?: return emptyList()
-        if (lease.epoch != epoch.get() || status().state != "READY" || observation.binding != lease.binding || observation.sourceId != lease.binding.sourceId) return emptyList()
+        if (lease.epoch != epoch.get() || status().state != "READY") return emptyList()
+        if (observation.binding != lease.binding || observation.sourceId != lease.binding.sourceId) {
+            frameOrder.reject(lease.epoch); return emptyList()
+        }
         val mono = monotonicClock(); val wall = wallClock()
         val now = maxOf(wall, lease.serverTime + mono - lease.started)
         if (now >= lease.pack.validUntilMs || observation.observedAtMs <= 0 || observation.observedAtMs > now ||
             now - observation.observedAtMs > lease.pack.maxStateAgeMs || observation.observedMonotonicMs < 0 ||
-            observation.observedMonotonicMs > mono || mono - observation.observedMonotonicMs > lease.pack.maxStateAgeMs) return emptyList()
+            observation.observedMonotonicMs > mono || mono - observation.observedMonotonicMs > lease.pack.maxStateAgeMs) {
+            frameOrder.reject(lease.epoch); return emptyList()
+        }
+        if (!frameOrder.accepts(lease.epoch, observation, mono, lease.pack.maxStateAgeMs)) return emptyList()
         if (records[key(lease.binding.profile)]?.digest != lease.pack.digest) return emptyList()
         val result = lease.pack.evaluate(observation.signals, locale, observation.observedAtMs)
         return if (lease.epoch == epoch.get()) result else emptyList()

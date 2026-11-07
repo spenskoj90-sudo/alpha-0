@@ -28,8 +28,26 @@ val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .orElse("")
     .get()
     .trim()
+val googleClientId = providers.environmentVariable("SENTINEL_GOOGLE_CLIENT_ID").orElse("").get().trim()
+if (googleClientId.isNotEmpty() && !Regex("[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com").matches(googleClientId)) {
+    error("Invalid public Google OAuth client ID")
+}
+val updateFeedUrl = providers.environmentVariable("SENTINEL_UPDATE_FEED_URL").orElse("").get().trim()
+val updateFeedKey = providers.environmentVariable("SENTINEL_UPDATE_FEED_VERIFYING_KEY").orElse("").get().trim()
+// Both are PUBLIC build-time values. Empty means no online update authority.
+if (updateFeedUrl.isNotEmpty() != updateFeedKey.isNotEmpty()) {
+    error("Signed-update URL and verifying public key must be configured together")
+}
+if (updateFeedUrl.isNotEmpty()) {
+    val uri = runCatching { URI(updateFeedUrl) }.getOrElse { error("Invalid signed-update HTTPS URL") }
+    if (uri.scheme != "https" || uri.host.isNullOrBlank() || uri.rawUserInfo != null ||
+        uri.rawQuery != null || uri.rawFragment != null || uri.rawPath.isNullOrBlank() ||
+        uri.normalize() != uri || (uri.port != -1 && uri.port != 443) ||
+        !Regex("[A-Za-z0-9+/]+={0,2}").matches(updateFeedKey)
+    ) error("Signed-update feed requires a strict HTTPS URL and base64 public key")
+}
 val githubActions = providers.environmentVariable("GITHUB_ACTIONS").orElse("").get() == "true"
-val canonicalVersionCode = 10007
+val canonicalVersionCode = 10008
 val physicalTestVersionCodeRaw = providers.environmentVariable("SENTINEL_PHYSICAL_TEST_VERSION_CODE")
     .orElse(canonicalVersionCode.toString())
     .get()
@@ -52,6 +70,10 @@ val physicalTestSigningValues = listOf(
 val physicalTestStableSigningConfigured = physicalTestSigningValues.all { it.isNotEmpty() }
 if (physicalTestSigningValues.any { it.isNotEmpty() } && !physicalTestStableSigningConfigured) {
     error("Physical-test signing must provide path, store password, alias, and key password together")
+}
+val telegramClientId = providers.environmentVariable("SENTINEL_TELEGRAM_CLIENT_ID").orElse("0").get().trim()
+if (!Regex("0|[1-9][0-9]{0,19}").matches(telegramClientId)) {
+    error("Invalid public Telegram OAuth client ID")
 }
 val vkClientId = providers.environmentVariable("SENTINEL_VK_CLIENT_ID")
     .orElse("0")
@@ -143,12 +165,17 @@ android {
         manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
         manifestPlaceholders["vkRedirectScheme"] = "vk$vkClientId"
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
+        buildConfigField("String", "SENTINEL_TELEGRAM_CLIENT_ID", "\"$telegramClientId\"")
+        buildConfigField("String", "SENTINEL_VK_CLIENT_ID", "\"$vkClientId\"")
+        buildConfigField("String", "SENTINEL_GOOGLE_CLIENT_ID", "\"$googleClientId\"")
         buildConfigField("String", "SENTINEL_VK_REDIRECT_URI", "\"vk$vkClientId://vk.ru/blank.html\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "SENTINEL_API_FALLBACK_BASE_URL", "\"$apiFallbackBaseUrl\"")
 
         buildConfigField("String", "SENTRY_DSN", "\"$sentryDsn\"")
         buildConfigField("String", "SENTINEL_SOURCE_SHA", "\"$sourceSha\"")
+        buildConfigField("String", "SENTINEL_UPDATE_FEED_URL", "\"$updateFeedUrl\"")
+        buildConfigField("String", "SENTINEL_UPDATE_FEED_VERIFYING_KEY", "\"$updateFeedKey\"")
         buildConfigField("String", "SENTINEL_RUNTIME_ENVIRONMENT", "\"$runtimeEnvironment\"")
         buildConfigField("int", "SENTINEL_HTTP_READ_TIMEOUT_MS", "15000")
     }
@@ -209,6 +236,13 @@ android {
             buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"play\"")
             manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth"
             buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth\"")
+        }
+        // Non-Play production build: same ID, release signer, production hardening.
+        create("signedRelease") {
+            initWith(getByName("release"))
+            proguardFiles("signed-feed-proguard.pro")
+            matchingFallbacks += listOf("release")
+            buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"signed_feed\"")
         }
     }
 

@@ -70,7 +70,7 @@ def attest(path, sha, workflow=WORKFLOW):
 def approval(value):
     require(set(value) == {'schema', 'status', 'channel', 'package', 'signer',
         'feedUrl', 'verifyingKey', 'highestIssuedVersionCode', 'baselineSourceSha',
-        'baselineApkSha256', 'reviewIssue', 'apiBaseUrl', 'vkClientId'}, 'approval fields')
+        'baselineApkSha256', 'reviewIssue', 'apiBaseUrl', 'vkClientId', 'googleClientId'}, 'approval fields')
     require(value['schema'] == 'sentinel.signed-feed-approval.v1' and
             value['status'] == 'APPROVED' and value['reviewIssue'] == 532,
             'separate PROJECTS approval required')
@@ -86,6 +86,8 @@ def approval(value):
             10007 <= value['highestIssuedVersionCode'] < 2100000000, 'independent ledger floor')
     require(bool(re.fullmatch('[0-9a-f]{40}', value['baselineSourceSha'])) and
             bool(re.fullmatch('[0-9a-f]{64}', value['baselineApkSha256'])), 'baseline provenance')
+    google = value['googleClientId']
+    require(isinstance(google, str) and (google == '' or bool(re.fullmatch(r'[A-Za-z0-9_-]{1,200}\.apps\.googleusercontent\.com', google))), 'approved Google client ID')
     pin = base64.b64decode(value['verifyingKey'], validate=True)
     require(base64.b64encode(pin).decode() == value['verifyingKey'], 'canonical public pin')
     info = tool(['openssl', 'pkey', '-pubin', '-inform', 'DER', '-text_pub', '-noout'], data=pin)
@@ -254,6 +256,7 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
         'SENTINEL_API_FALLBACK_BASE_URL': '',
         'SENTINEL_AUTH_CALLBACK_SCHEME': 'com.alpha0.app.auth',
         'SENTINEL_VK_REDIRECT_URI': 'vk' + policy['vkClientId'] + '://vk.ru/blank.html',
+        'SENTINEL_GOOGLE_CLIENT_ID': policy['googleClientId'],
         'SENTINEL_UPDATE_FEED_URL': policy['feedUrl'],
         'SENTINEL_UPDATE_FEED_VERIFYING_KEY': policy['verifyingKey']}
     require(all(constants[0].get(key) == value for key, value in expected.items()),

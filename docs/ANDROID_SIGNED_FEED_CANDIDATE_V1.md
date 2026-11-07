@@ -95,7 +95,5 @@ is retained alongside the existing CI evidence; the installable test APK is dele
 The Core origin and VK client ID are read only from the reviewed source policy,
 not dispatch inputs. Actual DEX constants for Core URL, empty fallback, the
 generic callback scheme, and exact VK redirect are compared to that policy
-before signer access and again by the consumer. Google client IDs and provider
-configuration are supplied dynamically by Core; this contract pins their HTTPS
-source and does not claim to attest their server-side values. No real origin or
+before signer access and again by the consumer. Google challenge client IDs are compared with the reviewed DEX-pinned `googleClientId` before Credential Manager is invoked. An empty pin disables Google for signed_feed; other channels retain their existing server-managed behavior. Core provider settings still require separate verification. No real origin or
 OAuth ID is approved by these changes.

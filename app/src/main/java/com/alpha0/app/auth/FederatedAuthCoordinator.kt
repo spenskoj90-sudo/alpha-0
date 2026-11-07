@@ -15,6 +15,7 @@ class FederatedAuthCoordinator(
     private val api: AuthApi,
     private val callbackScheme: String,
     private val vkRedirectUri: String,
+    private val googleClientIdPin: String? = null,
     private val stateStore: FederatedAuthStateStore = FederatedAuthStateStore(),
     private val credentialManager: CredentialManager = CredentialManager.create(context),
 ) {
@@ -45,7 +46,8 @@ class FederatedAuthCoordinator(
     }
 
     fun isProviderCompatible(status: AuthApi.ProviderStatus): Boolean = when (status.provider) {
-        "google", "telegram" -> true
+        "google" -> googleClientIdAllowed(googleClientIdPin, status.clientId)
+        "telegram" -> true
         "vk" -> {
             val clientId = status.clientId
             clientId != null && vkRedirectUri == "vk$clientId://vk.ru/blank.html"
@@ -75,6 +77,9 @@ class FederatedAuthCoordinator(
         val challenge = when (val result = api.googleChallenge()) {
             is AuthApi.GoogleChallengeResult.Success -> result.value
             is AuthApi.GoogleChallengeResult.Failure -> return GoogleCredentialResult.Failure(result.message)
+        }
+        if (!googleClientIdAllowed(googleClientIdPin, challenge.clientId)) {
+            return GoogleCredentialResult.Failure("AUTH_PROVIDER_NOT_CONFIGURED")
         }
         val option = GetGoogleIdOption.Builder()
             .setServerClientId(challenge.clientId)

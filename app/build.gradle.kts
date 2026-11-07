@@ -28,6 +28,10 @@ val sourceSha = providers.environmentVariable("SENTINEL_SOURCE_SHA")
     .orElse("")
     .get()
     .trim()
+val googleClientId = providers.environmentVariable("SENTINEL_GOOGLE_CLIENT_ID").orElse("").get().trim()
+if (googleClientId.isNotEmpty() && !Regex("[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com").matches(googleClientId)) {
+    error("Invalid public Google OAuth client ID")
+}
 val updateFeedUrl = providers.environmentVariable("SENTINEL_UPDATE_FEED_URL").orElse("").get().trim()
 val updateFeedKey = providers.environmentVariable("SENTINEL_UPDATE_FEED_VERIFYING_KEY").orElse("").get().trim()
 // Both are PUBLIC build-time values. Empty means no online update authority.
@@ -157,6 +161,7 @@ android {
         manifestPlaceholders["authCallbackScheme"] = "com.alpha0.app.auth.dev"
         manifestPlaceholders["vkRedirectScheme"] = "vk$vkClientId"
         buildConfigField("String", "SENTINEL_AUTH_CALLBACK_SCHEME", "\"com.alpha0.app.auth.dev\"")
+        buildConfigField("String", "SENTINEL_GOOGLE_CLIENT_ID", "\"$googleClientId\"")
         buildConfigField("String", "SENTINEL_VK_REDIRECT_URI", "\"vk$vkClientId://vk.ru/blank.html\"")
         buildConfigField("String", "SENTINEL_API_BASE_URL", "\"$apiBaseUrl\"")
         buildConfigField("String", "SENTINEL_API_FALLBACK_BASE_URL", "\"$apiFallbackBaseUrl\"")

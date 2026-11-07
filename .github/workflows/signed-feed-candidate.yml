@@ -66,6 +66,7 @@ jobs:
           export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/presecret.jks"
           export ANDROID_KEYSTORE_PASSWORD=isolated-only ANDROID_KEY_ALIAS=isolated ANDROID_KEY_PASSWORD=isolated-only
           export SENTINEL_API_BASE_URL="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["apiBaseUrl"])')"
+          export SENTINEL_GOOGLE_CLIENT_ID="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["googleClientId"])')"
           export SENTINEL_VK_CLIENT_ID="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["vkClientId"])')"
           export SENTINEL_API_FALLBACK_BASE_URL=""
           export SENTINEL_UPDATE_FEED_URL="$(python -c 'import json; print(json.load(open("signed-feed-presecret-binding.json"))["policy"]["feedUrl"])')"

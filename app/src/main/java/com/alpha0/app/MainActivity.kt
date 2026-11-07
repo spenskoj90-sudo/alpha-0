@@ -273,7 +273,9 @@ private fun SentinelApplicationUi(
     deviceIdentity: DeviceIdentity,
     diagnostics: DiagnosticLogger,
 ) {
-    val activity = androidx.compose.ui.platform.LocalContext.current as ComponentActivity
+    val activity = checkNotNull(androidx.activity.compose.LocalActivity.current as? ComponentActivity) {
+        "SENTINEL application requires a ComponentActivity host"
+    }
     val strings = LocalAppStrings.current
     val navController = rememberNavController()
     val rotationScope = rememberCoroutineScope()

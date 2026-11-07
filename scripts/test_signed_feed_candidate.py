@@ -128,8 +128,13 @@ class CandidateTests(unittest.TestCase):
     def test_installer_permission(self):
         self.permissions = ''
         with self.assertRaises(ValueError): self.inspect()
+    def test_sdk37_modern_certificate_report(self):
+        self.signature = self.signature.replace('Signer #1', 'V2 Signer:')
+        self.assertEqual(10008, self.inspect()['versionCode'])
+        self.signature += 'V3 Signer: certificate SHA-256 digest: '+feed.APPROVED_SIGNER+'\n'
+        self.assertEqual(10008, self.inspect()['versionCode'])
     def test_signer_and_v1(self):
-        for report in [self.signature.replace(feed.APPROVED_SIGNER, '0'*64), self.signature.replace(': true', ': false'), self.signature+self.signature]:
+        for report in [self.signature.replace(feed.APPROVED_SIGNER, '0'*64), self.signature.replace(': true', ': false'), self.signature+self.signature.replace('Signer #1', 'Signer #2')]:
             with self.subTest(report=report):
                 self.signature = report
                 with self.assertRaises(ValueError): self.inspect()

@@ -17,7 +17,8 @@ import zipfile
 from pathlib import Path
 
 import release_lineage as play
-from signed_update_feed_release import (APPROVED_SIGNER, CERT, INSTALL_PERMISSION,
+from apk_signer_certificate import certificate_digests
+from signed_update_feed_release import (APPROVED_SIGNER, INSTALL_PERMISSION,
     MODERN_APK_SIGNATURE, PACKAGE, tool, url)
 
 REPOSITORY = 'spenskoj90-sudo/alpha-0'
@@ -136,8 +137,7 @@ def presecret(sha, aapt2, apksigner):
 
 def verify_signature(apk, apksigner):
     report = tool([apksigner, 'verify', '--verbose', '--print-certs', str(apk)]).decode('ascii')
-    certs = CERT.findall(report)
-    require(len(certs) == 1 and certs[0].lower().replace(':', '') == APPROVED_SIGNER,
+    require(certificate_digests(report)['sha256'] == APPROVED_SIGNER,
             'single existing signer required')
     require(bool(MODERN_APK_SIGNATURE.search(report)), 'v2/v3 signature required')
 

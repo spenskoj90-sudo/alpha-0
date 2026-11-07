@@ -14,6 +14,7 @@ import re
 import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
+from apk_signer_certificate import certificate_digests
 
 MAX_APK = 256 * 1024 * 1024
 # Existing independently checked release signer; a new lineage needs a source+Owner gate.
@@ -101,8 +102,7 @@ def make(args):
     if not args.previous_version < version <= 2_100_000_000:
         raise ValueError("release version must strictly exceed distributed baseline")
     signature_report = tool([args.apksigner, "verify", "--verbose", "--print-certs", str(apk)]).decode("ascii", "strict")
-    signatures = CERT.findall(signature_report)
-    if len(signatures) != 1 or signatures[0].lower().replace(":", "") != expected:
+    if certificate_digests(signature_report)["sha256"] != expected:
         raise ValueError("APK must carry the separately approved single signing certificate")
     if not MODERN_APK_SIGNATURE.search(signature_report):
         raise ValueError("APK must verify with embedded v2 or v3 signature scheme")

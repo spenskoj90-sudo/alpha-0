@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 import signed_feed_candidate as feed
+from apk_signer_certificate import certificate_digests
 
 
 def main():
@@ -48,9 +49,8 @@ def main():
         try:
             subprocess.run(['bash', './gradlew', '--no-daemon', 'assembleSignedRelease', 'lintDebug'], env=env, check=True)
             report = feed.tool([str(apksigner), 'verify', '--verbose', '--print-certs', str(apk)]).decode('ascii')
-            certs = feed.CERT.findall(report)
-            feed.require(len(certs) == 1 and certs[0].lower().replace(':', '') == cert_hash and
-                bool(feed.MODERN_APK_SIGNATURE.search(report)), 'real ephemeral APK signature')
+            feed.require(certificate_digests(report)['sha256'] == cert_hash, 'real ephemeral APK certificate')
+            feed.require(bool(feed.MODERN_APK_SIGNATURE.search(report)), 'real ephemeral APK v2/v3 signature')
             compiled = feed.inspect(apk, binding, str(aapt2), str(apksigner), unsigned=True)
             binding['compiledPayloadSha256'] = compiled['compiledPayloadSha256']
             try:

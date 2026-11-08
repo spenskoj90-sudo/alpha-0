@@ -22,7 +22,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.alpha0.app.ui.LocalAppStrings
 
-/** Read-only game rule reference, accessible even when MediaProjection is off. */
+/** Read-only game rule reference, accessible even when screen capture is off. */
 @Composable
 fun GameReferenceScreen() {
     val context = LocalContext.current

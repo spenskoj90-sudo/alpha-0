@@ -24,8 +24,8 @@ internal object InstalledShatteredBinary {
             @Suppress("DEPRECATION")
             context.packageManager.getApplicationInfo(ShatteredGameProfile.PACKAGE, 0)
         }
-        val path = info.publicSourceDir?.takeIf { it.isNotBlank() } ?: return null
-        path to (info.splitSourceDirs?.isNotEmpty() == true)
+        val path = info.publicSourceDir?.takeIf { it.isNotBlank() }
+        if (path == null) null else path to (info.splitSourceDirs?.isNotEmpty() == true)
     } catch (_: PackageManager.NameNotFoundException) {
         null
     } catch (_: SecurityException) {

@@ -8,7 +8,6 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import java.security.MessageDigest
 
 class FederatedAuthCoordinator(
     private val context: Context,
@@ -199,16 +198,18 @@ class FederatedAuthCoordinator(
         val parsed = StrictInboundBrowserCallback.parseAny(
             uri.toString(), "$callbackScheme://callback", vkRedirectUri,
         ) ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        val pending = stateStore.consume(context)
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
-        if (pending.operation != expectedOperation) {
-            return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
-        }
-        if (pending.provider != parsed.provider) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        if (!constantTimeEquals(parsed.state, pending.state)) {
-            return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
+        val pending = when (val matched = stateStore.consumeMatching(
+            context, parsed.provider, expectedOperation, parsed.state,
+        )) {
+            is FederatedAuthStateStore.ConsumeResult.Matched -> matched.pending
+            FederatedAuthStateStore.ConsumeResult.Expired ->
+                return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
+            FederatedAuthStateStore.ConsumeResult.OperationMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
+            FederatedAuthStateStore.ConsumeResult.ProviderMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
+            FederatedAuthStateStore.ConsumeResult.StateMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
         }
         return when (parsed) {
             is StrictInboundBrowserCallback.Parsed.ProviderError ->
@@ -231,9 +232,4 @@ class FederatedAuthCoordinator(
         stateStore.clear(context)
     }
 
-    private fun constantTimeEquals(left: String, right: String): Boolean =
-        MessageDigest.isEqual(
-            left.toByteArray(Charsets.UTF_8),
-            right.toByteArray(Charsets.UTF_8),
-        )
 }

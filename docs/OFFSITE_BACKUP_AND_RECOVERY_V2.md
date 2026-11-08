@@ -68,3 +68,14 @@ public/Auth-shaped tables, owner, FORCE RLS, policy filtering, denied writes,
 role flags and default ACL parity. The CI runtime job requires real PG18/age and
 fails rather than silently skipping absent tools. This is **synthetic runtime**,
 never Neon managed Auth/session/JWKS recovery or G3 `RESTORE_PASS`.
+
+`b2_export_package.py` connects the two exported ciphertext identities to the
+existing independent writer/reader SDK adapters. It validates both original
+hashes and aggregate size before network, records both fresh planned object keys
+through a mandatory synchronous private journal callback, then independently
+verifies each uploaded version. Both receipts are required for completion. If any
+step fails, keep all original ciphertexts and remote partial copies; reconcile
+**all planned keys** because a failed PUT response/readback can follow a successful
+upload. It never deletes or overwrites an object. The caller must implement and
+verify durable private journal custody; this module does not create a journal,
+SDK client, credentials, scheduler, live workflow or provider authorization.

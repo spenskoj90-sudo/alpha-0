@@ -137,3 +137,26 @@ the previously composed button's enabled state. Negative UI tests cover
 pending/active disabled states, and a source-contract regression asserts
 hash cancellation precedes the system capture intent. The check still cannot
 attest the projected game's identity or authorize actions.
+
+## Manual Burning / water reference (offline source facts, not gameplay authority)
+
+At official upstream Shattered 4.0.2 commit `57a4e06a4caf162446d1c28caa7983f0493fecf0`,
+`Burning.java` blob `7533b54985c39f80fdd13b2f20fa6c1df0566eb1`,
+`act()` detaches Burning in water only when the character is not flying
+(lines 99–101, 178–182). A first Burning tick may still deal damage before
+detachment; this is NOT a damage-free rule.
+
+The collapsed-by-default Android reference collects four manual YES/NO/UNKNOWN
+facts: Burning active, flying, already in water, and a reachable water route
+with no known hazards. Unsupported version/build, unknown relevant facts, and
+unknown route safety cannot produce a moving suggestion. Flying produces an
+explicit exception; water while grounded only a cautious mechanistic note;
+a user-reported safe route produces a *conditional possible option* and a
+warning to check current threats. Nothing is extracted from OCR, persisted,
+uploaded or authorized for game input. Manual answers reset on installed-game/
+capture changes and are hidden during capture. Shared accessible choice chips
+announce the question context. Kotlin JUnit covers 81 tri-state combinations
+and three unsupported version cases (324 assertions); Compose tests cover
+unknown/conditional/flying/water/reset and capture pause. Source/CI tests are
+not real player evidence, selected-window identity, measured safety, owner
+visual acceptance or action permissions.

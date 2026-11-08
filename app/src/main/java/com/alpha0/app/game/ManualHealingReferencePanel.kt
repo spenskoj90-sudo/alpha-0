@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.SecondaryButton
@@ -87,7 +89,7 @@ internal fun ManualHealingReferencePanel(
 }
 
 @Composable
-private fun ManualFactQuestion(
+internal fun ManualFactQuestion(
     title: String,
     id: String,
     value: ShatteredManualHealing.Answer,
@@ -108,7 +110,8 @@ private fun ManualFactQuestion(
                 FilterChip(
                     selected = value == choice, onClick = { onSelect(choice) },
                     label = { Text(strings.text(option)) },
-                    modifier = Modifier.testTag("game-manual-$id-${choice.name.lowercase()}"),
+                    modifier = Modifier.testTag("game-manual-$id-${choice.name.lowercase()}")
+                        .semantics { contentDescription = "$title: ${strings.text(option)}" },
                 )
             }
         }

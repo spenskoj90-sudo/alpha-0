@@ -284,6 +284,10 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertNotIn('onLocalGameClick = if (BuildConfig.DEBUG)', self.main)
         self.assertIn('ObservationCapturePolicy.supports(', screen)
         self.assertIn('ObservationCapturePolicy.supports(', service)
+        # Lint NewApi must see an explicit SDK check before typed Parcelable API.
+        self.assertIn('if (Build.VERSION.SDK_INT < 34 ||', service)
+        self.assertLess(service.index('if (Build.VERSION.SDK_INT < 34 ||'),
+                        service.index('getParcelableExtra(CONSENT, Intent::class.java)'))
         self.assertIn('manifestPlaceholders["gameObservationEnabled"] = "true"', self.gradle)
         self.assertIn('"signed_feed" -> !debuggable', policy)
         self.assertIn('"development", "diagnostic" -> debuggable', policy)

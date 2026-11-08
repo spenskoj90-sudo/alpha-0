@@ -145,7 +145,12 @@ class GameObservationService : Service() {
             return START_NOT_STICKY
         }
         if (sessionId != null || stopping) return START_NOT_STICKY
-        if (!ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT)) {
+        // Android Lint must see this SDK guard directly: the typed
+        // getParcelableExtra overload below was introduced in API 33.
+        // The shared policy independently checks channel, debug and API 34+.
+        if (Build.VERSION.SDK_INT < 34 ||
+            !ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT)
+        ) {
             finish("ANDROID_14_REQUIRED")
             return START_NOT_STICKY
         }

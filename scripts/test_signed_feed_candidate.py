@@ -85,7 +85,7 @@ class CandidateTests(unittest.TestCase):
         A: android:name(0x01010003)="com.alpha0.app.game.GameObservationService" (Raw: ".game.GameObservationService")
         A: android:enabled(0x0101000e)=(type 0x12)0xffffffff
         A: android:exported(0x01010010)=(type 0x12)0x0
-        A: android:stopWithTask(0x010104ab)=(type 0x12)0xffffffff
+        A: android:stopWithTask(0x0101036a)=(type 0x12)0xffffffff
         A: android:foregroundServiceType(0x01010599)=(type 0x11)0x20
       E: provider (line=40)
         A: android:name(0x01010003)="androidx.core.content.FileProvider"
@@ -164,7 +164,7 @@ class CandidateTests(unittest.TestCase):
         mutations = [
             ('android:enabled(0x0101000e)=true', 'android:enabled(0x0101000e)=false'),
             ('android:exported(0x01010010)=false', 'android:exported(0x01010010)=true'),
-            ('android:stopWithTask(0x010104ab)=true', 'android:stopWithTask(0x010104ab)=false'),
+            ('android:stopWithTask(0x0101036a)=true', 'android:stopWithTask(0x0101036a)=false'),
             ('android:foregroundServiceType(0x01010599)=32',
              'android:foregroundServiceType(0x01010599)=33'),
             ('android:foregroundServiceType(0x01010599)=32',
@@ -197,8 +197,8 @@ class CandidateTests(unittest.TestCase):
              'android:enabled(0x0101000e)=(type 0x12)0x0'),
             ('android:exported(0x01010010)=(type 0x12)0x0',
              'android:exported(0x01010010)=(type 0x12)0xffffffff'),
-            ('android:stopWithTask(0x010104ab)=(type 0x12)0xffffffff',
-             'android:stopWithTask(0x010104ab)=(type 0x12)0x0'),
+            ('android:stopWithTask(0x0101036a)=(type 0x12)0xffffffff',
+             'android:stopWithTask(0x0101036a)=(type 0x12)0x0'),
             ('android:foregroundServiceType(0x01010599)=(type 0x11)0x20',
              'android:foregroundServiceType(0x01010599)=(type 0x11)0x80'),
             ('        A: android:enabled(0x0101000e)=(type 0x12)0xffffffff\n', ''),

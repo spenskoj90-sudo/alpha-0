@@ -10,7 +10,7 @@ ANDROID_ATTR_IDS = {
     'name': '01010003',
     'enabled': '0101000e',
     'exported': '01010010',
-    'stopWithTask': '010104ab',
+    'stopWithTask': '0101036a',
     'foregroundServiceType': '01010599',
 }
 # Modern aapt2 uses the full Android framework URI, older output uses android:.

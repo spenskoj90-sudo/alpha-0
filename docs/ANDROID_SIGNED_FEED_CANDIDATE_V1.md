@@ -38,7 +38,7 @@ REQUEST_INSTALL_PACKAGES, both foreground-service/MediaProjection permissions an
 the actual aapt2 binary AndroidManifest. The parser handles both the modern
 Android framework namespace URI and legacy android: prefix, with exact resource
 IDs and strict boolean/hex/decimal values. The signed_feed GameObservationService
-must appear once, be enabled, non-exported, stopWithTask=true, and declare only
+must appear once, be enabled, non-exported, stopWithTask=true (framework attr ID 0x0101036a), and declare only
 mediaProjection (0x20) foreground type. This is a compiled APK availability and
 least-privilege check, not proof of selected-game identity or physical runtime.
 Non-debuggable state and typed static BuildConfig fields are checked in DEX. The non-Play-only R8 rule retains that class. This checks exact

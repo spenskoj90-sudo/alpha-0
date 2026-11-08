@@ -16,6 +16,9 @@ on:
       - "scripts/test_b2_atomic_download.py"
       - "scripts/pg18_role_graph_contract.py"
       - "scripts/test_pg18_role_graph_contract.py"
+      - "scripts/pg18_encrypted_export.py"
+      - "scripts/test_pg18_encrypted_export.py"
+      - "scripts/test_pg18_encrypted_export_runtime.py"
       - "scripts/pg18_export_readiness.py"
       - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
@@ -41,6 +44,9 @@ on:
       - "scripts/test_b2_atomic_download.py"
       - "scripts/pg18_role_graph_contract.py"
       - "scripts/test_pg18_role_graph_contract.py"
+      - "scripts/pg18_encrypted_export.py"
+      - "scripts/test_pg18_encrypted_export.py"
+      - "scripts/test_pg18_encrypted_export_runtime.py"
       - "scripts/pg18_export_readiness.py"
       - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
@@ -76,3 +82,24 @@ jobs:
           python3 -m unittest discover -s scripts -p 'test_pg18_role_graph_contract.py' -v
           python3 -m unittest discover -s scripts -p 'test_pg18_export_readiness.py' -v
           python3 -m unittest discover -s scripts -p 'test_pg18_restore_inventory.py' -v
+          python3 -m unittest discover -s scripts -p 'test_pg18_encrypted_export.py' -v
+  synthetic-restore:
+    name: Synthetic PG18 encrypted restore (not G3 acceptance)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: postgres:18.1-bookworm
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install synthetic test dependencies
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends python3 age
+      - name: Restore only generated fixture into a second local cluster
+        run: |
+          runuser -u postgres -- env G3_REQUIRE_RUNTIME=1 \
+            PYTHONPATH="$GITHUB_WORKSPACE/scripts" PATH="$PATH" \
+            python3 -m unittest discover -s "$GITHUB_WORKSPACE/scripts" \
+              -p 'test_pg18_encrypted_export_runtime.py' -v

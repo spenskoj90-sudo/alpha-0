@@ -42,3 +42,29 @@
 ## Local source checks (synthetic only)
 
 The existing `Offsite Backup Contract` PR workflow executes the R2 legacy contract tests, B2 target/version guard tests, and the isolated B2 S3 adapter tests. Success is **CI_PASS for source contracts only**; runtime billing/credential scope/B2 transfer/restore remain **NOT_RUN**. See Issue #528 for provider readbacks and exact code SHAs.
+
+## Manual encrypted full-export building block (08.11.2026)
+
+`pg18_encrypted_export.py` is an unwired library, not a workflow, CLI, provider
+permission or source-identity check. After separately verifying the exact source,
+PG18 full-row authority and owner gates, an authorized caller can supply a private
+PG service file and age public recipient. It streams `pg_dump --format=custom
+--create` with ownership/ACL intact and a separate `pg_dumpall --roles-only
+--no-role-passwords` directly through age. No plaintext dump is staged. A total
+ciphertext byte cap, process deadlines, private exclusive files and all-or-nothing
+failure cleanup bound the operation. Each part returns its byte length and SHA256.
+Role passwords are deliberately excluded; authentication recovery is separate.
+
+The two files are a single logical recovery package. They must both be retained,
+version-pinned and independently retrieved; uploading only the database file is
+incomplete. No B2 upload of this package is wired yet. Source identity/readiness,
+consistent roles during export, managed-role portability, tablespaces, provider
+DENY, encryption custody and a validated production restore plan remain gates.
+
+`test_pg18_encrypted_export_runtime.py` creates two temporary local PG18 clusters
+with generated fixture data only, generates a disposable age identity, exports,
+decrypts through pipes and restores roles before the database. It checks both
+public/Auth-shaped tables, owner, FORCE RLS, policy filtering, denied writes,
+role flags and default ACL parity. The CI runtime job requires real PG18/age and
+fails rather than silently skipping absent tools. This is **synthetic runtime**,
+never Neon managed Auth/session/JWKS recovery or G3 `RESTORE_PASS`.

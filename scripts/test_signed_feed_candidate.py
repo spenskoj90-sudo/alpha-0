@@ -66,6 +66,7 @@ class CandidateTests(unittest.TestCase):
         self.fields = dict(APPLICATION_ID='com.alpha0.app', DEBUG=False, VERSION_CODE=10008,
             SENTINEL_SOURCE_SHA='c'*40, SENTINEL_DISTRIBUTION_CHANNEL='signed_feed',
             SENTINEL_API_BASE_URL=self.policy['apiBaseUrl'], SENTINEL_API_FALLBACK_BASE_URL='',
+            SENTINEL_RUNTIME_ENVIRONMENT='release-candidate', SENTRY_DSN='',
             SENTINEL_VK_CLIENT_ID=self.policy['vkClientId'], SENTINEL_TELEGRAM_CLIENT_ID=self.policy['telegramClientId'], SENTINEL_GOOGLE_CLIENT_ID=self.policy['googleClientId'], SENTINEL_AUTH_CALLBACK_SCHEME='com.alpha0.app.auth', SENTINEL_VK_REDIRECT_URI='vk123://vk.ru/blank.html',
             SENTINEL_UPDATE_FEED_URL=self.policy['feedUrl'], SENTINEL_UPDATE_FEED_VERIFYING_KEY=self.policy['verifyingKey'])
         self.apk = self.root / feed.APK
@@ -144,6 +145,17 @@ class CandidateTests(unittest.TestCase):
                 self.write_apk()
                 with self.assertRaises(ValueError): self.inspect()
                 self.fields[key] = previous
+    def test_runtime_environment_and_telemetry_dsn_cannot_be_substituted(self):
+        for key, altered in [('SENTINEL_RUNTIME_ENVIRONMENT', 'production'),
+                             ('SENTRY_DSN', 'https://unapproved.invalid/telemetry')]:
+            with self.subTest(field=key):
+                original = self.fields[key]
+                self.fields[key] = altered
+                self.write_apk()
+                with self.assertRaises(ValueError): self.inspect()
+                self.fields[key] = original
+                self.write_apk()
+
     def test_bad_metadata(self):
         for bad in ["package: name='other' versionCode='10008'", "package: name='com.alpha0.app' versionCode='10007'", self.badging+'application-debuggable\n']:
             with self.subTest(bad=bad):

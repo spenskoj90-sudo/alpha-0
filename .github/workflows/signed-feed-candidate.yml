@@ -57,6 +57,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
           SENTINEL_SOURCE_SHA: ${{ inputs.source_sha }}
           SENTINEL_RUNTIME_ENVIRONMENT: release-candidate
+          SENTRY_DSN: ""
         run: |
           set -euo pipefail
           trap 'rm -f "$RUNNER_TEMP/presecret.jks"' EXIT

@@ -264,6 +264,8 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
         'SENTINEL_DISTRIBUTION_CHANNEL': 'signed_feed',
         'SENTINEL_API_BASE_URL': policy['apiBaseUrl'],
         'SENTINEL_API_FALLBACK_BASE_URL': '',
+        'SENTINEL_RUNTIME_ENVIRONMENT': 'release-candidate',
+        'SENTRY_DSN': '',
         'SENTINEL_AUTH_CALLBACK_SCHEME': 'com.alpha0.app.auth',
         'SENTINEL_VK_REDIRECT_URI': 'vk' + policy['vkClientId'] + '://vk.ru/blank.html',
         'SENTINEL_GOOGLE_CLIENT_ID': policy['googleClientId'],

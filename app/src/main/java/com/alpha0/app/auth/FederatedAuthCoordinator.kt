@@ -194,51 +194,37 @@ class FederatedAuthCoordinator(
     }
 
     private fun consumeCallback(uri: Uri, expectedOperation: String): CallbackResult {
-        val genericCallback = uri.scheme == callbackScheme && uri.host == "callback"
-        val expectedVk = runCatching { Uri.parse(vkRedirectUri) }.getOrNull()
-        val vkCallback = expectedVk != null &&
-            uri.scheme == expectedVk.scheme &&
-            uri.host == expectedVk.host &&
-            uri.path == expectedVk.path
-        if (!genericCallback && !vkCallback) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
+        // Canonicalize before consuming the single-use Keystore PKCE pending state.
+        // An invalid deep link must not invalidate a legitimate in-progress login.
+        val parsed = StrictInboundBrowserCallback.parseAny(
+            uri.toString(), "$callbackScheme://callback", vkRedirectUri,
+        ) ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         val pending = stateStore.consume(context)
             ?: return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
         if (pending.operation != expectedOperation) {
             return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
         }
-        if (pending.provider == "vk" && !vkCallback) {
+        if (pending.provider != parsed.provider) {
             return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
         }
-        if (pending.provider == "telegram" && !genericCallback) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        val callbackState = uri.getQueryParameter("state")
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        if (!constantTimeEquals(callbackState, pending.state)) {
+        if (!constantTimeEquals(parsed.state, pending.state)) {
             return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
         }
-        val providerError = uri.getQueryParameter("error")
-        if (!providerError.isNullOrBlank()) {
-            return CallbackResult.Failure("AUTH_PROVIDER_CANCELLED")
+        return when (parsed) {
+            is StrictInboundBrowserCallback.Parsed.ProviderError ->
+                CallbackResult.Failure("AUTH_PROVIDER_CANCELLED")
+            is StrictInboundBrowserCallback.Parsed.Code ->
+                CallbackResult.Success(
+                    BrowserCallback(
+                        provider = pending.provider,
+                        operation = pending.operation,
+                        code = parsed.code,
+                        state = parsed.state,
+                        codeVerifier = pending.codeVerifier,
+                        deviceId = parsed.deviceId,
+                    ),
+                )
         }
-        val code = uri.getQueryParameter("code")
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        if (code.isBlank() || code.length > 4096) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        val deviceId = uri.getQueryParameter("device_id")?.takeIf { it.isNotBlank() && it.length <= 512 }
-        return CallbackResult.Success(
-            BrowserCallback(
-                provider = pending.provider,
-                operation = pending.operation,
-                code = code,
-                state = callbackState,
-                codeVerifier = pending.codeVerifier,
-                deviceId = deviceId,
-            )
-        )
     }
 
     fun cancelPendingBrowserFlow() {

@@ -49,6 +49,7 @@ import com.alpha0.app.auth.AuthApi
 import com.alpha0.app.auth.FederatedAuthCoordinator
 import com.alpha0.app.auth.LoginScreen
 import com.alpha0.app.auth.SessionManager
+import com.alpha0.app.auth.StrictInboundBrowserCallback
 import com.alpha0.app.dashboard.ActivityScreen
 import com.alpha0.app.dashboard.DashboardApi
 import com.alpha0.app.dashboard.DashboardScreen
@@ -245,14 +246,12 @@ class MainActivity : ComponentActivity() {
 
     private fun validatedFederatedCallback(intent: Intent?): Uri? {
         val uri = intent?.data ?: return null
-        val generic = uri.scheme == BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME &&
-            uri.host == "callback"
-        val expectedVk = runCatching { Uri.parse(BuildConfig.SENTINEL_VK_REDIRECT_URI) }.getOrNull()
-        val vk = expectedVk != null &&
-            uri.scheme == expectedVk.scheme &&
-            uri.host == expectedVk.host &&
-            uri.path == expectedVk.path
-        return uri.takeIf { generic || vk }
+        val parsed = StrictInboundBrowserCallback.parseAny(
+            uri.toString(),
+            "${BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME}://callback",
+            BuildConfig.SENTINEL_VK_REDIRECT_URI,
+        )
+        return uri.takeIf { parsed != null }
     }
 }
 

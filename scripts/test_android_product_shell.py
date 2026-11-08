@@ -274,6 +274,21 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'SENTINEL_DISTRIBUTION_CHANNEL", "\\\"{channel}\\\""', self.gradle)
         self.assertIn("BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL", self.update)
 
+    def test_signed_feed_readonly_observation_is_reachable_from_games(self) -> None:
+        # The service must be navigable through Games in the same allowed channels.
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        service = read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/ObservationCapturePolicy.kt")
+        self.assertIn('composable("game-observer")', self.main)
+        self.assertIn('onLocalGameClick = if (ObservationCapturePolicy.supports(', self.main)
+        self.assertNotIn('onLocalGameClick = if (BuildConfig.DEBUG)', self.main)
+        self.assertIn('ObservationCapturePolicy.supports(', screen)
+        self.assertIn('ObservationCapturePolicy.supports(', service)
+        self.assertIn('manifestPlaceholders["gameObservationEnabled"] = "true"', self.gradle)
+        self.assertIn('"signed_feed" -> !debuggable', policy)
+        self.assertIn('"development", "diagnostic" -> debuggable', policy)
+        self.assertIn('else -> false', policy)
+
     def test_landscape_shell_preserves_vertical_content_budget(self) -> None:
         self.assertIn("Configuration.ORIENTATION_LANDSCAPE", self.main)
         self.assertIn("val showSideRail = isLandscape && showBottomBar", self.main)

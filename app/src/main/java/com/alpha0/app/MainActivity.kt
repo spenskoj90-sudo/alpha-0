@@ -3,6 +3,7 @@ package com.alpha0.app
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -67,6 +68,7 @@ import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
 import com.alpha0.app.game.GameObservationScreen
 import com.alpha0.app.game.GameObservationService
+import com.alpha0.app.game.ObservationCapturePolicy
 import com.alpha0.app.help.HelpScreen
 import com.alpha0.app.net.DnsFailoverHttpTransport
 import com.alpha0.app.net.SessionCredentials
@@ -662,7 +664,10 @@ private fun SentinelApplicationUi(
                         GamesScreen(
                             current.accessToken,
                             dashboardApi,
-                            onLocalGameClick = if (BuildConfig.DEBUG) ({ navController.navigate("game-observer") }) else null,
+                            onLocalGameClick = if (ObservationCapturePolicy.supports(
+                                BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL,
+                                Build.VERSION.SDK_INT,
+                            )) ({ navController.navigate("game-observer") }) else null,
                         ) { navController.navigate("game-details/$it") }
                     }
                 }

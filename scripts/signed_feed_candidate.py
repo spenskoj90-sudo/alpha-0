@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 
 import release_lineage as play
 from apk_signer_certificate import certificate_digests
+from signed_feed_manifest_contract import require_capture_service_manifest
 from signed_update_feed_release import (APPROVED_SIGNER, INSTALL_PERMISSION,
     MODERN_APK_SIGNATURE, PACKAGE, tool, url)
 
@@ -237,6 +238,14 @@ def inspect(apk, binding, aapt2, apksigner, *, unsigned=False):
     require(not re.search(r'(?m)^application-debuggable(?:\s|$)', badging), 'debug APK')
     permissions = tool([aapt2, 'dump', 'permissions', str(apk)]).decode()
     require(bool(INSTALL_PERMISSION.search(permissions)), 'merged installer permission')
+    for name in ('android.permission.FOREGROUND_SERVICE',
+                 'android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION'):
+        require(bool(re.search(r"(?m)^uses-permission:\s+name='" + re.escape(name) +
+                               r"'(?:\s|$)", permissions)),
+                'merged MediaProjection permission: ' + name)
+    manifest_tree = tool([aapt2, 'dump', 'xmltree', str(apk),
+                          '--file', 'AndroidManifest.xml']).decode()
+    require_capture_service_manifest(manifest_tree)
     constants = []
     payload = {}
     with zipfile.ZipFile(apk) as archive:

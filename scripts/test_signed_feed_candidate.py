@@ -73,14 +73,32 @@ class CandidateTests(unittest.TestCase):
         with zipfile.ZipFile(self.apk) as z:
             self.binding['compiledPayloadSha256'] = feed.digest(feed.canonical({n:feed.digest(z.read(n)) for n in z.namelist()}))
         self.badging = "package: name='com.alpha0.app' versionCode='10008'\n"
-        self.permissions = "uses-permission: name='android.permission.REQUEST_INSTALL_PACKAGES'\n"
+        self.permissions = (
+            "uses-permission: name='android.permission.REQUEST_INSTALL_PACKAGES'\n"
+            "uses-permission: name='android.permission.FOREGROUND_SERVICE'\n"
+            "uses-permission: name='android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION'\n"
+        )
+        self.manifest_tree = """N: android=http://schemas.android.com/apk/res/android
+  E: manifest (line=1)
+    E: application (line=14)
+      E: service (line=29)
+        A: android:name(0x01010003)="com.alpha0.app.game.GameObservationService" (Raw: ".game.GameObservationService")
+        A: android:enabled(0x0101000e)=(type 0x12)0xffffffff
+        A: android:exported(0x01010010)=(type 0x12)0x0
+        A: android:stopWithTask(0x010104ab)=(type 0x12)0xffffffff
+        A: android:foregroundServiceType(0x01010599)=(type 0x11)0x20
+      E: provider (line=40)
+        A: android:name(0x01010003)="androidx.core.content.FileProvider"
+"""
         self.signature = 'Verified using v2 scheme (APK Signature Scheme v2): true\nSigner #1 certificate SHA-256 digest: '+feed.APPROVED_SIGNER+'\n'
         self.real_tool = feed.tool
         self.mock = patch.object(feed, 'tool', side_effect=self.tool); self.mock.start(); self.addCleanup(self.mock.stop)
     def write_apk(self):
         with zipfile.ZipFile(self.apk, 'w') as z: z.writestr('classes.dex', dex(self.fields))
     def tool(self, args, **kw):
-        if args[0] == 'aapt2': return (self.permissions if args[2] == 'permissions' else self.badging).encode()
+        if args[0] == 'aapt2':
+            if args[2] == 'xmltree': return self.manifest_tree.encode()
+            return (self.permissions if args[2] == 'permissions' else self.badging).encode()
         if args[0] == 'apksigner': return self.signature.encode()
         return self.real_tool(args, **kw)
     def inspect(self): return feed.inspect(self.apk, self.binding, 'aapt2', 'apksigner')
@@ -134,6 +152,44 @@ class CandidateTests(unittest.TestCase):
     def test_installer_permission(self):
         self.permissions = ''
         with self.assertRaises(ValueError): self.inspect()
+    def test_capture_manifest_and_fgs_are_fail_closed(self):
+        self.assertEqual(10008, self.inspect()['versionCode'])
+        self.manifest_tree = self.manifest_tree.replace(
+            'com.alpha0.app.game.GameObservationService',
+            '.game.GameObservationService')
+        self.assertEqual(10008, self.inspect()['versionCode'])
+        original = self.manifest_tree
+        mutations = [
+            ('android:enabled(0x0101000e)=(type 0x12)0xffffffff',
+             'android:enabled(0x0101000e)=(type 0x12)0x0'),
+            ('android:exported(0x01010010)=(type 0x12)0x0',
+             'android:exported(0x01010010)=(type 0x12)0xffffffff'),
+            ('android:stopWithTask(0x010104ab)=(type 0x12)0xffffffff',
+             'android:stopWithTask(0x010104ab)=(type 0x12)0x0'),
+            ('android:foregroundServiceType(0x01010599)=(type 0x11)0x20',
+             'android:foregroundServiceType(0x01010599)=(type 0x11)0x80'),
+            ('        A: android:enabled(0x0101000e)=(type 0x12)0xffffffff\n', ''),
+            ('        A: android:exported(0x01010010)=(type 0x12)0x0\n', ''),
+            ('        A: android:foregroundServiceType(0x01010599)=(type 0x11)0x20\n', ''),
+            ('.game.GameObservationService', '.game.OtherService'),
+            ('E: service (line=29)', 'E: activity (line=29)'),
+        ]
+        for before, after in mutations:
+            with self.subTest(before=before, after=after):
+                self.manifest_tree = original.replace(before, after)
+                with self.assertRaises(ValueError): self.inspect()
+        self.manifest_tree = original + original
+        with self.assertRaises(ValueError): self.inspect()
+        self.manifest_tree = original
+        permissions = self.permissions
+        for item in ('android.permission.FOREGROUND_SERVICE',
+                     'android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION'):
+            with self.subTest(permission=item):
+                self.permissions = permissions.replace(
+                    "uses-permission: name='" + item + "'\n", '')
+                with self.assertRaises(ValueError): self.inspect()
+        self.permissions = permissions
+
     def test_sdk37_modern_certificate_report(self):
         self.signature = self.signature.replace('Signer #1', 'V2 Signer:')
         self.assertEqual(10008, self.inspect()['versionCode'])

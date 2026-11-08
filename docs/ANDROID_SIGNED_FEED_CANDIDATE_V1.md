@@ -34,8 +34,12 @@ ledger has already reached that code. A new source increment is then required.
 
 The secret-free job checks approval/evidence/baseline, builds signedRelease with a
 one-day isolated test-only keystore, then inspects real merged APK badging,
-REQUEST_INSTALL_PACKAGES, non-debuggable state and typed static BuildConfig fields
-inside actual DEX. The non-Play-only R8 rule retains that class. This checks exact
+REQUEST_INSTALL_PACKAGES, both foreground-service/MediaProjection permissions and
+the actual aapt2 binary AndroidManifest. The signed_feed GameObservationService
+must appear once, be enabled, non-exported, stopWithTask=true, and declare only
+mediaProjection (0x20) foreground type. This is a compiled APK availability and
+least-privilege check, not proof of selected-game identity or physical runtime.
+Non-debuggable state and typed static BuildConfig fields are checked in DEX. The non-Play-only R8 rule retains that class. This checks exact
 source SHA, package, versionCode, channel, feed URL and public SPKI, rather than
 searching for unrelated strings. The binding records a digest of every unpacked
 payload entry except APK signature metadata. It transfers the inspected payload

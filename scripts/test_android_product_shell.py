@@ -303,7 +303,7 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("val observedStatus = GameObservationRuntime.state.value.observation.status", observer)
         self.assertIn("observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)", observer)
         self.assertIn("enabled = !binaryChecking && !active && !pending", observer)
-        start = observer.index('onStart = {\\n            // Cancel any in-flight APK hash')
+        start = observer.index('        onStart = {')
         cancel = observer.index('binaryJob?.cancel()', start)
         consent = observer.index('launcher.launch(manager.createScreenCaptureIntent())', start)
         self.assertLess(start, cancel)

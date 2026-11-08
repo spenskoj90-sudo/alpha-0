@@ -35,7 +35,9 @@ ledger has already reached that code. A new source increment is then required.
 The secret-free job checks approval/evidence/baseline, builds signedRelease with a
 one-day isolated test-only keystore, then inspects real merged APK badging,
 REQUEST_INSTALL_PACKAGES, both foreground-service/MediaProjection permissions and
-the actual aapt2 binary AndroidManifest. The signed_feed GameObservationService
+the actual aapt2 binary AndroidManifest. The parser handles both the modern
+Android framework namespace URI and legacy android: prefix, with exact resource
+IDs and strict boolean/hex/decimal values. The signed_feed GameObservationService
 must appear once, be enabled, non-exported, stopWithTask=true, and declare only
 mediaProjection (0x20) foreground type. This is a compiled APK availability and
 least-privilege check, not proof of selected-game identity or physical runtime.

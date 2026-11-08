@@ -152,6 +152,39 @@ class CandidateTests(unittest.TestCase):
     def test_installer_permission(self):
         self.permissions = ''
         with self.assertRaises(ValueError): self.inspect()
+    def test_modern_aapt2_namespace_and_values_fail_closed(self):
+        legacy = self.manifest_tree
+        modern = legacy.replace('A: android:',
+            'A: http://schemas.android.com/apk/res/android:')
+        modern = modern.replace('(type 0x12)0xffffffff', 'true')
+        modern = modern.replace('(type 0x12)0x0', 'false')
+        modern = modern.replace('(type 0x11)0x20', '32')
+        self.manifest_tree = modern
+        self.assertEqual(10008, self.inspect()['versionCode'])
+        mutations = [
+            ('android:enabled(0x0101000e)=true', 'android:enabled(0x0101000e)=false'),
+            ('android:exported(0x01010010)=false', 'android:exported(0x01010010)=true'),
+            ('android:stopWithTask(0x010104ab)=true', 'android:stopWithTask(0x010104ab)=false'),
+            ('android:foregroundServiceType(0x01010599)=32',
+             'android:foregroundServiceType(0x01010599)=33'),
+            ('android:foregroundServiceType(0x01010599)=32',
+             'android:foregroundServiceType(0x01010599)=64'),
+            ('android:enabled(0x0101000e)=true', 'android:enabled(0x0101000e)=TRUE'),
+            ('android:enabled(0x0101000e)', 'android:enabled(0x0101000f)'),
+            ('http://schemas.android.com/apk/res/android:exported',
+             'http://untrusted.example/exported'),
+        ]
+        for before, after in mutations:
+            with self.subTest(before=before, after=after):
+                self.assertIn(before, modern)
+                self.manifest_tree = modern.replace(before, after)
+                with self.assertRaises(ValueError): self.inspect()
+        self.manifest_tree = modern.replace(
+            'android:foregroundServiceType(0x01010599)=32',
+            'android:foregroundServiceType(0x01010599)=0x20')
+        self.assertEqual(10008, self.inspect()['versionCode'])
+        self.manifest_tree = legacy
+
     def test_capture_manifest_and_fgs_are_fail_closed(self):
         self.assertEqual(10008, self.inspect()['versionCode'])
         self.manifest_tree = self.manifest_tree.replace(

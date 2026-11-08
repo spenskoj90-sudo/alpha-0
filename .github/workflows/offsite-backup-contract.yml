@@ -23,6 +23,8 @@ on:
       - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
+      - "scripts/b2_private_journal.py"
+      - "scripts/test_b2_private_journal.py"
       - "scripts/b2_export_package.py"
       - "scripts/test_b2_export_package.py"
       - "scripts/b2_s3_transport.py"
@@ -53,6 +55,8 @@ on:
       - "scripts/test_pg18_export_readiness.py"
       - "scripts/pg18_restore_inventory.py"
       - "scripts/test_pg18_restore_inventory.py"
+      - "scripts/b2_private_journal.py"
+      - "scripts/test_b2_private_journal.py"
       - "scripts/b2_export_package.py"
       - "scripts/test_b2_export_package.py"
       - "scripts/b2_s3_transport.py"
@@ -78,6 +82,7 @@ jobs:
       - name: Execute tests without credentials or cloud access
         run: |
           python3 -m unittest discover -s scripts -p 'test_offsite_pg_backup_*.py' -v
+          python3 -m unittest discover -s scripts -p 'test_b2_private_journal.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_export_package.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_target_contract.py' -v
           python3 -m unittest discover -s scripts -p 'test_b2_versioned_transfer.py' -v

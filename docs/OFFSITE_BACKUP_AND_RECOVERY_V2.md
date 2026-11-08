@@ -79,3 +79,11 @@ step fails, keep all original ciphertexts and remote partial copies; reconcile
 upload. It never deletes or overwrites an object. The caller must implement and
 verify durable private journal custody; this module does not create a journal,
 SDK client, credentials, scheduler, live workflow or provider authorization.
+
+`PrivatePackageJournal` supplies a concrete callback implementation: new file only
+under a private owner-controlled parent, mode 0600, exact allowlisted plan and
+version-receipt fields, file/directory fsync and refusal of duplicate/unbound
+receipts. Any failed write/fsync poisons that attempt; no later transfer step may
+continue. Do not truncate or reuse a failed attempt journal. Local fsync does not
+establish independently recoverable custody: privately preserve the journal along
+with ciphertexts and reconcile possible uploads before any new attempt.

@@ -1,6 +1,8 @@
 """Synthetic SDK boundary tests; no real B2 authorizations or ciphertext."""
 import hashlib
 import io
+import json
+from b2_private_journal import PrivatePackageJournal
 from pathlib import Path
 import tempfile
 import unittest
@@ -55,6 +57,14 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(receipt.sha256,self.parts[name].sha256)
         self.assertEqual([e['event'] for e in self.events],['planned','verified','verified'])
         self.assertEqual(set(self.events[0]['parts']),{'database','roles'})
+    def test_real_private_journal_binds_both_completed_versions(self):
+        path=self.root/'attempt.jsonl'
+        with PrivatePackageJournal(path) as journal:
+            receipts=self.go(journal=journal)
+        rows=[json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual(len(rows),3)
+        self.assertEqual(rows[0]['parts']['roles']['key'],receipts['roles'].key)
+        self.assertEqual(rows[2]['receipt']['version_id'],'synthetic-version')
     def test_missing_roles_rejected_before_network(self):
         del self.parts['roles']
         with self.assertRaises(PackageRejected): self.go()

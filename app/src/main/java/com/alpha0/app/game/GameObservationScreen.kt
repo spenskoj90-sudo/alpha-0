@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontFamily
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -236,8 +237,17 @@ internal fun GameObservationPanel(
                 } else {
                     Text(strings.text("game_install_package", ShatteredGameProfile.PACKAGE))
                     Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
-                    Text(strings.text(if (installed.signerSha256 == null) "game_install_signer_unknown" else "game_install_signer_observed"),
+                    // PackageManager signer metadata describes the installed APK only.
+                    // Never treat this fingerprint as attestation of selected captured content.
+                    val certificate = GameSignerFingerprint.grouped(installed.signerSha256)
+                    Text(strings.text(if (certificate == null) "game_install_signer_unknown" else "game_install_signer_observed"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (certificate != null) {
+                        Text(strings.text("game_install_signer_sha256", certificate),
+                            modifier = Modifier.fillMaxWidth().testTag("game-installed-certificate"),
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Text(strings.text("game_capture_source_unverified"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SecondaryButton(strings.text("game_capture_launch"), onLaunch, Modifier.fillMaxWidth())
                 }

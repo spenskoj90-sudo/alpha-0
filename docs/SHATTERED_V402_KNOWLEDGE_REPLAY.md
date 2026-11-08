@@ -69,3 +69,9 @@ foreign source cannot bypass invalidation and revive an older recommendation.
 Before the first observation it reports a waiting state; loss after an accepted
 observation latches the epoch unavailable until the session is cleared. These
 are synthetic lifecycle guarantees, not proof of selected-game identity.
+
+The Android observation screen displays a locally observed, fully preserved
+installed-APK certificate SHA-256 in spaced groups when structurally valid,
+otherwise UNKNOWN. This is diagnostic provenance for a future independent
+publisher/channel check, **not** proof of game publisher, selected projection
+window, exact runtime source, trusted profile or permission for advice/actions.

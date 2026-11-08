@@ -103,9 +103,16 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithText(
             "Installed APK signer detected locally; publisher identity and selected capture app remain UNVERIFIED.",
         ).performScrollTo().assertIsDisplayed()
+        // Complete 64-digit fingerprint, broken into readable groups without loss.
+        compose.onNodeWithTag("game-installed-certificate").performScrollTo()
+            .assertTextContains(("aaaaaaaa ".repeat(7) + "aaaaaaaa"), substring = true)
         compose.runOnIdle { install.value = StockGameInstall("fixture", 1) }
         compose.onNodeWithText("Installed APK signer UNKNOWN. Game version and capture-source identity are not verified.")
             .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-installed-certificate").assertDoesNotExist()
+        // Unexpected/malformed metadata must not masquerade as a valid SHA-256.
+        compose.runOnIdle { install.value = StockGameInstall("fixture", 1, "untrusted") }
+        compose.onNodeWithTag("game-installed-certificate").assertDoesNotExist()
     }
 
     @Test fun stopRemainsVisibleWithoutScrollingWhenCalibrationIsBelowFold() {

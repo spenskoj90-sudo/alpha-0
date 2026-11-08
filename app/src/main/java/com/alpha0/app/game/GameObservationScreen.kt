@@ -418,6 +418,7 @@ internal fun GameObservationPanel(
                 }
             }
         }
+        ManualHealingReferencePanel(installed, observation.captureId, active)
         val hudEvidence = hudEvidenceState(observation, now)
         if (hudEvidence != HudEvidenceState.UNKNOWN) observation.lastHealth?.let { last ->
             SentinelCard(kind = SentinelCardKind.CONTENT) {

@@ -100,3 +100,30 @@ calibration, knowledge authority, entitlement or any action. On-device success,
 latency, resource use and official-signature custody remain NOT_RUN until actual
 installed APK/device evidence exists. No original game binary or artwork is
 redistributed.
+
+
+## Manual offline healing-rule reference (source-only until Android validation)
+
+The Android game-observation screen exposes a **separate user-entered, hypothetical**
+healing-potion reference for the installed Shattered 4.0.2 / build 922 profile.
+The reference evaluates three explicit tri-state answers (UNKNOWN / YES / NO):
+health at or below 25%, Pharmacophobia challenge, and a known Potion of Healing
+in inventory. Defaults are UNKNOWN. The exact source branch at upstream commit
+`57a4e06a4caf162446d1c28caa7983f0493fecf0`,
+`PotionOfHealing.java` blob `7c685cc18ad411639d0a919a1e30ffc71486ca8d`,
+switches to Poison when NO_HEALING is active. Without that challenge, an actual
+known potion and low self-reported health permit only a conditional *possible*
+option. This 25% threshold is a conservative local reference, not a claim of
+gameplay optimality. Other/unknown conditions never produce potion advice.
+
+This view **does not consume OCR, verified knowledge binding, projection frames,
+credentials, AI-generated live state or remote network calls**. It retains no
+persistent history, resets manual answers across installed-game and capture state
+transitions, and hides entry while capture is active. It cannot issue game input,
+grant execution authority, bypass permission, or assert the observed window's
+identity. The public upstream source's game-mechanic facts are described in
+original prose; no game assets/code are copied. JVM tests exercise all 27
+tri-state combinations and unsupported-version guards; Compose instrumentation
+covers warning/option/unknown, reset and wrong-version UI. This is SOURCE/CI
+coverage only until target-device visibility, 200% font scale and owner UX
+acceptance are actually checked.

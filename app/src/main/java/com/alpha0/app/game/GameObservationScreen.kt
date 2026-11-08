@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
@@ -33,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +59,9 @@ import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import com.alpha0.app.knowledge.AndroidKnowledgeRuntime
 import com.alpha0.app.knowledge.KnowledgeViewState
 
@@ -73,15 +78,38 @@ fun GameObservationScreen() {
     var pendingSigner by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    val binaryScope = rememberCoroutineScope()
+    var binaryEvidence by remember { mutableStateOf(GameBinaryEvidence.Status.NOT_CHECKED) }
+    var binaryChecking by remember { mutableStateOf(false) }
+    var binaryJob by remember { mutableStateOf<Job?>(null) }
 
     DisposableEffect(lifecycle, context) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) installed = ShatteredGameProfile.installed(context)
-            // Leaving the foreground must never keep a prechecked capture-consent control.
-            if (event == Lifecycle.Event.ON_STOP) consent = false
+            if (event == Lifecycle.Event.ON_RESUME) {
+                installed = ShatteredGameProfile.installed(context)
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+            }
+            // Never continue hashing a different app while the observer is backgrounded.
+            if (event == Lifecycle.Event.ON_STOP) {
+                consent = false
+                binaryJob?.cancel()
+                binaryJob = null
+                binaryChecking = false
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+            }
         }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            binaryJob?.cancel()
+            binaryJob = null
+            lifecycle.removeObserver(observer)
+        }
+    }
+    LaunchedEffect(installed) {
+        binaryJob?.cancel()
+        binaryJob = null
+        binaryChecking = false
+        binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
     }
     // System consent is separate; the checkbox is a short-lived UI acknowledgement only.
     // A source/session transition or game-install change requires a fresh acknowledgement.
@@ -116,6 +144,35 @@ fun GameObservationScreen() {
         installed = installed,
         state = state,
         knowledge = knowledge,
+        binaryEvidence = binaryEvidence,
+        binaryChecking = binaryChecking,
+        onVerifyBinary = {
+            val expected = installed
+            if (expected != null && !binaryChecking) {
+                binaryChecking = true
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                binaryJob = binaryScope.launch {
+                    val job = coroutineContext[Job]
+                    try {
+                        val observed = InstalledShatteredBinary.verify(context, expected)
+                        if (installed == expected &&
+                            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                        ) binaryEvidence = observed
+                    } catch (_: CancellationException) {
+                        // Lifecycle stop cancels hashing; no stale status published.
+                    } catch (_: Exception) {
+                        if (installed == expected &&
+                            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                        ) binaryEvidence = GameBinaryEvidence.Status.UNAVAILABLE
+                    } finally {
+                        if (binaryJob === job) {
+                            binaryChecking = false
+                            binaryJob = null
+                        }
+                    }
+                }
+            }
+        },
         supported = ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT),
         consent = consent,
         pending = pending,
@@ -170,6 +227,9 @@ internal fun GameObservationPanel(
     onStop: () -> Unit,
     onLaunch: () -> Unit,
     knowledge: KnowledgeViewState = KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE"),
+    binaryEvidence: GameBinaryEvidence.Status = GameBinaryEvidence.Status.NOT_CHECKED,
+    binaryChecking: Boolean = false,
+    onVerifyBinary: () -> Unit = {},
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
@@ -249,6 +309,27 @@ internal fun GameObservationPanel(
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(strings.text("game_capture_source_unverified"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.text("game_binary_disclosure"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SecondaryButton(
+                        strings.text("game_binary_check"), onVerifyBinary,
+                        Modifier.fillMaxWidth().testTag("game-binary-check"),
+                        enabled = !binaryChecking && !active && installed.signerSha256 != null,
+                    )
+                    if (binaryChecking) CircularProgressIndicator()
+                    val binaryLabel = when {
+                        binaryChecking -> "game_binary_checking"
+                        binaryEvidence == GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID -> "game_binary_match_android"
+                        binaryEvidence == GameBinaryEvidence.Status.MATCHED_GITHUB_GPLAY -> "game_binary_match_gplay"
+                        binaryEvidence == GameBinaryEvidence.Status.OTHER_OR_SPLIT -> "game_binary_other"
+                        binaryEvidence == GameBinaryEvidence.Status.UNAVAILABLE -> "game_binary_unavailable"
+                        binaryEvidence == GameBinaryEvidence.Status.UNSUPPORTED_VERSION -> "game_binary_unsupported"
+                        else -> "game_binary_not_checked"
+                    }
+                    Text(
+                        strings.text(binaryLabel),
+                        Modifier.testTag("game-binary-evidence-status").politeStatusSemantics(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     SecondaryButton(strings.text("game_capture_launch"), onLaunch, Modifier.fillMaxWidth())
                 }
             }

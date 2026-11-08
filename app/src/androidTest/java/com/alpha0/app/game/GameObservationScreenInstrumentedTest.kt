@@ -115,6 +115,50 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-installed-certificate").assertDoesNotExist()
     }
 
+    @Test fun localGameBinaryCheckIsOptInAndNeverAuthorizesProjectedContent() {
+        val status = mutableStateOf(GameBinaryEvidence.Status.NOT_CHECKED)
+        var clicks = 0
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(
+                    StockGameInstall("4.0.2", 922, "a".repeat(64)),
+                    GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {},
+                    binaryEvidence = status.value,
+                    onVerifyBinary = { clicks++ },
+                )
+            }
+        }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT CHECKED", substring = true)
+        compose.onNodeWithTag("game-binary-check").performScrollTo().performClick()
+        compose.runOnIdle { assertTrue(clicks == 1) }
+        compose.runOnIdle { status.value = GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("Captured content remains UNVERIFIED.", substring = true)
+        compose.onNodeWithText(
+            "Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.",
+        ).performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { status.value = GameBinaryEvidence.Status.OTHER_OR_SPLIT }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT proof of tampering", substring = true)
+    }
+
+    @Test fun signerUnknownCannotStartLocalBinaryHash() {
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(
+                    StockGameInstall("4.0.2", 922, null),
+                    GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {},
+                )
+            }
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT CHECKED", substring = true)
+    }
+
     @Test fun stopRemainsVisibleWithoutScrollingWhenCalibrationIsBelowFold() {
         val state = mutableStateOf(GameObservationViewState(
             ObservationSnapshot(status = ObservationStatus.OBSERVING, frames = 8),

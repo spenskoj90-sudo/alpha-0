@@ -75,3 +75,28 @@ installed-APK certificate SHA-256 in spaced groups when structurally valid,
 otherwise UNKNOWN. This is diagnostic provenance for a future independent
 publisher/channel check, **not** proof of game publisher, selected projection
 window, exact runtime source, trusted profile or permission for advice/actions.
+
+The user-initiated local binary-evidence check on Android 14+ does not contact
+GitHub at runtime and does not upload APK contents. Its fixed reference is the
+upstream 2026-10-07 v4.0.2 release at
+`https://github.com/00-Evan/shattered-pixel-dungeon/releases/tag/v4.0.2`:
+
+- `ShatteredPD-v4.0.2-Android.apk`: 30,275,058 bytes, SHA-256
+  `ceef4cdd4beddcb3d85379ac004cb4ab5d918b89dc7366b4ce9c4a3585a5e78e`;
+- `ShatteredPD-v4.0.2-GPlay.apk`: 31,318,705 bytes, SHA-256
+  `b7be54496503b613e241a7b67021fb6ed152ccf93f28c131a6af25daa3c30483`.
+
+The checker reads only the installed base APK (versionName 4.0.2, versionCode
+922) through PackageManager's publicly readable source path, caps input at
+32 MiB, hashes with SHA-256 in cancellable 64-KiB chunks, and rechecks local
+package version/certificate/source path before reporting. It cancels on screen
+Stop and returns NOT_CHECKED/UNAVAILABLE/OTHER_OR_SPLIT as appropriate. Split
+APK installations, inaccessible files and other legitimate distribution
+channels may not match those specific whole APK assets and are **not** labelled
+malicious. A binary match supports only observed base-APK file identity against
+GitHub-published digest metadata; it does **not** attest upstream publisher
+certificate custody, the selected MediaProjection window, live game frames,
+calibration, knowledge authority, entitlement or any action. On-device success,
+latency, resource use and official-signature custody remain NOT_RUN until actual
+installed APK/device evidence exists. No original game binary or artwork is
+redistributed.

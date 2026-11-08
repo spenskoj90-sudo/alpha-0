@@ -145,7 +145,7 @@ class GameObservationService : Service() {
             return START_NOT_STICKY
         }
         if (sessionId != null || stopping) return START_NOT_STICKY
-        if (!BuildConfig.DEBUG || Build.VERSION.SDK_INT < 34) {
+        if (!ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT)) {
             finish("ANDROID_14_REQUIRED")
             return START_NOT_STICKY
         }

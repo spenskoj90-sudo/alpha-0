@@ -115,7 +115,7 @@ fun GameObservationScreen() {
         installed = installed,
         state = state,
         knowledge = knowledge,
-        supported = BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 34,
+        supported = ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT),
         consent = consent,
         pending = pending,
         now = elapsed,

@@ -240,6 +240,9 @@ android {
         // Non-Play production build: same ID, release signer, production hardening.
         create("signedRelease") {
             initWith(getByName("release"))
+            // Consent-only local OCR is a real non-Play feature, not debug tooling.
+            // No trusted game source or game-action authority is enabled by this flag.
+            manifestPlaceholders["gameObservationEnabled"] = "true"
             proguardFiles("signed-feed-proguard.pro")
             matchingFallbacks += listOf("release")
             buildConfigField("String", "SENTINEL_DISTRIBUTION_CHANNEL", "\"signed_feed\"")

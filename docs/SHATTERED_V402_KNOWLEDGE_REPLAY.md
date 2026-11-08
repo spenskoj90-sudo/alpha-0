@@ -35,9 +35,20 @@ The service-owned Android binding/observation closures remain null. MediaProject
 callbacks, installed package metadata, OCR pixels and user statements do not prove
 the selected window's package, signer, version or exact source identity. No
 supported service/OS/game attestor for that identity exists in this package.
-Production capture stays DEBUG-gated; no mechanistic DEBUG replacement or action
-authority is introduced. OFF/Advisory/Confirm/Bounded consent, permission, Stop,
-action-grade proof and outcome gates remain independent and default-deny.
+Local consent-only observation is now source-enabled for signed_feed non-Play
+release builds on Android 14+ (in addition to existing debug/diagnostic builds).
+The Play release service remains disabled. Both the UI and service enforce the
+same channel/OS policy and the signed_feed manifest enables only this non-exported
+MediaProjection foreground service. The user still must acknowledge disclosure
+and grant Android system capture consent; session, screen lock, sign-out, elapsed
+five-minute limit and notification/in-app Stop retain their existing fail-closed
+handling. HUD OCR and local counts remain **INFERENCE / UNVERIFIED**, not claims
+of selected content identity; neither recognized text nor frames are persisted
+or uploaded. Source compilation/CI cannot claim real device/consent/runtime
+coverage. Trusted knowledge adapters remain null; no advice, game:write,
+action authority or background capture is activated by this source change.
+OFF/Advisory/Confirm/Bounded consent, permission, Stop, action-grade proof and
+outcome gates remain independent and default-deny.
 
 The service binding now requires exact package, certificate digest, versionName,
 versionCode and upstream source SHA in addition to target profile/source/session.

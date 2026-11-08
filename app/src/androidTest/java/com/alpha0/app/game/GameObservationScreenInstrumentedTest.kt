@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performScrollTo
 import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.SentinelTheme
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -131,8 +132,9 @@ class GameObservationScreenInstrumentedTest {
         }
         compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
             .assertTextContains("NOT CHECKED", substring = true)
-        compose.onNodeWithTag("game-binary-check").performScrollTo().performClick()
-        compose.runOnIdle { assertTrue(clicks == 1) }
+        compose.onNodeWithTag("game-binary-check").performScrollTo()
+            .assertIsDisplayed().assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals("local APK-check click callback count", 1, clicks) }
         compose.runOnIdle { status.value = GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID }
         compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
             .assertTextContains("Captured content remains UNVERIFIED.", substring = true)

@@ -160,3 +160,24 @@ and three unsupported version cases (324 assertions); Compose tests cover
 unknown/conditional/flying/water/reset and capture pause. Source/CI tests are
 not real player evidence, selected-window identity, measured safety, owner
 visual acceptance or action permissions.
+
+## Universal offline manual reference route without capture escalation
+
+The Games card now independently exposes `game-reference` for authenticated
+Android users on **all distribution channels**, including Play and Android
+below API34; no game-entitlement flag or MediaProjection capability is needed
+to view manually entered source-review rules. The separate existing
+`game-observer` path is *still* exposed only when
+`ObservationCapturePolicy.supports(DEBUG, channel, SDK)`, with the unchanged
+service/manifest/OS permission/consent/Stop boundaries. The new reference
+screen performs only local PackageManager installed-version lookup on resume,
+renders reused Healing/Burning hypothetical cards, never calls capture,
+network, OCR, privileged operations or game input, and shows UNKNOWN when the
+matching game version is unavailable. Safe local reference is not a claim of
+gameplay authority or a reason to waive user acceptance. RU/EN navigation
+labels are now explicit about the two routes. Android instrumentation tests
+check absence of capture controls and manually available reference; product
+shell contract checks route separation and service guards. The existing APK
+check touch regression now asserts enabled/displayed and reports the exact
+callback count to better diagnose the **one observed API34 test flake**;
+no semantic click fallback or retry is inserted to manufacture a PASS.

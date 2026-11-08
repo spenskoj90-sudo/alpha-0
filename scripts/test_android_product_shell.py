@@ -279,6 +279,22 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn(f'SENTINEL_DISTRIBUTION_CHANNEL", "\\\"{channel}\\\""', self.gradle)
         self.assertIn("BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL", self.update)
 
+    def test_manual_game_reference_remains_accessible_when_capture_is_disabled(self) -> None:
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        games = read("app/src/main/java/com/alpha0/app/dashboard/ProductScreens.kt")
+        self.assertIn('composable("game-reference")', self.main)
+        self.assertIn('onLocalReferenceClick = { navController.navigate("game-reference") }', self.main)
+        self.assertIn('AuthenticatedRoute(activeSession, sessionStore, activity, navController)', self.main)
+        self.assertIn('onLocalReferenceClick != null || onLocalGameClick != null', games)
+        self.assertIn('ManualHealingReferencePanel(installed, null, false)', reference)
+        self.assertIn('ManualBurningReferencePanel(installed, null, false)', reference)
+        self.assertNotIn('GameObservationService', reference)
+        self.assertNotIn('MediaProjection', reference)
+        # Keep the independent capture route and its channel/OS permission fences.
+        self.assertIn('onLocalGameClick = if (ObservationCapturePolicy.supports(', self.main)
+        self.assertIn('ObservationCapturePolicy.supports(', read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt"))
+        self.assertIn('ObservationCapturePolicy.supports(', read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt"))
+
     def test_signed_feed_readonly_observation_is_reachable_from_games(self) -> None:
         # The service must be navigable through Games in the same allowed channels.
         screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")

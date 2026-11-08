@@ -67,6 +67,7 @@ import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
 import com.alpha0.app.game.GameObservationScreen
+import com.alpha0.app.game.GameReferenceScreen
 import com.alpha0.app.game.GameObservationService
 import com.alpha0.app.game.ObservationCapturePolicy
 import com.alpha0.app.help.HelpScreen
@@ -664,11 +665,17 @@ private fun SentinelApplicationUi(
                         GamesScreen(
                             current.accessToken,
                             dashboardApi,
+                            onLocalReferenceClick = { navController.navigate("game-reference") },
                             onLocalGameClick = if (ObservationCapturePolicy.supports(
                                 BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL,
                                 Build.VERSION.SDK_INT,
                             )) ({ navController.navigate("game-observer") }) else null,
                         ) { navController.navigate("game-details/$it") }
+                    }
+                }
+                composable("game-reference") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) {
+                        GameReferenceScreen()
                     }
                 }
                 composable("game-observer") {

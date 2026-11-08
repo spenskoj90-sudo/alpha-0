@@ -40,6 +40,26 @@ def verify(root: Path) -> dict:
         cases = list(xml.iter("testcase"))
         if not cases:
             raise ValueError("Empty Android test suite")
+        # Android's own suite summary must reconcile with its testcase records.
+        # Otherwise a green set of cases could conceal an unmatched suite error
+        # or a truncated report. Fail rather than re-labeling missing evidence.
+        leaf_suites = [element for element in xml.iter("testsuite")
+                       if not any(child.tag == "testsuite" for child in element)]
+        if not leaf_suites:
+            raise ValueError("Android test suite summary missing")
+        for suite in leaf_suites:
+            scoped = list(suite.iter("testcase"))
+            actual = {"tests": len(scoped),
+                      "failures": sum(c.find("failure") is not None for c in scoped),
+                      "errors": sum(c.find("error") is not None for c in scoped),
+                      "skipped": sum(c.find("skipped") is not None for c in scoped)}
+            for key, amount in actual.items():
+                try:
+                    reported = int(suite.attrib[key])
+                except (KeyError, ValueError):
+                    raise ValueError("Missing/invalid Android suite counter: " + key)
+                if amount != reported:
+                    raise ValueError("Inconsistent Android suite counter: " + key)
         for case in cases:
             key = (case.attrib.get("classname"), case.attrib.get("name"))
             if not all(key) or key in tests:

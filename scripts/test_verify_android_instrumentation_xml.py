@@ -38,6 +38,10 @@ class InstrumentationReceiptTest(unittest.TestCase):
             ET.SubElement(root, "testcase", classname="x.NormalRegression", name=f"test{index:03d}")
         if duplicate:
             ET.SubElement(root, "testcase", classname="x.NonGatedTest", name="mustPass")
+        root.attrib.update(tests=str(len(root.findall("testcase"))),
+                           failures=str(len(root.findall("testcase/failure"))),
+                           errors=str(len(root.findall("testcase/error"))),
+                           skipped=str(len(root.findall("testcase/skipped"))))
         ET.ElementTree(root).write(self.folder / "TEST-matrix.xml", encoding="utf-8")
 
     def test_expected_four_gates_are_recorded_not_passing(self):
@@ -60,6 +64,7 @@ class InstrumentationReceiptTest(unittest.TestCase):
         root = tree.getroot()
         for item in list(root.findall("testcase[@classname='x.NormalRegression']"))[:10]:
             root.remove(item)
+        root.set("tests", str(len(root.findall("testcase"))))
         tree.write(self.folder / "TEST-matrix.xml", encoding="utf-8")
         self.assertIn({"test": "debug-connected-suite", "kind": "suite-shrunk-below-50"}, verify(self.folder)["unexpected"])
 
@@ -89,12 +94,29 @@ class InstrumentationReceiptTest(unittest.TestCase):
         child = tree.getroot().find("testcase[@classname='x.NonGatedTest']")
         outcome = ET.SubElement(child, "failure")
         outcome.text = ASSUME
+        tree.getroot().set("failures", "5")
         tree.write(self.folder / "TEST-matrix.xml", encoding="utf-8")
         self.assertEqual("FAIL", verify(self.folder)["status"])
 
     def test_gated_unexpected_error_is_not_whitelisted(self):
         self.report(gate="error")
         self.assertEqual("FAIL", verify(self.folder)["status"])
+
+    def test_false_green_suite_counter_is_rejected(self):
+        self.report()
+        tree = ET.parse(self.folder / "TEST-matrix.xml")
+        tree.getroot().set("errors", "1")
+        tree.write(self.folder / "TEST-matrix.xml", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Inconsistent Android suite counter: errors"):
+            verify(self.folder)
+
+    def test_missing_suite_counter_is_rejected(self):
+        self.report()
+        tree = ET.parse(self.folder / "TEST-matrix.xml")
+        del tree.getroot().attrib["tests"]
+        tree.write(self.folder / "TEST-matrix.xml", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Missing/invalid Android suite counter: tests"):
+            verify(self.folder)
 
     def test_corrupted_xml_fails(self):
         (self.folder / "TEST-broken.xml").write_text("<not-closed")

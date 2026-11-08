@@ -44,6 +44,9 @@ def main():
         env = dict(os.environ, ANDROID_KEYSTORE_PATH=str(keystore), ANDROID_KEYSTORE_PASSWORD='isolated-only',
             ANDROID_KEY_ALIAS='isolated', ANDROID_KEY_PASSWORD='isolated-only',
             SENTINEL_SOURCE_SHA=sha, SENTINEL_API_BASE_URL=policy['apiBaseUrl'],
+            # Always match the real candidate's approved runtime policy. Do not
+            # inherit runner-supplied telemetry or CI/default environment values.
+            SENTINEL_RUNTIME_ENVIRONMENT='release-candidate', SENTRY_DSN='',
             SENTINEL_API_FALLBACK_BASE_URL='', SENTINEL_VK_CLIENT_ID=policy['vkClientId'], SENTINEL_TELEGRAM_CLIENT_ID=policy['telegramClientId'], SENTINEL_GOOGLE_CLIENT_ID=policy['googleClientId'],
             SENTINEL_UPDATE_FEED_URL=policy['feedUrl'], SENTINEL_UPDATE_FEED_VERIFYING_KEY=policy['verifyingKey'])
         apk = Path('app/build/outputs/apk/signedRelease/app-signedRelease.apk')

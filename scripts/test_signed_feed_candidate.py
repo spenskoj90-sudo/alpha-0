@@ -103,6 +103,15 @@ class CandidateTests(unittest.TestCase):
         if args[0] == 'apksigner': return self.signature.encode()
         return self.real_tool(args, **kw)
     def inspect(self): return feed.inspect(self.apk, self.binding, 'aapt2', 'apksigner')
+    def test_ci_smoke_reproduces_explicit_release_candidate_environment(self):
+        # DEX verification must not be weakened for synthetic CI builds.
+        smoke = Path('scripts/signed_feed_ci_smoke.py').read_text()
+        self.assertIn("SENTINEL_RUNTIME_ENVIRONMENT='release-candidate'", smoke)
+        self.assertIn("SENTRY_DSN=''", smoke)
+        self.assertIn('feed.inspect(apk, binding, str(aapt2), str(apksigner), unsigned=True)', smoke)
+        self.assertIn("SENTINEL_RUNTIME_ENVIRONMENT': 'release-candidate'", Path('scripts/signed_feed_candidate.py').read_text())
+        self.assertIn("SENTRY_DSN': ''", Path('scripts/signed_feed_candidate.py').read_text())
+
     def test_workflow_presecret_separation(self):
         workflow = Path('.github/workflows/signed-feed-candidate.yml').read_text()
         self.assertLess(workflow.index('verify-compiled'), workflow.index('secrets.'))

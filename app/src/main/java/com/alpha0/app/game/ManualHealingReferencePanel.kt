@@ -59,7 +59,7 @@ internal fun ManualHealingReferencePanel(
                     ManualFactQuestion(strings.text("game_manual_pharma"), "pharma", pharmacophobia) { pharmacophobia = it }
                     ManualFactQuestion(strings.text("game_manual_potion"), "potion", knownPotion) { knownPotion = it }
                     val outcome = ShatteredManualHealing.evaluate(
-                        installed.versionName, installed.versionCode,
+                        installed?.versionName, installed?.versionCode,
                         lowHealth, pharmacophobia, knownPotion,
                     )
                     val key = when (outcome) {

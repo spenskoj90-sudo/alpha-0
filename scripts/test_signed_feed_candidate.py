@@ -284,7 +284,9 @@ class CandidateTests(unittest.TestCase):
         self.assertEqual(candidate,self.fetch(archive,run,artifact,lambda p,s:calls.append(p.name)))
         self.assertEqual(feed.MEMBERS,set(calls))
     def test_unattested_substitution_even_self_adjusted_hash(self):
-        self.fields['SENTINEL_RUNTIME_ENVIRONMENT'] = 'substituted'
+        # Alter an unrelated payload field: typed approved fields still match,
+        # but independent provenance attestation must reject self-rehashed bytes.
+        self.fields['UNRELATED_PAYLOAD_MARKER'] = 'substituted'
         self.write_apk()
         with zipfile.ZipFile(self.apk) as z:
             self.binding['compiledPayloadSha256'] = feed.digest(feed.canonical({n:feed.digest(z.read(n)) for n in z.namelist()}))

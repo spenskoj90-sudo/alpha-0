@@ -298,6 +298,17 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('"development", "diagnostic" -> debuggable', policy)
         self.assertIn('else -> false', policy)
 
+    def test_local_apk_hash_is_revoked_before_projection_consent(self) -> None:
+        observer = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        self.assertIn("val observedStatus = GameObservationRuntime.state.value.observation.status", observer)
+        self.assertIn("observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)", observer)
+        self.assertIn("enabled = !binaryChecking && !active && !pending", observer)
+        start = observer.index('onStart = {\\n            // Cancel any in-flight APK hash')
+        cancel = observer.index('binaryJob?.cancel()', start)
+        consent = observer.index('launcher.launch(manager.createScreenCaptureIntent())', start)
+        self.assertLess(start, cancel)
+        self.assertLess(cancel, consent)
+
     def test_landscape_shell_preserves_vertical_content_budget(self) -> None:
         self.assertIn("Configuration.ORIENTATION_LANDSCAPE", self.main)
         self.assertIn("val showSideRail = isLandscape && showBottomBar", self.main)

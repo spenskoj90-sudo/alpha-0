@@ -127,3 +127,13 @@ tri-state combinations and unsupported-version guards; Compose instrumentation
 covers warning/option/unknown, reset and wrong-version UI. This is SOURCE/CI
 coverage only until target-device visibility, 200% font scale and owner UX
 acceptance are actually checked.
+
+The local APK inspection and capture operations now share an additional
+lifecycle fence. Beginning Android system capture consent cancels and clears
+any in-flight binary hash and its provisional UI result; a pending consent
+or active capture hides the APK inspection action. The runtime callback also
+checks the latest process-local capture status before starting a hash, not only
+the previously composed button's enabled state. Negative UI tests cover
+pending/active disabled states, and a source-contract regression asserts
+hash cancellation precedes the system capture intent. The check still cannot
+attest the projected game's identity or authorize actions.

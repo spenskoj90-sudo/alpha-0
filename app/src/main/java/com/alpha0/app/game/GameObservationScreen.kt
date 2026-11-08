@@ -148,7 +148,11 @@ fun GameObservationScreen() {
         binaryChecking = binaryChecking,
         onVerifyBinary = {
             val expected = installed
-            if (expected != null && !binaryChecking) {
+            // Never overlap APK hashing with a pending or active screen capture.
+            val observedStatus = GameObservationRuntime.state.value.observation.status
+            if (expected != null && !binaryChecking && !pending &&
+                observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
+            ) {
                 binaryChecking = true
                 binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
                 binaryJob = binaryScope.launch {
@@ -179,6 +183,12 @@ fun GameObservationScreen() {
         now = elapsed,
         onConsent = { consent = it },
         onStart = {
+            // Cancel any in-flight APK hash before presenting system capture consent.
+            // This is independent of MediaProjection consent and gives no game authority.
+            binaryJob?.cancel()
+            binaryJob = null
+            binaryChecking = false
+            binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
             val current = ShatteredGameProfile.installed(context)
             if (current == null) {
                 installed = null
@@ -313,7 +323,7 @@ internal fun GameObservationPanel(
                     SecondaryButton(
                         strings.text("game_binary_check"), onVerifyBinary,
                         Modifier.fillMaxWidth().testTag("game-binary-check"),
-                        enabled = !binaryChecking && !active && installed.signerSha256 != null,
+                        enabled = !binaryChecking && !active && !pending && installed.signerSha256 != null,
                     )
                     if (binaryChecking) CircularProgressIndicator()
                     val binaryLabel = when {

@@ -144,6 +144,25 @@ class GameObservationScreenInstrumentedTest {
             .assertTextContains("NOT proof of tampering", substring = true)
     }
 
+    @Test fun pendingConsentAndActiveCaptureBlockLocalApkHash() {
+        val install = StockGameInstall("4.0.2", 922, "a".repeat(64))
+        val isPending = mutableStateOf(true)
+        val snapshot = mutableStateOf(GameObservationViewState())
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install, snapshot.value, true, false, isPending.value, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {
+            isPending.value = false
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-1"), install)
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+    }
+
     @Test fun signerUnknownCannotStartLocalBinaryHash() {
         compose.setContent {
             SentinelTheme(AppThemeMode.LIGHT) {

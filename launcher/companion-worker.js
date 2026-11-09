@@ -129,6 +129,9 @@ class CompanionWorkerRuntime {
   }
 
   start({ coreUrl, sessionToken }) {
+    // Parent starts one worker connection; duplicate IPC must not spawn a
+    // second live transport or resurrect a previously stopped generation.
+    if (this.running || this.socket) throw new Error('COMPANION_ALREADY_RUNNING');
     requireLoopbackCore(coreUrl);
     authProtocols(sessionToken);
     this.running = true;
@@ -183,12 +186,22 @@ class CompanionWorkerRuntime {
     this.handshaken = false;
 
     socket.addEventListener('open', () => {
+      if (socket !== this.socket || !this.running || this.killSwitch) return;
       this.attempt = 0;
       socket.send(JSON.stringify({ ...HANDSHAKE, instance_id: randomUUID() }));
     });
-    socket.addEventListener('message', event => this.#onMessage(event.data));
-    socket.addEventListener('error', () => this.#setState('DEGRADED', 'TRANSPORT_ERROR'));
-    socket.addEventListener('close', event => this.#onClose(event));
+    // A delayed event from a replaced/closed socket must never change the
+    // current session, dispatch stale advice, or clear a latched Stop.
+    socket.addEventListener('message', event => {
+      if (socket === this.socket && this.running && !this.killSwitch) this.#onMessage(event.data);
+    });
+    socket.addEventListener('error', () => {
+      if (socket === this.socket && this.running && !this.killSwitch)
+        this.#setState('DEGRADED', 'TRANSPORT_ERROR');
+    });
+    socket.addEventListener('close', event => {
+      if (socket === this.socket) this.#onClose(event);
+    });
   }
 
   #onMessage(raw) {

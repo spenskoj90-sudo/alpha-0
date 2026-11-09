@@ -117,6 +117,53 @@ test('worker heartbeat receives correlated Core HEALTH and emits measured runtim
   assert.equal(JSON.stringify(runtimeMessage).includes('opaque-session-token'), false);
 });
 
+test('worker discards stale websocket callbacks across rotation, Stop, and fresh start', () => {
+  FakeWebSocket.instances.length = 0;
+  const outputs = [];
+  const runtime = new CompanionWorkerRuntime({
+    WebSocketImpl: FakeWebSocket,
+    send: value => outputs.push(value),
+    setTimeoutImpl: () => 1,
+    clearTimeoutImpl: () => {},
+    setIntervalImpl: () => 1,
+    clearIntervalImpl: () => {},
+  });
+  const coreUrl = 'http://127.0.0.1:8000';
+  runtime.start({ coreUrl, sessionToken: 'opaque-session-token-0123456789' });
+  const old = FakeWebSocket.instances[0];
+  // Session rotation races a delayed close from the previous connection.
+  old.readyState = FakeWebSocket.CLOSED;
+  runtime.updateSession('rotated-session-token-0123456789');
+  const current = FakeWebSocket.instances[1];
+  assert.equal(runtime.socket, current);
+  old.emit('message', { data: 'invalid stale frame' });
+  old.emit('error');
+  old.emit('close', { reason: 'COMPANION_ENTITLEMENT_REVOKED' });
+  const oldSends = old.sent.length;
+  old.emit('open');
+  assert.equal(old.sent.length, oldSends);
+  assert.equal(runtime.socket, current);
+  assert.equal(runtime.running, true);
+
+  current.emit('open');
+  current.emit('message', { data: JSON.stringify({ accepted: true, mode: 'ACTIVE' }) });
+  assert.equal(runtime.state, 'ACTIVE');
+  assert.equal(outputs.filter(item => item.type === 'handshake-evidence').length, 1);
+  assert.throws(() => runtime.start({ coreUrl, sessionToken: 'third-session-token-0123456789' }),
+    /COMPANION_ALREADY_RUNNING/);
+  assert.equal(FakeWebSocket.instances.length, 2);
+
+  runtime.stop('KILL_SWITCH');
+  current.emit('message', { data: 'invalid after stop' });
+  current.emit('error');
+  current.emit('open');
+  assert.equal(runtime.state, 'STOPPED');
+  assert.equal(runtime.reason, 'KILL_SWITCH');
+  runtime.start({ coreUrl, sessionToken: 'fresh-session-token-0123456789' });
+  assert.equal(FakeWebSocket.instances.length, 3);
+  runtime.stop('TEST_DONE');
+});
+
 test('parent runtime-health sanitizer allowlists fields and drops secrets', () => {
   const safe = sanitizeRuntimeHealth({
     healthKind: 'runtime',

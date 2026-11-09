@@ -7,7 +7,7 @@ import java.io.IOException
 internal class TransferDeadline(private val clock: () -> Long, timeoutMs: Long) {
     private val started = clock()
     private val duration = timeoutMs
-    init { require(started >= 0 && duration in 1..1_800_000L) }
+    init { require(started >= 0 && duration in 1L..1_800_000L) }
 
     fun check() {
         val now = clock()

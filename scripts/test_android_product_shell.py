@@ -206,7 +206,9 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("readBounded(conn, FEED_CAP_BYTES) {", feed)
         self.assertIn("deadline.check()", feed)
         self.assertIn("checkCancellation = {", feed)
-        self.assertIn("val count = input.read(buffer)\\n            // A read may have blocked", stream)
+        self.assertIn("val count = input.read(buffer)", stream)
+        self.assertIn("A read may have blocked until cancellation/deadline occurred.", stream)
+        self.assertEqual(stream.count("checkCancellation()"), 2)
         self.assertIn("NETWORK_TRANSFER_DEADLINE", budget)
 
     def test_modern_android_platform_baseline_is_explicit(self) -> None:

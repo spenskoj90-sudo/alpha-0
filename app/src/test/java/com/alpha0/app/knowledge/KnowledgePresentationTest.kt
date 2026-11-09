@@ -11,7 +11,7 @@ import org.junit.Test
 class KnowledgePresentationTest {
     @Test fun unverifiedShippedProfileNeverOpensCacheOrNetwork() {
         val opened = AtomicInteger()
-        val controller = KnowledgePresentation({ null }, { null }, { opened.incrementAndGet(); throw AssertionError("untrusted cache") })
+        val controller = KnowledgePresentation({ null }, { KnowledgeObservationInput.Unavailable }, { opened.incrementAndGet(); throw AssertionError("untrusted cache") })
         try {
             controller.start()
             assertEquals("WAITING_FOR_VERIFIED_PROFILE", controller.state().state)
@@ -35,7 +35,7 @@ class KnowledgePresentationTest {
             override fun pack(profile: KnowledgeProfile, digest: String, budget: KnowledgeBudget): ByteArray { fetched.countDown(); return raw }
             override fun delta(profile: KnowledgeProfile, destination: String, base: String, budget: KnowledgeBudget) = throw AssertionError()
         }
-        val controller = KnowledgePresentation({ binding }, { null }, { KnowledgeCache(directory, it, transport, { 1000 }) })
+        val controller = KnowledgePresentation({ binding }, { KnowledgeObservationInput.Unavailable }, { KnowledgeCache(directory, it, transport, { 1000 }) })
         try {
             controller.start(); assertTrue(entered.await(2, TimeUnit.SECONDS))
             val before = System.nanoTime(); controller.stop()

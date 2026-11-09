@@ -302,8 +302,14 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('onLocalReferenceClick = { navController.navigate("game-reference") }', self.main)
         self.assertIn('AuthenticatedRoute(activeSession, sessionStore, activity, navController)', self.main)
         self.assertIn('onLocalReferenceClick != null || onLocalGameClick != null', games)
-        self.assertIn('ManualHealingReferencePanel(installed, null, false)', reference)
-        self.assertIn('ManualBurningReferencePanel(installed, null, false)', reference)
+        # Disabled capture remains a supported default for isolated reference
+        # tests, but the real route must use shared live observation state.
+        self.assertIn('captureActive: Boolean = false', reference)
+        self.assertIn('GameObservationRuntime.state.collectAsStateWithLifecycle()', reference)
+        self.assertIn('ManualHealingReferencePanel(installed, captureId, captureActive)', reference)
+        self.assertIn('ManualBurningReferencePanel(installed, captureId, captureActive)', reference)
+        self.assertNotIn('ManualHealingReferencePanel(installed, null, false)', reference)
+        self.assertNotIn('ManualBurningReferencePanel(installed, null, false)', reference)
         self.assertNotIn('GameObservationService', reference)
         self.assertNotIn('MediaProjection', reference)
         # Keep the independent capture route and its channel/OS permission fences.

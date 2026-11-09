@@ -321,7 +321,10 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('ManualBurningReferencePanel(installed, captureId, captureActive)', reference)
         self.assertNotIn('ManualHealingReferencePanel(installed, null, false)', reference)
         self.assertNotIn('ManualBurningReferencePanel(installed, null, false)', reference)
-        self.assertNotIn('GameObservationService', reference)
+        # The read-only reference may revoke an existing capture on game drift,
+        # but must not create, launch or otherwise claim MediaProjection authority.
+        self.assertNotIn('GameObservationService.start(', reference)
+        self.assertIn('GameObservationService.stop(context, "GAME_CHANGED")', reference)
         self.assertNotIn('MediaProjection', reference)
         # Keep the independent capture route and its channel/OS permission fences.
         self.assertIn('onLocalGameClick = if (ObservationCapturePolicy.supports(', self.main)

@@ -47,6 +47,8 @@ internal class KnowledgeFrameOrder {
             value.frameCapturedMonotonicMs < 0 || value.ocrCompletedMonotonicMs < value.frameCapturedMonotonicMs ||
             value.observedMonotonicMs != value.ocrCompletedMonotonicMs || value.ocrCompletedMonotonicMs > now ||
             now - value.frameCapturedMonotonicMs > maxAge) return deny()
+        // Completed OCR must obey the same five-second deadline as in-flight polling.
+        if (pending != null && now - value.frameCapturedMonotonicMs > minOf(maxAge, 5000L)) return deny()
         if (pending != null && pending != (value.frameSequence to value.frameCapturedMonotonicMs)) return deny()
         val previous = last
         if (previous != null) {

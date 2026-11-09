@@ -6,6 +6,8 @@ import android.os.Build
 import com.alpha0.app.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -126,31 +128,28 @@ internal object FeedUpdateClient {
                 if (!dir.isDirectory && !dir.mkdirs()) return@withContext LocalApkUpdate.Result.Failed
                 val temp = File.createTempFile("verified-", ".apk", dir)
                 temporary = temp
-                val digest = MessageDigest.getInstance("SHA-256")
-                var size = 0L
+                val cancellation = currentCoroutineContext()
                 conn = connection(release.apkUrl)
                 if (conn.responseCode != HttpsURLConnection.HTTP_OK) {
                     return@withContext LocalApkUpdate.Result.Failed
                 }
-                conn.inputStream.use { input ->
+                // Share the bounded, cancellation-aware stream contract with
+                // the local APK stager. No installed-package or signature trust
+                // is granted until LocalApkUpdate independently inspects bytes.
+                val fingerprint = conn.inputStream.use { input ->
                     FileOutputStream(temp).use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        while (true) {
-                            val n = input.read(buffer)
-                            if (n < 0) break
-                            if (n == 0) throw IllegalArgumentException("STREAM_NO_PROGRESS")
-                            size += n.toLong()
-                            if (size > APK_CAP_BYTES) throw IllegalArgumentException("APK_TOO_LARGE")
-                            output.write(buffer, 0, n)
-                            digest.update(buffer, 0, n)
-                        }
-                        output.fd.sync()
+                        ApkByteStream.consume(
+                            input = input,
+                            maxBytes = APK_CAP_BYTES,
+                            write = { buffer, count -> output.write(buffer, 0, count) },
+                            checkCancellation = { cancellation.ensureActive() },
+                        ).also { output.fd.sync() }
                     }
                 }
-                if (size == 0L ||
-                    !MessageDigest.isEqual(digest.digest(), release.apkSha256.chunked(2)
+                if (!MessageDigest.isEqual(fingerprint.sha256, release.apkSha256.chunked(2)
                         .map { it.toInt(16).toByte() }.toByteArray())
                 ) return@withContext LocalApkUpdate.Result.Failed
+                cancellation.ensureActive()
 
                 val staged = LocalApkUpdate.stage(context, Uri.fromFile(temp))
                 when (staged) {

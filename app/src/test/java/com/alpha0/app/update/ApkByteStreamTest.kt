@@ -43,6 +43,19 @@ class ApkByteStreamTest {
         assertEquals(20L, exact.bytes)
     }
 
+    @Test fun cancellationAfterFirstChunkStopsFurtherNetworkCopy() {
+        val payload = ByteArray(150_000) { (it * 17).toByte() }
+        val source = ByteArrayInputStream(payload)
+        var copied = 0
+        assertThrows(CancellationException::class.java) {
+            ApkByteStream.consume(source, payload.size.toLong(),
+                write = { _, count -> copied += count },
+                checkCancellation = { if (copied > 0) throw CancellationException("cancel download") })
+        }
+        assertEquals(64 * 1024, copied)
+        assertEquals(payload.size - copied, source.available())
+    }
+
     @Test fun cancellationAndOutputFailuresPropagate() {
         assertThrows(CancellationException::class.java) {
             ApkByteStream.consume(ByteArrayInputStream(byteArrayOf(1)), 10,

@@ -56,6 +56,40 @@ class ApkByteStreamTest {
         assertEquals(payload.size - copied, source.available())
     }
 
+    @Test fun elapsedNetworkDeadlineRejectsSlowTrickleAndClockRollback() {
+        var now = 100L
+        val deadline = TransferDeadline({ now }, 30L)
+        deadline.check()
+        now = 129L
+        deadline.check()
+        now = 130L
+        assertThrows(IOException::class.java) { deadline.check() }
+        now = 99L
+        assertThrows(IOException::class.java) { deadline.check() }
+        assertThrows(IllegalArgumentException::class.java) { TransferDeadline({ -1L }, 30L) }
+        assertThrows(IllegalArgumentException::class.java) { TransferDeadline({ 0L }, 1_800_001L) }
+    }
+
+    @Test fun transferDeadlineAfterSlowReadRejectsBytesBeforeAnyWrite() {
+        var now = 0L
+        val deadline = TransferDeadline({ now }, 30L)
+        var copied = 0
+        val slowInput = object : InputStream() {
+            override fun read(): Int = error("Unexpected single byte read")
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                now = 31L
+                b[off] = 7
+                return 1
+            }
+        }
+        assertThrows(IOException::class.java) {
+            ApkByteStream.consume(slowInput, 1024L,
+                write = { _, n -> copied += n },
+                checkCancellation = deadline::check)
+        }
+        assertEquals(0, copied)
+    }
+
     @Test fun cancellationAndOutputFailuresPropagate() {
         assertThrows(CancellationException::class.java) {
             ApkByteStream.consume(ByteArrayInputStream(byteArrayOf(1)), 10,

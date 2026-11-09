@@ -3,6 +3,7 @@ package com.alpha0.app.update
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import com.alpha0.app.BuildConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,8 @@ import javax.net.ssl.HttpsURLConnection
 internal object FeedUpdateClient {
     private const val FEED_CAP_BYTES = 8 * 1024
     private const val APK_CAP_BYTES = 256L * 1024 * 1024
+    private const val FEED_TOTAL_TIMEOUT_MS = 30_000L
+    private const val APK_TOTAL_TIMEOUT_MS = 1_800_000L
 
     sealed interface Check {
         /** Exact signed bytes are retained only in process memory for download-time revalidation. */
@@ -42,13 +45,16 @@ internal object FeedUpdateClient {
         return connection
     }
 
-    private fun readBounded(conn: HttpsURLConnection, maxBytes: Int): ByteArray {
+    private fun readBounded(conn: HttpsURLConnection, maxBytes: Int, checkRead: () -> Unit): ByteArray {
+        checkRead()
         if (conn.responseCode != HttpsURLConnection.HTTP_OK) throw IllegalArgumentException("HTTP_NOT_OK")
         conn.inputStream.use { source ->
             val bytes = java.io.ByteArrayOutputStream()
             val buffer = ByteArray(8192)
             while (true) {
+                checkRead()
                 val n = source.read(buffer)
+                checkRead() // Abort even when the most recent blocking read finished too late.
                 if (n < 0) break
                 if (n == 0) throw IllegalArgumentException("STREAM_NO_PROGRESS")
                 if (bytes.size() + n > maxBytes) throw IllegalArgumentException("TOO_LARGE")
@@ -82,8 +88,13 @@ internal object FeedUpdateClient {
                 if (!SignedUpdateFeed.acceptsHttpsUrl(feedUrl)) {
                     return@withContext Check.Unavailable
                 }
+                val cancellation = currentCoroutineContext()
+                val deadline = TransferDeadline(SystemClock::elapsedRealtime, FEED_TOTAL_TIMEOUT_MS)
                 conn = connection(feedUrl)
-                val data = readBounded(conn, FEED_CAP_BYTES)
+                val data = readBounded(conn, FEED_CAP_BYTES) {
+                    cancellation.ensureActive()
+                    deadline.check()
+                }
                 val release = SignedUpdateFeed.verify(
                     data, verifyingKey, feedUrl, context.packageName, installedVersion, signer,
                     allowInstalledVersionForStatus = true,
@@ -129,20 +140,28 @@ internal object FeedUpdateClient {
                 val temp = File.createTempFile("verified-", ".apk", dir)
                 temporary = temp
                 val cancellation = currentCoroutineContext()
+                val deadline = TransferDeadline(SystemClock::elapsedRealtime, APK_TOTAL_TIMEOUT_MS)
                 conn = connection(release.apkUrl)
+                cancellation.ensureActive()
+                deadline.check()
                 if (conn.responseCode != HttpsURLConnection.HTTP_OK) {
                     return@withContext LocalApkUpdate.Result.Failed
                 }
-                // Share the bounded, cancellation-aware stream contract with
-                // the local APK stager. No installed-package or signature trust
-                // is granted until LocalApkUpdate independently inspects bytes.
+                deadline.check()
+                // A read timeout only bounds each blocking read, not a slow trickling
+                // response. The total elapsed budget is checked before/after chunks.
+                // No installed-package or signature trust is granted until
+                // LocalApkUpdate independently inspects bytes.
                 val fingerprint = conn.inputStream.use { input ->
                     FileOutputStream(temp).use { output ->
                         ApkByteStream.consume(
                             input = input,
                             maxBytes = APK_CAP_BYTES,
                             write = { buffer, count -> output.write(buffer, 0, count) },
-                            checkCancellation = { cancellation.ensureActive() },
+                            checkCancellation = {
+                                cancellation.ensureActive()
+                                deadline.check()
+                            },
                         ).also { output.fd.sync() }
                     }
                 }

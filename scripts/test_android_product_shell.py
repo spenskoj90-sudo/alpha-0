@@ -197,6 +197,18 @@ class AndroidProductShellTests(unittest.TestCase):
             self.assertIn("GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall)", screen)
             self.assertIn('GameObservationService.stop(context, "GAME_CHANGED")', screen)
 
+    def test_signed_feed_limits_total_elapsed_transfer_as_well_as_each_read(self) -> None:
+        feed = read("app/src/main/java/com/alpha0/app/update/FeedUpdateClient.kt")
+        stream = read("app/src/main/java/com/alpha0/app/update/ApkByteStream.kt")
+        budget = read("app/src/main/java/com/alpha0/app/update/TransferDeadline.kt")
+        self.assertIn("TransferDeadline(SystemClock::elapsedRealtime, FEED_TOTAL_TIMEOUT_MS)", feed)
+        self.assertIn("TransferDeadline(SystemClock::elapsedRealtime, APK_TOTAL_TIMEOUT_MS)", feed)
+        self.assertIn("readBounded(conn, FEED_CAP_BYTES) {", feed)
+        self.assertIn("deadline.check()", feed)
+        self.assertIn("checkCancellation = {", feed)
+        self.assertIn("val count = input.read(buffer)\\n            // A read may have blocked", stream)
+        self.assertIn("NETWORK_TRANSFER_DEADLINE", budget)
+
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")

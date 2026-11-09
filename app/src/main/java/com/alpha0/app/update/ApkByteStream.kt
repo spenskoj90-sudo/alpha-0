@@ -23,6 +23,8 @@ internal object ApkByteStream {
         while (true) {
             checkCancellation()
             val count = input.read(buffer)
+            // A read may have blocked until cancellation/deadline occurred.
+            checkCancellation()
             if (count < 0) break
             if (count == 0) throw IOException("APK_INPUT_NO_PROGRESS")
             if (count > maxBytes - total) throw IOException("APK_INPUT_TOO_LARGE")

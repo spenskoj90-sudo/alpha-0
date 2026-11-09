@@ -34,4 +34,26 @@ class KnowledgeFrameOrderDeadlineTest {
         assertFalse(order.accepts(1, frame(111), 111, 100))
         assertTrue(order.isBlocked(1))
     }
+    @Test fun lateFirstFrameWithoutProcessingIsDenied() {
+        val order = KnowledgeFrameOrder()
+        assertFalse(order.accepts(1, frame(5011), 5011, 30000))
+        assertTrue(order.isBlocked(1))
+    }
+
+    @Test fun acceptedFrameCanBeReRenderedWithinPackAge() {
+        val order = KnowledgeFrameOrder()
+        assertTrue(order.accepts(1, frame(5010), 5010, 30000))
+        assertTrue(order.accepts(1, frame(5010), 6000, 30000))
+        assertFalse(order.isBlocked(1))
+    }
+
+    @Test fun lateNextFrameWithoutProcessingLatchesUnavailable() {
+        val order = KnowledgeFrameOrder()
+        assertTrue(order.accepts(1, frame(5010), 5010, 30000))
+        val later = frame(12010).copy(
+            frameId = "frame-2", frameSequence = 2, frameCapturedMonotonicMs = 7000,
+        )
+        assertFalse(order.accepts(1, later, 12010, 30000))
+        assertTrue(order.isBlocked(1))
+    }
 }

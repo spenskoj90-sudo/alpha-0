@@ -47,10 +47,13 @@ internal class KnowledgeFrameOrder {
             value.frameCapturedMonotonicMs < 0 || value.ocrCompletedMonotonicMs < value.frameCapturedMonotonicMs ||
             value.observedMonotonicMs != value.ocrCompletedMonotonicMs || value.ocrCompletedMonotonicMs > now ||
             now - value.frameCapturedMonotonicMs > maxAge) return deny()
-        // Completed OCR must obey the same five-second deadline as in-flight polling.
-        if (pending != null && now - value.frameCapturedMonotonicMs > minOf(maxAge, 5000L)) return deny()
-        if (pending != null && pending != (value.frameSequence to value.frameCapturedMonotonicMs)) return deny()
         val previous = last
+        // A new frame cannot bypass the five-second OCR deadline merely because
+        // its Processing phase was not polled. An immutable previously accepted
+        // frame may still be re-rendered until its separate pack age expires.
+        if ((pending != null || previous == null || value.frameSequence > previous.frameSequence) &&
+            now - value.frameCapturedMonotonicMs > minOf(maxAge, 5000L)) return deny()
+        if (pending != null && pending != (value.frameSequence to value.frameCapturedMonotonicMs)) return deny()
         if (previous != null) {
             if (value.binding != previous.binding || value.sourceId != previous.sourceId) return deny()
             if (value.frameSequence < previous.frameSequence || value.observedAtMs < previous.observedAtMs ||

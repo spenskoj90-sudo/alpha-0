@@ -44,7 +44,7 @@ import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 
-private enum class UpdateState { IDLE, CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, PLAY_REQUIRED, FAILED }
+private enum class UpdateState { IDLE, CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, STORE_UPDATE, PLAY_REQUIRED, FAILED }
 
 @Composable
 fun UpdateScreen() {
@@ -130,7 +130,16 @@ fun UpdateScreen() {
                         )
                     }
                 } else {
-                    state = if (context.installedFromPlay()) UpdateState.CURRENT else UpdateState.PLAY_REQUIRED
+                    // Only an explicit not-available result proves CURRENT. A
+                    // disallowed flexible update or an interrupted Play flow
+                    // must not be presented as "latest version".
+                    state = when (info.updateAvailability()) {
+                        UpdateAvailability.UPDATE_AVAILABLE,
+                        UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> UpdateState.STORE_UPDATE
+                        UpdateAvailability.UPDATE_NOT_AVAILABLE ->
+                            if (context.installedFromPlay()) UpdateState.CURRENT else UpdateState.PLAY_REQUIRED
+                        else -> UpdateState.FAILED
+                    }
                 }
             }
             .addOnFailureListener {
@@ -345,12 +354,13 @@ fun UpdateScreen() {
         }
         item {
             val message = when (state) {
-                UpdateState.IDLE -> if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic") "update_sideload_notice" else "up_to_date"
+                UpdateState.IDLE -> "update_not_checked"
                 UpdateState.CHECKING -> "checking_updates"
                 UpdateState.CURRENT -> "up_to_date"
                 UpdateState.AVAILABLE -> "update_available"
                 UpdateState.DOWNLOADING -> "update_downloading"
                 UpdateState.READY_TO_INSTALL -> "update_ready"
+                UpdateState.STORE_UPDATE -> "update_open_play_required"
                 UpdateState.PLAY_REQUIRED -> "update_play_required"
                 UpdateState.FAILED -> "server_unreachable"
             }

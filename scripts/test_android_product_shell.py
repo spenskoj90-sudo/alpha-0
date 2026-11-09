@@ -170,6 +170,15 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("SENTINEL_PHYSICAL_TEST_VERSION_CODE", self.gradle)
         self.assertIn("physicalTestVersionCode", self.gradle)
 
+    def test_play_update_status_does_not_claim_latest_without_positive_evidence(self) -> None:
+        self.assertIn('UpdateState.IDLE -> "update_not_checked"', self.update)
+        self.assertIn("UpdateAvailability.UPDATE_NOT_AVAILABLE ->", self.update)
+        self.assertIn("UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> UpdateState.STORE_UPDATE", self.update)
+        self.assertIn('UpdateState.STORE_UPDATE -> "update_open_play_required"', self.update)
+        app_strings = read("app/src/main/java/com/alpha0/app/ui/AppStrings.kt")
+        self.assertEqual(app_strings.count('"update_not_checked" to '), 2)
+        self.assertEqual(app_strings.count('"update_open_play_required" to '), 2)
+
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")

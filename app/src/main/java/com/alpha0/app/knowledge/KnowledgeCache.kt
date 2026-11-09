@@ -230,9 +230,20 @@ internal class KnowledgeCache(private val directory: File, private val authority
         val lease = active ?: return false
         return lease.epoch == epoch.get() && frameOrder.isBlocked(lease.epoch)
     }
-    fun observationUnavailable() {
+    /** Only valid before the first accepted/pending frame. */
+    fun observationAwaitingFirstFrame() {
         val lease = active ?: return
         if (lease.epoch == epoch.get()) frameOrder.rejectMissingAfterObservation(lease.epoch)
+    }
+    fun observationProcessing(sequence: Long, capturedMonotonicMs: Long): Boolean {
+        val lease = active ?: return false
+        if (lease.epoch != epoch.get() || status().state != "READY") return false
+        return frameOrder.processing(lease.epoch, sequence, capturedMonotonicMs, monotonicClock(), lease.pack.maxStateAgeMs)
+    }
+    /** Explicit loss, unlike a pending OCR callback, latches the epoch unavailable. */
+    fun observationUnavailable() {
+        val lease = active ?: return
+        if (lease.epoch == epoch.get()) frameOrder.reject(lease.epoch)
     }
     fun evaluate(observation: TrustedKnowledgeObservation, locale: String): List<KnowledgeRecommendation> {
         val lease = active ?: return emptyList()

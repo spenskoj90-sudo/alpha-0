@@ -56,7 +56,7 @@ object AndroidKnowledgeRuntime {
     // A reviewed exact target/version/environment/source calibration is required
     // before implementing these adapters. Fixtures never populate either closure.
     private fun verifiedBinding(): TrustedKnowledgeBinding? = null
-    private fun verifiedObservation(): TrustedKnowledgeObservation? = null
+    private fun verifiedObservation(): KnowledgeObservationInput = KnowledgeObservationInput.Unavailable
     @Synchronized internal fun start() { controller?.start() }
     @Synchronized internal fun stop() { controller?.stop(); mutableState.value = KnowledgeViewState("STOPPED") }
 }

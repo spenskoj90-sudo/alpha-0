@@ -181,3 +181,14 @@ shell contract checks route separation and service guards. The existing APK
 check touch regression now asserts enabled/displayed and reports the exact
 callback count to better diagnose the **one observed API34 test flake**;
 no semantic click fallback or retry is inserted to manufacture a PASS.
+
+
+## Typed in-flight frame and service-failure fence (09.11.2026)
+
+A service-owned adapter reports AwaitingFirstFrame, Processing(sequence,
+monotonic capture time), Frame or Unavailable. A pending frame hides old advice,
+can complete only as the same newer frame, and expires at five seconds or the
+reviewed max frame age. Changed/dropped/expired frames, explicit source loss and
+adapter exceptions fail closed for the lease epoch; refresh cannot revive old
+advice. This does not attest the game/window: the shipped adapter still has no
+trusted binding or observation producer. No live advice or game action is enabled.

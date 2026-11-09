@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alpha0.app.ui.LocalAppStrings
 
 /** Read-only game rule reference, accessible even when screen capture is off. */
@@ -37,12 +38,23 @@ fun GameReferenceScreen() {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    GameReferencePanel(installed)
+    // A capture started from the observer route survives navigation; the
+    // reference route must not silently reset the shared manual-input guard.
+    val runtime by GameObservationRuntime.state.collectAsStateWithLifecycle()
+    val observation = runtime.observation
+    GameReferencePanel(
+        installed, observation.captureId,
+        observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED),
+    )
 }
 
 /** Injectable local UI for tests; never enables projection, OCR or game input. */
 @Composable
-internal fun GameReferencePanel(installed: StockGameInstall?) {
+internal fun GameReferencePanel(
+    installed: StockGameInstall?,
+    captureId: String? = null,
+    captureActive: Boolean = false,
+) {
     val strings = LocalAppStrings.current
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -57,7 +69,7 @@ internal fun GameReferencePanel(installed: StockGameInstall?) {
         } else {
             Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
         }
-        ManualHealingReferencePanel(installed, null, false)
-        ManualBurningReferencePanel(installed, null, false)
+        ManualHealingReferencePanel(installed, captureId, captureActive)
+        ManualBurningReferencePanel(installed, captureId, captureActive)
     }
 }

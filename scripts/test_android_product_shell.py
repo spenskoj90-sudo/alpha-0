@@ -179,6 +179,13 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertEqual(app_strings.count('"update_not_checked" to '), 2)
         self.assertEqual(app_strings.count('"update_open_play_required" to '), 2)
 
+    def test_game_reference_route_observes_live_capture_status(self) -> None:
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        self.assertIn("GameObservationRuntime.state.collectAsStateWithLifecycle()", reference)
+        self.assertIn("ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED", reference)
+        self.assertIn("ManualHealingReferencePanel(installed, captureId, captureActive)", reference)
+        self.assertIn("ManualBurningReferencePanel(installed, captureId, captureActive)", reference)
+
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")

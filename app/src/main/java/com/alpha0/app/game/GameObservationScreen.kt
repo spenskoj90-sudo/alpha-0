@@ -86,8 +86,12 @@ fun GameObservationScreen() {
     DisposableEffect(lifecycle, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                installed = ShatteredGameProfile.installed(context)
+                val observedInstall = ShatteredGameProfile.installed(context)
+                installed = observedInstall
                 binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                // Do not wait for the service's periodic identity heartbeat.
+                if (GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall))
+                    GameObservationService.stop(context, "GAME_CHANGED")
             }
             // Never continue hashing a different app while the observer is backgrounded.
             if (event == Lifecycle.Event.ON_STOP) {

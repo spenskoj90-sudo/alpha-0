@@ -32,7 +32,11 @@ fun GameReferenceScreen() {
     DisposableEffect(context, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                installed = ShatteredGameProfile.installed(context)
+                val observedInstall = ShatteredGameProfile.installed(context)
+                installed = observedInstall
+                // This route can be opened while the other screen's capture persists.
+                if (GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall))
+                    GameObservationService.stop(context, "GAME_CHANGED")
             }
         }
         lifecycle.addObserver(observer)

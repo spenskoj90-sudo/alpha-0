@@ -186,6 +186,17 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("ManualHealingReferencePanel(installed, captureId, captureActive)", reference)
         self.assertIn("ManualBurningReferencePanel(installed, captureId, captureActive)", reference)
 
+    def test_resume_revokes_active_capture_on_installed_game_change_on_both_routes(self) -> None:
+        source = read("app/src/main/java/com/alpha0/app/game/StockGameInstall.kt")
+        observer = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        self.assertIn("fun activeCaptureRequiresStop(", source)
+        self.assertIn("ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED", source)
+        for screen in (observer, reference):
+            self.assertIn("Lifecycle.Event.ON_RESUME", screen)
+            self.assertIn("GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall)", screen)
+            self.assertIn('GameObservationService.stop(context, "GAME_CHANGED")', screen)
+
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")

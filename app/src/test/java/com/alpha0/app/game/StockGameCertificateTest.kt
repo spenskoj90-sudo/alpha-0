@@ -35,6 +35,31 @@ class StockGameCertificateTest {
         assertFalse(GameInstallFence.matches("4.0.0", 912, null, unknown, signerSupplied = false))
         assertFalse(GameInstallFence.matches("4.0.0", 912, expected.signerSha256, expected, signerSupplied = false))
     }
+    @Test fun `game resume stops active capture on installed identity change`() {
+        val expected = StockGameInstall("4.0.2", 922, "a".repeat(64))
+        val changed = listOf<StockGameInstall?>(
+            null,
+            expected.copy(versionName = "4.0.3"),
+            expected.copy(versionCode = 923),
+            expected.copy(signerSha256 = "b".repeat(64)),
+            expected.copy(signerSha256 = null),
+        )
+        for (status in listOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)) {
+            val active = GameObservationViewState(ObservationSnapshot(status = status, captureId = "capture"), expected)
+            assertFalse(GameInstallFence.activeCaptureRequiresStop(active, expected))
+            changed.forEach { assertTrue(GameInstallFence.activeCaptureRequiresStop(active, it)) }
+            assertTrue(GameInstallFence.activeCaptureRequiresStop(active.copy(installed = null), expected))
+        }
+    }
+
+    @Test fun `inactive capture is not stopped because game metadata changes`() {
+        val expected = StockGameInstall("4.0.2", 922, "a".repeat(64))
+        for (status in listOf(ObservationStatus.STOPPED, ObservationStatus.FAILED)) {
+            val inactive = GameObservationViewState(ObservationSnapshot(status = status), expected)
+            assertFalse(GameInstallFence.activeCaptureRequiresStop(inactive, null))
+            assertFalse(GameInstallFence.activeCaptureRequiresStop(inactive, expected.copy(versionCode = 923)))
+        }
+    }
     @Test fun `same game version with different installed signer is different identity`() {
         val first = StockGameInstall("4.0.0", 912, StockGameCertificate.digest(listOf(byteArrayOf(1))))
         val second = first.copy(signerSha256 = StockGameCertificate.digest(listOf(byteArrayOf(2))))

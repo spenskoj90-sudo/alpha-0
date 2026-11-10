@@ -282,9 +282,10 @@ async function submitVoiceBlob(blob, epoch) {
   if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio);
 }
 
-async function finalizeVoiceCapture() {
+async function finalizeVoiceCapture(epoch, recorder) {
+  // Late MediaRecorder callbacks from an old consent/session never own current UI.
+  if (voiceRecorder !== recorder || epoch !== voiceCaptureEpoch) return;
   clearVoiceTimer();
-  const epoch = voiceCaptureEpoch;
   const chunks = voiceChunks;
   const discarded = voiceCaptureDiscarded;
   voiceChunks = [];
@@ -308,10 +309,13 @@ async function finalizeVoiceCapture() {
     const blob = new Blob(chunks, { type: currentVoice.captureContentType || 'audio/webm;codecs=opus' });
     await submitVoiceBlob(blob, epoch);
   } catch (error) {
-    showError(voiceResult, error);
+    if (epoch === voiceCaptureEpoch) showError(voiceResult, error);
   } finally {
-    voiceBusy = false;
-    refreshButtons();
+    // A superseded transcription cannot unlock a newer microphone capture.
+    if (epoch === voiceCaptureEpoch) {
+      voiceBusy = false;
+      refreshButtons();
+    }
   }
 }
 
@@ -355,13 +359,19 @@ async function startVoiceCapture() {
     if (voiceMicState) ui.text(voiceMicState, 'OPEN · HOLDING');
     if (voiceHeadline) ui.text(voiceHeadline, 'Listening…');
     if (voiceDetail) ui.text(voiceDetail, 'Release to send. Move away from the control to cancel without submitting.');
-    recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
+    recorder.ondataavailable = event => {
+      if (epoch === voiceCaptureEpoch && voiceRecorder === recorder &&
+          !voiceCaptureDiscarded && event.data?.size) voiceChunks.push(event.data);
+    };
     recorder.onerror = () => {
+      if (epoch !== voiceCaptureEpoch || voiceRecorder !== recorder) return;
       voiceCaptureDiscarded = true;
       showError(voiceResult, new Error('VOICE_CAPTURE_FAILED'));
       if (recorder.state !== 'inactive') recorder.stop();
     };
-    recorder.onstop = () => { void finalizeVoiceCapture(); };
+    recorder.onstop = () => {
+      if (voiceRecorder === recorder) void finalizeVoiceCapture(epoch, recorder);
+    };
     recorder.start(250);
     const maxMs = Math.min(Math.max(Number(currentVoice.maxCaptureMs || 6000), 1000), 6000);
     voiceCaptureTimer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, maxMs);
@@ -403,13 +413,13 @@ function cancelVoiceCapture() {
   clearVoiceTimer();
   voiceCaptureDiscarded = true;
   voiceChunks = [];
-  if (voiceRecorder && voiceRecorder.state !== 'inactive') {
-    voiceBusy = true;
-    refreshButtons();
-    voiceRecorder.stop();
-    return;
-  }
+  // Revoke recorder ownership synchronously, before queued data/error/stop
+  // callbacks can run. Always close its tracks, including failed stop().
+  const recorder = voiceRecorder;
   voiceRecorder = null;
+  if (recorder && recorder.state !== 'inactive') {
+    try { recorder.stop(); } catch { /* closing tracks below is fail-closed */ }
+  }
   stopVoiceTracks();
   if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
   if (voiceHeadline) ui.text(voiceHeadline, 'Capture canceled');

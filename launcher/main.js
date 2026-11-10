@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, screen, session: electronSession } = requir
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { performance } = require('node:perf_hooks');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
 const { revokeAccountBoundRuntime } = require('./account-lifecycle');
@@ -106,7 +107,7 @@ function clearVoiceCapturePermission() {
 }
 
 function voiceCapturePermissionArmed() {
-  return voiceConsentGranted && voiceCapturePermissionExpiresAt > Date.now();
+  return voiceConsentGranted && voiceCapturePermissionExpiresAt > performance.now();
 }
 
 function requireMainRenderer(event) {
@@ -430,13 +431,13 @@ ipcMain.handle('voice:capture:arm', async event => {
   requireMainRenderer(event);
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
   if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
-  if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');
+  if (companion.status.state !== 'ACTIVE') throw new Error('COMPANION_NOT_ACTIVE');
   const boundary = voiceRequestBoundary();
   requireVoiceBoundary(boundary);
   if (!voiceProviderStatus) await refreshVoiceProviderStatus();
   requireVoiceBoundary(boundary);
   if (!voiceProviderStatus?.sttAvailable) throw new Error(voiceStateReason || 'VOICE_PROVIDER_UNAVAILABLE');
-  voiceCapturePermissionExpiresAt = Date.now() + VOICE_CAPTURE_PERMISSION_LEASE_MS;
+  voiceCapturePermissionExpiresAt = performance.now() + VOICE_CAPTURE_PERMISSION_LEASE_MS;
   return { armed: true, expiresInMs: VOICE_CAPTURE_PERMISSION_LEASE_MS, actionCapable: false };
 });
 ipcMain.handle('voice:capture:disarm', event => {
@@ -449,7 +450,7 @@ ipcMain.handle('voice:submit', async (event, payload) => {
   clearVoiceCapturePermission();
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
   if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
-  if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');
+  if (companion.status.state !== 'ACTIVE') throw new Error('COMPANION_NOT_ACTIVE');
   const boundary = voiceRequestBoundary();
   requireVoiceBoundary(boundary);
   if (!voiceProviderStatus) await refreshVoiceProviderStatus();

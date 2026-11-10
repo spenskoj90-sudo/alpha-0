@@ -53,8 +53,8 @@ function refreshButtons() {
   startButton.disabled = !signedIn || companionState !== 'STOPPED' || !grantedFeatures.includes('companion');
   stopButton.disabled = companionState === 'STOPPED';
 
-  const companionReady = ['ACTIVE', 'DEGRADED'].includes(companionState);
-  const voiceReady = signedIn && grantedFeatures.includes('companion') && companionReady && currentVoice.consentGranted && currentVoice.sttAvailable;
+  const companionReady = companionState === 'ACTIVE';
+  const voiceReady = signedIn && grantedFeatures.includes('companion') && companionReady && currentVoice.state === 'READY' && currentVoice.consentGranted === true && currentVoice.sttAvailable === true;
   voiceConsent.disabled = !signedIn || !grantedFeatures.includes('companion') || voiceBusy || Boolean(voiceRecorder);
   voiceLocale.disabled = voiceBusy || Boolean(voiceRecorder);
   voicePtt.disabled = voiceRecorder ? false : (!voiceReady || voiceBusy);
@@ -76,7 +76,7 @@ function setAccount(status, features = [], mfa = null) {
 
 function setCompanion(status) {
   companionState = status?.state || 'STOPPED';
-  if (!['ACTIVE', 'DEGRADED'].includes(companionState) &&
+  if (companionState !== 'ACTIVE' &&
       (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   const reason = status?.reason ? ` / ${status.reason}` : '';
   const warning = ['DEGRADED', 'LOCAL-ONLY', 'CONNECTING'].includes(companionState);
@@ -128,7 +128,7 @@ function voiceCaptureStillAuthorized(epoch, requireHold = false) {
   return epoch === voiceCaptureEpoch && signedIn &&
     currentVoice.state === 'READY' && currentVoice.consentGranted === true &&
     currentVoice.sttAvailable === true &&
-    ['ACTIVE', 'DEGRADED'].includes(companionState) &&
+    companionState === 'ACTIVE' &&
     (!requireHold || voiceHoldActive);
 }
 
@@ -147,7 +147,7 @@ function setVoice(status) {
   const ttsAvailable = currentVoice.ttsAvailable;
   const provider = () => sttAvailable ? ui.t(' / STT READY{tts}', { tts: ui.t(ttsAvailable ? ' / TTS READY' : ' / TTS UNAVAILABLE') }) : '';
   const healthy = state === 'READY';
-  const warning = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'ENTITLEMENT_REQUIRED'].includes(state);
+  const warning = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'ENTITLEMENT_REQUIRED', 'COMPANION_UNAVAILABLE'].includes(state);
   voiceStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'SIGNED_OUT' ? '' : 'err'}`;
   ui.text(voiceStatus, 'VOICE: {state}{provider}{reason}', { state: () => ui.state(state), provider, reason });
 
@@ -160,6 +160,7 @@ function setVoice(status) {
       READY: ['Hold to talk', 'The microphone opens only while you hold the control. Release to send.'],
       CONSENT_REQUIRED: ['Microphone consent required', 'Voice remains closed until you explicitly allow capture for this launcher session.'],
       PROVIDER_UNAVAILABLE: ['Voice provider unavailable', 'Text and non-voice Companion functions remain available.'],
+      COMPANION_UNAVAILABLE: ['Companion connection required', 'Start Companion or restore its connection. Microphone capture is unavailable until the transport is active.'],
       ENTITLEMENT_REQUIRED: ['Voice is not entitled', 'The current account does not have the required Companion voice capability.'],
       SIGNED_OUT: ['Voice is signed out', 'Sign in and start Companion to evaluate voice capability.'],
       UNAVAILABLE: ['Voice is unavailable', 'The current runtime cannot establish a voice provider boundary.'],

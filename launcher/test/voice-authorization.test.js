@@ -11,7 +11,7 @@ test('voice request remains bound during in-account refresh only', () => {
   const bound = bindVoiceRequest(base, 5);
   assert.ok(bound);
   assert.equal(voiceRequestStillCurrent(bound, { ...base }, 5, true, 'ACTIVE'), true);
-  assert.equal(voiceRequestStillCurrent(bound, { ...base }, 5, true, 'DEGRADED'), true);
+  assert.equal(voiceRequestStillCurrent(bound, { ...base }, 5, true, 'DEGRADED'), false);
   assert.equal(voiceRequestStillCurrent(bound, { ...base, sessionId: '45' }, 5, true, 'ACTIVE'), false);
   assert.equal(voiceRequestStillCurrent(bound, { ...base, origin: 'http://localhost:8080' }, 5, true, 'ACTIVE'), false);
   assert.equal(voiceRequestStillCurrent(bound, base, 6, true, 'ACTIVE'), false);

@@ -21,7 +21,7 @@ function voiceRequestStillCurrent(expected, context, consentGeneration, consentG
     sameSessionContext(expected, context) &&
     expected.consentGeneration === consentGeneration &&
     consentGranted === true &&
-    (companionState === 'ACTIVE' || companionState === 'DEGRADED');
+    companionState === 'ACTIVE';
 }
 
 module.exports = { sameSessionContext, bindVoiceRequest, voiceRequestStillCurrent };

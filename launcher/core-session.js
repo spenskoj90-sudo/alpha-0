@@ -121,6 +121,8 @@ class CoreSessionManager {
   #mfaChallenge = null;
   #mfaExpiresAt = null;
   #sessionEpoch = 0;
+  // Invalidates async login/MFA replies that arrive after Logout or a newer attempt.
+  #authGeneration = 0;
   #knowledgeControllers = new Set();
   #refreshFlight = null;
   #knowledgeTimeoutMs;
@@ -153,6 +155,11 @@ class CoreSessionManager {
     if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
       throw new Error('CREDENTIALS_REQUIRED');
     }
+    const attempt = ++this.#authGeneration;
+    // A fresh login revokes any older MFA challenge immediately, even if the
+    // new server response is delayed or fails.
+    this.#mfaChallenge = null;
+    this.#mfaExpiresAt = null;
     const rid = requestId();
     const response = await this.#fetch(`${normalized}/v1/auth/login`, {
       method: 'POST',
@@ -160,6 +167,7 @@ class CoreSessionManager {
       body: JSON.stringify({ email: email.trim(), password }),
     });
     const payload = await readJson(response);
+    if (attempt !== this.#authGeneration) throw new Error('SESSION_CHANGED');
     if (!response.ok) throw new Error(errorCode(payload, 'LOGIN_FAILED'));
     if (payload?.mfa_required === true) {
       if (typeof payload.challenge_token !== 'string' || payload.challenge_token.length < 32) {
@@ -179,18 +187,23 @@ class CoreSessionManager {
     if (!this.#coreUrl || !this.#mfaChallenge) throw new Error('MFA_CHALLENGE_REQUIRED');
     const normalizedCode = typeof code === 'string' ? code.trim() : '';
     if (normalizedCode.length < 6 || normalizedCode.length > 64) throw new Error('MFA_CODE_INVALID');
+    const origin = this.#coreUrl;
+    const challenge = this.#mfaChallenge;
+    const attempt = ++this.#authGeneration;
     const rid = requestId();
-    const response = await this.#fetch(`${this.#coreUrl}/v1/auth/mfa/complete`, {
+    const response = await this.#fetch(`${origin}/v1/auth/mfa/complete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
       body: JSON.stringify({
-        challenge_token: this.#mfaChallenge,
+        challenge_token: challenge,
         code: normalizedCode,
       }),
     });
     const payload = await readJson(response);
+    if (attempt !== this.#authGeneration || this.#coreUrl !== origin ||
+        this.#mfaChallenge !== challenge) throw new Error('SESSION_CHANGED');
     if (!response.ok) throw new Error(errorCode(payload, 'MFA_VERIFICATION_FAILED'));
-    this.#setSession(this.#coreUrl, payload);
+    this.#setSession(origin, payload);
     return this.status;
   }
 
@@ -306,6 +319,7 @@ class CoreSessionManager {
   }
 
   clear() {
+    this.#authGeneration += 1;
     this.#sessionEpoch += 1;
     this.cancelKnowledge();
     this.#session = null;

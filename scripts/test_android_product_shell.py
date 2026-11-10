@@ -381,7 +381,8 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return finish", service)
         self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return@use finish", service)
         self.assertIn("if (!stopping && sessionEpoch != SecureSessionStore.currentEpoch())", service)
-        self.assertIn("fun currentEpoch(): Long = synchronized(writer) { epoch }", session_store)
+        self.assertIn("@Volatile private var epoch = 0L", session_store)
+        self.assertIn("fun currentEpoch(): Long = epoch", session_store)
 
     def test_game_capture_chooser_rechecks_displayed_installed_game_and_consent(self) -> None:
         screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")

@@ -348,7 +348,7 @@ class GameObservationService : Service() {
         private const val SESSION_DEVICE = "capture-session-device-id"
         private const val SESSION_EPOCH = "capture-session-epoch"
         private const val STOP = "com.alpha0.app.game.STOP_OBSERVATION"
-        fun start(context: Context, consent: Intent, install: StockGameInstall, session: CaptureSessionBinding) {
+        internal fun start(context: Context, consent: Intent, install: StockGameInstall, session: CaptureSessionBinding) {
             try {
                 ContextCompat.startForegroundService(context, Intent(context, GameObservationService::class.java)
                     .putExtra(CONSENT, consent).putExtra(VERSION, install.versionCode)

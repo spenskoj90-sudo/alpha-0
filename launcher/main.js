@@ -8,6 +8,7 @@ const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
 const { revokeAccountBoundRuntime } = require('./account-lifecycle');
 const { bindVoiceRequest, voiceRequestStillCurrent, sameSessionContext } = require('./voice-authorization');
+const { CompanionStartFence } = require('./companion-start-fence');
 const { OverlayPresentationStore, clearOverlayOnInactiveCompanion } = require('./overlay-state');
 const { KnowledgePresentation } = require('./knowledge-presentation');
 const {
@@ -39,6 +40,7 @@ const catalog = [
 ];
 
 const session = new CoreSessionManager();
+const companionStartFence = new CompanionStartFence();
 const overlayStore = new OverlayPresentationStore({ maxItems: 4, ttlMs: 15000 });
 let mainWindow = null;
 let overlayWindow = null;
@@ -241,6 +243,8 @@ const companion = new CompanionProcessManager({
 // New account identity must not inherit an old worker, game observer, cached
 // overlay recommendation, voice consent or asynchronous Core response.
 function clearAccountBoundary(reason) {
+  // Cancel a pending entitlement/start request before tearing down the worker.
+  companionStartFence.revoke();
   revokeAccountBoundRuntime({
     session,
     companion,
@@ -372,9 +376,15 @@ ipcMain.handle('knowledge:status', event => { requireMainRenderer(event); return
 ipcMain.handle('knowledge:refresh', event => { requireMainRenderer(event); return knowledge?.refresh(); });
 ipcMain.handle('companion:start', async (_, coreUrl) => {
   if (!session.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
+  const startLease = companionStartFence.begin(session.knowledgeContext);
+  if (!startLease) throw new Error('AUTHENTICATION_REQUIRED');
   const requestedCore = normalizeCoreUrl(coreUrl);
   if (requestedCore !== session.coreUrl) throw new Error('CORE_SESSION_ORIGIN_MISMATCH');
   const features = await session.featureStatus();
+  // A prior Stop, account replacement or newer start request must not be
+  // undone when an older entitlement lookup finishes asynchronously.
+  if (!companionStartFence.isCurrent(startLease, session.knowledgeContext))
+    throw new Error('COMPANION_START_REVOKED');
   if (!Array.isArray(features.features) || !features.features.includes('companion')) throw new Error('COMPANION_ENTITLEMENT_REQUIRED');
   companionRuntimeHealth = null;
   const status = companion.start({ coreUrl: session.coreUrl, sessionToken: session.accessToken });
@@ -382,6 +392,7 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   wowBridge?.start(); wowBridge?.onCompanionStatus(status); publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
 ipcMain.handle('companion:stop', () => {
+  companionStartFence.revoke();
   knowledge?.stop();
   clearVoiceCapturePermission();
   wowBridge?.stop(); const status = companion.stop('STOPPED_BY_USER'); overlayStore.clear(); companionRuntimeHealth = null; publishOverlaySnapshot(); publishVoiceSnapshot(); return status;

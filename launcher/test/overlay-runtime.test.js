@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { OverlayPresentationStore, sanitizePresentation } = require('../overlay-state');
+const { OverlayPresentationStore, sanitizePresentation, clearOverlayOnInactiveCompanion } = require('../overlay-state');
 const { normalizeServerPresentation } = require('../companion-worker');
 
 function presentation(id = 'p-1', overrides = {}) {
@@ -96,4 +96,44 @@ test('overlay preserves fact/inference distinction without granting authority', 
   assert.equal(sanitizePresentation({ ...value, evidenceKind: 'EXECUTE' }), null);
   const wire = normalizeServerPresentation({ message_type: 'PRESENTATION', payload: { presentation_id: 'p', channel: 'OVERLAY', kind: 'RECOMMENDATION', knowledge_kind: 'inference', text: 'Evidence.', confidence: null, provenance: ['source'] } });
   assert.equal(wire?.evidenceKind, 'INFERENCE');
+});
+
+test('overlay advice revokes immediately on reconnecting, degraded, stopped and unknown states', () => {
+  const store = new OverlayPresentationStore();
+  const add = id => store.push(presentation(id, { kind: 'RECOMMENDATION' }));
+  assert.equal(add('a'), true);
+  assert.equal(clearOverlayOnInactiveCompanion({ state: 'ACTIVE' }, store), false);
+  assert.deepEqual(store.snapshot().map(value => value.presentationId), ['a']);
+
+  for (const state of ['DEGRADED', 'CONNECTING', 'STOPPED', 'UNKNOWN']) {
+    assert.equal(clearOverlayOnInactiveCompanion({ state }, store), true, state);
+    assert.deepEqual(store.snapshot(), [], state);
+    assert.equal(add(state), true);
+  }
+  assert.equal(clearOverlayOnInactiveCompanion(null, store), true);
+  assert.deepEqual(store.snapshot(), []);
+  // An ACTIVE transition by itself never restores advice from a prior generation.
+  assert.equal(clearOverlayOnInactiveCompanion({ state: 'ACTIVE' }, store), false);
+  assert.deepEqual(store.snapshot(), []);
+
+  const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
+  assert.match(main, /clearOverlayOnInactiveCompanion\(status, overlayStore\)/);
+  assert.match(main, /companion\.status\.state !== 'ACTIVE' \|\| !overlayStore\.push\(presentation\)/);
+  assert.match(main, /onRuntimeHealth: health => \{\s*if \(companion\.status\.state !== 'ACTIVE'\) return/);
+});
+
+test('overlay TTL is monotonic by default and fails closed on clock reversal or invalid clock', () => {
+  let now = 5000;
+  const store = new OverlayPresentationStore({ now: () => now, ttlMs: 1000 });
+  assert.equal(store.push(presentation('observed')), true);
+  now = 4900;
+  assert.deepEqual(store.snapshot(), []);
+  now = 9000;
+  assert.deepEqual(store.snapshot(), []);
+
+  const corrupt = new OverlayPresentationStore({ now: () => NaN });
+  assert.equal(corrupt.push(presentation('invalid')), false);
+  assert.deepEqual(corrupt.snapshot(), []);
+  const source = fs.readFileSync(path.join(__dirname, '..', 'overlay-state.js'), 'utf8');
+  assert.match(source, /performance\.now\(\)/);
 });

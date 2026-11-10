@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
-const { OverlayPresentationStore } = require('./overlay-state');
+const { OverlayPresentationStore, clearOverlayOnInactiveCompanion } = require('./overlay-state');
 const { KnowledgePresentation } = require('./knowledge-presentation');
 const {
   CAPTURE_CONTENT_TYPE,
@@ -176,6 +176,7 @@ function applyVoiceIntent(intent) {
 
 const companion = new CompanionProcessManager({
   onStatus: status => {
+    if (clearOverlayOnInactiveCompanion(status, overlayStore)) companionRuntimeHealth = null;
     if (status.state === 'STOPPED') knowledge?.stop();
     wowBridge?.onCompanionStatus(status);
     mainWindow?.webContents.send('companion:status', status);
@@ -195,11 +196,13 @@ const companion = new CompanionProcessManager({
   onObservationAck: ({ eventId, accepted, reason }) => wowBridge?.acknowledge(eventId, accepted, reason),
   onObservationDeferred: eventId => wowBridge?.defer(eventId),
   onPresentation: presentation => {
-    if (!overlayStore.push(presentation)) return;
+    // A delayed Core message must not resurrect advice after disconnect/Stop.
+    if (companion.status.state !== 'ACTIVE' || !overlayStore.push(presentation)) return;
     publishOverlaySnapshot();
     scheduleOverlayExpiry();
   },
   onRuntimeHealth: health => {
+    if (companion.status.state !== 'ACTIVE') return;
     companionRuntimeHealth = health;
     publishOverlaySnapshot();
   },

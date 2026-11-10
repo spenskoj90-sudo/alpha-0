@@ -41,6 +41,8 @@ let voiceCaptureDiscarded = false;
 let voiceBusy = false;
 let suppressNextVoiceClick = false;
 let voiceHoldActive = false;
+// Monotonic generation; any revoke invalidates pending mic permission or media replies.
+let voiceCaptureEpoch = 0;
 
 function refreshButtons() {
   loginButton.disabled = signedIn || mfaRequired;
@@ -60,6 +62,7 @@ function refreshButtons() {
 
 function setAccount(status, features = [], mfa = null) {
   signedIn = Boolean(status?.authenticated);
+  if (!signedIn && (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
   mfaRequired = !signedIn && mfa?.required === true;
   grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
   accountStatus.className = 'status ' + (signedIn ? 'ok' : mfaRequired ? 'warn' : '');
@@ -72,6 +75,8 @@ function setAccount(status, features = [], mfa = null) {
 
 function setCompanion(status) {
   companionState = status?.state || 'STOPPED';
+  if (!['ACTIVE', 'DEGRADED'].includes(companionState) &&
+      (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
   const reason = status?.reason ? ` / ${status.reason}` : '';
   const warning = ['DEGRADED', 'LOCAL-ONLY', 'CONNECTING'].includes(companionState);
   const failed = companionState === 'OFFLINE';
@@ -118,11 +123,22 @@ knowledgeRefresh.addEventListener('click', async () => {
   catch { setKnowledge({ state: 'UNAVAILABLE' }); }
 });
 
+function voiceCaptureStillAuthorized(epoch, requireHold = false) {
+  return epoch === voiceCaptureEpoch && signedIn &&
+    currentVoice.state === 'READY' && currentVoice.consentGranted === true &&
+    currentVoice.sttAvailable === true &&
+    ['ACTIVE', 'DEGRADED'].includes(companionState) &&
+    (!requireHold || voiceHoldActive);
+}
+
 function setVoice(status) {
   currentVoice = status && typeof status === 'object' ? status : {
     state: 'UNAVAILABLE', consentGranted: false, sttAvailable: false, ttsAvailable: false,
     maxAudioBytes: 512000, maxCaptureMs: 6000, captureContentType: 'audio/webm;codecs=opus', actionCapable: false,
   };
+  if ((currentVoice.state !== 'READY' || currentVoice.consentGranted !== true ||
+       currentVoice.sttAvailable !== true) &&
+      (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
   voiceConsent.checked = currentVoice.consentGranted === true;
   const state = String(currentVoice.state || 'UNAVAILABLE');
   const reason = currentVoice.reason ? ` / ${currentVoice.reason}` : '';
@@ -239,13 +255,18 @@ async function playFeedbackAudio(feedback) {
   try { await player.play(); } catch { cleanup(); }
 }
 
-async function submitVoiceBlob(blob) {
+async function submitVoiceBlob(blob, epoch) {
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   if (!blob.size) throw new Error('VOICE_CAPTURE_EMPTY');
   if (blob.size > Number(currentVoice.maxAudioBytes || 512000)) throw new Error('VOICE_AUDIO_TOO_LARGE');
+  const audioBase64 = await blobToBase64(blob);
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   const response = await window.sentinel.submitVoice({
-    audioBase64: await blobToBase64(blob),
+    audioBase64,
     locale: voiceLocale.value,
   });
+  // A delayed response may be from an account/consent that no longer exists.
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   const result = response?.result;
   if (!result || typeof result.reasonCode !== 'string') throw new Error('VOICE_RESPONSE_INVALID');
   const mode = result.intent?.mode ? ` / ${result.intent.mode}` : '';
@@ -263,6 +284,7 @@ async function submitVoiceBlob(blob) {
 
 async function finalizeVoiceCapture() {
   clearVoiceTimer();
+  const epoch = voiceCaptureEpoch;
   const chunks = voiceChunks;
   const discarded = voiceCaptureDiscarded;
   voiceChunks = [];
@@ -284,7 +306,7 @@ async function finalizeVoiceCapture() {
   try {
     if (discarded) return;
     const blob = new Blob(chunks, { type: currentVoice.captureContentType || 'audio/webm;codecs=opus' });
-    await submitVoiceBlob(blob);
+    await submitVoiceBlob(blob, epoch);
   } catch (error) {
     showError(voiceResult, error);
   } finally {
@@ -299,15 +321,19 @@ async function startVoiceCapture() {
   const mimeType = currentVoice.captureContentType || 'audio/webm;codecs=opus';
   if (typeof MediaRecorder.isTypeSupported === 'function' && !MediaRecorder.isTypeSupported(mimeType)) throw new Error('VOICE_CAPTURE_FORMAT_UNSUPPORTED');
 
+  const epoch = voiceCaptureEpoch;
+  if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
   voiceBusy = true;
   refreshButtons();
   let armed = false;
+  let acquiredStream = null;
   try {
     const lease = await window.sentinel.armVoiceCapture();
     if (!lease?.armed || lease.actionCapable !== false) throw new Error('VOICE_CAPTURE_PERMISSION_DENIED');
     armed = true;
+    if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
     try {
-      voiceStream = await navigator.mediaDevices.getUserMedia({
+      acquiredStream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: false,
       });
@@ -317,6 +343,11 @@ async function startVoiceCapture() {
         try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
       }
     }
+    // Never publish the newly acquired stream to shared renderer state until
+    // its exact capture generation remains authorized after all awaits.
+    if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
+    voiceStream = acquiredStream;
+    acquiredStream = null;
     voiceChunks = [];
     voiceCaptureDiscarded = false;
     const recorder = new MediaRecorder(voiceStream, { mimeType, audioBitsPerSecond: 64000 });
@@ -340,13 +371,20 @@ async function startVoiceCapture() {
     if (armed) {
       try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
     }
-    stopVoiceTracks();
-    voiceRecorder = null;
-    voiceCaptureDiscarded = false;
+    // A canceled earlier generation may finish after a newer capture starts:
+    // close only the stream owned by that canceled generation.
+    if (acquiredStream) for (const track of acquiredStream.getTracks()) track.stop();
+    if (epoch === voiceCaptureEpoch) {
+      stopVoiceTracks();
+      voiceRecorder = null;
+      voiceCaptureDiscarded = false;
+    }
     throw error;
   } finally {
-    voiceBusy = false;
-    refreshButtons();
+    if (epoch === voiceCaptureEpoch) {
+      voiceBusy = false;
+      refreshButtons();
+    }
   }
 }
 
@@ -360,6 +398,8 @@ function stopVoiceCapture() {
 }
 
 function cancelVoiceCapture() {
+  voiceCaptureEpoch += 1;
+  voiceHoldActive = false;
   clearVoiceTimer();
   voiceCaptureDiscarded = true;
   voiceChunks = [];
@@ -437,6 +477,7 @@ stopButton.onclick = async () => {
 
 voiceConsent.onchange = async () => {
   const requested = voiceConsent.checked;
+  if (!requested) cancelVoiceCapture();
   try { setVoice(await window.sentinel.setVoiceConsent(requested)); }
   catch (error) {
     voiceConsent.checked = false;
@@ -447,11 +488,13 @@ voiceConsent.onchange = async () => {
 
 async function beginVoiceHold() {
   if (voiceRecorder || voiceBusy || voicePtt.disabled) return;
+  const epoch = voiceCaptureEpoch;
   try {
     await startVoiceCapture();
     if (!voiceHoldActive && voiceRecorder) stopVoiceCapture();
   }
   catch (error) {
+    if (epoch !== voiceCaptureEpoch) return;
     showError(voiceResult, error);
     if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
     if (voiceHeadline) ui.text(voiceHeadline, 'Voice capture unavailable');

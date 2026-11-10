@@ -117,6 +117,8 @@ class CompanionWorkerRuntime {
     this.socket = null;
     this.reconnectTimer = null;
     this.heartbeatTimer = null;
+    this.reconnectEpoch = 0;
+    this.heartbeatEpoch = 0;
     this.running = false;
     this.killSwitch = false;
     this.handshaken = false;
@@ -145,11 +147,22 @@ class CompanionWorkerRuntime {
 
   updateSession(sessionToken) {
     authProtocols(sessionToken);
+    if (!this.running || this.killSwitch) return;
+    const changed = this.token !== sessionToken;
     this.token = sessionToken;
-    if (this.running && (!this.socket || this.socket.readyState === this.WebSocketImpl.CLOSED)) {
-      this.attempt = 0;
-      this.#connect();
+    const oldSocket = this.socket;
+    // A new credential must not leave an already authenticated connection
+    // using the previous credential. Even a cancelled timer may fire later.
+    if (!changed && oldSocket && oldSocket.readyState !== this.WebSocketImpl.CLOSED) return;
+    this.socket = null;
+    this.handshaken = false;
+    this.runtimeHealth.resetPending();
+    this.#clearTimers();
+    if (oldSocket && oldSocket.readyState < this.WebSocketImpl.CLOSING) {
+      oldSocket.close(1000, 'SESSION_ROTATED');
     }
+    this.attempt = 0;
+    this.#connect();
   }
 
   sendWowObservation(observation) {
@@ -168,8 +181,11 @@ class CompanionWorkerRuntime {
   stop(reason = 'STOPPED_BY_USER') {
     this.running = false;
     this.killSwitch = true;
+    this.handshaken = false;
     this.runtimeHealth.resetPending();
     this.#clearTimers();
+    this.token = null;
+    this.coreUrl = null;
     const socket = this.socket;
     this.socket = null;
     if (socket && socket.readyState < this.WebSocketImpl.CLOSING) socket.close(1000, reason);
@@ -251,29 +267,35 @@ class CompanionWorkerRuntime {
     const reason = String(event?.reason || 'TRANSPORT_CLOSED');
     if (!this.running || this.killSwitch) return;
     if (TERMINAL_POLICY_REASONS.has(reason)) {
-      this.running = false;
-      this.#setState('STOPPED', reason);
+      this.stop(reason);
       return;
     }
     if (reason === 'INVALID_SESSION' || reason === 'AUTHENTICATION_REQUIRED') {
+      this.token = null;
       this.#setState('DEGRADED', 'SESSION_REFRESH_REQUIRED');
       this.send({ type: 'refresh-needed' });
       return;
     }
     this.attempt += 1;
     if (!this.reconnectPolicy.canRetry(this.attempt)) {
-      this.running = false;
-      this.#setState('STOPPED', 'RECONNECT_BUDGET_EXHAUSTED');
+      this.stop('RECONNECT_BUDGET_EXHAUSTED');
       return;
     }
     const delayMs = this.reconnectPolicy.delay(this.attempt);
     this.#setState('DEGRADED', 'RECONNECT_SCHEDULED', { retryInMs: delayMs, attempt: this.attempt });
-    this.reconnectTimer = this.setTimeoutImpl(() => this.#connect(), delayMs);
+    const epoch = this.reconnectEpoch;
+    this.reconnectTimer = this.setTimeoutImpl(() => {
+      if (epoch !== this.reconnectEpoch || !this.running || this.killSwitch) return;
+      this.reconnectTimer = null;
+      this.#connect();
+    }, delayMs);
   }
 
   #startHeartbeat() {
     this.#clearHeartbeat();
+    const epoch = this.heartbeatEpoch;
     this.heartbeatTimer = this.setIntervalImpl(() => {
+      if (epoch !== this.heartbeatEpoch || !this.running || this.killSwitch) return;
       const socket = this.socket;
       if (!socket || socket.readyState !== this.WebSocketImpl.OPEN || !this.handshaken) return;
       this.sequence += 1;
@@ -296,10 +318,12 @@ class CompanionWorkerRuntime {
   }
 
   #clearHeartbeat() {
+    this.heartbeatEpoch += 1;
     if (this.heartbeatTimer) this.clearIntervalImpl(this.heartbeatTimer);
     this.heartbeatTimer = null;
   }
   #clearReconnect() {
+    this.reconnectEpoch += 1;
     if (this.reconnectTimer) this.clearTimeoutImpl(this.reconnectTimer);
     this.reconnectTimer = null;
   }

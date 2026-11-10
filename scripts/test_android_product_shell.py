@@ -365,6 +365,24 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('else -> false', policy)
 
 
+    def test_capture_session_generation_fence_spans_checkbox_chooser_service_and_frames(self) -> None:
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        service = read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt")
+        session_store = read("app/src/main/java/com/alpha0/app/security/SecureSessionStore.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/CaptureSessionFence.kt")
+        self.assertIn("data class CaptureSessionBinding", policy)
+        self.assertIn("expected.deviceId == actualDeviceId && expected.epoch == actualEpoch", policy)
+        self.assertIn("acknowledgedSession = CaptureSessionFence.snapshot(", screen)
+        self.assertIn("pendingSession = binding", screen)
+        self.assertIn("!CaptureSessionFence.isCurrent(expectedSession, session?.deviceId, session?.epoch)", screen)
+        self.assertIn("GameObservationService.start(context, result.data!!, currentInstall!!, expectedSession!!)", screen)
+        self.assertIn("!CaptureSessionFence.isCurrent(expectedSession, current?.deviceId, current?.epoch)", service)
+        self.assertIn(".putExtra(SESSION_DEVICE, session.deviceId).putExtra(SESSION_EPOCH, session.epoch)", service)
+        self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return finish", service)
+        self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return@use finish", service)
+        self.assertIn("if (!stopping && sessionEpoch != SecureSessionStore.currentEpoch())", service)
+        self.assertIn("fun currentEpoch(): Long = synchronized(writer) { epoch }", session_store)
+
     def test_game_capture_chooser_rechecks_displayed_installed_game_and_consent(self) -> None:
         screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
         policy = read("app/src/main/java/com/alpha0/app/game/ObservationCapturePolicy.kt")

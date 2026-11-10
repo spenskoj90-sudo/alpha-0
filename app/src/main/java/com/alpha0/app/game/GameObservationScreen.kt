@@ -73,6 +73,9 @@ fun GameObservationScreen() {
     val state by GameObservationRuntime.state.collectAsStateWithLifecycle()
     val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
     var consent by remember { mutableStateOf(false) }
+    // Checkbox consent belongs to the session that acknowledged it, not just the device.
+    var acknowledgedSession by remember { mutableStateOf<CaptureSessionBinding?>(null) }
+    var pendingSession by remember { mutableStateOf<CaptureSessionBinding?>(null) }
     var pendingVersion by remember { mutableStateOf<Long?>(null) }
     var pendingVersionName by remember { mutableStateOf<String?>(null) }
     var pendingSigner by remember { mutableStateOf<String?>(null) }
@@ -96,6 +99,7 @@ fun GameObservationScreen() {
             // Never continue hashing a different app while the observer is backgrounded.
             if (event == Lifecycle.Event.ON_STOP) {
                 consent = false
+                acknowledgedSession = null
                 binaryJob?.cancel()
                 binaryJob = null
                 binaryChecking = false
@@ -119,6 +123,7 @@ fun GameObservationScreen() {
     // A source/session transition or game-install change requires a fresh acknowledgement.
     LaunchedEffect(installed, state.observation.status, state.observation.reason, state.observation.captureId) {
         consent = false
+        acknowledgedSession = null
     }
     LaunchedEffect(state.observation.lastHealth?.observedAt) {
         while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
@@ -130,18 +135,21 @@ fun GameObservationScreen() {
         val expectedVersion = pendingVersion
         val expectedName = pendingVersionName
         val expectedSigner = pendingSigner
+        val expectedSession = pendingSession
+        pendingSession = null
+        acknowledgedSession = null
         pendingVersion = null
         pendingVersionName = null
         pendingSigner = null
         val currentInstall = ShatteredGameProfile.installed(context)
-        val session = SecureSessionStore().load(context)
+        val session = runCatching { SecureSessionStore().load(context) }.getOrNull()
         when {
             !wasPending -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             !GameInstallFence.matches(expectedName, expectedVersion, expectedSigner, currentInstall) ||
-                session?.deviceId.isNullOrBlank() ->
+                !CaptureSessionFence.isCurrent(expectedSession, session?.deviceId, session?.epoch) ->
                 GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
-            else -> GameObservationService.start(context, result.data!!, currentInstall!!)
+            else -> GameObservationService.start(context, result.data!!, currentInstall!!, expectedSession!!)
         }
     }
     val captureSupported = ObservationCapturePolicy.supports(
@@ -188,7 +196,11 @@ fun GameObservationScreen() {
         consent = consent,
         pending = pending,
         now = elapsed,
-        onConsent = { consent = it },
+        onConsent = { acknowledged ->
+            val session = if (acknowledged) runCatching { SecureSessionStore().load(context) }.getOrNull() else null
+            acknowledgedSession = CaptureSessionFence.snapshot(session?.deviceId, session?.epoch)
+            consent = acknowledged && acknowledgedSession != null
+        },
         onStart = {
             // A stale UI callback must not request a second projection while
             // consent is pending or an observation session is already active.
@@ -204,16 +216,21 @@ fun GameObservationScreen() {
                 binaryChecking = false
                 binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
                 val current = ShatteredGameProfile.installed(context)
+                val session = runCatching { SecureSessionStore().load(context) }.getOrNull()
+                val binding = CaptureSessionFence.snapshot(session?.deviceId, session?.epoch)
                 if (current == null ||
-                    !ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current)
+                    !ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current) ||
+                    !CaptureSessionFence.isCurrent(acknowledgedSession, binding?.deviceId, binding?.epoch)
                 ) {
                     installed = current
                     consent = false
+                    acknowledgedSession = null
                     GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
                 } else {
                     pendingVersion = current.versionCode
                     pendingVersionName = current.versionName
                     pendingSigner = current.signerSha256
+                    pendingSession = binding
                     pending = true
                     try {
                         val manager = context.getSystemService(MediaProjectionManager::class.java)
@@ -224,6 +241,8 @@ fun GameObservationScreen() {
                         pendingVersion = null
                         pendingVersionName = null
                         pendingSigner = null
+                        pendingSession = null
+                        acknowledgedSession = null
                         consent = false
                         GameObservationRuntime.stop("CAPTURE_START_FAILED")
                     }

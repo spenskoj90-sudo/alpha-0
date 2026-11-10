@@ -22,6 +22,8 @@ class SecureSessionStore {
         private const val DEVICE_ID = "device_id"
         private val writer = Any()
         private var epoch = 0L
+        // Capture heartbeat may check revocation without decrypting the session.
+        fun currentEpoch(): Long = synchronized(writer) { epoch }
 
         data class Session(val accessToken: String, val refreshToken: String, val deviceId: String? = null, val epoch: Long = 0)
     }

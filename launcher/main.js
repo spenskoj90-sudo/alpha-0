@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
+const { accountSnapshot, createAccountSnapshotPublisher } = require('./account-snapshot');
 const { CompanionProcessManager } = require('./companion-process');
 const { revokeAccountBoundRuntime } = require('./account-lifecycle');
 const { bindVoiceRequest, voiceRequestStillCurrent, sameSessionContext } = require('./voice-authorization');
@@ -57,22 +58,12 @@ let voiceConsentGeneration = 0;
 let voiceStatusRequestGeneration = 0;
 let knowledge = null;
 
-async function accountSnapshot() {
-  if (!session.status) return { session: null, features: [], mfa: session.mfaStatus };
-  try {
-    const payload = await session.featureStatus();
-    return {
-      session: session.status,
-      features: Array.isArray(payload.features) ? payload.features : [],
-      mfa: null,
-    };
-  } catch {
-    return { session: session.status, features: [], mfa: null };
-  }
-}
+const accountPublisher = createAccountSnapshotPublisher(session, snapshot => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('account:status', snapshot);
+});
 
 function publishAccountSnapshot() {
-  void accountSnapshot().then(snapshot => mainWindow?.webContents.send('account:status', snapshot));
+  void accountPublisher.publish();
 }
 
 function voiceSnapshot() {
@@ -245,6 +236,8 @@ const companion = new CompanionProcessManager({
 // New account identity must not inherit an old worker, game observer, cached
 // overlay recommendation, voice consent or asynchronous Core response.
 function clearAccountBoundary(reason) {
+  // Revoke in-flight account feature publications before changing principal.
+  accountPublisher.revoke();
   // Cancel a pending entitlement/start request before tearing down the worker.
   companionStartFence.revoke();
   revokeAccountBoundRuntime({
@@ -361,18 +354,18 @@ ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
   clearAccountBoundary('ACCOUNT_SWITCH');
   await session.login({ coreUrl, email, password });
   resetVoiceState(session.status ? 'VOICE_CONSENT_REQUIRED' : 'AUTHENTICATION_REQUIRED');
-  return accountSnapshot();
+  return accountSnapshot(session);
 });
 ipcMain.handle('account:mfa-complete', async (_, code) => {
   await session.completeMfa(code);
   resetVoiceState('VOICE_CONSENT_REQUIRED');
-  return accountSnapshot();
+  return accountSnapshot(session);
 });
 ipcMain.handle('account:logout', () => {
   clearAccountBoundary('ACCOUNT_LOGOUT');
   return true;
 });
-ipcMain.handle('account:status', () => accountSnapshot());
+ipcMain.handle('account:status', () => accountSnapshot(session));
 ipcMain.handle('companion:status', () => companion.status);
 ipcMain.handle('knowledge:status', event => { requireMainRenderer(event); return knowledge?.status(); });
 ipcMain.handle('knowledge:refresh', event => { requireMainRenderer(event); return knowledge?.refresh(); });

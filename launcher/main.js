@@ -79,12 +79,13 @@ function voiceSnapshot() {
   if (session.status) {
     if (!voiceConsentGranted) state = 'CONSENT_REQUIRED';
     else if (['COMPANION_ENTITLEMENT_REQUIRED', 'COMPANION_ENTITLEMENT_REVOKED'].includes(voiceStateReason)) state = 'ENTITLEMENT_REQUIRED';
+    else if (companion.status.state !== 'ACTIVE') state = 'COMPANION_UNAVAILABLE';
     else if (voiceProviderStatus?.sttAvailable) state = 'READY';
     else state = 'PROVIDER_UNAVAILABLE';
   }
   return Object.freeze({
     state,
-    reason: voiceStateReason,
+    reason: state === 'COMPANION_UNAVAILABLE' ? 'COMPANION_NOT_ACTIVE' : voiceStateReason,
     consentGranted: voiceConsentGranted,
     sttAvailable: Boolean(voiceProviderStatus?.sttAvailable),
     ttsAvailable: Boolean(voiceProviderStatus?.ttsAvailable),

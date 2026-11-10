@@ -44,3 +44,11 @@ test('renderer arms only for explicit getUserMedia and immediately disarms after
   assert.ok(armIndex >= 0 && mediaIndex > armIndex && disarmIndex > mediaIndex);
   assert.match(renderer, /video:\s*false/);
 });
+
+test('voice readiness requires active Companion transport, not just cached STT availability', () => {
+  const body = functionBody(main, 'voiceSnapshot()', 'function publishVoiceSnapshot()');
+  assert.match(body, /companion\.status\.state !== 'ACTIVE'/);
+  assert.match(body, /state = 'COMPANION_UNAVAILABLE'/);
+  assert.match(body, /state === 'COMPANION_UNAVAILABLE' \? 'COMPANION_NOT_ACTIVE'/);
+  assert.ok(body.indexOf("companion.status.state !== 'ACTIVE'") < body.indexOf("voiceProviderStatus?.sttAvailable) state = 'READY'"));
+});

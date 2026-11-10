@@ -7,6 +7,7 @@ const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
 const { revokeAccountBoundRuntime } = require('./account-lifecycle');
+const { bindVoiceRequest, voiceRequestStillCurrent, sameSessionContext } = require('./voice-authorization');
 const { OverlayPresentationStore, clearOverlayOnInactiveCompanion } = require('./overlay-state');
 const { KnowledgePresentation } = require('./knowledge-presentation');
 const {
@@ -49,6 +50,8 @@ let voiceConsentGranted = false;
 let voiceProviderStatus = null;
 let voiceStateReason = 'VOICE_CONSENT_REQUIRED';
 let voiceCapturePermissionExpiresAt = 0;
+let voiceConsentGeneration = 0;
+let voiceStatusRequestGeneration = 0;
 let knowledge = null;
 
 async function accountSnapshot() {
@@ -110,6 +113,8 @@ function requireMainRenderer(event) {
 }
 
 function resetVoiceState(reason = 'VOICE_CONSENT_REQUIRED') {
+  voiceConsentGeneration += 1;
+  voiceStatusRequestGeneration += 1;
   clearVoiceCapturePermission();
   voiceConsentGranted = false;
   voiceProviderStatus = null;
@@ -122,17 +127,36 @@ async function refreshVoiceProviderStatus() {
     resetVoiceState('AUTHENTICATION_REQUIRED');
     return voiceSnapshot();
   }
+  // Latest request wins. A delayed former-session provider response cannot
+  // turn a new principal's voice UI READY or overwrite its error state.
+  const generation = ++voiceStatusRequestGeneration;
+  const boundSession = session.knowledgeContext;
+  const stillCurrent = () => generation === voiceStatusRequestGeneration &&
+    sameSessionContext(boundSession, session.knowledgeContext);
   try {
     const sanitized = sanitizeVoiceStatus(await session.voiceStatus());
+    if (!stillCurrent()) return voiceSnapshot();
     if (!sanitized) throw new Error('VOICE_STATUS_INVALID');
     voiceProviderStatus = sanitized;
     voiceStateReason = sanitized.sttAvailable ? null : 'VOICE_PROVIDER_UNAVAILABLE';
   } catch (error) {
+    if (!stillCurrent()) return voiceSnapshot();
     voiceProviderStatus = null;
     voiceStateReason = String(error?.message || 'VOICE_STATUS_FAILED').slice(0, 128);
   }
   publishVoiceSnapshot();
   return voiceSnapshot();
+}
+
+function voiceRequestBoundary() {
+  return bindVoiceRequest(session.knowledgeContext, voiceConsentGeneration);
+}
+
+function requireVoiceBoundary(expected) {
+  if (!voiceRequestStillCurrent(
+    expected, session.knowledgeContext, voiceConsentGeneration,
+    voiceConsentGranted, companion.status.state,
+  )) throw new Error('VOICE_CAPTURE_REVOKED');
 }
 
 function overlaySnapshot() {
@@ -178,6 +202,11 @@ function applyVoiceIntent(intent) {
 const companion = new CompanionProcessManager({
   onStatus: status => {
     if (clearOverlayOnInactiveCompanion(status, overlayStore)) companionRuntimeHealth = null;
+    if (status.state !== 'ACTIVE') {
+      // A lost/replaced transport cannot keep an in-flight capture/voice result alive.
+      voiceConsentGeneration += 1;
+      clearVoiceCapturePermission();
+    }
     if (status.state === 'STOPPED') knowledge?.stop();
     wowBridge?.onCompanionStatus(status);
     mainWindow?.webContents.send('companion:status', status);
@@ -370,7 +399,13 @@ ipcMain.handle('voice:consent:set', async (event, granted) => {
     return voiceSnapshot();
   }
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
+  const sessionContext = session.knowledgeContext;
+  const generation = ++voiceConsentGeneration;
   const features = await session.featureStatus();
+  if (generation !== voiceConsentGeneration ||
+      !sameSessionContext(sessionContext, session.knowledgeContext)) {
+    throw new Error('VOICE_CONSENT_REVOKED');
+  }
   if (!Array.isArray(features.features) || !features.features.includes('companion')) {
     resetVoiceState('COMPANION_ENTITLEMENT_REQUIRED');
     throw new Error('COMPANION_ENTITLEMENT_REQUIRED');
@@ -384,7 +419,10 @@ ipcMain.handle('voice:capture:arm', async event => {
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
   if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
   if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');
+  const boundary = voiceRequestBoundary();
+  requireVoiceBoundary(boundary);
   if (!voiceProviderStatus) await refreshVoiceProviderStatus();
+  requireVoiceBoundary(boundary);
   if (!voiceProviderStatus?.sttAvailable) throw new Error(voiceStateReason || 'VOICE_PROVIDER_UNAVAILABLE');
   voiceCapturePermissionExpiresAt = Date.now() + VOICE_CAPTURE_PERMISSION_LEASE_MS;
   return { armed: true, expiresInMs: VOICE_CAPTURE_PERMISSION_LEASE_MS, actionCapable: false };
@@ -400,7 +438,10 @@ ipcMain.handle('voice:submit', async (event, payload) => {
   if (!session.status) throw new Error('AUTHENTICATION_REQUIRED');
   if (!voiceConsentGranted) throw new Error('VOICE_CONSENT_REQUIRED');
   if (!['ACTIVE', 'DEGRADED'].includes(companion.status.state)) throw new Error('COMPANION_NOT_ACTIVE');
+  const boundary = voiceRequestBoundary();
+  requireVoiceBoundary(boundary);
   if (!voiceProviderStatus) await refreshVoiceProviderStatus();
+  requireVoiceBoundary(boundary);
   if (!voiceProviderStatus?.sttAvailable) throw new Error(voiceStateReason || 'VOICE_PROVIDER_UNAVAILABLE');
   const capture = validateCapturePayload(payload, voiceProviderStatus.maxAudioBytes);
   const rawResult = await session.transcribeVoice({
@@ -409,6 +450,7 @@ ipcMain.handle('voice:submit', async (event, payload) => {
     recommendationId: overlayStore.latestRecommendationId(),
     consentGranted: true,
   });
+  requireVoiceBoundary(boundary);
   const result = sanitizeVoiceResult(rawResult);
   if (!result) throw new Error('VOICE_RESPONSE_INVALID');
   if (result.intent) applyVoiceIntent(result.intent);
@@ -423,13 +465,16 @@ ipcMain.handle('voice:submit', async (event, payload) => {
         locale: capture.locale,
         consentGranted: true,
       }));
+      requireVoiceBoundary(boundary);
       if (!feedbackAudio) feedbackReason = 'VOICE_TTS_RESPONSE_INVALID';
     } catch {
+      requireVoiceBoundary(boundary);
       feedbackReason = 'VOICE_TTS_DEGRADED';
     }
   } else if (feedbackText) {
     feedbackReason = 'VOICE_TTS_UNAVAILABLE';
   }
+  requireVoiceBoundary(boundary);
   return { result, feedbackAudio, feedbackReason };
 });
 

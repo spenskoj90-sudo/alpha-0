@@ -45,6 +45,7 @@ test('late recorder data and stop callback cannot poison the next microphone cap
       disarmVoiceCapture: async () => true,
     } },
     refreshButtons: () => {}, clearVoiceTimer: () => {},
+    stopVoiceFeedback: () => {},
     stopVoiceTracks: () => { if (context.voiceStream) {
       for (const track of context.voiceStream.getTracks()) track.stop();
       context.voiceStream = null;

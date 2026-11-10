@@ -91,6 +91,7 @@ test('revocation during pending getUserMedia closes only the late stream without
       disarmVoiceCapture: async () => true,
     } },
     refreshButtons: () => {},
+    stopVoiceFeedback: () => {},
     clearVoiceTimer: () => {},
     stopVoiceTracks: () => { if (context.voiceStream) {
       for (const track of context.voiceStream.getTracks()) track.stop();

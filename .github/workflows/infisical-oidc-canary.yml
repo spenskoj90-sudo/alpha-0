@@ -3,11 +3,20 @@ name: "Sentinel Infisical OIDC canary (manual; no real secrets)"
 # Deliberately inert until reviewed and merged to protected main. No PR/fork secrets.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "Auth-only or bounded token lifecycle (no resource access)"
+        type: choice
+        default: auth
+        options: [auth, lifecycle]
   # PR event is a NEGATIVE cross-context canary only. Never run positive test on PR.
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/infisical-oidc-canary.yml"
+      - ".github/workflows/infisical-oidc-negative.yml"
+      - "scripts/infisical_oidc_lifecycle.py"
+      - "scripts/test_infisical_oidc_lifecycle.py"
 
 permissions:
   contents: read
@@ -18,7 +27,7 @@ concurrency:
 
 jobs:
   oidc-canary:
-    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode != 'lifecycle'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -193,3 +202,36 @@ jobs:
           except Exception:
               fail("OIDC denial could not be verified")
           PY
+
+  offline-protocol:
+    name: OIDC lifecycle offline protocol
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest discover -s scripts -p test_infisical_oidc_lifecycle.py -v
+
+  token-lifecycle:
+    name: Verify bounded expiry and self-revocation (NoAccess)
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'lifecycle'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify expiry then revoke a separate temporary token chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 scripts/infisical_oidc_lifecycle.py lifecycle

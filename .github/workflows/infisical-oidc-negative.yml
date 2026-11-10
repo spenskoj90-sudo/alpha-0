@@ -1,0 +1,31 @@
+name: Sentinel OIDC wrong-workflow DENY (manual; no real secrets)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sentinel-oidc-negative-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  deny-wrong-workflow:
+    if: github.repository == 'spenskoj90-sudo/alpha-0' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Require provider rejection of a different workflow on protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 scripts/infisical_oidc_lifecycle.py deny-workflow

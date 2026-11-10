@@ -364,6 +364,21 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('"development", "diagnostic" -> debuggable', policy)
         self.assertIn('else -> false', policy)
 
+
+    def test_game_capture_chooser_rechecks_displayed_installed_game_and_consent(self) -> None:
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/ObservationCapturePolicy.kt")
+        self.assertIn("fun canRequestConsent(", policy)
+        start = screen.index("        onStart = {")
+        end = screen.index("        onStop =", start)
+        request = screen[start:end]
+        self.assertIn("val liveStatus = GameObservationRuntime.state.value.observation.status", request)
+        self.assertIn("if (!pending && liveStatus !in setOf(", request)
+        self.assertIn("!ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current)", request)
+        self.assertIn("installed = current", request)
+        self.assertLess(request.index("canRequestConsent("),
+                        request.index("launcher.launch(manager.createScreenCaptureIntent())"))
+
     def test_local_apk_hash_is_revoked_before_projection_consent(self) -> None:
         observer = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
         self.assertIn("val observedStatus = GameObservationRuntime.state.value.observation.status", observer)

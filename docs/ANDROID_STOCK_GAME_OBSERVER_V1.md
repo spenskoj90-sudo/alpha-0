@@ -32,6 +32,11 @@ the selected package to SENTINEL; the source therefore remains user-selected and
 ## Capture lifecycle
 
 - A fresh Android consent result is required for every session.
+- Immediately before opening Android's capture chooser, the UI rechecks its
+  acknowledgement and the exact installed game version/name/current signer
+  against what was displayed; a changed or missing game revokes acknowledgement.
+  Pending/active sessions refuse overlapping consent requests. Callback/service
+  revalidation is independent; none of these checks attest the selected window.
 - The observed installed package version **name**, version code and current signer digest
   are rechecked after the consent chooser and again on foreground-service start;
   if any field changed, the session is denied. This is package-metadata

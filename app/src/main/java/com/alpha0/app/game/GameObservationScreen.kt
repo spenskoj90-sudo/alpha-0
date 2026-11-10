@@ -144,6 +144,9 @@ fun GameObservationScreen() {
             else -> GameObservationService.start(context, result.data!!, currentInstall!!)
         }
     }
+    val captureSupported = ObservationCapturePolicy.supports(
+        BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT,
+    )
     GameObservationPanel(
         installed = installed,
         state = state,
@@ -181,38 +184,49 @@ fun GameObservationScreen() {
                 }
             }
         },
-        supported = ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT),
+        supported = captureSupported,
         consent = consent,
         pending = pending,
         now = elapsed,
         onConsent = { consent = it },
         onStart = {
-            // Cancel any in-flight APK hash before presenting system capture consent.
-            // This is independent of MediaProjection consent and gives no game authority.
-            binaryJob?.cancel()
-            binaryJob = null
-            binaryChecking = false
-            binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
-            val current = ShatteredGameProfile.installed(context)
-            if (current == null) {
-                installed = null
-                GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
-            } else {
-                pendingVersion = current.versionCode
-                pendingVersionName = current.versionName
-                pendingSigner = current.signerSha256
-                pending = true
-                try {
-                    val manager = context.getSystemService(MediaProjectionManager::class.java)
-                        ?: throw IllegalStateException("Projection service unavailable")
-                    launcher.launch(manager.createScreenCaptureIntent())
-                } catch (_: Exception) {
-                    pending = false
-                    pendingVersion = null
-                    pendingVersionName = null
-                    pendingSigner = null
+            // A stale UI callback must not request a second projection while
+            // consent is pending or an observation session is already active.
+            val liveStatus = GameObservationRuntime.state.value.observation.status
+            if (!pending && liveStatus !in setOf(
+                    ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED,
+                )
+            ) {
+                // Cancel any in-flight APK hash before presenting system capture consent.
+                // This is independent of MediaProjection consent and gives no game authority.
+                binaryJob?.cancel()
+                binaryJob = null
+                binaryChecking = false
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                val current = ShatteredGameProfile.installed(context)
+                if (current == null ||
+                    !ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current)
+                ) {
+                    installed = current
                     consent = false
-                    GameObservationRuntime.stop("CAPTURE_START_FAILED")
+                    GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
+                } else {
+                    pendingVersion = current.versionCode
+                    pendingVersionName = current.versionName
+                    pendingSigner = current.signerSha256
+                    pending = true
+                    try {
+                        val manager = context.getSystemService(MediaProjectionManager::class.java)
+                            ?: throw IllegalStateException("Projection service unavailable")
+                        launcher.launch(manager.createScreenCaptureIntent())
+                    } catch (_: Exception) {
+                        pending = false
+                        pendingVersion = null
+                        pendingVersionName = null
+                        pendingSigner = null
+                        consent = false
+                        GameObservationRuntime.stop("CAPTURE_START_FAILED")
+                    }
                 }
             }
         },

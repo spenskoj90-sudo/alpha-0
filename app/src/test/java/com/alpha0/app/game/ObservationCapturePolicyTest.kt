@@ -23,6 +23,25 @@ class ObservationCapturePolicyTest {
         }
     }
 
+
+    @Test fun captureChooserRequiresFreshDisplayedGameIdentityAndAcknowledgement() {
+        val shown = StockGameInstall("4.0.2", 922L, "a".repeat(64))
+        assertTrue(ObservationCapturePolicy.canRequestConsent(true, true, shown, shown))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(false, true, shown, shown))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, false, shown, shown))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, null, shown))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, shown, null))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, shown, shown.copy(versionCode = 923L)))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, shown, shown.copy(versionName = "4.0.3")))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, shown, shown.copy(signerSha256 = "b".repeat(64))))
+    }
+
+    @Test fun unknownSignerRemainsDiagnosticOnlyAndNeverClaimsSourceAttestation() {
+        val observedWithoutSigner = StockGameInstall("4.0.2", 922L, null)
+        assertTrue(ObservationCapturePolicy.canRequestConsent(true, true, observedWithoutSigner, observedWithoutSigner))
+        assertFalse(ObservationCapturePolicy.canRequestConsent(true, true, observedWithoutSigner,
+            observedWithoutSigner.copy(signerSha256 = "b".repeat(64))))
+    }
     @Test fun nonDebuggableSignedFeedObservesButPlayDoesNot() {
         assertTrue(ObservationCapturePolicy.supports(false, "signed_feed", 34))
         assertTrue(ObservationCapturePolicy.supports(false, "signed_feed", 37))

@@ -43,6 +43,7 @@ let suppressNextVoiceClick = false;
 let voiceHoldActive = false;
 // Monotonic generation; any revoke invalidates pending mic permission or media replies.
 let voiceCaptureEpoch = 0;
+let voiceFeedbackPlayback = null;
 
 function refreshButtons() {
   loginButton.disabled = signedIn || mfaRequired;
@@ -62,7 +63,7 @@ function refreshButtons() {
 
 function setAccount(status, features = [], mfa = null) {
   signedIn = Boolean(status?.authenticated);
-  if (!signedIn && (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
+  if (!signedIn && (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   mfaRequired = !signedIn && mfa?.required === true;
   grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
   accountStatus.className = 'status ' + (signedIn ? 'ok' : mfaRequired ? 'warn' : '');
@@ -76,7 +77,7 @@ function setAccount(status, features = [], mfa = null) {
 function setCompanion(status) {
   companionState = status?.state || 'STOPPED';
   if (!['ACTIVE', 'DEGRADED'].includes(companionState) &&
-      (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
+      (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   const reason = status?.reason ? ` / ${status.reason}` : '';
   const warning = ['DEGRADED', 'LOCAL-ONLY', 'CONNECTING'].includes(companionState);
   const failed = companionState === 'OFFLINE';
@@ -138,7 +139,7 @@ function setVoice(status) {
   };
   if ((currentVoice.state !== 'READY' || currentVoice.consentGranted !== true ||
        currentVoice.sttAvailable !== true) &&
-      (voiceRecorder || voiceStream || voiceBusy)) cancelVoiceCapture();
+      (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   voiceConsent.checked = currentVoice.consentGranted === true;
   const state = String(currentVoice.state || 'UNAVAILABLE');
   const reason = currentVoice.reason ? ` / ${currentVoice.reason}` : '';
@@ -242,17 +243,44 @@ function blobToBase64(blob) {
   });
 }
 
-async function playFeedbackAudio(feedback) {
-  if (!feedback?.audioBase64 || feedback.contentType !== 'audio/wav') return;
+function stopVoiceFeedback() {
+  const playback = voiceFeedbackPlayback;
+  if (!playback) return;
+  voiceFeedbackPlayback = null;
+  try { playback.player.pause(); } catch { /* revoke even if the audio backend fails */ }
+  playback.cleanup();
+}
+
+async function playFeedbackAudio(feedback, epoch) {
+  if (!voiceCaptureStillAuthorized(epoch) || !feedback?.audioBase64 || feedback.contentType !== 'audio/wav') return;
   const binary = atob(feedback.audioBase64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  stopVoiceFeedback();
   const url = URL.createObjectURL(new Blob([bytes], { type: feedback.contentType }));
-  const player = new Audio(url);
-  const cleanup = () => URL.revokeObjectURL(url);
-  player.addEventListener('ended', cleanup, { once: true });
-  player.addEventListener('error', cleanup, { once: true });
-  try { await player.play(); } catch { cleanup(); }
+  let player;
+  try { player = new Audio(url); } catch {
+    URL.revokeObjectURL(url);
+    return;
+  }
+  let released = false;
+  const playback = { player, cleanup: () => {
+    if (released) return;
+    released = true;
+    if (voiceFeedbackPlayback === playback) voiceFeedbackPlayback = null;
+    URL.revokeObjectURL(url);
+  } };
+  voiceFeedbackPlayback = playback;
+  player.addEventListener('ended', playback.cleanup, { once: true });
+  player.addEventListener('error', playback.cleanup, { once: true });
+  try {
+    if (!voiceCaptureStillAuthorized(epoch)) { stopVoiceFeedback(); return; }
+    await player.play();
+    if (!voiceCaptureStillAuthorized(epoch) && voiceFeedbackPlayback === playback) stopVoiceFeedback();
+  } catch {
+    if (voiceFeedbackPlayback === playback) stopVoiceFeedback();
+    else playback.cleanup();
+  }
 }
 
 async function submitVoiceBlob(blob, epoch) {
@@ -279,7 +307,7 @@ async function submitVoiceBlob(blob, epoch) {
       ? 'Core accepted the presentation intent. No autonomous game action was performed.'
       : 'Core kept the request fail-closed: {code}.', { code: result.reasonCode });
   }
-  if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio);
+  if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio, epoch);
 }
 
 async function finalizeVoiceCapture(epoch, recorder) {
@@ -327,6 +355,8 @@ async function startVoiceCapture() {
 
   const epoch = voiceCaptureEpoch;
   if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
+  // Fresh press-to-talk supersedes the previous spoken response.
+  stopVoiceFeedback();
   voiceBusy = true;
   refreshButtons();
   let armed = false;
@@ -409,6 +439,7 @@ function stopVoiceCapture() {
 
 function cancelVoiceCapture() {
   voiceCaptureEpoch += 1;
+  stopVoiceFeedback();
   voiceHoldActive = false;
   clearVoiceTimer();
   voiceCaptureDiscarded = true;

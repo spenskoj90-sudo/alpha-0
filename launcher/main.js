@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { CompanionProcessManager } = require('./companion-process');
+const { revokeAccountBoundRuntime } = require('./account-lifecycle');
 const { OverlayPresentationStore, clearOverlayOnInactiveCompanion } = require('./overlay-state');
 const { KnowledgePresentation } = require('./knowledge-presentation');
 const {
@@ -208,6 +209,24 @@ const companion = new CompanionProcessManager({
   },
 });
 
+// New account identity must not inherit an old worker, game observer, cached
+// overlay recommendation, voice consent or asynchronous Core response.
+function clearAccountBoundary(reason) {
+  revokeAccountBoundRuntime({
+    session,
+    companion,
+    knowledge,
+    wowBridge,
+    overlayStore,
+    resetEvidence: () => {
+      wowCheckpointStatus = null;
+      companionRuntimeHealth = null;
+    },
+    resetVoice: resetVoiceState,
+    publishOverlay: publishOverlaySnapshot,
+  }, reason);
+}
+
 function configPath() { return path.join(app.getPath('userData'), 'games.json'); }
 function loadConfig() {
   try { return JSON.parse(fs.readFileSync(configPath(), 'utf8')); } catch { return {}; }
@@ -302,6 +321,9 @@ ipcMain.handle('game:launch', (_, id) => {
   spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref(); return true;
 });
 ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
+  // Deny stale account/worker activity at the start of the new login attempt,
+  // not after a response (which may be delayed, rejected or MFA-pending).
+  clearAccountBoundary('ACCOUNT_SWITCH');
   await session.login({ coreUrl, email, password });
   resetVoiceState(session.status ? 'VOICE_CONSENT_REQUIRED' : 'AUTHENTICATION_REQUIRED');
   return accountSnapshot();
@@ -312,8 +334,8 @@ ipcMain.handle('account:mfa-complete', async (_, code) => {
   return accountSnapshot();
 });
 ipcMain.handle('account:logout', () => {
-  knowledge?.logout();
-  wowBridge?.stop(); companion.stop('ACCOUNT_LOGOUT'); session.clear(); overlayStore.clear(); wowCheckpointStatus = null; companionRuntimeHealth = null; resetVoiceState('AUTHENTICATION_REQUIRED'); publishOverlaySnapshot(); return true;
+  clearAccountBoundary('ACCOUNT_LOGOUT');
+  return true;
 });
 ipcMain.handle('account:status', () => accountSnapshot());
 ipcMain.handle('companion:status', () => companion.status);

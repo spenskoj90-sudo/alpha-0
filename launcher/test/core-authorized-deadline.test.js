@@ -232,3 +232,57 @@ test('login also rejects malformed or oversized real streamed Core responses', a
   await assert.rejects(login(manager), /CORE_SIZE_INVALID/);
   assert.equal(manager.status, null);
 });
+
+test('Core accepts a finite empty stream chunk before a valid JSON response', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    let reads = 0;
+    return Promise.resolve(new Response(new ReadableStream({
+      pull(controller) {
+        if (reads++ === 0) controller.enqueue(new Uint8Array());
+        else {
+          controller.enqueue(new TextEncoder().encode('{"features":["companion"]}'));
+          controller.close();
+        }
+      },
+    }), { status: 200 }));
+  });
+  await login(manager);
+  assert.deepEqual(await manager.featureStatus(), { features: ['companion'] });
+});
+
+test('Core rejects a stream with repeated zero-progress chunks without waiting on a timer', async () => {
+  let cancelled = false;
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    let emptyChunks = 0;
+    return Promise.resolve(new Response(new ReadableStream({
+      pull(controller) {
+        if (++emptyChunks <= 33) controller.enqueue(new Uint8Array());
+        else {
+          controller.enqueue(new TextEncoder().encode('{"features":["companion"]}'));
+          controller.close();
+        }
+      },
+      cancel() { cancelled = true; },
+    }), { status: 200 }));
+  }, 200);
+  await login(manager);
+  await assert.rejects(manager.featureStatus(), /CORE_RESPONSE_INVALID/);
+  assert.equal(cancelled, true);
+});
+
+test('Core caps tiny streamed reads even when total bytes remain below the size limit', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    let emitted = 0;
+    return Promise.resolve(new Response(new ReadableStream({
+      pull(controller) {
+        if (emitted++ < 32769) controller.enqueue(new Uint8Array([32]));
+        else controller.close();
+      },
+    }), { status: 200 }));
+  }, 2000);
+  await login(manager);
+  await assert.rejects(manager.featureStatus(), /CORE_RESPONSE_INVALID/);
+});

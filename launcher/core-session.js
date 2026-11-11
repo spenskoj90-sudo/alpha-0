@@ -90,21 +90,33 @@ async function readBounded(response, limit, signal, errorKind = 'KNOWLEDGE') {
   }
   const chunks = [];
   let length = 0;
+  let reads = 0;
+  let emptyReads = 0;
+  let complete = false;
   const reader = response.body.getReader();
   try {
-  while (true) {
-    const { done, value } = await abortable(() => reader.read(), signal);
-    if (done) break;
-    length += value.byteLength;
-    if (length > limit) {
-      void reader.cancel().catch(() => {});
-      throw new Error(`${errorKind}_SIZE_INVALID`);
+    while (true) {
+      // A malicious stream can resolve read() indefinitely without yielding
+      // the event loop to the wall-clock timeout. Bound *read operations* as
+      // well as bytes and reject repeated zero-progress chunks.
+      if (++reads > 32768) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+      const { done, value } = await abortable(() => reader.read(), signal);
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+      if (value.byteLength === 0) {
+        if (++emptyReads > 32) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+        continue;
+      }
+      length += value.byteLength;
+      if (length > limit) throw new Error(`${errorKind}_SIZE_INVALID`);
+      chunks.push(Buffer.from(value));
     }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, length);
+    complete = true;
+    return Buffer.concat(chunks, length);
   } finally {
-    if (signal?.aborted) void reader.cancel().catch(() => {});
+    // Every failed / incomplete response releases its reader and transport.
+    // A completed body needs no additional network cancellation.
+    if (!complete || signal?.aborted) void reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }

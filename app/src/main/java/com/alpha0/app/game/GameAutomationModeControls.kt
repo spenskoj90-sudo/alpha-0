@@ -34,6 +34,7 @@ internal fun GameAutomationModeControls(
     decision: GameAutomationModeDecision,
     preview: GameAutomationModeDecision,
     stopLatched: Boolean,
+    canResetStop: Boolean,
     onEnable: () -> Unit,
     onResetStop: () -> Unit,
 ) {
@@ -131,10 +132,17 @@ internal fun GameAutomationModeControls(
                     modifier = Modifier.testTag("game-automation-stop-latched"),
                     color = MaterialTheme.colorScheme.error,
                 )
+                if (!canResetStop) {
+                    Text(
+                        strings.text("game_automation_reset_requires_new_capture"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 SecondaryButton(
                     strings.text("game_automation_reset_stop"),
                     onResetStop,
                     Modifier.fillMaxWidth().testTag("game-automation-reset-stop"),
+                    enabled = canResetStop,
                 )
             }
         }

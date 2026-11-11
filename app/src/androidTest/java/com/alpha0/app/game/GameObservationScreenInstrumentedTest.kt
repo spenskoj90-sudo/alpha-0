@@ -41,10 +41,11 @@ class GameObservationScreenInstrumentedTest {
     }
 
     @Test fun automationModesStayOffUntilExactTargetAndSourceEvidenceExist() {
+        val latch = GameAutomationStopLatch()
         compose.setContent {
             SentinelTheme(AppThemeMode.LIGHT) {
                 GameObservationPanel(StockGameInstall("fixture", 1), GameObservationViewState(), true, false, false, 100,
-                    {}, {}, {}, {})
+                    {}, {}, {}, {}, automationStopLatch = latch)
             }
         }
         compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
@@ -57,6 +58,7 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-automation-stop").assertIsDisplayed().performClick()
         compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("game-automation-stop-latched").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
     }
 
     @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {

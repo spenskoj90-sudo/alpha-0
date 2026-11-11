@@ -277,6 +277,7 @@ internal fun GameObservationPanel(
     binaryEvidence: GameBinaryEvidence.Status = GameBinaryEvidence.Status.NOT_CHECKED,
     binaryChecking: Boolean = false,
     onVerifyBinary: () -> Unit = {},
+    automationStopLatch: GameAutomationStopLatch = GameAutomationStopRuntime.latch,
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
@@ -296,11 +297,17 @@ internal fun GameObservationPanel(
     var expectedMaximum by remember(campaignId) { mutableStateOf("") }
     var sampleCount by remember(campaignId) { mutableStateOf(campaign.count) }
     var calibrationMessage by remember(campaignId) { mutableStateOf("") }
-    var desiredAutomationMode by remember { mutableStateOf(GameAutomationMode.OFF) }
-    var automationEnabled by remember { mutableStateOf(false) }
-    var automationRiskAcknowledged by remember { mutableStateOf(false) }
-    var automationRulesReviewed by remember { mutableStateOf(false) }
-    var automationStopLatched by remember { mutableStateOf(false) }
+    // Every acknowledgement is bound to the installed game identity and capture
+    // generation. Changing a package version, signer or capture resets all choices.
+    val automationScope = remember(captureGame, observation.captureId) {
+        ShatteredGameProfile.GAME_ID to (captureGame to observation.captureId)
+    }
+    var desiredAutomationMode by remember(automationScope) { mutableStateOf(GameAutomationMode.OFF) }
+    var automationEnabled by remember(automationScope) { mutableStateOf(false) }
+    var automationRiskAcknowledged by remember(automationScope) { mutableStateOf(false) }
+    var automationRulesReviewed by remember(automationScope) { mutableStateOf(false) }
+    val stopState by automationStopLatch.state.collectAsStateWithLifecycle()
+    val automationStopLatched = stopState.latched
     val automationEvidence = GameAutomationEvidence(
         riskAcknowledged = automationRiskAcknowledged,
         operatorRulesReviewed = automationRulesReviewed,
@@ -332,7 +339,7 @@ internal fun GameObservationPanel(
             if (event == Lifecycle.Event.ON_STOP) {
                 automationEnabled = false
                 desiredAutomationMode = GameAutomationMode.OFF
-                automationStopLatched = true
+                automationStopLatch.stop(observation.captureId)
                 automationRiskAcknowledged = false
                 automationRulesReviewed = false
             }
@@ -365,7 +372,7 @@ internal fun GameObservationPanel(
                     {
                         automationEnabled = false
                         desiredAutomationMode = GameAutomationMode.OFF
-                        automationStopLatched = true
+                        automationStopLatch.stop(observation.captureId)
                         automationRiskAcknowledged = false
                         automationRulesReviewed = false
                     },
@@ -373,7 +380,12 @@ internal fun GameObservationPanel(
                 )
                 if (active) {
                     DangerButton(
-                        strings.text("game_capture_stop"), onStop,
+                        strings.text("game_capture_stop"), {
+                            automationStopLatch.stop(observation.captureId)
+                            automationEnabled = false
+                            desiredAutomationMode = GameAutomationMode.OFF
+                            onStop()
+                        },
                         Modifier.fillMaxWidth().testTag("game-capture-stop"),
                     )
                 }
@@ -453,8 +465,13 @@ internal fun GameObservationPanel(
             decision = automationDecision,
             preview = automationPreview,
             stopLatched = automationStopLatched,
-            onEnable = { if (automationPreview.canEnable) automationEnabled = true },
-            onResetStop = { automationStopLatched = false },
+            canResetStop = automationStopLatch.canResetForNewCapture(observation.captureId),
+            onEnable = {
+                if (!automationStopLatch.state.value.latched && automationPreview.canEnable) {
+                    automationEnabled = true
+                }
+            },
+            onResetStop = { automationStopLatch.resetForNewCapture(observation.captureId) },
         )
         SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

@@ -29,6 +29,8 @@ object GameObservationRuntime {
     }
 
     internal fun stop(reason: String) {
+        // Revoke any action authority before the capture generation is cleared.
+        GameAutomationStopRuntime.latch.stop(session.snapshot.captureId)
         com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
         session.stop(reason)
         calibration.clear()

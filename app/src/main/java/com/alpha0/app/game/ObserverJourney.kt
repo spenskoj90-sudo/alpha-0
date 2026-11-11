@@ -36,3 +36,51 @@ internal fun observerNextStep(
     !consent -> ObserverNextStep.CONSENT
     else -> ObserverNextStep.CHOOSE_SOURCE
 }
+
+
+/** UI-only classification of OCR evidence, never game-health truth or action authority.
+ * Historical OCR can remain in diagnostics after the app becomes hidden; it must
+ * not be relabelled as live when recognition misses or the clock moves backwards.
+ */
+internal enum class HudEvidenceState { UNKNOWN, RECENT_UNVERIFIED, HISTORICAL }
+
+internal fun hudEvidenceState(snapshot: ObservationSnapshot, now: Long): HudEvidenceState {
+    if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED) ||
+        snapshot.captureId.isNullOrBlank() || now < 0) return HudEvidenceState.UNKNOWN
+    val last = snapshot.lastHealth ?: return HudEvidenceState.UNKNOWN
+    if (last.observedAt < 0 || now < last.observedAt) return HudEvidenceState.UNKNOWN
+    // Recent evidence requires one fully completed callback for the current frame,
+    // including coherent capture/completion clocks. Displayed values alone do not
+    // prove a callback happened (nor do these checks attest the selected game).
+    val timing = CalibrationSamplingGate.timing(snapshot, now)
+    val fresh = snapshot.status == ObservationStatus.OBSERVING &&
+        snapshot.health == last.candidate && snapshot.lastRecognizedFrameAt == last.observedAt &&
+        snapshot.lastFrameAt == last.observedAt &&
+        snapshot.lastCompletedFrameAt == last.observedAt &&
+        timing != null && timing.frameAgeMs <= 5000L
+    return if (fresh) HudEvidenceState.RECENT_UNVERIFIED else HudEvidenceState.HISTORICAL
+}
+
+
+/** Display-only cause of a stopped diagnostic capture, never permission to retry.
+ * The service/session already failed closed; this only makes the reason visible.
+ * Unknown termination reasons must not be presented as an intentional user Stop.
+ */
+internal data class ObserverStopNotice(val stringKey: String, val urgent: Boolean)
+
+internal fun observerStopNotice(snapshot: ObservationSnapshot): ObserverStopNotice? {
+    if (snapshot.status != ObservationStatus.STOPPED && snapshot.status != ObservationStatus.FAILED)
+        return null
+    return when (snapshot.reason) {
+        "USER_STOP" -> if (snapshot.status == ObservationStatus.STOPPED) null
+            else ObserverStopNotice("game_capture_failed", true)
+        "CONSENT_CANCELLED" -> ObserverStopNotice("game_capture_cancelled", false)
+        "TIME_LIMIT" -> ObserverStopNotice("game_capture_time_limit", false)
+        "CAPTURE_REVOKED" -> ObserverStopNotice("game_capture_revoked", true)
+        "SCREEN_LOCKED", "TASK_REMOVED" -> ObserverStopNotice("game_capture_background_stop", true)
+        "SESSION_CLOSED", "SESSION_CHECK_FAILED", "SESSION_CHECK_TIMEOUT",
+        "SESSION_OR_GAME_UNAVAILABLE", "GAME_CHANGED" ->
+            ObserverStopNotice("game_capture_session_stop", true)
+        else -> ObserverStopNotice("game_capture_failed", true)
+    }
+}

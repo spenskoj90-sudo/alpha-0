@@ -6,6 +6,8 @@ const { URL } = require('node:url');
 const KNOWLEDGE_MAX_BYTES = 262144;
 const KNOWLEDGE_MAX_JSON_BYTES = 4 * Math.ceil(KNOWLEDGE_MAX_BYTES / 3) + 4096;
 const KNOWLEDGE_TIMEOUT_MS = 10000;
+const CORE_REQUEST_TIMEOUT_MS = 15000;
+const CORE_REQUEST_MAX_TIMEOUT_MS = 30000;
 const KNOWLEDGE_PROFILE_KEYS = ['game', 'platform', 'patch', 'environment', 'profile'];
 const DIGEST = /^[0-9a-f]{64}$/;
 
@@ -124,14 +126,21 @@ class CoreSessionManager {
   // Invalidates async login/MFA replies that arrive after Logout or a newer attempt.
   #authGeneration = 0;
   #knowledgeControllers = new Set();
+  #authorizedControllers = new Set();
   #refreshFlight = null;
   #knowledgeTimeoutMs;
+  #coreTimeoutMs;
 
-  constructor({ fetchImpl = globalThis.fetch, knowledgeTimeoutMs = KNOWLEDGE_TIMEOUT_MS } = {}) {
+  constructor({ fetchImpl = globalThis.fetch, knowledgeTimeoutMs = KNOWLEDGE_TIMEOUT_MS,
+    coreTimeoutMs = CORE_REQUEST_TIMEOUT_MS } = {}) {
     if (typeof fetchImpl !== 'function') throw new Error('FETCH_UNAVAILABLE');
     if (!Number.isInteger(knowledgeTimeoutMs) || knowledgeTimeoutMs < 1 || knowledgeTimeoutMs > KNOWLEDGE_TIMEOUT_MS) {
       throw new Error('KNOWLEDGE_TIMEOUT_INVALID');
     }
+    if (!Number.isInteger(coreTimeoutMs) || coreTimeoutMs < 1 || coreTimeoutMs > CORE_REQUEST_MAX_TIMEOUT_MS) {
+      throw new Error('CORE_TIMEOUT_INVALID');
+    }
+    this.#coreTimeoutMs = coreTimeoutMs;
     this.#knowledgeTimeoutMs = knowledgeTimeoutMs;
     this.#fetch = fetchImpl;
   }
@@ -322,6 +331,9 @@ class CoreSessionManager {
     this.#authGeneration += 1;
     this.#sessionEpoch += 1;
     this.cancelKnowledge();
+    // Logout/account replacement cancels outstanding feature/voice requests too.
+    for (const controller of this.#authorizedControllers) controller.abort(new Error('SESSION_CHANGED'));
+    this.#authorizedControllers.clear();
     this.#session = null;
     this.#coreUrl = null;
     this.#mfaChallenge = null;
@@ -333,29 +345,57 @@ class CoreSessionManager {
     const rid = requestId();
     const epoch = this.#sessionEpoch;
     const origin = this.#coreUrl;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    this.#authorizedControllers.add(controller);
+    // One total deadline covers the initial request, one-use token rotation,
+    // retry and JSON decoding. The network can never keep Voice/Account busy
+    // forever, even if an injected transport ignores AbortSignal.
+    const timer = setTimeout(() => controller.abort(
+      new DOMException('Core request deadline', 'TimeoutError'),
+    ), this.#coreTimeoutMs);
+    const ensureCurrent = () => {
+      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl || !this.accessToken) {
+        throw new Error('SESSION_CHANGED');
+      }
+      signal.throwIfAborted();
+    };
     const send = () => {
-      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
+      ensureCurrent();
       const headers = { Authorization: `Bearer ${this.accessToken}`, 'X-Request-ID': rid };
-      const init = { method, headers };
+      const init = { method, headers, redirect: 'error', cache: 'no-store', signal };
       if (body !== null) {
         headers['content-type'] = 'application/json';
         init.body = JSON.stringify(body);
       }
-      return this.#fetch(`${this.#coreUrl}${path}`, init);
+      return abortable(() => this.#fetch(`${origin}${path}`, init), signal);
     };
 
-    const attemptedAccess = this.accessToken;
-    let response = await send();
-    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
-    if (response.status === 401 && this.refreshToken) {
-      // Another caller may already have rotated the same one-use token.
-      if (this.accessToken === attemptedAccess) await this.refresh(rid);
-      response = await send();
+    try {
+      const attemptedAccess = this.accessToken;
+      let response = await send();
+      ensureCurrent();
+      if (response.status === 401 && this.refreshToken) {
+        // A concurrent caller may have already rotated this one-use token.
+        if (this.accessToken === attemptedAccess) await this.refresh(rid, { signal });
+        ensureCurrent();
+        response = await send();
+      }
+      const payload = await abortable(() => readJson(response), signal);
+      ensureCurrent();
+      if (!response.ok) throw new Error(errorCode(payload, fallback));
+      return payload;
+    } catch (error) {
+      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
+      if (signal.aborted && signal.reason?.name === 'TimeoutError') {
+        throw new Error('CORE_REQUEST_TIMEOUT');
+      }
+      if (signal.aborted) throw new Error('SESSION_CHANGED');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      this.#authorizedControllers.delete(controller);
     }
-    const payload = await readJson(response);
-    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
-    if (!response.ok) throw new Error(errorCode(payload, fallback));
-    return payload;
   }
 
   #requireKnowledgeOrigin() {

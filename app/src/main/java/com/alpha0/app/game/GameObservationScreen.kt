@@ -128,8 +128,11 @@ fun GameObservationScreen() {
         consent = false
         acknowledgedSession = null
     }
-    LaunchedEffect(state.observation.lastHealth?.observedAt) {
-        while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
+    LaunchedEffect(state.observation.lastHealth?.observedAt, browserSelected) {
+        // No Shattered HUD timer runs while the distinct browser profile is selected.
+        if (!browserSelected) {
+            while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
+        }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val wasPending = pending
@@ -147,7 +150,7 @@ fun GameObservationScreen() {
         val currentInstall = ShatteredGameProfile.installed(context)
         val session = runCatching { SecureSessionStore().load(context) }.getOrNull()
         when {
-            !wasPending -> GameObservationRuntime.stop("CONSENT_CANCELLED")
+            !wasPending || browserSelected -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             !GameInstallFence.matches(expectedName, expectedVersion, expectedSigner, currentInstall) ||
                 !CaptureSessionFence.isCurrent(expectedSession, session?.deviceId, session?.epoch) ->
@@ -176,6 +179,19 @@ fun GameObservationScreen() {
     }
     GameObservationPanel(
         onOpenBrowserProfile = {
+            // Invalidate the in-flight system chooser and APK verification before
+            // changing games. A late chooser result must not start Shattered capture.
+            pending = false
+            pendingSession = null
+            pendingVersion = null
+            pendingVersionName = null
+            pendingSigner = null
+            acknowledgedSession = null
+            consent = false
+            binaryJob?.cancel()
+            binaryJob = null
+            binaryChecking = false
+            binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
             // Switching games revokes capture and action authority before displaying
             // LastHavens. Shattered OCR and calibration must never be cross-labelled.
             GameObservationService.stop(context, "GAME_CHANGED")
@@ -190,7 +206,7 @@ fun GameObservationScreen() {
             val expected = installed
             // Never overlap APK hashing with a pending or active screen capture.
             val observedStatus = GameObservationRuntime.state.value.observation.status
-            if (expected != null && !binaryChecking && !pending &&
+            if (!browserSelected && expected != null && !binaryChecking && !pending &&
                 observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
             ) {
                 binaryChecking = true
@@ -230,7 +246,7 @@ fun GameObservationScreen() {
             // A stale UI callback must not request a second projection while
             // consent is pending or an observation session is already active.
             val liveStatus = GameObservationRuntime.state.value.observation.status
-            if (!pending && liveStatus !in setOf(
+            if (!browserSelected && !pending && liveStatus !in setOf(
                     ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED,
                 )
             ) {

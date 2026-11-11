@@ -8,8 +8,9 @@ const {
   documentUrl, isLocalDocument, assertMainFrameRequest, restrictAppWindowNavigation,
 } = require('../renderer-boundary');
 
-const trusted = 'file:///opt/SENTINEL%20Companion/index.html';
-const overlay = 'file:///opt/SENTINEL%20Companion/overlay.html';
+const fixtureDir = path.resolve('SENTINEL Companion');
+const trusted = documentUrl(fixtureDir, 'index.html');
+const overlay = documentUrl(fixtureDir, 'overlay.html');
 
 function fixture(url = trusted) {
   const mainFrame = { url };
@@ -19,7 +20,8 @@ function fixture(url = trusted) {
 }
 
 test('packaged file URI permits only the exact local document and optional fragment', () => {
-  assert.equal(documentUrl('/opt/SENTINEL Companion', 'index.html'), trusted);
+  assert.match(trusted, /\/SENTINEL%20Companion\/index\.html$/);
+  assert.equal(documentUrl(fixtureDir, 'index.html'), trusted);
   for (const url of [trusted, trusted + '#games', trusted + '#main-content']) {
     assert.equal(isLocalDocument(url, trusted), true, url);
   }

@@ -22,6 +22,7 @@ internal enum class GameAutomationGateReason(val stringKey: String) {
     CALIBRATION_UNVERIFIED("game_automation_gate_calibration_unverified"),
     KNOWLEDGE_UNREVIEWED("game_automation_gate_knowledge_unreviewed"),
     OPERATOR_RESTRICTS_AUTOMATION("game_automation_gate_operator_restricts"),
+    EXECUTOR_UNAVAILABLE("game_automation_gate_executor_unavailable"),
     ACTION_BINDING_UNVERIFIED("game_automation_gate_action_binding_unverified"),
     ACTION_CONSENT_REQUIRED("game_automation_gate_action_consent_required"),
     ARM_REQUIRED("game_automation_gate_arm_required"),
@@ -39,6 +40,7 @@ internal data class GameAutomationEvidence(
     val observationFresh: Boolean = false,
     val calibrationApproved: Boolean = false,
     val knowledgeReviewed: Boolean = false,
+    val executorAvailable: Boolean = false,
     val actionBindingVerified: Boolean = false,
     val actionConsent: Boolean = false,
     val armActive: Boolean = false,
@@ -100,6 +102,7 @@ internal object GameAutomationModePolicy {
                 requestedMode == GameAutomationMode.BOUNDED_ACTIVE
             ) {
                 if (!evidence.operatorAllowsAutomation) add(GameAutomationGateReason.OPERATOR_RESTRICTS_AUTOMATION)
+                if (!evidence.executorAvailable) add(GameAutomationGateReason.EXECUTOR_UNAVAILABLE)
                 if (!evidence.actionBindingVerified) add(GameAutomationGateReason.ACTION_BINDING_UNVERIFIED)
                 if (!evidence.actionConsent) add(GameAutomationGateReason.ACTION_CONSENT_REQUIRED)
             }

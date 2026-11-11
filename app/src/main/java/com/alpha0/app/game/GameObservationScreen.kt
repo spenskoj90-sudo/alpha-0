@@ -307,6 +307,7 @@ internal fun GameObservationPanel(
         // No trusted provider currently attests the selected game window, source,
         // operator permission, calibration or action-grade binding.
         operatorAllowsAutomation = false,
+        executorAvailable = false,
         targetVerified = false,
         sourceVerified = false,
         observationFresh = false,

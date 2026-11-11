@@ -48,6 +48,7 @@ class GameAutomationModePolicyTest {
     @Test fun userConfirmedRequiresOperatorPermissionActionBindingAndPerActionConsent() {
         val evidence = verifiedReadOnlyEvidence().copy(
             operatorAllowsAutomation = true,
+            executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
         )
@@ -62,6 +63,7 @@ class GameAutomationModePolicyTest {
     @Test fun userConfirmedCannotOverrideOperatorRestrictionOrMissingActionConsent() {
         val evidence = verifiedReadOnlyEvidence().copy(
             operatorAllowsAutomation = false,
+            executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = false,
         )
@@ -77,6 +79,7 @@ class GameAutomationModePolicyTest {
     @Test fun boundedRequiresFreshArmLeaseAllowlistAndBudgets() {
         val evidence = verifiedReadOnlyEvidence().copy(
             operatorAllowsAutomation = true,
+            executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
             armActive = true,
@@ -95,6 +98,7 @@ class GameAutomationModePolicyTest {
     @Test fun stopLatchOverridesEveryRequestedMode() {
         val evidence = verifiedReadOnlyEvidence().copy(
             operatorAllowsAutomation = true,
+            executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
             armActive = true,

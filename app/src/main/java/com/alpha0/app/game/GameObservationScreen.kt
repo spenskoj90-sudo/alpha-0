@@ -1,6 +1,8 @@
 package com.alpha0.app.game
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.SystemClock
@@ -69,6 +71,7 @@ import com.alpha0.app.knowledge.KnowledgeViewState
 fun GameObservationScreen() {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var browserSelected by remember { mutableStateOf(false) }
     var installed by remember { mutableStateOf(ShatteredGameProfile.installed(context)) }
     val state by GameObservationRuntime.state.collectAsStateWithLifecycle()
     val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
@@ -155,7 +158,29 @@ fun GameObservationScreen() {
     val captureSupported = ObservationCapturePolicy.supports(
         BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT,
     )
+    if (browserSelected) {
+        BrowserGameObservationPanel(
+            onReturnToShattered = { browserSelected = false },
+            onOpenOfficialUrl = { url ->
+                // Opening the external browser conveys no tab/source identity to SENTINEL.
+                GameAutomationStopRuntime.latch.stop(GameObservationRuntime.state.value.observation.captureId)
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            .addCategory(Intent.CATEGORY_BROWSABLE),
+                    )
+                }.isSuccess
+            },
+        )
+        return
+    }
     GameObservationPanel(
+        onOpenBrowserProfile = {
+            // Switching games revokes capture and action authority before displaying
+            // LastHavens. Shattered OCR and calibration must never be cross-labelled.
+            GameObservationService.stop(context, "GAME_CHANGED")
+            browserSelected = true
+        },
         installed = installed,
         state = state,
         knowledge = knowledge,
@@ -278,6 +303,7 @@ internal fun GameObservationPanel(
     binaryChecking: Boolean = false,
     onVerifyBinary: () -> Unit = {},
     automationStopLatch: GameAutomationStopLatch = GameAutomationStopRuntime.latch,
+    onOpenBrowserProfile: (() -> Unit)? = null,
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
@@ -397,6 +423,13 @@ internal fun GameObservationPanel(
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(strings.text("game_observer_title"), style = MaterialTheme.typography.headlineLarge)
+        if (onOpenBrowserProfile != null) {
+            SecondaryButton(
+                strings.text("game_browser_profile_open"),
+                onOpenBrowserProfile,
+                Modifier.fillMaxWidth().testTag("game-browser-select"),
+            )
+        }
         Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleLarge)
         Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         SentinelCard(kind = SentinelCardKind.CONTENT) {

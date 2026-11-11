@@ -37,12 +37,13 @@ internal fun GameAutomationModeControls(
     canResetStop: Boolean,
     onEnable: () -> Unit,
     onResetStop: () -> Unit,
+    scopeKey: String = "game_automation_scope",
 ) {
     val strings = LocalAppStrings.current
     SentinelCard(kind = SentinelCardKind.CONTENT) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(strings.text("game_automation_title"), style = MaterialTheme.typography.titleMedium)
-            Text(strings.text("game_automation_scope"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.text(scopeKey), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(strings.text("game_automation_risk"), color = MaterialTheme.colorScheme.error)
             GameAutomationMode.entries.forEach { mode ->
                 Row(

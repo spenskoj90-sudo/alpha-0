@@ -392,7 +392,28 @@ class AndroidProductShellTests(unittest.TestCase):
         end = screen.index("        onStop =", start)
         request = screen[start:end]
         self.assertIn("val liveStatus = GameObservationRuntime.state.value.observation.status", request)
-        self.assertIn("if (!pending && liveStatus !in setOf(", request)
+        self.assertIn("if (!browserSelected && !pending && liveStatus !in setOf(", request)
+        self.assertIn(
+            '!wasPending || browserSelected -> GameObservationRuntime.stop("CONSENT_CANCELLED")',
+            screen,
+        )
+        # A pending projection result must be invalidated before a profile
+        # switch can display another game, never merely renamed as a new source.
+        transition = screen[screen.index("        onOpenBrowserProfile = {"):]
+        transition = transition[:transition.index("        installed = installed,")]
+        for cleared in (
+            "pending = false", "pendingSession = null", "pendingVersion = null",
+            "pendingVersionName = null", "pendingSigner = null",
+            "acknowledgedSession = null", "consent = false", "binaryJob?.cancel()",
+        ):
+            self.assertIn(cleared, transition)
+            self.assertLess(transition.index(cleared), transition.index(
+                'GameObservationService.stop(context, "GAME_CHANGED")'
+            ))
+        self.assertLess(
+            transition.index('GameObservationService.stop(context, "GAME_CHANGED")'),
+            transition.index("browserSelected = true"),
+        )
         self.assertIn("!ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current)", request)
         self.assertIn("installed = current", request)
         self.assertLess(request.index("canRequestConsent("),

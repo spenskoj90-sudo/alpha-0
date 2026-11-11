@@ -40,6 +40,25 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithText("Review defense").assertDoesNotExist()
     }
 
+    @Test fun automationModesStayOffUntilExactTargetAndSourceEvidenceExist() {
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-mode-bounded_active").performScrollTo().performClick()
+        compose.onNodeWithTag("game-automation-risk-ack").performScrollTo().performClick()
+        compose.onNodeWithTag("game-automation-rules-reviewed").performScrollTo().performClick()
+        compose.onNodeWithText("Exact game target/profile is not verified", substring = true)
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-enable").assertIsNotEnabled()
+        compose.onNodeWithTag("game-automation-stop").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-stop-latched").performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {
         val install = StockGameInstall("fixture", 1)
         GameObservationRuntime.calibration.clear()

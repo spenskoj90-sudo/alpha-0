@@ -296,6 +296,50 @@ internal fun GameObservationPanel(
     var expectedMaximum by remember(campaignId) { mutableStateOf("") }
     var sampleCount by remember(campaignId) { mutableStateOf(campaign.count) }
     var calibrationMessage by remember(campaignId) { mutableStateOf("") }
+    var desiredAutomationMode by remember { mutableStateOf(GameAutomationMode.OFF) }
+    var automationEnabled by remember { mutableStateOf(false) }
+    var automationRiskAcknowledged by remember { mutableStateOf(false) }
+    var automationRulesReviewed by remember { mutableStateOf(false) }
+    var automationStopLatched by remember { mutableStateOf(false) }
+    val automationEvidence = GameAutomationEvidence(
+        riskAcknowledged = automationRiskAcknowledged,
+        operatorRulesReviewed = automationRulesReviewed,
+        // No trusted provider currently attests the selected game window, source,
+        // operator permission, calibration or action-grade binding.
+        operatorAllowsAutomation = false,
+        targetVerified = false,
+        sourceVerified = false,
+        observationFresh = false,
+        calibrationApproved = false,
+        knowledgeReviewed = false,
+        actionBindingVerified = false,
+        actionConsent = false,
+        armActive = false,
+        leaseValid = false,
+        allowlistApproved = false,
+        budgetsValid = false,
+        stopLatched = automationStopLatched,
+    )
+    val automationDecision = GameAutomationModePolicy.evaluate(
+        desiredAutomationMode, automationEnabled, automationEvidence,
+    )
+    val automationPreview = GameAutomationModePolicy.evaluate(
+        desiredAutomationMode, enabled = true, automationEvidence,
+    )
+    val automationLifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(automationLifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                automationEnabled = false
+                desiredAutomationMode = GameAutomationMode.OFF
+                automationStopLatched = true
+                automationRiskAcknowledged = false
+                automationRulesReviewed = false
+            }
+        }
+        automationLifecycle.addObserver(observer)
+        onDispose { automationLifecycle.removeObserver(observer) }
+    }
     val nextStep = observerNextStep(
         installed = installed != null,
         supported = supported,
@@ -310,14 +354,29 @@ internal fun GameObservationPanel(
     // The foreground notification/system capture controls remain additional Stop routes.
     Scaffold(
         bottomBar = {
-            if (active) {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Automation Stop is always reachable independently of scroll position.
                 DangerButton(
-                    strings.text("game_capture_stop"), onStop,
-                    // Keep emergency Stop above gesture/navigation bars and the numeric IME
-                    // while the user is comparing a captured HUD value.
-                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
-                        .padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
+                    strings.text("game_automation_stop"),
+                    {
+                        automationEnabled = false
+                        desiredAutomationMode = GameAutomationMode.OFF
+                        automationStopLatched = true
+                        automationRiskAcknowledged = false
+                        automationRulesReviewed = false
+                    },
+                    Modifier.fillMaxWidth().testTag("game-automation-stop"),
                 )
+                if (active) {
+                    DangerButton(
+                        strings.text("game_capture_stop"), onStop,
+                        Modifier.fillMaxWidth().testTag("game-capture-stop"),
+                    )
+                }
             }
         },
     ) { contentPadding ->
@@ -381,6 +440,22 @@ internal fun GameObservationPanel(
                 }
             }
         }
+        GameAutomationModeControls(
+            desiredMode = desiredAutomationMode,
+            onModeChange = { mode ->
+                desiredAutomationMode = mode
+                automationEnabled = false
+            },
+            riskAcknowledged = automationRiskAcknowledged,
+            onRiskAcknowledged = { automationRiskAcknowledged = it },
+            rulesReviewed = automationRulesReviewed,
+            onRulesReviewed = { automationRulesReviewed = it },
+            decision = automationDecision,
+            preview = automationPreview,
+            stopLatched = automationStopLatched,
+            onEnable = { if (automationPreview.canEnable) automationEnabled = true },
+            onResetStop = { automationStopLatched = false },
+        )
         SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val label = when (observation.status) {

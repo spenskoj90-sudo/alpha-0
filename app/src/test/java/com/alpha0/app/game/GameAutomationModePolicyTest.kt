@@ -47,7 +47,6 @@ class GameAutomationModePolicyTest {
 
     @Test fun userConfirmedRequiresOperatorPermissionActionBindingAndPerActionConsent() {
         val evidence = verifiedReadOnlyEvidence().copy(
-            operatorAllowsAutomation = true,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
@@ -60,25 +59,25 @@ class GameAutomationModePolicyTest {
         assertTrue(decision.maySendInput)
     }
 
-    @Test fun userConfirmedCannotOverrideOperatorRestrictionOrMissingActionConsent() {
+    @Test fun userConfirmedRequiresExplicitRiskAndRulesAcknowledgement() {
         val evidence = verifiedReadOnlyEvidence().copy(
-            operatorAllowsAutomation = false,
+            riskAcknowledged = false,
+            operatorRulesReviewed = false,
             executorAvailable = true,
             actionBindingVerified = true,
-            actionConsent = false,
+            actionConsent = true,
         )
         val decision = GameAutomationModePolicy.evaluate(
             GameAutomationMode.USER_CONFIRMED, enabled = true, evidence,
         )
         assertEquals(GameAutomationMode.OFF, decision.effectiveMode)
-        assertTrue(GameAutomationGateReason.OPERATOR_RESTRICTS_AUTOMATION in decision.reasons)
-        assertTrue(GameAutomationGateReason.ACTION_CONSENT_REQUIRED in decision.reasons)
+        assertTrue(GameAutomationGateReason.RISK_NOT_ACKNOWLEDGED in decision.reasons)
+        assertTrue(GameAutomationGateReason.OPERATOR_RULES_UNREVIEWED in decision.reasons)
         assertFalse(decision.maySendInput)
     }
 
     @Test fun boundedRequiresFreshArmLeaseAllowlistAndBudgets() {
         val evidence = verifiedReadOnlyEvidence().copy(
-            operatorAllowsAutomation = true,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
@@ -97,7 +96,6 @@ class GameAutomationModePolicyTest {
 
     @Test fun stopLatchOverridesEveryRequestedMode() {
         val evidence = verifiedReadOnlyEvidence().copy(
-            operatorAllowsAutomation = true,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,

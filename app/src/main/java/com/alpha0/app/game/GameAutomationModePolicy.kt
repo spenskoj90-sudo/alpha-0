@@ -21,7 +21,6 @@ internal enum class GameAutomationGateReason(val stringKey: String) {
     OBSERVATION_STALE("game_automation_gate_observation_stale"),
     CALIBRATION_UNVERIFIED("game_automation_gate_calibration_unverified"),
     KNOWLEDGE_UNREVIEWED("game_automation_gate_knowledge_unreviewed"),
-    OPERATOR_RESTRICTS_AUTOMATION("game_automation_gate_operator_restricts"),
     EXECUTOR_UNAVAILABLE("game_automation_gate_executor_unavailable"),
     ACTION_BINDING_UNVERIFIED("game_automation_gate_action_binding_unverified"),
     ACTION_CONSENT_REQUIRED("game_automation_gate_action_consent_required"),
@@ -34,7 +33,6 @@ internal enum class GameAutomationGateReason(val stringKey: String) {
 internal data class GameAutomationEvidence(
     val riskAcknowledged: Boolean = false,
     val operatorRulesReviewed: Boolean = false,
-    val operatorAllowsAutomation: Boolean = false,
     val targetVerified: Boolean = false,
     val sourceVerified: Boolean = false,
     val observationFresh: Boolean = false,
@@ -63,7 +61,7 @@ internal data class GameAutomationModeDecision(
 
 /**
  * Pure fail-closed policy. The caller supplies evidence from trusted sources;
- * UI acknowledgements alone never establish target/source/operator permission.
+ * UI acknowledgements alone never establish target/source/action/executor proof.
  */
 internal object GameAutomationModePolicy {
     fun evaluate(
@@ -101,7 +99,6 @@ internal object GameAutomationModePolicy {
             if (requestedMode == GameAutomationMode.USER_CONFIRMED ||
                 requestedMode == GameAutomationMode.BOUNDED_ACTIVE
             ) {
-                if (!evidence.operatorAllowsAutomation) add(GameAutomationGateReason.OPERATOR_RESTRICTS_AUTOMATION)
                 if (!evidence.executorAvailable) add(GameAutomationGateReason.EXECUTOR_UNAVAILABLE)
                 if (!evidence.actionBindingVerified) add(GameAutomationGateReason.ACTION_BINDING_UNVERIFIED)
                 if (!evidence.actionConsent) add(GameAutomationGateReason.ACTION_CONSENT_REQUIRED)

@@ -305,8 +305,7 @@ internal fun GameObservationPanel(
         riskAcknowledged = automationRiskAcknowledged,
         operatorRulesReviewed = automationRulesReviewed,
         // No trusted provider currently attests the selected game window, source,
-        // operator permission, calibration or action-grade binding.
-        operatorAllowsAutomation = false,
+        // calibration, reviewed knowledge or action-grade binding.
         executorAvailable = false,
         targetVerified = false,
         sourceVerified = false,

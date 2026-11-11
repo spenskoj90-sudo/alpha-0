@@ -23,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /** UI permission/state boundaries; not physical game or MediaProjection acceptance. */
 class GameObservationScreenInstrumentedTest {
@@ -118,7 +119,7 @@ class GameObservationScreenInstrumentedTest {
 
     @Test fun localGameBinaryCheckIsOptInAndNeverAuthorizesProjectedContent() {
         val status = mutableStateOf(GameBinaryEvidence.Status.NOT_CHECKED)
-        var clicks = 0
+        val clicks = AtomicInteger(0)
         compose.setContent {
             SentinelTheme(AppThemeMode.LIGHT) {
                 GameObservationPanel(
@@ -126,15 +127,21 @@ class GameObservationScreenInstrumentedTest {
                     GameObservationViewState(), true, false, false, 100,
                     {}, {}, {}, {},
                     binaryEvidence = status.value,
-                    onVerifyBinary = { clicks++ },
+                    onVerifyBinary = { clicks.incrementAndGet() },
                 )
             }
         }
         compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
             .assertTextContains("NOT CHECKED", substring = true)
         compose.onNodeWithTag("game-binary-check").performScrollTo()
+        // Scroll animations and delayed pointer delivery on slower API 34
+        // must finish before testing the *physical* click. No semantics
+        // bypass or assertion relaxation: require exactly one callback.
+        compose.waitForIdle()
+        compose.onNodeWithTag("game-binary-check")
             .assertIsDisplayed().assertIsEnabled().performClick()
-        compose.runOnIdle { assertEquals("local APK-check click callback count", 1, clicks) }
+        compose.waitUntil(timeoutMillis = 3000) { clicks.get() == 1 }
+        compose.runOnIdle { assertEquals("local APK-check click callback count", 1, clicks.get()) }
         compose.runOnIdle { status.value = GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID }
         compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
             .assertTextContains("Captured content remains UNVERIFIED.", substring = true)

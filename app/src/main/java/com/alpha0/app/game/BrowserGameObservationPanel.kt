@@ -107,9 +107,14 @@ internal fun BrowserGameObservationPanel(
             SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     StatusBadge(
-                        strings.text("game_browser_profile_blocked"),
+                        strings.text("game_browser_source_unverified"),
                         SentinelStatus.WARNING,
                         Modifier.testTag("game-browser-source-status"),
+                    )
+                    Text(
+                        strings.text("game_browser_profile_blocked"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("game-browser-source-detail"),
                     )
                     Text(strings.text("game_browser_profile_source"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(strings.text("game_browser_profile_rules"), color = MaterialTheme.colorScheme.error)

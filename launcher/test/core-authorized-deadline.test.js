@@ -108,3 +108,127 @@ test('invalid request-deadline parameters fail before any transport activity', (
     assert.throws(() => create(() => {}, value), /CORE_TIMEOUT_INVALID/);
   }
 });
+
+test('Core rejects oversized declared feature response before parsing body', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    return Promise.resolve(new Response('{"features":[]}', {
+      status: 200, headers: { 'content-length': String(4 * 1024 * 1024) },
+    }));
+  });
+  await login(manager);
+  await assert.rejects(manager.featureStatus(), /CORE_SIZE_INVALID/);
+});
+
+test('Core rejects a streamed oversized body without a declared content length', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    return Promise.resolve(new Response(new Uint8Array(3 * 1024 * 1024 + 1), { status: 200 }));
+  }, 2000);
+  await login(manager);
+  await assert.rejects(manager.voiceStatus(), /CORE_SIZE_INVALID/);
+});
+
+test('Core handles malformed streamed JSON as an explicit error', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    return Promise.resolve(new Response('not valid json', { status: 200 }));
+  });
+  await login(manager);
+  await assert.rejects(manager.featureStatus(), /CORE_RESPONSE_INVALID/);
+});
+
+test('Core parses a normal streamed JSON response', async () => {
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    return Promise.resolve(Response.json({ features: ['companion'] }));
+  });
+  await login(manager);
+  assert.deepEqual(await manager.featureStatus(), { features: ['companion'] });
+});
+
+test('Core releases unauthorized streamed body before one-use refresh retry', async () => {
+  let cancelled = false;
+  let lookups = 0;
+  const manager = create(url => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, credentials));
+    if (url.endsWith('/v1/sessions/refresh')) return Promise.resolve(reply(200, {
+      session_token: 'refreshed-access', refresh_token: 'refreshed-refresh',
+    }));
+    if (url.endsWith('/v1/billing/features')) {
+      if (++lookups === 1) return Promise.resolve({
+        status: 401, ok: false, body: { cancel: () => {
+          cancelled = true; return Promise.resolve();
+        } }, json: async () => ({ code: 'EXPIRED' }),
+      });
+      return Promise.resolve(reply(200, { features: ['companion'] }));
+    }
+    throw new Error('UNEXPECTED_ROUTE');
+  }, 200);
+  await login(manager);
+  assert.deepEqual(await manager.featureStatus(), { features: ['companion'] });
+  assert.equal(lookups, 2);
+  assert.equal(cancelled, true);
+  assert.equal(manager.accessToken, 'refreshed-access');
+});
+
+test('email login has finite deadline when authentication transport never resolves', async () => {
+  let signal;
+  const manager = create((_url, init) => {
+    signal = init.signal;
+    return new Promise(() => {});
+  }, 30);
+  await assert.rejects(login(manager), /CORE_REQUEST_TIMEOUT/);
+  assert.equal(signal.aborted, true);
+  assert.equal(manager.status, null);
+});
+
+test('MFA completion has a deadline without consuming the pending challenge', async () => {
+  let completionSignal;
+  const manager = create((url, init) => {
+    if (url.endsWith('/v1/auth/login')) {
+      return Promise.resolve(reply(200, {
+        mfa_required: true, challenge_token: 'c'.repeat(48),
+      }));
+    }
+    completionSignal = init.signal;
+    return new Promise(() => {});
+  }, 30);
+  await login(manager);
+  assert.equal(manager.mfaStatus.required, true);
+  await assert.rejects(manager.completeMfa('123456'), /CORE_REQUEST_TIMEOUT/);
+  assert.equal(completionSignal.aborted, true);
+  assert.equal(manager.mfaStatus.required, true);
+  assert.equal(manager.status, null);
+});
+
+test('logout revokes pending MFA even when the old provider ignores abort', async () => {
+  let completionSignal;
+  const manager = create((url, init) => {
+    if (url.endsWith('/v1/auth/login')) return Promise.resolve(reply(200, {
+      mfa_required: true, challenge_token: 'm'.repeat(48),
+    }));
+    completionSignal = init.signal;
+    return new Promise(() => {});
+  }, 200);
+  await login(manager);
+  const pending = manager.completeMfa('123456');
+  manager.clear();
+  await assert.rejects(pending, /SESSION_CHANGED/);
+  assert.equal(completionSignal.aborted, true);
+  assert.equal(manager.mfaStatus, null);
+});
+
+test('login also rejects malformed or oversized real streamed Core responses', async () => {
+  let count = 0;
+  const manager = create(() => {
+    ++count;
+    if (count === 1) return Promise.resolve(new Response('not json', { status: 200 }));
+    return Promise.resolve(new Response('{"hello":true}', {
+      status: 200, headers: { 'content-length': String(4 * 1024 * 1024) },
+    }));
+  });
+  await assert.rejects(login(manager), /CORE_RESPONSE_INVALID/);
+  await assert.rejects(login(manager), /CORE_SIZE_INVALID/);
+  assert.equal(manager.status, null);
+});

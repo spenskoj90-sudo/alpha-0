@@ -192,3 +192,19 @@ reviewed max frame age. Changed/dropped/expired frames, explicit source loss and
 adapter exceptions fail closed for the lease epoch; refresh cannot revive old
 advice. This does not attest the game/window: the shipped adapter still has no
 trusted binding or observation producer. No live advice or game action is enabled.
+
+## Reference-route Stop boundary (11.11.2026 / source-only)
+
+A shared MediaProjection session can remain active after the user navigates to
+Games → offline game reference. While WAITING, OBSERVING or PAUSED, this route
+now exposes the same persistent in-app emergency **Stop observation** as the
+observer screen, in a fixed inset-aware bottom bar outside the manual-rule
+scroll view. Its callback calls the existing `GameObservationService.stop`;
+the manual reference never starts screen capture or game input. Once stopped,
+the fixed action disappears and manual answers revert to UNKNOWN for the new
+epoch. The route remains read-only when observation is not active.
+
+A Compose instrumentation regression checks real pointer click dispatch exactly
+once, the disappearance of Stop after the callback and the absence of a capture
+start action. This does not prove physical phone/OEM behavior, game identity,
+actual Stop latency or Owner acceptance; those remain separate gates.

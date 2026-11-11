@@ -2,6 +2,7 @@ package com.alpha0.app.game
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -13,6 +14,8 @@ import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.SentinelTheme
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Read-only reference UI, not a real player or MediaProjection proof. */
 class GameReferenceScreenInstrumentedTest {
@@ -71,5 +74,35 @@ class GameReferenceScreenInstrumentedTest {
         compose.onNodeWithTag("game-manual-burn-result").performScrollTo()
             .assertTextContains("requires", substring = true)
         compose.onNodeWithTag("game-capture-start").assertDoesNotExist()
+    }
+
+    @Test fun activeReferenceHasPersistentStopWithoutEnablingCaptureControls() {
+        val capturing = mutableStateOf(true)
+        val stops = AtomicInteger(0)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameReferencePanel(
+                    installed = StockGameInstall("4.0.2", 922),
+                    captureId = "observing-session",
+                    captureActive = capturing.value,
+                    onStop = {
+                        stops.incrementAndGet()
+                        capturing.value = false
+                    },
+                )
+            }
+        }
+        // The fixed bottom-bar action is reachable without scrolling through
+        // the manual rules, and dispatches exactly once through the supplied
+        // production Stop boundary (not a semantics-only shortcut).
+        compose.waitForIdle()
+        compose.onNodeWithTag("game-capture-stop")
+            .assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 3000) { stops.get() == 1 }
+        compose.runOnIdle { assertEquals(1, stops.get()) }
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+        compose.onNodeWithTag("game-capture-start").assertDoesNotExist()
+        compose.onNodeWithTag("game-manual-low-unknown").performScrollTo()
+            .assertIsSelected()
     }
 }

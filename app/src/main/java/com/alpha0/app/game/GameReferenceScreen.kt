@@ -3,10 +3,14 @@ package com.alpha0.app.game
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -16,11 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.alpha0.app.ui.DangerButton
 import com.alpha0.app.ui.LocalAppStrings
 
 /** Read-only game rule reference, accessible even when screen capture is off. */
@@ -49,6 +55,7 @@ fun GameReferenceScreen() {
     GameReferencePanel(
         installed, observation.captureId,
         observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED),
+        onStop = { GameObservationService.stop(context) },
     )
 }
 
@@ -58,22 +65,37 @@ internal fun GameReferencePanel(
     installed: StockGameInstall?,
     captureId: String? = null,
     captureActive: Boolean = false,
+    onStop: (() -> Unit)? = null,
 ) {
     val strings = LocalAppStrings.current
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(strings.text("game_reference_title"), style = MaterialTheme.typography.headlineLarge)
-        Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleMedium)
-        Text(strings.text("game_reference_disclosure"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (installed == null) {
-            Text(strings.text("game_install_missing"))
-        } else {
-            Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
+    // The observer can remain active after navigation into the read-only
+    // reference. Provide the same persistent in-app emergency Stop here.
+    Scaffold(
+        bottomBar = {
+            if (captureActive && onStop != null) {
+                DangerButton(
+                    strings.text("game_capture_stop"), onStop,
+                    Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                        .padding(horizontal = 20.dp, vertical = 8.dp).testTag("game-capture-stop"),
+                )
+            }
+        },
+    ) { contentPadding ->
+        Column(
+            Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(strings.text("game_reference_title"), style = MaterialTheme.typography.headlineLarge)
+            Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleMedium)
+            Text(strings.text("game_reference_disclosure"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (installed == null) {
+                Text(strings.text("game_install_missing"))
+            } else {
+                Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
+            }
+            ManualHealingReferencePanel(installed, captureId, captureActive)
+            ManualBurningReferencePanel(installed, captureId, captureActive)
         }
-        ManualHealingReferencePanel(installed, captureId, captureActive)
-        ManualBurningReferencePanel(installed, captureId, captureActive)
     }
 }

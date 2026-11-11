@@ -54,6 +54,8 @@ internal fun BrowserGameObservationPanel(
     val evidence = GameAutomationEvidence(
         riskAcknowledged = riskAcknowledged,
         operatorRulesReviewed = rulesReviewed,
+        // Official LastHavens rule 5 forbids third-party bot automation.
+        operatorActionPermission = GameOperatorActionPermission.PROHIBITED,
         // No production Chrome-tab attestation exists. A user toggle or an
         // external ACTION_VIEW cannot establish source/action-grade evidence.
         stopLatched = latched.latched,

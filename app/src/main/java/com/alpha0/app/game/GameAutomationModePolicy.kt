@@ -11,11 +11,20 @@ internal enum class GameAutomationMode(
     BOUNDED_ACTIVE("game_automation_mode_bounded", "game_automation_desc_bounded"),
 }
 
+/** User acknowledgement is never itself operator permission to automate a game. */
+internal enum class GameOperatorActionPermission {
+    UNKNOWN,
+    PROHIBITED,
+    PERMITTED,
+}
+
 internal enum class GameAutomationGateReason(val stringKey: String) {
     USER_DISABLED("game_automation_gate_user_disabled"),
     STOP_LATCHED("game_automation_gate_stop_latched"),
     RISK_NOT_ACKNOWLEDGED("game_automation_gate_risk_not_acknowledged"),
     OPERATOR_RULES_UNREVIEWED("game_automation_gate_operator_rules_unreviewed"),
+    OPERATOR_ACTION_PROHIBITED("game_automation_gate_operator_action_prohibited"),
+    OPERATOR_ACTION_PERMISSION_UNKNOWN("game_automation_gate_operator_action_permission_unknown"),
     TARGET_UNVERIFIED("game_automation_gate_target_unverified"),
     SOURCE_UNVERIFIED("game_automation_gate_source_unverified"),
     OBSERVATION_STALE("game_automation_gate_observation_stale"),
@@ -33,6 +42,8 @@ internal enum class GameAutomationGateReason(val stringKey: String) {
 internal data class GameAutomationEvidence(
     val riskAcknowledged: Boolean = false,
     val operatorRulesReviewed: Boolean = false,
+    /** Trusted exact-game rules/capability evidence; never inferred from a checkbox. */
+    val operatorActionPermission: GameOperatorActionPermission = GameOperatorActionPermission.UNKNOWN,
     val targetVerified: Boolean = false,
     val sourceVerified: Boolean = false,
     val observationFresh: Boolean = false,
@@ -99,6 +110,13 @@ internal object GameAutomationModePolicy {
             if (requestedMode == GameAutomationMode.USER_CONFIRMED ||
                 requestedMode == GameAutomationMode.BOUNDED_ACTIVE
             ) {
+                when (evidence.operatorActionPermission) {
+                    GameOperatorActionPermission.UNKNOWN ->
+                        add(GameAutomationGateReason.OPERATOR_ACTION_PERMISSION_UNKNOWN)
+                    GameOperatorActionPermission.PROHIBITED ->
+                        add(GameAutomationGateReason.OPERATOR_ACTION_PROHIBITED)
+                    GameOperatorActionPermission.PERMITTED -> Unit
+                }
                 if (!evidence.executorAvailable) add(GameAutomationGateReason.EXECUTOR_UNAVAILABLE)
                 if (!evidence.actionBindingVerified) add(GameAutomationGateReason.ACTION_BINDING_UNVERIFIED)
                 if (!evidence.actionConsent) add(GameAutomationGateReason.ACTION_CONSENT_REQUIRED)

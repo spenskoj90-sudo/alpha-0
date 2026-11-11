@@ -47,6 +47,7 @@ class GameAutomationModePolicyTest {
 
     @Test fun userConfirmedRequiresOperatorPermissionActionBindingAndPerActionConsent() {
         val evidence = verifiedReadOnlyEvidence().copy(
+            operatorActionPermission = GameOperatorActionPermission.PERMITTED,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
@@ -63,6 +64,7 @@ class GameAutomationModePolicyTest {
         val evidence = verifiedReadOnlyEvidence().copy(
             riskAcknowledged = false,
             operatorRulesReviewed = false,
+            operatorActionPermission = GameOperatorActionPermission.PERMITTED,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
@@ -78,6 +80,7 @@ class GameAutomationModePolicyTest {
 
     @Test fun boundedRequiresFreshArmLeaseAllowlistAndBudgets() {
         val evidence = verifiedReadOnlyEvidence().copy(
+            operatorActionPermission = GameOperatorActionPermission.PERMITTED,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,
@@ -94,8 +97,43 @@ class GameAutomationModePolicyTest {
         assertTrue(decision.maySendInput)
     }
 
+    @Test fun acknowledgingGameRulesCannotOverrideOperatorProhibition() {
+        val verified = verifiedReadOnlyEvidence().copy(
+            executorAvailable = true,
+            actionBindingVerified = true,
+            actionConsent = true,
+            armActive = true,
+            leaseValid = true,
+            allowlistApproved = true,
+            budgetsValid = true,
+        )
+        for (mode in listOf(GameAutomationMode.USER_CONFIRMED, GameAutomationMode.BOUNDED_ACTIVE)) {
+            for ((permission, reason) in listOf(
+                GameOperatorActionPermission.UNKNOWN to
+                    GameAutomationGateReason.OPERATOR_ACTION_PERMISSION_UNKNOWN,
+                GameOperatorActionPermission.PROHIBITED to
+                    GameAutomationGateReason.OPERATOR_ACTION_PROHIBITED,
+            )) {
+                val result = GameAutomationModePolicy.evaluate(
+                    mode, enabled = true, verified.copy(operatorActionPermission = permission),
+                )
+                assertEquals(GameAutomationMode.OFF, result.effectiveMode)
+                assertFalse(result.maySendInput)
+                assertTrue(reason in result.reasons)
+            }
+        }
+        // Read-only advisory can remain available with complete observation
+        // evidence, but never gains an action executor or bypasses operator rules.
+        val advisory = GameAutomationModePolicy.evaluate(
+            GameAutomationMode.OBSERVE_ADVISORY, enabled = true, verified,
+        )
+        assertEquals(GameAutomationMode.OBSERVE_ADVISORY, advisory.effectiveMode)
+        assertFalse(advisory.maySendInput)
+    }
+
     @Test fun stopLatchOverridesEveryRequestedMode() {
         val evidence = verifiedReadOnlyEvidence().copy(
+            operatorActionPermission = GameOperatorActionPermission.PERMITTED,
             executorAvailable = true,
             actionBindingVerified = true,
             actionConsent = true,

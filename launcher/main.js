@@ -5,6 +5,9 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
+const { documentUrl, assertMainFrameRequest, restrictAppWindowNavigation } = require('./renderer-boundary');
+const TRUSTED_MAIN_DOCUMENT = documentUrl(__dirname, 'index.html');
+const TRUSTED_OVERLAY_DOCUMENT = documentUrl(__dirname, 'overlay.html');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
 const { accountSnapshot, createAccountSnapshotPublisher } = require('./account-snapshot');
 const { CompanionProcessManager } = require('./companion-process');
@@ -105,6 +108,7 @@ function requireMainRenderer(event) {
   if (!mainWindow || mainWindow.isDestroyed() || event?.sender !== mainWindow.webContents) {
     throw new Error('UNTRUSTED_RENDERER');
   }
+  assertMainFrameRequest(event, mainWindow, TRUSTED_MAIN_DOCUMENT);
 }
 
 function resetVoiceState(reason = 'VOICE_CONSENT_REQUIRED') {
@@ -281,6 +285,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   mainWindow = win;
+  restrictAppWindowNavigation(win.webContents, TRUSTED_MAIN_DOCUMENT);
   win.on('closed', () => {
     knowledge?.stop();
     if (mainWindow === win) mainWindow = null;
@@ -303,6 +308,7 @@ function createOverlayWindow() {
     webPreferences: { preload: path.join(__dirname, 'overlay-preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   overlayWindow = win;
+  restrictAppWindowNavigation(win.webContents, TRUSTED_OVERLAY_DOCUMENT);
   win.setIgnoreMouseEvents(true, { forward: true });
   win.setMenuBarVisibility(false);
   win.webContents.on('did-finish-load', publishOverlaySnapshot);
@@ -333,22 +339,25 @@ function configureVoicePermissions() {
   runtimeSession.setDisplayMediaRequestHandler((_request, callback) => callback(null));
 }
 
-ipcMain.handle('catalog', () => catalog);
-ipcMain.handle('config:get', () => loadConfig());
-ipcMain.handle('config:set', (_, id, executable) => {
+ipcMain.handle('catalog', event => { requireMainRenderer(event); return catalog; });
+ipcMain.handle('config:get', event => { requireMainRenderer(event); return loadConfig(); });
+ipcMain.handle('config:set', (event, id, executable) => {
+  requireMainRenderer(event);
   const game = catalog.find(item => item.id === id);
   if (!game || game.platform !== 'windows') throw new Error('UNSUPPORTED_GAME');
   if (typeof executable !== 'string' || !path.isAbsolute(executable)) throw new Error('INVALID_EXECUTABLE_PATH');
   const config = loadConfig(); config[id] = executable; saveConfig(config); return true;
 });
-ipcMain.handle('game:launch', (_, id) => {
+ipcMain.handle('game:launch', (event, id) => {
+  requireMainRenderer(event);
   const game = catalog.find(item => item.id === id);
   if (!game || game.platform !== 'windows') throw new Error('ANDROID_GAME_REQUIRES_ANDROID_CLIENT');
   const executable = loadConfig()[id];
   if (!executable || !fs.existsSync(executable)) throw new Error('GAME_EXECUTABLE_NOT_CONFIGURED');
   spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref(); return true;
 });
-ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
+ipcMain.handle('account:login', async (event, coreUrl, email, password) => {
+  requireMainRenderer(event);
   // Deny stale account/worker activity at the start of the new login attempt,
   // not after a response (which may be delayed, rejected or MFA-pending).
   clearAccountBoundary('ACCOUNT_SWITCH');
@@ -356,20 +365,23 @@ ipcMain.handle('account:login', async (_, coreUrl, email, password) => {
   resetVoiceState(session.status ? 'VOICE_CONSENT_REQUIRED' : 'AUTHENTICATION_REQUIRED');
   return accountSnapshot(session);
 });
-ipcMain.handle('account:mfa-complete', async (_, code) => {
+ipcMain.handle('account:mfa-complete', async (event, code) => {
+  requireMainRenderer(event);
   await session.completeMfa(code);
   resetVoiceState('VOICE_CONSENT_REQUIRED');
   return accountSnapshot(session);
 });
-ipcMain.handle('account:logout', () => {
+ipcMain.handle('account:logout', event => {
+  requireMainRenderer(event);
   clearAccountBoundary('ACCOUNT_LOGOUT');
   return true;
 });
-ipcMain.handle('account:status', () => accountSnapshot(session));
-ipcMain.handle('companion:status', () => companion.status);
+ipcMain.handle('account:status', event => { requireMainRenderer(event); return accountSnapshot(session); });
+ipcMain.handle('companion:status', event => { requireMainRenderer(event); return companion.status; });
 ipcMain.handle('knowledge:status', event => { requireMainRenderer(event); return knowledge?.status(); });
 ipcMain.handle('knowledge:refresh', event => { requireMainRenderer(event); return knowledge?.refresh(); });
-ipcMain.handle('companion:start', async (_, coreUrl) => {
+ipcMain.handle('companion:start', async (event, coreUrl) => {
+  requireMainRenderer(event);
   if (!session.accessToken) throw new Error('AUTHENTICATION_REQUIRED');
   const startLease = companionStartFence.begin(session.knowledgeContext);
   if (!startLease) throw new Error('AUTHENTICATION_REQUIRED');
@@ -386,7 +398,8 @@ ipcMain.handle('companion:start', async (_, coreUrl) => {
   void knowledge?.start();
   wowBridge?.start(); wowBridge?.onCompanionStatus(status); publishOverlaySnapshot(); publishVoiceSnapshot(); return status;
 });
-ipcMain.handle('companion:stop', () => {
+ipcMain.handle('companion:stop', event => {
+  requireMainRenderer(event);
   companionStartFence.revoke();
   knowledge?.stop();
   clearVoiceCapturePermission();

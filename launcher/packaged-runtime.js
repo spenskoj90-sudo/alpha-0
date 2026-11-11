@@ -26,6 +26,7 @@ const REQUIRED_APP_FILES = Object.freeze([
   'packaged-runtime.js',
   'preload.js',
   'renderer.js',
+  'renderer-boundary.js',
   'ui-locale.js',
   'runtime-health.js',
   'voice-runtime.js',

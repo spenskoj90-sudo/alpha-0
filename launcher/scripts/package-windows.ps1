@@ -99,6 +99,7 @@ $ApplicationSources = @(
   "packaged-runtime.js",
   "preload.js",
   "renderer.js",
+  "renderer-boundary.js",
   "runtime-health.js",
   "voice-runtime.js",
   "wow-savedvariables.js"

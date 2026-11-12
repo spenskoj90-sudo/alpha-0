@@ -352,14 +352,8 @@ ipcMain.handle('catalog', event => {
     launchState: gameLaunchState(game, config?.[game.id], fs.statSync),
   }));
 });
-ipcMain.handle('config:get', event => { requireMainRenderer(event); return loadConfig(); });
-ipcMain.handle('config:set', (event, id, executable) => {
-  requireMainRenderer(event);
-  const game = catalog.find(item => item.id === id);
-  if (!game || game.platform !== 'windows') throw new Error('UNSUPPORTED_GAME');
-  if (typeof executable !== 'string' || !path.isAbsolute(executable)) throw new Error('INVALID_EXECUTABLE_PATH');
-  const config = loadConfig(); config[id] = executable; saveConfig(config); return true;
-});
+// Keep existing saved paths compatible, but never expose or mutate them through
+// arbitrary renderer strings. New selections must use the native main-process dialog.
 ipcMain.handle('game:choose-executable', async (event, id) => {
   requireMainRenderer(event);
   const game = catalog.find(item => item.id === id);

@@ -185,7 +185,7 @@ async function refreshVoiceStatus() {
 }
 
 async function renderGames() {
-  const [catalog, config] = await Promise.all([window.sentinel.catalog(), window.sentinel.getConfig()]);
+  const catalog = await window.sentinel.catalog();
   const grid = $('grid');
   grid.replaceChildren();
   for (const game of catalog) {
@@ -200,19 +200,57 @@ async function renderGames() {
 
     const button = document.createElement('button');
     button.className = 'btn';
-    ui.text(button, game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH');
-    button.disabled = game.platform === 'android';
+    const launchLabel = game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH';
+    button.setAttribute('data-i18n', launchLabel);
+    button.textContent = ui.t(launchLabel);
+    button.disabled = game.platform !== 'windows' || game.launchState !== 'READY';
     button.onclick = async () => {
       try { await window.sentinel.launch(game.id); } catch (error) { window.alert(String(error?.message || error)); }
     };
-    card.appendChild(button);
 
     if (game.platform === 'windows') {
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      actions.appendChild(button);
+      const chooser = document.createElement('button');
+      chooser.className = 'btn secondary';
+      chooser.setAttribute('data-i18n', 'SELECT GAME EXECUTABLE');
+      chooser.textContent = ui.t('SELECT GAME EXECUTABLE');
       const configured = document.createElement('div');
       configured.className = 'sub';
       configured.style.marginTop = '12px';
-      ui.text(configured, config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED');
-      card.appendChild(configured);
+      configured.setAttribute('role', 'status');
+      configured.setAttribute('aria-live', 'polite');
+      const availabilityLabel = game.launchState === 'READY'
+        ? 'EXECUTABLE CONFIGURED'
+        : game.launchState === 'NOT_CONFIGURED'
+          ? 'EXECUTABLE NOT CONFIGURED'
+          : 'EXECUTABLE UNAVAILABLE — RESELECT';
+      configured.setAttribute('data-i18n', availabilityLabel);
+      configured.textContent = ui.t(availabilityLabel);
+      chooser.onclick = async () => {
+        chooser.disabled = true;
+        try {
+          const result = await window.sentinel.chooseExecutable(game.id);
+          if (result?.configured === true) await renderGames();
+        } catch {
+          let message = card.querySelector('.game-config-error');
+          if (!message) {
+            message = document.createElement('div');
+            message.className = 'status err game-config-error';
+            message.setAttribute('role', 'alert');
+            card.appendChild(message);
+          }
+          message.setAttribute('data-i18n', 'GAME EXECUTABLE SELECTION FAILED');
+          message.textContent = ui.t('GAME EXECUTABLE SELECTION FAILED');
+        } finally {
+          chooser.disabled = false;
+        }
+      };
+      actions.appendChild(chooser);
+      card.append(actions, configured);
+    } else {
+      card.appendChild(button);
     }
     grid.appendChild(card);
   }

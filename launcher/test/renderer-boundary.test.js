@@ -89,7 +89,7 @@ test('all sensitive Electron IPC handlers invoke main-frame authorization as the
   const main = fs.readFileSync(path.join(__dirname, '..', 'main.js'), 'utf8');
   const tokens = [...main.matchAll(/ipcMain\.handle\('([^']+)'/g)];
   const expected = [
-    'catalog', 'config:get', 'config:set', 'game:launch', 'account:login',
+    'catalog', 'config:get', 'config:set', 'game:choose-executable', 'game:launch', 'account:login',
     'account:mfa-complete', 'account:logout', 'account:status', 'companion:status',
     'knowledge:status', 'knowledge:refresh', 'companion:start', 'companion:stop',
     'voice:status', 'voice:consent:set', 'voice:capture:arm', 'voice:capture:disarm', 'voice:submit',

@@ -1,11 +1,12 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, screen, session: electronSession } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen, session: electronSession } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { documentUrl, assertMainFrameRequest, restrictAppWindowNavigation } = require('./renderer-boundary');
+const { isSelectableExecutable, gameLaunchState } = require('./game-executable-policy');
 const TRUSTED_MAIN_DOCUMENT = documentUrl(__dirname, 'index.html');
 const TRUSTED_OVERLAY_DOCUMENT = documentUrl(__dirname, 'overlay.html');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
@@ -261,7 +262,10 @@ function clearAccountBoundary(reason) {
 
 function configPath() { return path.join(app.getPath('userData'), 'games.json'); }
 function loadConfig() {
-  try { return JSON.parse(fs.readFileSync(configPath(), 'utf8')); } catch { return {}; }
+  try {
+    const value = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch { return {}; }
 }
 function saveConfig(value) { fs.writeFileSync(configPath(), JSON.stringify(value, null, 2), { mode: 0o600 }); }
 
@@ -339,7 +343,15 @@ function configureVoicePermissions() {
   runtimeSession.setDisplayMediaRequestHandler((_request, callback) => callback(null));
 }
 
-ipcMain.handle('catalog', event => { requireMainRenderer(event); return catalog; });
+ipcMain.handle('catalog', event => {
+  requireMainRenderer(event);
+  const config = loadConfig();
+  return catalog.map(game => ({
+    ...game,
+    // Never expose a saved absolute path in the game card. A missing EXE is not ready.
+    launchState: gameLaunchState(game, config?.[game.id], fs.statSync),
+  }));
+});
 ipcMain.handle('config:get', event => { requireMainRenderer(event); return loadConfig(); });
 ipcMain.handle('config:set', (event, id, executable) => {
   requireMainRenderer(event);
@@ -348,12 +360,38 @@ ipcMain.handle('config:set', (event, id, executable) => {
   if (typeof executable !== 'string' || !path.isAbsolute(executable)) throw new Error('INVALID_EXECUTABLE_PATH');
   const config = loadConfig(); config[id] = executable; saveConfig(config); return true;
 });
+ipcMain.handle('game:choose-executable', async (event, id) => {
+  requireMainRenderer(event);
+  const game = catalog.find(item => item.id === id);
+  if (!game || game.platform !== 'windows') throw new Error('UNSUPPORTED_GAME');
+  if (process.platform !== 'win32') throw new Error('WINDOWS_HOST_REQUIRED');
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select the game executable',
+    properties: ['openFile'],
+    filters: [{ name: 'Windows executables', extensions: ['exe'] }],
+  });
+  // A modal chooser may outlive its initiating renderer or document.
+  requireMainRenderer(event);
+  if (result.canceled) return { configured: false };
+  const executable = result.filePaths?.[0];
+  if (!isSelectableExecutable(executable) ||
+      gameLaunchState(game, executable, fs.statSync) !== 'READY') {
+    throw new Error('GAME_EXECUTABLE_UNAVAILABLE');
+  }
+  const config = loadConfig();
+  config[id] = executable;
+  saveConfig(config);
+  // Do not send private executable paths back to the renderer.
+  return { configured: true };
+});
 ipcMain.handle('game:launch', (event, id) => {
   requireMainRenderer(event);
   const game = catalog.find(item => item.id === id);
   if (!game || game.platform !== 'windows') throw new Error('ANDROID_GAME_REQUIRES_ANDROID_CLIENT');
   const executable = loadConfig()[id];
-  if (!executable || !fs.existsSync(executable)) throw new Error('GAME_EXECUTABLE_NOT_CONFIGURED');
+  if (gameLaunchState(game, executable, fs.statSync) !== 'READY') {
+    throw new Error('GAME_EXECUTABLE_NOT_CONFIGURED');
+  }
   spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref(); return true;
 });
 ipcMain.handle('account:login', async (event, coreUrl, email, password) => {

@@ -204,10 +204,6 @@ async function renderGames() {
     button.setAttribute('data-i18n', launchLabel);
     button.textContent = ui.t(launchLabel);
     button.disabled = game.platform !== 'windows' || game.launchState !== 'READY';
-    button.onclick = async () => {
-      try { await window.sentinel.launch(game.id); } catch (error) { window.alert(String(error?.message || error)); }
-    };
-
     if (game.platform === 'windows') {
       const actions = document.createElement('div');
       actions.className = 'actions';
@@ -228,6 +224,35 @@ async function renderGames() {
           : 'EXECUTABLE UNAVAILABLE — RESELECT';
       configured.setAttribute('data-i18n', availabilityLabel);
       configured.textContent = ui.t(availabilityLabel);
+      const launchStatus = document.createElement('div');
+      launchStatus.className = 'status game-launch-status';
+      launchStatus.setAttribute('role', 'status');
+      launchStatus.setAttribute('aria-live', 'polite');
+      launchStatus.setAttribute('aria-atomic', 'true');
+      launchStatus.hidden = true;
+      const reportLaunch = (key, kind) => {
+        launchStatus.hidden = false;
+        launchStatus.className = 'status game-launch-status ' + kind;
+        launchStatus.setAttribute('data-i18n', key);
+        launchStatus.textContent = ui.t(key);
+      };
+      button.onclick = async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        chooser.disabled = true;
+        reportLaunch('GAME LAUNCH REQUESTED', 'warn');
+        try {
+          // Main acknowledges OS spawn, not game readiness or trusted game identity.
+          await window.sentinel.launch(game.id);
+          reportLaunch('GAME PROCESS STARTED', 'ok');
+        } catch {
+          // Avoid exposing host paths or raw OS/process details in the renderer.
+          reportLaunch('GAME LAUNCH FAILED', 'err');
+        } finally {
+          button.disabled = game.launchState !== 'READY';
+          chooser.disabled = false;
+        }
+      };
       chooser.onclick = async () => {
         chooser.disabled = true;
         try {
@@ -248,7 +273,7 @@ async function renderGames() {
         }
       };
       actions.appendChild(chooser);
-      card.append(actions, configured);
+      card.append(actions, configured, launchStatus);
     } else {
       card.appendChild(button);
     }

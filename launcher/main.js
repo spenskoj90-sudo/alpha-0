@@ -1,12 +1,12 @@
 'use strict';
 
 const { app, BrowserWindow, dialog, ipcMain, screen, session: electronSession } = require('electron');
-const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 const { documentUrl, assertMainFrameRequest, restrictAppWindowNavigation } = require('./renderer-boundary');
 const { isSelectableExecutable, gameLaunchState } = require('./game-executable-policy');
+const { launchGameExecutable } = require('./game-process-launch');
 const TRUSTED_MAIN_DOCUMENT = documentUrl(__dirname, 'index.html');
 const TRUSTED_OVERLAY_DOCUMENT = documentUrl(__dirname, 'overlay.html');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
@@ -378,15 +378,16 @@ ipcMain.handle('game:choose-executable', async (event, id) => {
   // Do not send private executable paths back to the renderer.
   return { configured: true };
 });
-ipcMain.handle('game:launch', (event, id) => {
+ipcMain.handle('game:launch', async (event, id) => {
   requireMainRenderer(event);
   const game = catalog.find(item => item.id === id);
   if (!game || game.platform !== 'windows') throw new Error('ANDROID_GAME_REQUIRES_ANDROID_CLIENT');
+  if (process.platform !== 'win32') throw new Error('WINDOWS_HOST_REQUIRED');
   const executable = loadConfig()[id];
   if (gameLaunchState(game, executable, fs.statSync) !== 'READY') {
     throw new Error('GAME_EXECUTABLE_NOT_CONFIGURED');
   }
-  spawn(executable, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref(); return true;
+  return launchGameExecutable(executable);
 });
 ipcMain.handle('account:login', async (event, coreUrl, email, password) => {
   requireMainRenderer(event);

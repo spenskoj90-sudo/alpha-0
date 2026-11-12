@@ -16,6 +16,7 @@ const REQUIRED_APP_FILES = Object.freeze([
   'knowledge-presentation.js',
   'exact-environment-evidence.js',
   'game-executable-policy.js',
+  'game-process-launch.js',
   'index.html',
   'main.js',
   'overlay-preload.js',

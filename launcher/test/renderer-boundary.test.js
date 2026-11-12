@@ -98,10 +98,10 @@ test('all sensitive Electron IPC handlers invoke main-frame authorization as the
   // Native file selection is the only renderer-accessible writer. Previously
   // exposed config:get/set allowed the renderer to leak paths or bypass .exe selection.
   const preload = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
-  assert.doesNotMatch(main, /ipcMain\\.handle\\('config:(?:get|set)'/);
-  assert.doesNotMatch(preload, /(?:getConfig|setExecutable)\\s*:/);
-  assert.doesNotMatch(preload, /ipcRenderer\\.invoke\\('config:(?:get|set)'/);
-  assert.match(preload, /chooseExecutable: id => ipcRenderer\\.invoke\\('game:choose-executable', id\\)/);
+  assert.doesNotMatch(main, /ipcMain\.handle\('config:(?:get|set)'/);
+  assert.doesNotMatch(preload, /(?:getConfig|setExecutable)\s*:/);
+  assert.doesNotMatch(preload, /ipcRenderer\.invoke\('config:(?:get|set)'/);
+  assert.match(preload, /chooseExecutable: id => ipcRenderer\.invoke\('game:choose-executable', id\)/);
   for (let i = 0; i < tokens.length; i++) {
     const body = main.slice(tokens[i].index, tokens[i + 1]?.index ?? main.indexOf('\n\napp.whenReady()', tokens[i].index));
     assert.match(body.slice(0, 220), /requireMainRenderer\(event\)/, expected[i]);

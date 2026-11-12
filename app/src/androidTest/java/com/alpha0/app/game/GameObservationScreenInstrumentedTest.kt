@@ -1,5 +1,6 @@
 package com.alpha0.app.game
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -19,6 +20,10 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.SentinelTheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -85,6 +90,40 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsEnabled()
         compose.onNodeWithTag("game-automation-reset-stop").performClick()
         compose.runOnIdle { assertTrue(!latch.state.value.latched) }
+    }
+
+    @Test fun lifecycleStopLatchesCurrentCaptureAfterGenerationChanges() {
+        val latch = GameAutomationStopLatch()
+        val install = StockGameInstall("fixture", 1)
+        val source = mutableStateOf(
+            GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-A"), install,
+            ),
+        )
+        val owner = object : LifecycleOwner {
+            val registry = LifecycleRegistry(this)
+            override val lifecycle: Lifecycle get() = registry
+        }
+        compose.runOnUiThread { owner.registry.currentState = Lifecycle.State.RESUMED }
+        compose.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                SentinelTheme(AppThemeMode.LIGHT) {
+                    GameObservationPanel(install, source.value, true, false, false, 100,
+                        {}, {}, {}, {}, automationStopLatch = latch)
+                }
+            }
+        }
+        compose.runOnIdle {
+            source.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-B"), install,
+            )
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP) }
+        compose.runOnIdle {
+            assertTrue(latch.state.value.latched)
+            assertEquals("capture-B", latch.state.value.stoppedCaptureId)
+        }
     }
 
     @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {

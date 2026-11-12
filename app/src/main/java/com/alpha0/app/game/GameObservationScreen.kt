@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -376,12 +377,15 @@ internal fun GameObservationPanel(
         desiredAutomationMode, enabled = true, automationEvidence,
     )
     val automationLifecycle = LocalLifecycleOwner.current.lifecycle
+    // The lifecycle observer is long-lived while the capture generation can change.
+    // Use the current ID, not the ID captured at the first composition.
+    val currentCaptureId by rememberUpdatedState(observation.captureId)
     DisposableEffect(automationLifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 automationEnabled = false
                 desiredAutomationMode = GameAutomationMode.OFF
-                automationStopLatch.stop(observation.captureId)
+                automationStopLatch.stop(currentCaptureId)
                 automationRiskAcknowledged = false
                 automationRulesReviewed = false
             }

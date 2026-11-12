@@ -7,6 +7,7 @@ const { performance } = require('node:perf_hooks');
 const { documentUrl, assertMainFrameRequest, restrictAppWindowNavigation } = require('./renderer-boundary');
 const { isSelectableExecutable, gameLaunchState } = require('./game-executable-policy');
 const { launchGameExecutable } = require('./game-process-launch');
+const { createGameLaunchGate } = require('./game-launch-gate');
 const TRUSTED_MAIN_DOCUMENT = documentUrl(__dirname, 'index.html');
 const TRUSTED_OVERLAY_DOCUMENT = documentUrl(__dirname, 'overlay.html');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
@@ -46,6 +47,7 @@ const catalog = [
 ];
 
 const session = new CoreSessionManager();
+const launchGame = createGameLaunchGate(launchGameExecutable);
 const companionStartFence = new CompanionStartFence();
 const overlayStore = new OverlayPresentationStore({ maxItems: 4, ttlMs: 15000 });
 let mainWindow = null;
@@ -387,7 +389,7 @@ ipcMain.handle('game:launch', async (event, id) => {
   if (gameLaunchState(game, executable, fs.statSync) !== 'READY') {
     throw new Error('GAME_EXECUTABLE_NOT_CONFIGURED');
   }
-  return launchGameExecutable(executable);
+  return launchGame(id, executable);
 });
 ipcMain.handle('account:login', async (event, coreUrl, email, password) => {
   requireMainRenderer(event);

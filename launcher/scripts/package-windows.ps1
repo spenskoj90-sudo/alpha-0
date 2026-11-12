@@ -90,6 +90,7 @@ $ApplicationSources = @(
   "exact-environment-evidence.js",
   "game-executable-policy.js",
   "game-process-launch.js",
+  "game-launch-gate.js",
   "index.html",
   "main.js",
   "overlay-preload.js",

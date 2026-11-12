@@ -61,6 +61,32 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
     }
 
+    @Test fun resetStopStaysDisabledUntilAnActualNewActiveCaptureIsObserved() {
+        val latch = GameAutomationStopLatch()
+        val install = StockGameInstall("fixture", 1)
+        val observed = mutableStateOf(GameObservationViewState())
+        latch.stop(null)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install, observed.value, true, false, false, 100,
+                    {}, {}, {}, {}, automationStopLatch = latch)
+            }
+        }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
+        // Merely changing a caller-provided ID cannot open the latch.
+        compose.runOnIdle {
+            observed.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "new-capture"), install,
+            )
+        }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
+        // This event comes from the real service in production (the test supplies it explicitly).
+        compose.runOnIdle { latch.onCaptureStarted("new-capture") }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("game-automation-reset-stop").performClick()
+        compose.runOnIdle { assertTrue(!latch.state.value.latched) }
+    }
+
     @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {
         val install = StockGameInstall("fixture", 1)
         GameObservationRuntime.calibration.clear()

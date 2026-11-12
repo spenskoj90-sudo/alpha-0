@@ -7,6 +7,8 @@ internal data class GameAutomationStopState(
     val latched: Boolean = false,
     /** Capture generation for which STOP was latched; never persists across process death. */
     val stoppedCaptureId: String? = null,
+    /** Non-authoritative reset token: observed only when the service starts a NEW capture. */
+    val freshCaptureId: String? = null,
 )
 
 /**
@@ -24,14 +26,27 @@ internal class GameAutomationStopLatch {
         mutable.value = GameAutomationStopState(
             latched = true,
             stoppedCaptureId = captureId?.takeIf { it.isNotBlank() } ?: previous.stoppedCaptureId,
+            // Any STOP, including one without a capture ID, revokes prior reset eligibility.
+            freshCaptureId = null,
         )
+    }
+
+    /** Called only by the capture service after an actual ObservationSession.start. */
+    @Synchronized
+    fun onCaptureStarted(captureId: String) {
+        require(captureId.isNotBlank() && captureId.length <= 64)
+        val current = mutable.value
+        if (current.latched && captureId != current.stoppedCaptureId) {
+            mutable.value = current.copy(freshCaptureId = captureId)
+        }
     }
 
     @Synchronized
     fun canResetForNewCapture(captureId: String?): Boolean =
         mutable.value.let { current ->
             current.latched && !captureId.isNullOrBlank() &&
-                captureId != current.stoppedCaptureId
+                captureId != current.stoppedCaptureId &&
+                current.freshCaptureId == captureId
         }
 
     @Synchronized

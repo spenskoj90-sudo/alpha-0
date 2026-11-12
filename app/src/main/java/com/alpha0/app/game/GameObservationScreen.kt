@@ -514,13 +514,15 @@ internal fun GameObservationPanel(
             decision = automationDecision,
             preview = automationPreview,
             stopLatched = automationStopLatched,
-            canResetStop = automationStopLatch.canResetForNewCapture(observation.captureId),
+            canResetStop = active && automationStopLatch.canResetForNewCapture(observation.captureId),
             onEnable = {
                 if (!automationStopLatch.state.value.latched && automationPreview.canEnable) {
                     automationEnabled = true
                 }
             },
-            onResetStop = { automationStopLatch.resetForNewCapture(observation.captureId) },
+            onResetStop = {
+                if (active) automationStopLatch.resetForNewCapture(observation.captureId)
+            },
         )
         SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

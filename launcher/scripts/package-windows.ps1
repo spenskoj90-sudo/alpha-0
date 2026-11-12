@@ -91,6 +91,7 @@ $ApplicationSources = @(
   "game-executable-policy.js",
   "game-process-launch.js",
   "game-launch-gate.js",
+  "game-config-store.js",
   "index.html",
   "main.js",
   "overlay-preload.js",

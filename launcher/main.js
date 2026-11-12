@@ -8,6 +8,7 @@ const { documentUrl, assertMainFrameRequest, restrictAppWindowNavigation } = req
 const { isSelectableExecutable, gameLaunchState } = require('./game-executable-policy');
 const { launchGameExecutable } = require('./game-process-launch');
 const { createGameLaunchGate } = require('./game-launch-gate');
+const { saveGameConfigFile } = require('./game-config-store');
 const TRUSTED_MAIN_DOCUMENT = documentUrl(__dirname, 'index.html');
 const TRUSTED_OVERLAY_DOCUMENT = documentUrl(__dirname, 'overlay.html');
 const { CoreSessionManager, normalizeCoreUrl } = require('./core-session');
@@ -269,7 +270,7 @@ function loadConfig() {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   } catch { return {}; }
 }
-function saveConfig(value) { fs.writeFileSync(configPath(), JSON.stringify(value, null, 2), { mode: 0o600 }); }
+function saveConfig(value) { saveGameConfigFile(configPath(), value); }
 
 function createWowBridge() {
   const queue = new WowObservationQueue({ filePath: path.join(app.getPath('userData'), 'wow-observations.json'), maxItems: 128 });

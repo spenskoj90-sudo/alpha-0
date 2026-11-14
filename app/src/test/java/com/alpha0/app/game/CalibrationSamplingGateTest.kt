@@ -192,6 +192,23 @@ class CalibrationSamplingGateTest {
         }
     }
 
+    @Test fun `paused completed OCR remains a retrospective sample after live frame is revoked`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        assertTrue(session.frame("capture", 110))
+        assertTrue(session.recognized("capture", 1, 110, 125, HealthCandidate(4, 20, 0)))
+        session.visibility("capture", false, 130)
+        val paused = session.snapshot
+        assertNull(paused.lastFrameAt)
+        assertNotNull(CalibrationSamplingGate.frameId(paused))
+        assertTrue(CalibrationSamplingGate.canSave(paused, game, game, 131))
+        assertEquals(HealthCandidate(4, 20, 0), CalibrationSamplingGate.current(paused)?.candidate)
+        session.visibility("capture", true, 132)
+        assertNull(CalibrationSamplingGate.frameId(session.snapshot))
+        assertFalse(CalibrationSamplingGate.canSave(session.snapshot, game, game, 133))
+    }
+
     @Test fun `Save rejects future OCR and expired retrospective evidence`() {
         val session = ObservationSession()
         session.start("capture", 100)

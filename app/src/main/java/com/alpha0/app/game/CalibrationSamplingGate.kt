@@ -23,7 +23,11 @@ internal object CalibrationSamplingGate {
         val latencyMs = snapshot.lastOcrLatencyMs ?: return null
         // A sequence number alone cannot prove a completed current-frame OCR callback.
         // Even an OCR miss requires coherent, bounded capture/completion timestamps.
-        if (frameAt < 0 || frameAt != snapshot.lastFrameAt ||
+        // Pausing deliberately clears the live-frame timestamp so a historical
+        // comparison cannot be mistaken for live health. Keep the completed OCR
+        // timestamp usable for that retrospective comparison only.
+        if (frameAt < 0 ||
+            (snapshot.status == ObservationStatus.OBSERVING && frameAt != snapshot.lastFrameAt) ||
             completedAt < frameAt || latencyMs !in 0L..5000L ||
             completedAt - frameAt != latencyMs) return null
         return CalibrationFrameId(captureId, snapshot.frames)

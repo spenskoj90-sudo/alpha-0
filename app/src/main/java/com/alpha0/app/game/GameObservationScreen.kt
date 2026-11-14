@@ -1,6 +1,8 @@
 package com.alpha0.app.game
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.SystemClock
@@ -11,24 +13,31 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.font.FontFamily
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +50,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.security.SecureSessionStore
+import com.alpha0.app.ui.DangerButton
+import com.alpha0.app.ui.assertiveStatusSemantics
+import com.alpha0.app.ui.politeStatusSemantics
 import com.alpha0.app.ui.DataText
 import com.alpha0.app.ui.LocalAppStrings
 import com.alpha0.app.ui.PrimaryButton
@@ -50,6 +62,9 @@ import com.alpha0.app.ui.SentinelCardKind
 import com.alpha0.app.ui.SentinelStatus
 import com.alpha0.app.ui.StatusBadge
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import com.alpha0.app.knowledge.AndroidKnowledgeRuntime
 import com.alpha0.app.knowledge.KnowledgeViewState
 
@@ -57,32 +72,68 @@ import com.alpha0.app.knowledge.KnowledgeViewState
 fun GameObservationScreen() {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var browserSelected by remember { mutableStateOf(false) }
     var installed by remember { mutableStateOf(ShatteredGameProfile.installed(context)) }
     val state by GameObservationRuntime.state.collectAsStateWithLifecycle()
     val knowledge by AndroidKnowledgeRuntime.state.collectAsStateWithLifecycle()
     var consent by remember { mutableStateOf(false) }
+    // Checkbox consent belongs to the session that acknowledged it, not just the device.
+    var acknowledgedSession by remember { mutableStateOf<CaptureSessionBinding?>(null) }
+    var pendingSession by remember { mutableStateOf<CaptureSessionBinding?>(null) }
     var pendingVersion by remember { mutableStateOf<Long?>(null) }
     var pendingVersionName by remember { mutableStateOf<String?>(null) }
     var pendingSigner by remember { mutableStateOf<String?>(null) }
     var pending by remember { mutableStateOf(false) }
     var elapsed by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
+    val binaryScope = rememberCoroutineScope()
+    var binaryEvidence by remember { mutableStateOf(GameBinaryEvidence.Status.NOT_CHECKED) }
+    var binaryChecking by remember { mutableStateOf(false) }
+    var binaryJob by remember { mutableStateOf<Job?>(null) }
 
     DisposableEffect(lifecycle, context) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) installed = ShatteredGameProfile.installed(context)
-            // Leaving the foreground must never keep a prechecked capture-consent control.
-            if (event == Lifecycle.Event.ON_STOP) consent = false
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val observedInstall = ShatteredGameProfile.installed(context)
+                installed = observedInstall
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                // Do not wait for the service's periodic identity heartbeat.
+                if (GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall))
+                    GameObservationService.stop(context, "GAME_CHANGED")
+            }
+            // Never continue hashing a different app while the observer is backgrounded.
+            if (event == Lifecycle.Event.ON_STOP) {
+                consent = false
+                acknowledgedSession = null
+                binaryJob?.cancel()
+                binaryJob = null
+                binaryChecking = false
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+            }
         }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            binaryJob?.cancel()
+            binaryJob = null
+            lifecycle.removeObserver(observer)
+        }
+    }
+    LaunchedEffect(installed) {
+        binaryJob?.cancel()
+        binaryJob = null
+        binaryChecking = false
+        binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
     }
     // System consent is separate; the checkbox is a short-lived UI acknowledgement only.
     // A source/session transition or game-install change requires a fresh acknowledgement.
     LaunchedEffect(installed, state.observation.status, state.observation.reason, state.observation.captureId) {
         consent = false
+        acknowledgedSession = null
     }
-    LaunchedEffect(state.observation.lastHealth?.observedAt) {
-        while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
+    LaunchedEffect(state.observation.lastHealth?.observedAt, browserSelected) {
+        // No Shattered HUD timer runs while the distinct browser profile is selected.
+        if (!browserSelected) {
+            while (true) { elapsed = SystemClock.elapsedRealtime(); delay(1000) }
+        }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val wasPending = pending
@@ -91,50 +142,152 @@ fun GameObservationScreen() {
         val expectedVersion = pendingVersion
         val expectedName = pendingVersionName
         val expectedSigner = pendingSigner
+        val expectedSession = pendingSession
+        pendingSession = null
+        acknowledgedSession = null
         pendingVersion = null
         pendingVersionName = null
         pendingSigner = null
         val currentInstall = ShatteredGameProfile.installed(context)
-        val session = SecureSessionStore().load(context)
+        val session = runCatching { SecureSessionStore().load(context) }.getOrNull()
         when {
-            !wasPending -> GameObservationRuntime.stop("CONSENT_CANCELLED")
+            !wasPending || browserSelected -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             result.resultCode != Activity.RESULT_OK || result.data == null -> GameObservationRuntime.stop("CONSENT_CANCELLED")
             !GameInstallFence.matches(expectedName, expectedVersion, expectedSigner, currentInstall) ||
-                session?.deviceId.isNullOrBlank() ->
+                !CaptureSessionFence.isCurrent(expectedSession, session?.deviceId, session?.epoch) ->
                 GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
-            else -> GameObservationService.start(context, result.data!!, currentInstall!!)
+            else -> GameObservationService.start(context, result.data!!, currentInstall!!, expectedSession!!)
         }
     }
+    val captureSupported = ObservationCapturePolicy.supports(
+        BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT,
+    )
+    if (browserSelected) {
+        BrowserGameObservationPanel(
+            onReturnToShattered = { browserSelected = false },
+            onOpenOfficialUrl = { url ->
+                // Opening the external browser conveys no tab/source identity to SENTINEL.
+                GameAutomationStopRuntime.latch.stop(GameObservationRuntime.state.value.observation.captureId)
+                runCatching {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            .addCategory(Intent.CATEGORY_BROWSABLE),
+                    )
+                }.isSuccess
+            },
+        )
+        return
+    }
     GameObservationPanel(
+        onOpenBrowserProfile = {
+            // Invalidate the in-flight system chooser and APK verification before
+            // changing games. A late chooser result must not start Shattered capture.
+            pending = false
+            pendingSession = null
+            pendingVersion = null
+            pendingVersionName = null
+            pendingSigner = null
+            acknowledgedSession = null
+            consent = false
+            binaryJob?.cancel()
+            binaryJob = null
+            binaryChecking = false
+            binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+            // Switching games revokes capture and action authority before displaying
+            // LastHavens. Shattered OCR and calibration must never be cross-labelled.
+            GameObservationService.stop(context, "GAME_CHANGED")
+            browserSelected = true
+        },
         installed = installed,
         state = state,
         knowledge = knowledge,
-        supported = BuildConfig.DEBUG && Build.VERSION.SDK_INT >= 34,
+        binaryEvidence = binaryEvidence,
+        binaryChecking = binaryChecking,
+        onVerifyBinary = {
+            val expected = installed
+            // Never overlap APK hashing with a pending or active screen capture.
+            val observedStatus = GameObservationRuntime.state.value.observation.status
+            if (!browserSelected && expected != null && !binaryChecking && !pending &&
+                observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
+            ) {
+                binaryChecking = true
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                binaryJob = binaryScope.launch {
+                    val job = coroutineContext[Job]
+                    try {
+                        val observed = InstalledShatteredBinary.verify(context, expected)
+                        if (installed == expected &&
+                            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                        ) binaryEvidence = observed
+                    } catch (_: CancellationException) {
+                        // Lifecycle stop cancels hashing; no stale status published.
+                    } catch (_: Exception) {
+                        if (installed == expected &&
+                            lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                        ) binaryEvidence = GameBinaryEvidence.Status.UNAVAILABLE
+                    } finally {
+                        if (binaryJob === job) {
+                            binaryChecking = false
+                            binaryJob = null
+                        }
+                    }
+                }
+            }
+        },
+        supported = captureSupported,
         consent = consent,
         pending = pending,
         now = elapsed,
-        onConsent = { consent = it },
+        onConsent = { acknowledged ->
+            val session = if (acknowledged) runCatching { SecureSessionStore().load(context) }.getOrNull() else null
+            acknowledgedSession = CaptureSessionFence.snapshot(session?.deviceId, session?.epoch)
+            consent = acknowledged && acknowledgedSession != null
+        },
         onStart = {
-            val current = ShatteredGameProfile.installed(context)
-            if (current == null) {
-                installed = null
-                GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
-            } else {
-                pendingVersion = current.versionCode
-                pendingVersionName = current.versionName
-                pendingSigner = current.signerSha256
-                pending = true
-                try {
-                    val manager = context.getSystemService(MediaProjectionManager::class.java)
-                        ?: throw IllegalStateException("Projection service unavailable")
-                    launcher.launch(manager.createScreenCaptureIntent())
-                } catch (_: Exception) {
-                    pending = false
-                    pendingVersion = null
-                    pendingVersionName = null
-                    pendingSigner = null
+            // A stale UI callback must not request a second projection while
+            // consent is pending or an observation session is already active.
+            val liveStatus = GameObservationRuntime.state.value.observation.status
+            if (!browserSelected && !pending && liveStatus !in setOf(
+                    ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED,
+                )
+            ) {
+                // Cancel any in-flight APK hash before presenting system capture consent.
+                // This is independent of MediaProjection consent and gives no game authority.
+                binaryJob?.cancel()
+                binaryJob = null
+                binaryChecking = false
+                binaryEvidence = GameBinaryEvidence.Status.NOT_CHECKED
+                val current = ShatteredGameProfile.installed(context)
+                val session = runCatching { SecureSessionStore().load(context) }.getOrNull()
+                val binding = CaptureSessionFence.snapshot(session?.deviceId, session?.epoch)
+                if (current == null ||
+                    !ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current) ||
+                    !CaptureSessionFence.isCurrent(acknowledgedSession, binding?.deviceId, binding?.epoch)
+                ) {
+                    installed = current
                     consent = false
-                    GameObservationRuntime.stop("CAPTURE_START_FAILED")
+                    acknowledgedSession = null
+                    GameObservationRuntime.stop("SESSION_OR_GAME_UNAVAILABLE")
+                } else {
+                    pendingVersion = current.versionCode
+                    pendingVersionName = current.versionName
+                    pendingSigner = current.signerSha256
+                    pendingSession = binding
+                    pending = true
+                    try {
+                        val manager = context.getSystemService(MediaProjectionManager::class.java)
+                            ?: throw IllegalStateException("Projection service unavailable")
+                        launcher.launch(manager.createScreenCaptureIntent())
+                    } catch (_: Exception) {
+                        pending = false
+                        pendingVersion = null
+                        pendingVersionName = null
+                        pendingSigner = null
+                        pendingSession = null
+                        acknowledgedSession = null
+                        consent = false
+                        GameObservationRuntime.stop("CAPTURE_START_FAILED")
+                    }
                 }
             }
         },
@@ -163,6 +316,11 @@ internal fun GameObservationPanel(
     onStop: () -> Unit,
     onLaunch: () -> Unit,
     knowledge: KnowledgeViewState = KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE"),
+    binaryEvidence: GameBinaryEvidence.Status = GameBinaryEvidence.Status.NOT_CHECKED,
+    binaryChecking: Boolean = false,
+    onVerifyBinary: () -> Unit = {},
+    automationStopLatch: GameAutomationStopLatch = GameAutomationStopRuntime.latch,
+    onOpenBrowserProfile: (() -> Unit)? = null,
 ) {
     val strings = LocalAppStrings.current
     val observation = state.observation
@@ -175,25 +333,123 @@ internal fun GameObservationPanel(
     }
     val campaign = campaignRun.campaign
     val campaignId = campaignRun.campaignId
-    var expectedCurrent by remember { mutableStateOf("") }
-    var expectedMaximum by remember { mutableStateOf("") }
-    var sampleCount by remember(captureGame, observation.captureId) { mutableStateOf(campaign.count) }
-    var calibrationMessage by remember { mutableStateOf("") }
+    // Manual ground truth belongs to exactly one capture campaign. A stopped/revoked
+    // capture must not leave editable values or a misleading "saved" message in a
+    // new session, even if the Compose panel itself survives.
+    var expectedCurrent by remember(campaignId) { mutableStateOf("") }
+    var expectedMaximum by remember(campaignId) { mutableStateOf("") }
+    var sampleCount by remember(campaignId) { mutableStateOf(campaign.count) }
+    var calibrationMessage by remember(campaignId) { mutableStateOf("") }
+    // Every acknowledgement is bound to the installed game identity and capture
+    // generation. Changing a package version, signer or capture resets all choices.
+    val automationScope = remember(captureGame, observation.captureId) {
+        ShatteredGameProfile.GAME_ID to (captureGame to observation.captureId)
+    }
+    var desiredAutomationMode by remember(automationScope) { mutableStateOf(GameAutomationMode.OFF) }
+    var automationEnabled by remember(automationScope) { mutableStateOf(false) }
+    var automationRiskAcknowledged by remember(automationScope) { mutableStateOf(false) }
+    var automationRulesReviewed by remember(automationScope) { mutableStateOf(false) }
+    val stopState by automationStopLatch.state.collectAsStateWithLifecycle()
+    val automationStopLatched = stopState.latched
+    val automationEvidence = GameAutomationEvidence(
+        riskAcknowledged = automationRiskAcknowledged,
+        operatorRulesReviewed = automationRulesReviewed,
+        // No trusted provider currently attests the selected game window, source,
+        // calibration, reviewed knowledge or action-grade binding.
+        executorAvailable = false,
+        targetVerified = false,
+        sourceVerified = false,
+        observationFresh = false,
+        calibrationApproved = false,
+        knowledgeReviewed = false,
+        actionBindingVerified = false,
+        actionConsent = false,
+        armActive = false,
+        leaseValid = false,
+        allowlistApproved = false,
+        budgetsValid = false,
+        stopLatched = automationStopLatched,
+    )
+    val automationDecision = GameAutomationModePolicy.evaluate(
+        desiredAutomationMode, automationEnabled, automationEvidence,
+    )
+    val automationPreview = GameAutomationModePolicy.evaluate(
+        desiredAutomationMode, enabled = true, automationEvidence,
+    )
+    val automationLifecycle = LocalLifecycleOwner.current.lifecycle
+    // The lifecycle observer is long-lived while the capture generation can change.
+    // Use the current ID, not the ID captured at the first composition.
+    val currentCaptureId by rememberUpdatedState(observation.captureId)
+    DisposableEffect(automationLifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                automationEnabled = false
+                desiredAutomationMode = GameAutomationMode.OFF
+                automationStopLatch.stop(currentCaptureId)
+                automationRiskAcknowledged = false
+                automationRulesReviewed = false
+            }
+        }
+        automationLifecycle.addObserver(observer)
+        onDispose { automationLifecycle.removeObserver(observer) }
+    }
     val nextStep = observerNextStep(
         installed = installed != null,
         supported = supported,
         status = observation.status,
-        hasSampleableFrame = CalibrationSamplingGate.canSample(observation, state.installed, installed),
+        hasSampleableFrame = CalibrationSamplingGate.canSave(observation, state.installed, installed, now),
         consent = consent,
         pending = pending,
         sampleCount = sampleCount,
     )
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+    // Stop remains reachable independently of scrolling through calibration and diagnostics.
+    // The foreground notification/system capture controls remain additional Stop routes.
+    Scaffold(
+        bottomBar = {
+            Column(
+                Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Automation Stop is always reachable independently of scroll position.
+                DangerButton(
+                    strings.text("game_automation_stop"),
+                    {
+                        automationEnabled = false
+                        desiredAutomationMode = GameAutomationMode.OFF
+                        automationStopLatch.stop(observation.captureId)
+                        automationRiskAcknowledged = false
+                        automationRulesReviewed = false
+                    },
+                    Modifier.fillMaxWidth().testTag("game-automation-stop"),
+                )
+                if (active) {
+                    DangerButton(
+                        strings.text("game_capture_stop"), {
+                            automationStopLatch.stop(observation.captureId)
+                            automationEnabled = false
+                            desiredAutomationMode = GameAutomationMode.OFF
+                            onStop()
+                        },
+                        Modifier.fillMaxWidth().testTag("game-capture-stop"),
+                    )
+                }
+            }
+        },
+    ) { contentPadding ->
+      Column(
+        Modifier.fillMaxSize().padding(contentPadding).verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+      ) {
         Text(strings.text("game_observer_title"), style = MaterialTheme.typography.headlineLarge)
+        if (onOpenBrowserProfile != null) {
+            SecondaryButton(
+                strings.text("game_browser_profile_open"),
+                onOpenBrowserProfile,
+                Modifier.fillMaxWidth().testTag("game-browser-select"),
+            )
+        }
         Text("Shattered Pixel Dungeon", style = MaterialTheme.typography.titleLarge)
         Text(strings.text("game_observer_subtitle"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         SentinelCard(kind = SentinelCardKind.CONTENT) {
@@ -210,27 +466,89 @@ internal fun GameObservationPanel(
                     StatusBadge(strings.text("status_unavailable"), SentinelStatus.UNAVAILABLE)
                     Text(strings.text("game_install_missing"))
                 } else {
+                    Text(strings.text("game_install_package", ShatteredGameProfile.PACKAGE))
                     Text(strings.text("game_install_version", installed.versionName, installed.versionCode))
+                    // PackageManager signer metadata describes the installed APK only.
+                    // Never treat this fingerprint as attestation of selected captured content.
+                    val certificate = GameSignerFingerprint.grouped(installed.signerSha256)
+                    Text(strings.text(if (certificate == null) "game_install_signer_unknown" else "game_install_signer_observed"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (certificate != null) {
+                        Text(strings.text("game_install_signer_sha256", certificate),
+                            modifier = Modifier.fillMaxWidth().testTag("game-installed-certificate"),
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Text(strings.text("game_capture_source_unverified"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.text("game_binary_disclosure"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SecondaryButton(
+                        strings.text("game_binary_check"), onVerifyBinary,
+                        Modifier.fillMaxWidth().testTag("game-binary-check"),
+                        enabled = !binaryChecking && !active && !pending && installed.signerSha256 != null,
+                    )
+                    if (binaryChecking) CircularProgressIndicator()
+                    val binaryLabel = when {
+                        binaryChecking -> "game_binary_checking"
+                        binaryEvidence == GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID -> "game_binary_match_android"
+                        binaryEvidence == GameBinaryEvidence.Status.MATCHED_GITHUB_GPLAY -> "game_binary_match_gplay"
+                        binaryEvidence == GameBinaryEvidence.Status.OTHER_OR_SPLIT -> "game_binary_other"
+                        binaryEvidence == GameBinaryEvidence.Status.UNAVAILABLE -> "game_binary_unavailable"
+                        binaryEvidence == GameBinaryEvidence.Status.UNSUPPORTED_VERSION -> "game_binary_unsupported"
+                        else -> "game_binary_not_checked"
+                    }
+                    Text(
+                        strings.text(binaryLabel),
+                        Modifier.testTag("game-binary-evidence-status").politeStatusSemantics(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     SecondaryButton(strings.text("game_capture_launch"), onLaunch, Modifier.fillMaxWidth())
                 }
             }
         }
+        GameAutomationModeControls(
+            desiredMode = desiredAutomationMode,
+            onModeChange = { mode ->
+                desiredAutomationMode = mode
+                automationEnabled = false
+            },
+            riskAcknowledged = automationRiskAcknowledged,
+            onRiskAcknowledged = { automationRiskAcknowledged = it },
+            rulesReviewed = automationRulesReviewed,
+            onRulesReviewed = { automationRulesReviewed = it },
+            decision = automationDecision,
+            preview = automationPreview,
+            stopLatched = automationStopLatched,
+            canResetStop = active && automationStopLatch.canResetForNewCapture(observation.captureId),
+            onEnable = {
+                if (!automationStopLatch.state.value.latched && automationPreview.canEnable) {
+                    automationEnabled = true
+                }
+            },
+            onResetStop = {
+                if (active) automationStopLatch.resetForNewCapture(observation.captureId)
+            },
+        )
         SentinelCard(kind = SentinelCardKind.OPERATIONAL) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val label = when (observation.status) {
                     ObservationStatus.WAITING -> "game_capture_waiting"
                     ObservationStatus.OBSERVING -> "game_capture_active"
                     ObservationStatus.PAUSED -> "game_capture_paused"
+                    ObservationStatus.FAILED -> "status_failed"
                     else -> "status_stopped"
                 }
                 StatusBadge(strings.text(label), when (observation.status) {
                     ObservationStatus.OBSERVING -> SentinelStatus.ACTIVE
                     ObservationStatus.WAITING -> SentinelStatus.PENDING
                     ObservationStatus.PAUSED -> SentinelStatus.WARNING
+                    ObservationStatus.FAILED -> SentinelStatus.FAILED
                     else -> SentinelStatus.STOPPED
-                })
+                }, Modifier.politeStatusSemantics().testTag("game-observation-state"))
                 Text(strings.text("game_capture_summary", observation.frames))
+                if (active && hudEvidenceState(observation, now) == HudEvidenceState.UNKNOWN) {
+                    Text(strings.text("game_capture_evidence_unknown"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 observation.lastOcrLatencyMs?.let { latency ->
                     Text(strings.text("game_capture_ocr_latency", latency), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -245,15 +563,19 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_capture_ocr_metrics_note"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                when (observation.reason) {
-                    "CONSENT_CANCELLED" -> Text(strings.text("game_capture_cancelled"))
-                    "CAPTURE_START_FAILED", "CAPTURE_RESIZE_FAILED", "RECOGNITION_UNAVAILABLE", "INVALID_CAPTURE_SIZE", "SESSION_OR_GAME_UNAVAILABLE" ->
-                        Text(strings.text("game_capture_failed"), color = MaterialTheme.colorScheme.error)
-                    "TIME_LIMIT" -> Text(strings.text("game_capture_time_limit"))
+                // The session has already stopped. Explain *why* it stopped, with
+                // exactly one accessible notice; never suggest a blind resume.
+                observerStopNotice(observation)?.let { notice ->
+                    Text(
+                        strings.text(notice.stringKey),
+                        modifier = (if (notice.urgent) Modifier.assertiveStatusSemantics()
+                            else Modifier.politeStatusSemantics())
+                            .testTag(if (notice.urgent) "game-observer-error" else "game-observer-notice"),
+                        color = if (notice.urgent) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-                if (active) {
-                    PrimaryButton(strings.text("game_capture_stop"), onStop, Modifier.fillMaxWidth().testTag("game-capture-stop"))
-                } else {
+                if (!active) {
                     Text(strings.text("game_capture_disclosure"))
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -276,6 +598,7 @@ internal fun GameObservationPanel(
                 Text(strings.text("game_knowledge_title"), style = MaterialTheme.typography.titleMedium)
                 val label = when (knowledge.state) {
                     "WAITING_FOR_VERIFIED_PROFILE" -> "game_knowledge_waiting"
+                    "WAITING_FOR_VERIFIED_OBSERVATION" -> "game_knowledge_observation_waiting"
                     "LOADING" -> "game_knowledge_loading"
                     "READY" -> "game_knowledge_ready"
                     "DENIED" -> "game_knowledge_denied"
@@ -289,10 +612,21 @@ internal fun GameObservationPanel(
                 }
             }
         }
-        observation.lastHealth?.let { last ->
+        ManualHealingReferencePanel(installed, observation.captureId, active)
+        ManualBurningReferencePanel(installed, observation.captureId, active)
+        val hudEvidence = hudEvidenceState(observation, now)
+        if (hudEvidence != HudEvidenceState.UNKNOWN) observation.lastHealth?.let { last ->
             SentinelCard(kind = SentinelCardKind.CONTENT) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DataText("INFERENCE")
+                    // Long safety labels must wrap at 200% font scaling, not ellipsize.
+                    Text(
+                        strings.text(if (hudEvidence == HudEvidenceState.RECENT_UNVERIFIED)
+                            "game_capture_evidence_recent" else "game_capture_evidence_historical"),
+                        modifier = Modifier.politeStatusSemantics().testTag("game-hud-evidence-status"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(strings.text("game_capture_health", last.candidate.current, last.candidate.maximum, last.candidate.shield))
                     Text(strings.text("game_capture_age", maxOf(0, (now - last.observedAt) / 1000)))
                     Text(strings.text("game_capture_hypothesis"), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -313,17 +647,18 @@ internal fun GameObservationPanel(
                     Text(strings.text("game_calibration_since_ocr", timing.afterOcrMs / 1000))
                 }
                 Text(strings.text("game_calibration_timing_note"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(expectedCurrent, { expectedCurrent = it.take(6) }, label = { Text(strings.text("game_calibration_current")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-current"))
+                OutlinedTextField(expectedMaximum, { expectedMaximum = it.take(6) }, label = { Text(strings.text("game_calibration_maximum")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth().testTag("game-calibration-maximum"))
                 SecondaryButton(strings.text("game_calibration_save"), {
                     var writeFailed = false
                     // Recheck the live session and installed APK at the actual Save boundary.
                     // A previously rendered frame or a paused historical candidate is not proof of a current observation.
                     val live = GameObservationRuntime.state.value
                     val currentInstall = ShatteredGameProfile.installed(context)
+                    val savedAt = SystemClock.elapsedRealtime()
                     val frameId = CalibrationSamplingGate.frameId(live.observation)
-                    val sample = if (frameId != null && CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
-                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime(), frameId, live.observation.lastCompletedFrameAt) { sample ->
+                    val sample = if (frameId != null && CalibrationSamplingGate.canSave(live.observation, live.installed, currentInstall, savedAt))
+                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), savedAt, frameId, live.observation.lastCompletedFrameAt) { sample ->
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
@@ -349,12 +684,22 @@ internal fun GameObservationPanel(
                         sampleCount = campaign.count
                         calibrationMessage = "game_calibration_saved"
                     }
-                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSample(observation, state.installed, installed) && sampleCount < 32)
+                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSave(observation, state.installed, installed, now) && sampleCount < 32)
                 Text(strings.text("game_calibration_count", sampleCount))
+                if (sampleCount > 0) {
+                    val review = campaign.comparisonSummary()
+                    Text(strings.text("game_calibration_review_counts",
+                        review.exactPairs, review.differentPairs, review.missingOcr),
+                        modifier = Modifier.testTag("game-calibration-review-counts"))
+                    Text(strings.text("game_calibration_review_delay", review.delayedAtSave, review.saved))
+                    Text(strings.text("game_calibration_review_scope"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (calibrationMessage.isNotBlank()) Text(strings.text(calibrationMessage))
                 Text(strings.text("game_calibration_action_gate"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Text(strings.text("game_capture_boundary"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }

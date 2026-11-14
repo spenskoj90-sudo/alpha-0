@@ -1,19 +1,34 @@
 package com.alpha0.app.game
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import com.alpha0.app.ui.AppThemeMode
 import com.alpha0.app.ui.SentinelTheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /** UI permission/state boundaries; not physical game or MediaProjection acceptance. */
 class GameObservationScreenInstrumentedTest {
@@ -28,6 +43,109 @@ class GameObservationScreenInstrumentedTest {
         }
         compose.onNodeWithText("Waiting for a verified target profile").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Review defense").assertDoesNotExist()
+    }
+
+    @Test fun automationModesStayOffUntilExactTargetAndSourceEvidenceExist() {
+        val latch = GameAutomationStopLatch()
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {}, automationStopLatch = latch)
+            }
+        }
+        compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-mode-bounded_active").performScrollTo().performClick()
+        compose.onNodeWithTag("game-automation-risk-ack").performScrollTo().performClick()
+        compose.onNodeWithTag("game-automation-rules-reviewed").performScrollTo().performClick()
+        compose.onNodeWithText("Exact game target/profile is not verified", substring = true)
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-enable").assertIsNotEnabled()
+        compose.onNodeWithTag("game-automation-stop").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Effective mode: OFF", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-stop-latched").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test fun resetStopStaysDisabledUntilAnActualNewActiveCaptureIsObserved() {
+        val latch = GameAutomationStopLatch()
+        val install = StockGameInstall("fixture", 1)
+        val observed = mutableStateOf(GameObservationViewState())
+        latch.stop(null)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install, observed.value, true, false, false, 100,
+                    {}, {}, {}, {}, automationStopLatch = latch)
+            }
+        }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
+        // Merely changing a caller-provided ID cannot open the latch.
+        compose.runOnIdle {
+            observed.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "new-capture"), install,
+            )
+        }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsNotEnabled()
+        // This event comes from the real service in production (the test supplies it explicitly).
+        compose.runOnIdle { latch.onCaptureStarted("new-capture") }
+        compose.onNodeWithTag("game-automation-reset-stop").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("game-automation-reset-stop").performClick()
+        compose.runOnIdle { assertTrue(!latch.state.value.latched) }
+    }
+
+    @Test fun lifecycleStopLatchesCurrentCaptureAfterGenerationChanges() {
+        val latch = GameAutomationStopLatch()
+        val install = StockGameInstall("fixture", 1)
+        val source = mutableStateOf(
+            GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-A"), install,
+            ),
+        )
+        val owner = object : LifecycleOwner {
+            val registry = LifecycleRegistry(this)
+            override val lifecycle: Lifecycle get() = registry
+        }
+        compose.runOnUiThread { owner.registry.currentState = Lifecycle.State.RESUMED }
+        compose.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                SentinelTheme(AppThemeMode.LIGHT) {
+                    GameObservationPanel(install, source.value, true, false, false, 100,
+                        {}, {}, {}, {}, automationStopLatch = latch)
+                }
+            }
+        }
+        compose.runOnIdle {
+            source.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-B"), install,
+            )
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { owner.registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP) }
+        compose.runOnIdle {
+            assertTrue(latch.state.value.latched)
+            assertEquals("capture-B", latch.state.value.stoppedCaptureId)
+        }
+    }
+
+    @Test fun comparisonSummaryIsVisibleWithoutGameAuthority() {
+        val install = StockGameInstall("fixture", 1)
+        GameObservationRuntime.calibration.clear()
+        val c = GameObservationRuntime.calibration.forCapture("review-fixture", install).campaign
+        assertTrue(c.record("9", "20", HealthObservation(HealthCandidate(9, 20, 0), 100),
+            120, CalibrationFrameId("review-fixture", 1), 100) != null)
+        assertTrue(c.record("10", "20", null, 200,
+            CalibrationFrameId("review-fixture", 2), 200) != null)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install,
+                    GameObservationViewState(ObservationSnapshot(
+                        status = ObservationStatus.WAITING, captureId = "review-fixture"), install),
+                    true, false, false, 300, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-calibration-review-counts").performScrollTo()
+            .assertTextContains("matching 1 · different 0 · OCR missing 1", substring = true)
+        compose.onNodeWithText("Waiting for a verified target profile").performScrollTo().assertIsDisplayed()
+        GameObservationRuntime.calibration.clear()
     }
 
     @Test fun missingGameCannotStartCaptureEvenWithConsent() {
@@ -56,8 +174,274 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-capture-start").assertIsEnabled()
         compose.runOnIdle { state.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.PAUSED)) }
         compose.onNodeWithTag("game-capture-start").assertDoesNotExist()
-        compose.onNodeWithTag("game-capture-stop").performScrollTo().performClick()
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed().performClick()
         compose.runOnIdle { assertTrue(stopped) }
+    }
+
+    @Test fun localSignerMetadataNeverClaimsPublisherOrCaptureSource() {
+        val install = mutableStateOf(StockGameInstall("fixture", 1, "a".repeat(64)))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install.value, GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Installed game package: com.shatteredpixel.shatteredpixeldungeon")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(
+            "Installed APK signer detected locally; publisher identity and selected capture app remain UNVERIFIED.",
+        ).performScrollTo().assertIsDisplayed()
+        // Complete 64-digit fingerprint, broken into readable groups without loss.
+        compose.onNodeWithTag("game-installed-certificate").performScrollTo()
+            .assertTextContains(("aaaaaaaa ".repeat(7) + "aaaaaaaa"), substring = true)
+        compose.runOnIdle { install.value = StockGameInstall("fixture", 1) }
+        compose.onNodeWithText("Installed APK signer UNKNOWN. Game version and capture-source identity are not verified.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("game-installed-certificate").assertDoesNotExist()
+        // Unexpected/malformed metadata must not masquerade as a valid SHA-256.
+        compose.runOnIdle { install.value = StockGameInstall("fixture", 1, "untrusted") }
+        compose.onNodeWithTag("game-installed-certificate").assertDoesNotExist()
+    }
+
+    @Test fun localGameBinaryCheckIsOptInAndNeverAuthorizesProjectedContent() {
+        val status = mutableStateOf(GameBinaryEvidence.Status.NOT_CHECKED)
+        val clicks = AtomicInteger(0)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(
+                    StockGameInstall("4.0.2", 922, "a".repeat(64)),
+                    GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {},
+                    binaryEvidence = status.value,
+                    onVerifyBinary = { clicks.incrementAndGet() },
+                )
+            }
+        }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT CHECKED", substring = true)
+        compose.onNodeWithTag("game-binary-check").performScrollTo()
+        // Scroll animations and delayed pointer delivery on slower API 34
+        // must finish before testing the *physical* click. No semantics
+        // bypass or assertion relaxation: require exactly one callback.
+        compose.waitForIdle()
+        compose.onNodeWithTag("game-binary-check")
+            .assertIsDisplayed().assertIsEnabled().performClick()
+        compose.waitUntil(timeoutMillis = 3000) { clicks.get() == 1 }
+        compose.runOnIdle { assertEquals("local APK-check click callback count", 1, clicks.get()) }
+        compose.runOnIdle { status.value = GameBinaryEvidence.Status.MATCHED_GITHUB_ANDROID }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("Captured content remains UNVERIFIED.", substring = true)
+        compose.onNodeWithText(
+            "Game input: OFF. This screen only collects local diagnostic evidence; it cannot authorize recommendations or actions.",
+        ).performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { status.value = GameBinaryEvidence.Status.OTHER_OR_SPLIT }
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT proof of tampering", substring = true)
+    }
+
+    @Test fun pendingConsentAndActiveCaptureBlockLocalApkHash() {
+        val install = StockGameInstall("4.0.2", 922, "a".repeat(64))
+        val isPending = mutableStateOf(true)
+        val snapshot = mutableStateOf(GameObservationViewState())
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install, snapshot.value, true, false, isPending.value, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle {
+            isPending.value = false
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-1"), install)
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test fun signerUnknownCannotStartLocalBinaryHash() {
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(
+                    StockGameInstall("4.0.2", 922, null),
+                    GameObservationViewState(), true, false, false, 100,
+                    {}, {}, {}, {},
+                )
+            }
+        }
+        compose.onNodeWithTag("game-binary-check").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("game-binary-evidence-status").performScrollTo()
+            .assertTextContains("NOT CHECKED", substring = true)
+    }
+
+    @Test fun stopRemainsVisibleWithoutScrollingWhenCalibrationIsBelowFold() {
+        val state = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.OBSERVING, frames = 8),
+        ))
+        var stops = 0
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), state.value, true, false, false, 100,
+                    {}, {}, { stops++ }, {})
+            }
+        }
+        // A screen-filling diagnostic/calibration column must not push Stop off screen.
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertTrue(stops == 1) }
+        compose.runOnIdle {
+            state.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED),
+            )
+        }
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+    }
+
+    @Test fun numericCalibrationFormClearsOnStopAndFreshCapture() {
+        val active = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.PAUSED, captureId = "capture-a"),
+            StockGameInstall("fixture", 1),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), active.value, true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-calibration-current")
+            .performScrollTo().performTextInput("15")
+        compose.onNodeWithTag("game-calibration-maximum")
+            .performScrollTo().performTextInput("20")
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("15")
+        // Even while the numeric field owns IME focus, the user's Stop remains reachable.
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed()
+        compose.runOnIdle {
+            active.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED), StockGameInstall("fixture", 1),
+            )
+        }
+        // The previous capture's typed private comparison must not survive Stop.
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
+        compose.onNodeWithTag("game-calibration-maximum").assertTextContains("", substring = false)
+        compose.runOnIdle {
+            active.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.WAITING, captureId = "capture-b"),
+                StockGameInstall("fixture", 1),
+            )
+        }
+        compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
+    }
+
+    @Test fun recentOcrHypothesisDegradesToHistoryThenDisappearsOnStop() {
+        val health = HealthCandidate(8, 20, 0)
+        val snapshot = ObservationSnapshot(
+            status = ObservationStatus.OBSERVING, captureId = "capture-a",
+            frames = 1, lastFrameAt = 110L, health = health,
+            lastHealth = HealthObservation(health, 110L),
+            lastRecognizedFrameAt = 110L,
+            lastCompletedFrameSequence = 1L, lastCompletedFrameAt = 110L,
+            lastCompletedOcrAt = 111L, lastOcrLatencyMs = 1L,
+        )
+        val state = mutableStateOf(GameObservationViewState(snapshot, StockGameInstall("fixture", 1)))
+        val now = mutableStateOf(111L)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), state.value, true, false, false, now.value,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText("Recent OCR hypothesis · NOT verified game state")
+            .performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { now.value = 5111L }
+        compose.onNodeWithText("Historical OCR only · NOT current health")
+            .performScrollTo().assertIsDisplayed()
+        compose.runOnIdle {
+            state.value = GameObservationViewState(ObservationSnapshot(status = ObservationStatus.STOPPED))
+        }
+        compose.onNodeWithText("Historical OCR only · NOT current health").assertDoesNotExist()
+    }
+
+    @Test fun captureFailureAnnouncesExactlyOneErrorAndAccessibleState() {
+        val failed = GameObservationViewState(ObservationSnapshot(
+            status = ObservationStatus.FAILED, reason = "CAPTURE_RESIZE_FAILED",
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), failed, true, false, false, 100,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-observation-state").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+        )
+        compose.onAllNodesWithTag("game-observer-error").assertCountEquals(1)
+        compose.onNodeWithTag("game-observer-error").performScrollTo().assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive)
+        )
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+    }
+
+    @Test fun revokedCaptureShowsOneAssertiveReasonAndNoStopOrLiveEvidence() {
+        val snapshot = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "CAPTURE_REVOKED"),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), snapshot.value, true, false, false, 200,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onAllNodesWithTag("game-observer-error").assertCountEquals(1)
+        compose.onNodeWithTag("game-observer-error").performScrollTo()
+            .assertTextContains("Android ended screen sharing or its permission was revoked.", substring = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Assertive))
+        compose.onNodeWithTag("game-capture-stop").assertDoesNotExist()
+        compose.onNodeWithTag("game-hud-evidence-status").assertDoesNotExist()
+        compose.runOnIdle {
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "USER_STOP"),
+            )
+        }
+        compose.onNodeWithTag("game-observer-error").assertDoesNotExist()
+    }
+
+    @Test fun expiredCaptureAndInvalidSessionShowDistinctRecoveryNotices() {
+        val snapshot = mutableStateOf(GameObservationViewState(
+            ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "TIME_LIMIT"),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(StockGameInstall("fixture", 1), snapshot.value, true, false, false, 200,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-observer-notice").performScrollTo()
+            .assertTextContains("The five-minute test ended.", substring = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.runOnIdle {
+            snapshot.value = GameObservationViewState(
+                ObservationSnapshot(status = ObservationStatus.STOPPED, reason = "SESSION_CHECK_TIMEOUT"),
+            )
+        }
+        compose.onNodeWithTag("game-observer-notice").assertDoesNotExist()
+        compose.onNodeWithTag("game-observer-error").performScrollTo()
+            .assertTextContains("account session or installed game could not be verified", substring = true)
+    }
+
+    @Test fun longHistoricalOcrWarningExposesFullAccessibleText() {
+        val health = HealthCandidate(4, 20, 0)
+        val paused = GameObservationViewState(ObservationSnapshot(
+            status = ObservationStatus.PAUSED, captureId = "capture-a",
+            frames = 1, lastHealth = HealthObservation(health, 110L),
+        ))
+        compose.setContent {
+            SentinelTheme(AppThemeMode.DARK) {
+                GameObservationPanel(StockGameInstall("fixture", 1), paused, true, false, false, 5111,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-hud-evidence-status").performScrollTo()
+            .assertTextContains("Historical OCR only · NOT current health")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        compose.onNodeWithTag("game-capture-stop").assertIsDisplayed()
     }
 
     @Test fun journeyExplainsNextStepAndKeepsInputOff() {

@@ -11,7 +11,7 @@ import org.junit.Test
 class KnowledgePresentationTest {
     @Test fun unverifiedShippedProfileNeverOpensCacheOrNetwork() {
         val opened = AtomicInteger()
-        val controller = KnowledgePresentation({ null }, { null }, { opened.incrementAndGet(); throw AssertionError("untrusted cache") })
+        val controller = KnowledgePresentation({ null }, { KnowledgeObservationInput.Unavailable }, { opened.incrementAndGet(); throw AssertionError("untrusted cache") })
         try {
             controller.start()
             assertEquals("WAITING_FOR_VERIFIED_PROFILE", controller.state().state)
@@ -23,7 +23,7 @@ class KnowledgePresentationTest {
     @Test fun lateFetchAfterStopCannotPublishReadyAndRestartNeedsFreshManifest() {
         val entered = CountDownLatch(1); val finish = CountDownLatch(1); val fetched = CountDownLatch(1)
         val raw = KnowledgeFixture.bytes(); val digest = KnowledgeFixture.digest(raw)
-        val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source-a", "session-a", "http://127.0.0.1")
+        val binding = TrustedKnowledgeBinding(KnowledgeFixture.profile, "source-a", "session-a", "http://127.0.0.1", KnowledgeFixture.target)
         val directory = Files.createTempDirectory("presentation").toFile()
         val transport = object : KnowledgeDistributionTransport {
             override fun manifest(profile: KnowledgeProfile, knownDigest: String?, budget: KnowledgeBudget): JSONObject {
@@ -35,7 +35,7 @@ class KnowledgePresentationTest {
             override fun pack(profile: KnowledgeProfile, digest: String, budget: KnowledgeBudget): ByteArray { fetched.countDown(); return raw }
             override fun delta(profile: KnowledgeProfile, destination: String, base: String, budget: KnowledgeBudget) = throw AssertionError()
         }
-        val controller = KnowledgePresentation({ binding }, { null }, { KnowledgeCache(directory, it, transport, { 1000 }) })
+        val controller = KnowledgePresentation({ binding }, { KnowledgeObservationInput.Unavailable }, { KnowledgeCache(directory, it, transport, { 1000 }) })
         try {
             controller.start(); assertTrue(entered.await(2, TimeUnit.SECONDS))
             val before = System.nanoTime(); controller.stop()

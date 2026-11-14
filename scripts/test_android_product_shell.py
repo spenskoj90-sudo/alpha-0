@@ -170,6 +170,47 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn("SENTINEL_PHYSICAL_TEST_VERSION_CODE", self.gradle)
         self.assertIn("physicalTestVersionCode", self.gradle)
 
+    def test_play_update_status_does_not_claim_latest_without_positive_evidence(self) -> None:
+        self.assertIn('UpdateState.IDLE -> "update_not_checked"', self.update)
+        self.assertIn("UpdateAvailability.UPDATE_NOT_AVAILABLE ->", self.update)
+        self.assertIn("UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> UpdateState.STORE_UPDATE", self.update)
+        self.assertIn('UpdateState.STORE_UPDATE -> "update_open_play_required"', self.update)
+        app_strings = read("app/src/main/java/com/alpha0/app/ui/AppStrings.kt")
+        self.assertEqual(app_strings.count('"update_not_checked" to '), 2)
+        self.assertEqual(app_strings.count('"update_open_play_required" to '), 2)
+
+    def test_game_reference_route_observes_live_capture_status(self) -> None:
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        self.assertIn("GameObservationRuntime.state.collectAsStateWithLifecycle()", reference)
+        self.assertIn("ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED", reference)
+        self.assertIn("ManualHealingReferencePanel(installed, captureId, captureActive)", reference)
+        self.assertIn("ManualBurningReferencePanel(installed, captureId, captureActive)", reference)
+
+    def test_resume_revokes_active_capture_on_installed_game_change_on_both_routes(self) -> None:
+        source = read("app/src/main/java/com/alpha0/app/game/StockGameInstall.kt")
+        observer = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        self.assertIn("fun activeCaptureRequiresStop(", source)
+        self.assertIn("ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED", source)
+        for screen in (observer, reference):
+            self.assertIn("Lifecycle.Event.ON_RESUME", screen)
+            self.assertIn("GameInstallFence.activeCaptureRequiresStop(GameObservationRuntime.state.value, observedInstall)", screen)
+            self.assertIn('GameObservationService.stop(context, "GAME_CHANGED")', screen)
+
+    def test_signed_feed_limits_total_elapsed_transfer_as_well_as_each_read(self) -> None:
+        feed = read("app/src/main/java/com/alpha0/app/update/FeedUpdateClient.kt")
+        stream = read("app/src/main/java/com/alpha0/app/update/ApkByteStream.kt")
+        budget = read("app/src/main/java/com/alpha0/app/update/TransferDeadline.kt")
+        self.assertIn("TransferDeadline(SystemClock::elapsedRealtime, FEED_TOTAL_TIMEOUT_MS)", feed)
+        self.assertIn("TransferDeadline(SystemClock::elapsedRealtime, APK_TOTAL_TIMEOUT_MS)", feed)
+        self.assertIn("readBounded(conn, FEED_CAP_BYTES) {", feed)
+        self.assertIn("deadline.check()", feed)
+        self.assertIn("checkCancellation = {", feed)
+        self.assertIn("val count = input.read(buffer)", stream)
+        self.assertIn("A read may have blocked until cancellation/deadline occurred.", stream)
+        self.assertEqual(stream.count("checkCancellation()"), 2)
+        self.assertIn("NETWORK_TRANSFER_DEADLINE", budget)
+
     def test_modern_android_platform_baseline_is_explicit(self) -> None:
         root_gradle = read("build.gradle.kts")
         wrapper = read("gradle/wrapper/gradle-wrapper.properties")
@@ -201,7 +242,12 @@ class AndroidProductShellTests(unittest.TestCase):
         self.assertIn('implementation("com.google.android.libraries.identity.googleid:googleid:1.2.1")', self.gradle)
         self.assertIn("GetGoogleIdOption.Builder()", coordinator)
         self.assertIn(".setNonce(challenge.nonce)", coordinator)
-        self.assertIn("MessageDigest.isEqual", coordinator)
+        callback_policy = read("app/src/main/java/com/alpha0/app/auth/PendingCallbackPolicy.kt")
+        self.assertIn("MessageDigest.isEqual", callback_policy)
+        self.assertIn("stateStore.consumeMatching(", coordinator)
+        self.assertNotIn("stateStore.consume(context)", coordinator)
+        self.assertIn("PendingCallbackPolicy.classify(", state_store)
+        self.assertIn("prefs.edit().remove(PAYLOAD).commit()", state_store)
         self.assertIn("FederatedAuthStateStore.Pending", coordinator)
         self.assertIn("AndroidKeyStore", state_store)
         self.assertIn("code_verifier", auth_api)
@@ -273,6 +319,116 @@ class AndroidProductShellTests(unittest.TestCase):
         for channel in ("development", "diagnostic", "play"):
             self.assertIn(f'SENTINEL_DISTRIBUTION_CHANNEL", "\\\"{channel}\\\""', self.gradle)
         self.assertIn("BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL", self.update)
+
+    def test_manual_game_reference_remains_accessible_when_capture_is_disabled(self) -> None:
+        reference = read("app/src/main/java/com/alpha0/app/game/GameReferenceScreen.kt")
+        games = read("app/src/main/java/com/alpha0/app/dashboard/ProductScreens.kt")
+        self.assertIn('composable("game-reference")', self.main)
+        self.assertIn('onLocalReferenceClick = { navController.navigate("game-reference") }', self.main)
+        self.assertIn('AuthenticatedRoute(activeSession, sessionStore, activity, navController)', self.main)
+        self.assertIn('onLocalReferenceClick != null || onLocalGameClick != null', games)
+        # Disabled capture remains a supported default for isolated reference
+        # tests, but the real route must use shared live observation state.
+        self.assertIn('captureActive: Boolean = false', reference)
+        self.assertIn('GameObservationRuntime.state.collectAsStateWithLifecycle()', reference)
+        self.assertIn('ManualHealingReferencePanel(installed, captureId, captureActive)', reference)
+        self.assertIn('ManualBurningReferencePanel(installed, captureId, captureActive)', reference)
+        self.assertNotIn('ManualHealingReferencePanel(installed, null, false)', reference)
+        self.assertNotIn('ManualBurningReferencePanel(installed, null, false)', reference)
+        # The read-only reference may revoke an existing capture on game drift,
+        # but must not create, launch or otherwise claim MediaProjection authority.
+        self.assertNotIn('GameObservationService.start(', reference)
+        self.assertIn('GameObservationService.stop(context, "GAME_CHANGED")', reference)
+        self.assertNotIn('MediaProjection', reference)
+        # Keep the independent capture route and its channel/OS permission fences.
+        self.assertIn('onLocalGameClick = if (ObservationCapturePolicy.supports(', self.main)
+        self.assertIn('ObservationCapturePolicy.supports(', read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt"))
+        self.assertIn('ObservationCapturePolicy.supports(', read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt"))
+
+    def test_signed_feed_readonly_observation_is_reachable_from_games(self) -> None:
+        # The service must be navigable through Games in the same allowed channels.
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        service = read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/ObservationCapturePolicy.kt")
+        self.assertIn('composable("game-observer")', self.main)
+        self.assertIn('onLocalGameClick = if (ObservationCapturePolicy.supports(', self.main)
+        self.assertNotIn('onLocalGameClick = if (BuildConfig.DEBUG)', self.main)
+        self.assertIn('ObservationCapturePolicy.supports(', screen)
+        self.assertIn('ObservationCapturePolicy.supports(', service)
+        # Lint NewApi must see an explicit SDK check before typed Parcelable API.
+        self.assertIn('if (Build.VERSION.SDK_INT < 34 ||', service)
+        self.assertLess(service.index('if (Build.VERSION.SDK_INT < 34 ||'),
+                        service.index('getParcelableExtra(CONSENT, Intent::class.java)'))
+        self.assertIn('manifestPlaceholders["gameObservationEnabled"] = "true"', self.gradle)
+        self.assertIn('"signed_feed" -> !debuggable', policy)
+        self.assertIn('"development", "diagnostic" -> debuggable', policy)
+        self.assertIn('else -> false', policy)
+
+
+    def test_capture_session_generation_fence_spans_checkbox_chooser_service_and_frames(self) -> None:
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        service = read("app/src/main/java/com/alpha0/app/game/GameObservationService.kt")
+        session_store = read("app/src/main/java/com/alpha0/app/security/SecureSessionStore.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/CaptureSessionFence.kt")
+        self.assertIn("data class CaptureSessionBinding", policy)
+        self.assertIn("expected.deviceId == actualDeviceId && expected.epoch == actualEpoch", policy)
+        self.assertIn("acknowledgedSession = CaptureSessionFence.snapshot(", screen)
+        self.assertIn("pendingSession = binding", screen)
+        self.assertIn("!CaptureSessionFence.isCurrent(expectedSession, session?.deviceId, session?.epoch)", screen)
+        self.assertIn("GameObservationService.start(context, result.data!!, currentInstall!!, expectedSession!!)", screen)
+        self.assertIn("!CaptureSessionFence.isCurrent(expectedSession, current?.deviceId, current?.epoch)", service)
+        self.assertIn(".putExtra(SESSION_DEVICE, session.deviceId).putExtra(SESSION_EPOCH, session.epoch)", service)
+        self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return finish", service)
+        self.assertIn("if (sessionEpoch != SecureSessionStore.currentEpoch()) return@use finish", service)
+        self.assertIn("if (!stopping && sessionEpoch != SecureSessionStore.currentEpoch())", service)
+        self.assertIn("@Volatile private var epoch = 0L", session_store)
+        self.assertIn("fun currentEpoch(): Long = epoch", session_store)
+
+    def test_game_capture_chooser_rechecks_displayed_installed_game_and_consent(self) -> None:
+        screen = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        policy = read("app/src/main/java/com/alpha0/app/game/ObservationCapturePolicy.kt")
+        self.assertIn("fun canRequestConsent(", policy)
+        start = screen.index("        onStart = {")
+        end = screen.index("        onStop =", start)
+        request = screen[start:end]
+        self.assertIn("val liveStatus = GameObservationRuntime.state.value.observation.status", request)
+        self.assertIn("if (!browserSelected && !pending && liveStatus !in setOf(", request)
+        self.assertIn(
+            '!wasPending || browserSelected -> GameObservationRuntime.stop("CONSENT_CANCELLED")',
+            screen,
+        )
+        # A pending projection result must be invalidated before a profile
+        # switch can display another game, never merely renamed as a new source.
+        transition = screen[screen.index("        onOpenBrowserProfile = {"):]
+        transition = transition[:transition.index("        installed = installed,")]
+        for cleared in (
+            "pending = false", "pendingSession = null", "pendingVersion = null",
+            "pendingVersionName = null", "pendingSigner = null",
+            "acknowledgedSession = null", "consent = false", "binaryJob?.cancel()",
+        ):
+            self.assertIn(cleared, transition)
+            self.assertLess(transition.index(cleared), transition.index(
+                'GameObservationService.stop(context, "GAME_CHANGED")'
+            ))
+        self.assertLess(
+            transition.index('GameObservationService.stop(context, "GAME_CHANGED")'),
+            transition.index("browserSelected = true"),
+        )
+        self.assertIn("!ObservationCapturePolicy.canRequestConsent(captureSupported, consent, installed, current)", request)
+        self.assertIn("installed = current", request)
+        self.assertLess(request.index("canRequestConsent("),
+                        request.index("launcher.launch(manager.createScreenCaptureIntent())"))
+
+    def test_local_apk_hash_is_revoked_before_projection_consent(self) -> None:
+        observer = read("app/src/main/java/com/alpha0/app/game/GameObservationScreen.kt")
+        self.assertIn("val observedStatus = GameObservationRuntime.state.value.observation.status", observer)
+        self.assertIn("observedStatus !in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)", observer)
+        self.assertIn("enabled = !binaryChecking && !active && !pending", observer)
+        start = observer.index('        onStart = {')
+        cancel = observer.index('binaryJob?.cancel()', start)
+        consent = observer.index('launcher.launch(manager.createScreenCaptureIntent())', start)
+        self.assertLess(start, cancel)
+        self.assertLess(cancel, consent)
 
     def test_landscape_shell_preserves_vertical_content_budget(self) -> None:
         self.assertIn("Configuration.ORIENTATION_LANDSCAPE", self.main)

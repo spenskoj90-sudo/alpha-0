@@ -40,6 +40,8 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace assembleDebug
       - name: Run Unit Tests
         run: ./gradlew --no-daemon --stacktrace test
+      - name: Verify real non-Play compiled APK with disposable test keys (never distribute)
+        run: python3 scripts/signed_feed_ci_smoke.py
       - name: Verify APK exists
         run: test -s app/build/outputs/apk/debug/app-debug.apk
       - name: Create non-installable debug build receipt
@@ -59,6 +61,7 @@ jobs:
           name: alpha-0-debug-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             android-debug-ci.sha256
+            signed-feed-ci-receipt.json
             ANDROID_DEBUG_CI_ONLY.txt
           if-no-files-found: error
           retention-days: 14

@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 internal object KnowledgeFixture {
+    val target = KnowledgeTargetIdentity("synthetic.fixture", "a".repeat(64), "1", 1, "b".repeat(40))
     val profile = KnowledgeProfile("fixture", "android", "1", "offline-fixture", "tank")
     fun bytes(version: String = "1"): ByteArray = JSONObject().apply {
         put("schema_version", 1); put("id", "fixture"); put("version", version)

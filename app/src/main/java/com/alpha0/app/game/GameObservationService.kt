@@ -53,6 +53,7 @@ class GameObservationService : Service() {
     private var recognizer: TextRecognizer? = null
     private var sessionId: String? = null
     private var deviceId: String? = null
+    private var sessionEpoch: Long? = null
     private var stopping = false
     private var receiverRegistered = false
     private var recognitionBusy = false
@@ -72,12 +73,14 @@ class GameObservationService : Service() {
 
         override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
             val id = sessionId ?: return
+            if (!isVisible) com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
             GameObservationRuntime.session.visibility(id, isVisible, now())
             GameObservationRuntime.publish()
         }
 
         override fun onCapturedContentResize(width: Int, height: Int) {
             if (stopping) return
+            com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
             sessionId?.let { GameObservationRuntime.session.invalidate(it); GameObservationRuntime.publish() }
             val size = CaptureSize.fit(width, height) ?: return finish("INVALID_CAPTURE_SIZE")
             try {
@@ -99,6 +102,8 @@ class GameObservationService : Service() {
             if (stopping || sessionId == null) return
             val elapsed = now()
             if (!GameObservationRuntime.session.tick(elapsed)) return finish(GameObservationRuntime.session.snapshot.reason)
+            // Memory-only epoch check is safe on the main heartbeat; no Keystore I/O.
+            if (sessionEpoch != SecureSessionStore.currentEpoch()) return finish("SESSION_CLOSED")
             if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked != false) return finish("SCREEN_LOCKED")
             // Never block the main-thread capture/Stop heartbeat on Keystore I/O.
             // A missing, hung, or failed check stops capture instead of trusting old state.
@@ -143,7 +148,12 @@ class GameObservationService : Service() {
             return START_NOT_STICKY
         }
         if (sessionId != null || stopping) return START_NOT_STICKY
-        if (!BuildConfig.DEBUG || Build.VERSION.SDK_INT < 34) {
+        // Android Lint must see this SDK guard directly: the typed
+        // getParcelableExtra overload below was introduced in API 33.
+        // The shared policy independently checks channel, debug and API 34+.
+        if (Build.VERSION.SDK_INT < 34 ||
+            !ObservationCapturePolicy.supports(BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL, Build.VERSION.SDK_INT)
+        ) {
             finish("ANDROID_14_REQUIRED")
             return START_NOT_STICKY
         }
@@ -151,7 +161,11 @@ class GameObservationService : Service() {
             val consent = intent?.getParcelableExtra(CONSENT, Intent::class.java)
             val current = SecureSessionStore().load(this)
             val install = ShatteredGameProfile.installed(this)
-            if (consent == null || current?.deviceId.isNullOrBlank() || install == null ||
+            val expectedSession = CaptureSessionFence.snapshot(
+                intent?.getStringExtra(SESSION_DEVICE), intent?.getLongExtra(SESSION_EPOCH, -1L),
+            )
+            if (consent == null || install == null ||
+                !CaptureSessionFence.isCurrent(expectedSession, current?.deviceId, current?.epoch) ||
                 !GameInstallFence.matches(
                     intent?.getStringExtra(VERSION_NAME),
                     intent?.getLongExtra(VERSION, -1),
@@ -178,6 +192,7 @@ class GameObservationService : Service() {
                 .build()
             startForeground(7401, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
             deviceId = current!!.deviceId
+            sessionEpoch = current.epoch
             val id = UUID.randomUUID().toString()
             sessionId = id
             GameObservationRuntime.begin(install, id, now())
@@ -214,6 +229,7 @@ class GameObservationService : Service() {
             val image = try { source.acquireLatestImage() } catch (_: IllegalStateException) { null }
             image?.use { frame ->
                 val id = sessionId ?: return@use
+                if (sessionEpoch != SecureSessionStore.currentEpoch()) return@use finish("SESSION_CLOSED")
                 val capturedAt = now()
                 if (stopping || recognitionBusy || capturedAt - lastProcessedAt < 2000) return@use
                 if (!GameObservationRuntime.session.frame(id, capturedAt)) return@use
@@ -231,7 +247,9 @@ class GameObservationService : Service() {
                         catch (error: Exception) { input.recycle(); recognitionBusy = false; throw error }
                     task.addOnCompleteListener { result ->
                         try {
-                            if (!stopping && result.isSuccessful) {
+                            if (!stopping && sessionEpoch != SecureSessionStore.currentEpoch()) {
+                                finish("SESSION_CLOSED")
+                            } else if (!stopping && result.isSuccessful) {
                                 val lines = result.result.textBlocks.flatMap { it.lines }.take(65).mapNotNull { line ->
                                     line.boundingBox?.let { box ->
                                         ScreenTextLine(line.text.take(65), (width * .04f).toInt().toFloat() / width + box.left / (2f * width),
@@ -303,6 +321,7 @@ class GameObservationService : Service() {
             "ocr_max_latency_ms" to GameObservationRuntime.session.snapshot.maxOcrLatencyMs,
         ))
         sessionId = null
+        sessionEpoch = null
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -326,12 +345,15 @@ class GameObservationService : Service() {
         private const val VERSION = "game-version"
         private const val VERSION_NAME = "game-version-name"
         private const val SIGNER = "game-signer-sha256"
+        private const val SESSION_DEVICE = "capture-session-device-id"
+        private const val SESSION_EPOCH = "capture-session-epoch"
         private const val STOP = "com.alpha0.app.game.STOP_OBSERVATION"
-        fun start(context: Context, consent: Intent, install: StockGameInstall) {
+        internal fun start(context: Context, consent: Intent, install: StockGameInstall, session: CaptureSessionBinding) {
             try {
                 ContextCompat.startForegroundService(context, Intent(context, GameObservationService::class.java)
                     .putExtra(CONSENT, consent).putExtra(VERSION, install.versionCode)
-                    .putExtra(VERSION_NAME, install.versionName).putExtra(SIGNER, install.signerSha256))
+                    .putExtra(VERSION_NAME, install.versionName).putExtra(SIGNER, install.signerSha256)
+                    .putExtra(SESSION_DEVICE, session.deviceId).putExtra(SESSION_EPOCH, session.epoch))
             } catch (_: Exception) {
                 GameObservationRuntime.stop("CAPTURE_START_FAILED")
             }

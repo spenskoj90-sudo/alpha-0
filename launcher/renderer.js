@@ -41,6 +41,9 @@ let voiceCaptureDiscarded = false;
 let voiceBusy = false;
 let suppressNextVoiceClick = false;
 let voiceHoldActive = false;
+// Monotonic generation; any revoke invalidates pending mic permission or media replies.
+let voiceCaptureEpoch = 0;
+let voiceFeedbackPlayback = null;
 
 function refreshButtons() {
   loginButton.disabled = signedIn || mfaRequired;
@@ -50,8 +53,8 @@ function refreshButtons() {
   startButton.disabled = !signedIn || companionState !== 'STOPPED' || !grantedFeatures.includes('companion');
   stopButton.disabled = companionState === 'STOPPED';
 
-  const companionReady = ['ACTIVE', 'DEGRADED'].includes(companionState);
-  const voiceReady = signedIn && grantedFeatures.includes('companion') && companionReady && currentVoice.consentGranted && currentVoice.sttAvailable;
+  const companionReady = companionState === 'ACTIVE';
+  const voiceReady = signedIn && grantedFeatures.includes('companion') && companionReady && currentVoice.state === 'READY' && currentVoice.consentGranted === true && currentVoice.sttAvailable === true;
   voiceConsent.disabled = !signedIn || !grantedFeatures.includes('companion') || voiceBusy || Boolean(voiceRecorder);
   voiceLocale.disabled = voiceBusy || Boolean(voiceRecorder);
   voicePtt.disabled = voiceRecorder ? false : (!voiceReady || voiceBusy);
@@ -60,6 +63,7 @@ function refreshButtons() {
 
 function setAccount(status, features = [], mfa = null) {
   signedIn = Boolean(status?.authenticated);
+  if (!signedIn && (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   mfaRequired = !signedIn && mfa?.required === true;
   grantedFeatures = signedIn && Array.isArray(features) ? [...features] : [];
   accountStatus.className = 'status ' + (signedIn ? 'ok' : mfaRequired ? 'warn' : '');
@@ -72,6 +76,8 @@ function setAccount(status, features = [], mfa = null) {
 
 function setCompanion(status) {
   companionState = status?.state || 'STOPPED';
+  if (companionState !== 'ACTIVE' &&
+      (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   const reason = status?.reason ? ` / ${status.reason}` : '';
   const warning = ['DEGRADED', 'LOCAL-ONLY', 'CONNECTING'].includes(companionState);
   const failed = companionState === 'OFFLINE';
@@ -118,11 +124,22 @@ knowledgeRefresh.addEventListener('click', async () => {
   catch { setKnowledge({ state: 'UNAVAILABLE' }); }
 });
 
+function voiceCaptureStillAuthorized(epoch, requireHold = false) {
+  return epoch === voiceCaptureEpoch && signedIn &&
+    currentVoice.state === 'READY' && currentVoice.consentGranted === true &&
+    currentVoice.sttAvailable === true &&
+    companionState === 'ACTIVE' &&
+    (!requireHold || voiceHoldActive);
+}
+
 function setVoice(status) {
   currentVoice = status && typeof status === 'object' ? status : {
     state: 'UNAVAILABLE', consentGranted: false, sttAvailable: false, ttsAvailable: false,
     maxAudioBytes: 512000, maxCaptureMs: 6000, captureContentType: 'audio/webm;codecs=opus', actionCapable: false,
   };
+  if ((currentVoice.state !== 'READY' || currentVoice.consentGranted !== true ||
+       currentVoice.sttAvailable !== true) &&
+      (voiceRecorder || voiceStream || voiceBusy || voiceFeedbackPlayback)) cancelVoiceCapture();
   voiceConsent.checked = currentVoice.consentGranted === true;
   const state = String(currentVoice.state || 'UNAVAILABLE');
   const reason = currentVoice.reason ? ` / ${currentVoice.reason}` : '';
@@ -130,7 +147,7 @@ function setVoice(status) {
   const ttsAvailable = currentVoice.ttsAvailable;
   const provider = () => sttAvailable ? ui.t(' / STT READY{tts}', { tts: ui.t(ttsAvailable ? ' / TTS READY' : ' / TTS UNAVAILABLE') }) : '';
   const healthy = state === 'READY';
-  const warning = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'ENTITLEMENT_REQUIRED'].includes(state);
+  const warning = ['CONSENT_REQUIRED', 'PROVIDER_UNAVAILABLE', 'ENTITLEMENT_REQUIRED', 'COMPANION_UNAVAILABLE'].includes(state);
   voiceStatus.className = `status ${healthy ? 'ok' : warning ? 'warn' : state === 'SIGNED_OUT' ? '' : 'err'}`;
   ui.text(voiceStatus, 'VOICE: {state}{provider}{reason}', { state: () => ui.state(state), provider, reason });
 
@@ -143,6 +160,7 @@ function setVoice(status) {
       READY: ['Hold to talk', 'The microphone opens only while you hold the control. Release to send.'],
       CONSENT_REQUIRED: ['Microphone consent required', 'Voice remains closed until you explicitly allow capture for this launcher session.'],
       PROVIDER_UNAVAILABLE: ['Voice provider unavailable', 'Text and non-voice Companion functions remain available.'],
+      COMPANION_UNAVAILABLE: ['Companion connection required', 'Start Companion or restore its connection. Microphone capture is unavailable until the transport is active.'],
       ENTITLEMENT_REQUIRED: ['Voice is not entitled', 'The current account does not have the required Companion voice capability.'],
       SIGNED_OUT: ['Voice is signed out', 'Sign in and start Companion to evaluate voice capability.'],
       UNAVAILABLE: ['Voice is unavailable', 'The current runtime cannot establish a voice provider boundary.'],
@@ -167,7 +185,7 @@ async function refreshVoiceStatus() {
 }
 
 async function renderGames() {
-  const [catalog, config] = await Promise.all([window.sentinel.catalog(), window.sentinel.getConfig()]);
+  const catalog = await window.sentinel.catalog();
   const grid = $('grid');
   grid.replaceChildren();
   for (const game of catalog) {
@@ -182,19 +200,82 @@ async function renderGames() {
 
     const button = document.createElement('button');
     button.className = 'btn';
-    ui.text(button, game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH');
-    button.disabled = game.platform === 'android';
-    button.onclick = async () => {
-      try { await window.sentinel.launch(game.id); } catch (error) { window.alert(String(error?.message || error)); }
-    };
-    card.appendChild(button);
-
+    const launchLabel = game.platform === 'android' ? 'USE ANDROID CLIENT' : 'LAUNCH';
+    button.setAttribute('data-i18n', launchLabel);
+    button.textContent = ui.t(launchLabel);
+    button.disabled = game.platform !== 'windows' || game.launchState !== 'READY';
     if (game.platform === 'windows') {
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+      actions.appendChild(button);
+      const chooser = document.createElement('button');
+      chooser.className = 'btn secondary';
+      chooser.setAttribute('data-i18n', 'SELECT GAME EXECUTABLE');
+      chooser.textContent = ui.t('SELECT GAME EXECUTABLE');
       const configured = document.createElement('div');
       configured.className = 'sub';
       configured.style.marginTop = '12px';
-      ui.text(configured, config[game.id] ? 'EXECUTABLE CONFIGURED' : 'EXECUTABLE NOT CONFIGURED');
-      card.appendChild(configured);
+      configured.setAttribute('role', 'status');
+      configured.setAttribute('aria-live', 'polite');
+      const availabilityLabel = game.launchState === 'READY'
+        ? 'EXECUTABLE CONFIGURED'
+        : game.launchState === 'NOT_CONFIGURED'
+          ? 'EXECUTABLE NOT CONFIGURED'
+          : 'EXECUTABLE UNAVAILABLE — RESELECT';
+      configured.setAttribute('data-i18n', availabilityLabel);
+      configured.textContent = ui.t(availabilityLabel);
+      const launchStatus = document.createElement('div');
+      launchStatus.className = 'status game-launch-status';
+      launchStatus.setAttribute('role', 'status');
+      launchStatus.setAttribute('aria-live', 'polite');
+      launchStatus.setAttribute('aria-atomic', 'true');
+      launchStatus.hidden = true;
+      const reportLaunch = (key, kind) => {
+        launchStatus.hidden = false;
+        launchStatus.className = 'status game-launch-status ' + kind;
+        launchStatus.setAttribute('data-i18n', key);
+        launchStatus.textContent = ui.t(key);
+      };
+      button.onclick = async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        chooser.disabled = true;
+        reportLaunch('GAME LAUNCH REQUESTED', 'warn');
+        try {
+          // Main acknowledges OS spawn, not game readiness or trusted game identity.
+          await window.sentinel.launch(game.id);
+          reportLaunch('GAME PROCESS STARTED', 'ok');
+        } catch {
+          // Avoid exposing host paths or raw OS/process details in the renderer.
+          reportLaunch('GAME LAUNCH FAILED', 'err');
+        } finally {
+          button.disabled = game.launchState !== 'READY';
+          chooser.disabled = false;
+        }
+      };
+      chooser.onclick = async () => {
+        chooser.disabled = true;
+        try {
+          const result = await window.sentinel.chooseExecutable(game.id);
+          if (result?.configured === true) await renderGames();
+        } catch {
+          let message = card.querySelector('.game-config-error');
+          if (!message) {
+            message = document.createElement('div');
+            message.className = 'status err game-config-error';
+            message.setAttribute('role', 'alert');
+            card.appendChild(message);
+          }
+          message.setAttribute('data-i18n', 'GAME EXECUTABLE SELECTION FAILED');
+          message.textContent = ui.t('GAME EXECUTABLE SELECTION FAILED');
+        } finally {
+          chooser.disabled = false;
+        }
+      };
+      actions.appendChild(chooser);
+      card.append(actions, configured, launchStatus);
+    } else {
+      card.appendChild(button);
     }
     grid.appendChild(card);
   }
@@ -226,26 +307,58 @@ function blobToBase64(blob) {
   });
 }
 
-async function playFeedbackAudio(feedback) {
-  if (!feedback?.audioBase64 || feedback.contentType !== 'audio/wav') return;
+function stopVoiceFeedback() {
+  const playback = voiceFeedbackPlayback;
+  if (!playback) return;
+  voiceFeedbackPlayback = null;
+  try { playback.player.pause(); } catch { /* revoke even if the audio backend fails */ }
+  playback.cleanup();
+}
+
+async function playFeedbackAudio(feedback, epoch) {
+  if (!voiceCaptureStillAuthorized(epoch) || !feedback?.audioBase64 || feedback.contentType !== 'audio/wav') return;
   const binary = atob(feedback.audioBase64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  stopVoiceFeedback();
   const url = URL.createObjectURL(new Blob([bytes], { type: feedback.contentType }));
-  const player = new Audio(url);
-  const cleanup = () => URL.revokeObjectURL(url);
-  player.addEventListener('ended', cleanup, { once: true });
-  player.addEventListener('error', cleanup, { once: true });
-  try { await player.play(); } catch { cleanup(); }
+  let player;
+  try { player = new Audio(url); } catch {
+    URL.revokeObjectURL(url);
+    return;
+  }
+  let released = false;
+  const playback = { player, cleanup: () => {
+    if (released) return;
+    released = true;
+    if (voiceFeedbackPlayback === playback) voiceFeedbackPlayback = null;
+    URL.revokeObjectURL(url);
+  } };
+  voiceFeedbackPlayback = playback;
+  player.addEventListener('ended', playback.cleanup, { once: true });
+  player.addEventListener('error', playback.cleanup, { once: true });
+  try {
+    if (!voiceCaptureStillAuthorized(epoch)) { stopVoiceFeedback(); return; }
+    await player.play();
+    if (!voiceCaptureStillAuthorized(epoch) && voiceFeedbackPlayback === playback) stopVoiceFeedback();
+  } catch {
+    if (voiceFeedbackPlayback === playback) stopVoiceFeedback();
+    else playback.cleanup();
+  }
 }
 
-async function submitVoiceBlob(blob) {
+async function submitVoiceBlob(blob, epoch) {
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   if (!blob.size) throw new Error('VOICE_CAPTURE_EMPTY');
   if (blob.size > Number(currentVoice.maxAudioBytes || 512000)) throw new Error('VOICE_AUDIO_TOO_LARGE');
+  const audioBase64 = await blobToBase64(blob);
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   const response = await window.sentinel.submitVoice({
-    audioBase64: await blobToBase64(blob),
+    audioBase64,
     locale: voiceLocale.value,
   });
+  // A delayed response may be from an account/consent that no longer exists.
+  if (!voiceCaptureStillAuthorized(epoch)) return;
   const result = response?.result;
   if (!result || typeof result.reasonCode !== 'string') throw new Error('VOICE_RESPONSE_INVALID');
   const mode = result.intent?.mode ? ` / ${result.intent.mode}` : '';
@@ -258,10 +371,12 @@ async function submitVoiceBlob(blob) {
       ? 'Core accepted the presentation intent. No autonomous game action was performed.'
       : 'Core kept the request fail-closed: {code}.', { code: result.reasonCode });
   }
-  if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio);
+  if (response.feedbackAudio) await playFeedbackAudio(response.feedbackAudio, epoch);
 }
 
-async function finalizeVoiceCapture() {
+async function finalizeVoiceCapture(epoch, recorder) {
+  // Late MediaRecorder callbacks from an old consent/session never own current UI.
+  if (voiceRecorder !== recorder || epoch !== voiceCaptureEpoch) return;
   clearVoiceTimer();
   const chunks = voiceChunks;
   const discarded = voiceCaptureDiscarded;
@@ -284,12 +399,15 @@ async function finalizeVoiceCapture() {
   try {
     if (discarded) return;
     const blob = new Blob(chunks, { type: currentVoice.captureContentType || 'audio/webm;codecs=opus' });
-    await submitVoiceBlob(blob);
+    await submitVoiceBlob(blob, epoch);
   } catch (error) {
-    showError(voiceResult, error);
+    if (epoch === voiceCaptureEpoch) showError(voiceResult, error);
   } finally {
-    voiceBusy = false;
-    refreshButtons();
+    // A superseded transcription cannot unlock a newer microphone capture.
+    if (epoch === voiceCaptureEpoch) {
+      voiceBusy = false;
+      refreshButtons();
+    }
   }
 }
 
@@ -299,15 +417,21 @@ async function startVoiceCapture() {
   const mimeType = currentVoice.captureContentType || 'audio/webm;codecs=opus';
   if (typeof MediaRecorder.isTypeSupported === 'function' && !MediaRecorder.isTypeSupported(mimeType)) throw new Error('VOICE_CAPTURE_FORMAT_UNSUPPORTED');
 
+  const epoch = voiceCaptureEpoch;
+  if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
+  // Fresh press-to-talk supersedes the previous spoken response.
+  stopVoiceFeedback();
   voiceBusy = true;
   refreshButtons();
   let armed = false;
+  let acquiredStream = null;
   try {
     const lease = await window.sentinel.armVoiceCapture();
     if (!lease?.armed || lease.actionCapable !== false) throw new Error('VOICE_CAPTURE_PERMISSION_DENIED');
     armed = true;
+    if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
     try {
-      voiceStream = await navigator.mediaDevices.getUserMedia({
+      acquiredStream = await navigator.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: false,
       });
@@ -317,6 +441,11 @@ async function startVoiceCapture() {
         try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
       }
     }
+    // Never publish the newly acquired stream to shared renderer state until
+    // its exact capture generation remains authorized after all awaits.
+    if (!voiceCaptureStillAuthorized(epoch, true)) throw new Error('VOICE_CAPTURE_REVOKED');
+    voiceStream = acquiredStream;
+    acquiredStream = null;
     voiceChunks = [];
     voiceCaptureDiscarded = false;
     const recorder = new MediaRecorder(voiceStream, { mimeType, audioBitsPerSecond: 64000 });
@@ -324,13 +453,19 @@ async function startVoiceCapture() {
     if (voiceMicState) ui.text(voiceMicState, 'OPEN · HOLDING');
     if (voiceHeadline) ui.text(voiceHeadline, 'Listening…');
     if (voiceDetail) ui.text(voiceDetail, 'Release to send. Move away from the control to cancel without submitting.');
-    recorder.ondataavailable = event => { if (event.data?.size) voiceChunks.push(event.data); };
+    recorder.ondataavailable = event => {
+      if (epoch === voiceCaptureEpoch && voiceRecorder === recorder &&
+          !voiceCaptureDiscarded && event.data?.size) voiceChunks.push(event.data);
+    };
     recorder.onerror = () => {
+      if (epoch !== voiceCaptureEpoch || voiceRecorder !== recorder) return;
       voiceCaptureDiscarded = true;
       showError(voiceResult, new Error('VOICE_CAPTURE_FAILED'));
       if (recorder.state !== 'inactive') recorder.stop();
     };
-    recorder.onstop = () => { void finalizeVoiceCapture(); };
+    recorder.onstop = () => {
+      if (voiceRecorder === recorder) void finalizeVoiceCapture(epoch, recorder);
+    };
     recorder.start(250);
     const maxMs = Math.min(Math.max(Number(currentVoice.maxCaptureMs || 6000), 1000), 6000);
     voiceCaptureTimer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, maxMs);
@@ -340,13 +475,20 @@ async function startVoiceCapture() {
     if (armed) {
       try { await window.sentinel.disarmVoiceCapture(); } catch { /* lease expires fail-closed */ }
     }
-    stopVoiceTracks();
-    voiceRecorder = null;
-    voiceCaptureDiscarded = false;
+    // A canceled earlier generation may finish after a newer capture starts:
+    // close only the stream owned by that canceled generation.
+    if (acquiredStream) for (const track of acquiredStream.getTracks()) track.stop();
+    if (epoch === voiceCaptureEpoch) {
+      stopVoiceTracks();
+      voiceRecorder = null;
+      voiceCaptureDiscarded = false;
+    }
     throw error;
   } finally {
-    voiceBusy = false;
-    refreshButtons();
+    if (epoch === voiceCaptureEpoch) {
+      voiceBusy = false;
+      refreshButtons();
+    }
   }
 }
 
@@ -360,16 +502,19 @@ function stopVoiceCapture() {
 }
 
 function cancelVoiceCapture() {
+  voiceCaptureEpoch += 1;
+  stopVoiceFeedback();
+  voiceHoldActive = false;
   clearVoiceTimer();
   voiceCaptureDiscarded = true;
   voiceChunks = [];
-  if (voiceRecorder && voiceRecorder.state !== 'inactive') {
-    voiceBusy = true;
-    refreshButtons();
-    voiceRecorder.stop();
-    return;
-  }
+  // Revoke recorder ownership synchronously, before queued data/error/stop
+  // callbacks can run. Always close its tracks, including failed stop().
+  const recorder = voiceRecorder;
   voiceRecorder = null;
+  if (recorder && recorder.state !== 'inactive') {
+    try { recorder.stop(); } catch { /* closing tracks below is fail-closed */ }
+  }
   stopVoiceTracks();
   if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
   if (voiceHeadline) ui.text(voiceHeadline, 'Capture canceled');
@@ -437,6 +582,7 @@ stopButton.onclick = async () => {
 
 voiceConsent.onchange = async () => {
   const requested = voiceConsent.checked;
+  if (!requested) cancelVoiceCapture();
   try { setVoice(await window.sentinel.setVoiceConsent(requested)); }
   catch (error) {
     voiceConsent.checked = false;
@@ -447,11 +593,13 @@ voiceConsent.onchange = async () => {
 
 async function beginVoiceHold() {
   if (voiceRecorder || voiceBusy || voicePtt.disabled) return;
+  const epoch = voiceCaptureEpoch;
   try {
     await startVoiceCapture();
     if (!voiceHoldActive && voiceRecorder) stopVoiceCapture();
   }
   catch (error) {
+    if (epoch !== voiceCaptureEpoch) return;
     showError(voiceResult, error);
     if (voiceMicState) ui.text(voiceMicState, 'CLOSED');
     if (voiceHeadline) ui.text(voiceHeadline, 'Voice capture unavailable');

@@ -17,13 +17,30 @@ internal object CalibrationSamplingGate {
     fun frameId(snapshot: ObservationSnapshot): CalibrationFrameId? {
         if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED)) return null
         val captureId = snapshot.captureId?.takeIf { it.isNotBlank() } ?: return null
-        if (snapshot.frames < 1 || snapshot.lastCompletedFrameSequence != snapshot.frames ||
-            snapshot.lastCompletedFrameAt == null || snapshot.lastCompletedFrameAt < 0) return null
+        if (snapshot.frames < 1 || snapshot.lastCompletedFrameSequence != snapshot.frames) return null
+        val frameAt = snapshot.lastCompletedFrameAt ?: return null
+        val completedAt = snapshot.lastCompletedOcrAt ?: return null
+        val latencyMs = snapshot.lastOcrLatencyMs ?: return null
+        // A sequence number alone cannot prove a completed current-frame OCR callback.
+        // Even an OCR miss requires coherent, bounded capture/completion timestamps.
+        // Pausing deliberately clears the live-frame timestamp so a historical
+        // comparison cannot be mistaken for live health. Keep the completed OCR
+        // timestamp usable for that retrospective comparison only.
+        if (frameAt < 0 ||
+            (snapshot.status == ObservationStatus.OBSERVING && frameAt != snapshot.lastFrameAt) ||
+            completedAt < frameAt || latencyMs !in 0L..5000L ||
+            completedAt - frameAt != latencyMs) return null
         return CalibrationFrameId(captureId, snapshot.frames)
     }
 
     fun canSample(snapshot: ObservationSnapshot, captured: StockGameInstall?, installed: StockGameInstall?): Boolean =
         frameId(snapshot) != null && captured != null && captured == installed
+
+    /** A Save must recheck the live elapsed clock, not only a rendered frame ID. */
+    fun canSave(
+        snapshot: ObservationSnapshot, captured: StockGameInstall?,
+        installed: StockGameInstall?, now: Long,
+    ): Boolean = canSample(snapshot, captured, installed) && timing(snapshot, now) != null
 
     /** Never display a duration if the callback belongs to another/invalid frame. */
     fun timing(snapshot: ObservationSnapshot, now: Long): CalibrationTimingBreakdown? {
@@ -38,6 +55,7 @@ internal object CalibrationSamplingGate {
     }
 
     fun current(snapshot: ObservationSnapshot): HealthObservation? {
+        if (frameId(snapshot) == null) return null
         val last = snapshot.lastHealth ?: return null
         if (snapshot.lastRecognizedFrameAt != last.observedAt) return null
         return when (snapshot.status) {

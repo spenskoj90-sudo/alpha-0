@@ -26,8 +26,8 @@ class KnowledgeCacheTest {
         override fun pack(profile: KnowledgeProfile, digest: String, budget: KnowledgeBudget): ByteArray = packCall?.invoke() ?: raw
         override fun delta(profile: KnowledgeProfile, destination: String, base: String, budget: KnowledgeBudget): JSONObject = throw KnowledgeFailure("KNOWLEDGE_DELTA_UNAVAILABLE")
     }
-    private fun binding() = TrustedKnowledgeBinding(KnowledgeFixture.profile, "fixture-source", "session-a", "fixture-origin")
-    private fun observation(time: Long = 1500, source: String = "fixture-source", monotonic: Long = 10L) = TrustedKnowledgeObservation(binding(), source, time, mapOf("health" to 0.2), monotonic)
+    private fun binding() = TrustedKnowledgeBinding(KnowledgeFixture.profile, "fixture-source", "session-a", "fixture-origin", KnowledgeFixture.target)
+    private fun observation(time: Long = 1500, source: String = "fixture-source", monotonic: Long = 10L) = TrustedKnowledgeObservation(binding(), source, time, mapOf("health" to 0.2), monotonic, "fixture-frame-$monotonic", monotonic + 1, monotonic, monotonic)
     @Test fun leaseSubtractsAllNetworkTimeAndUsesMonotonicFreshness() {
         val directory = Files.createTempDirectory("knowledge-test-").toFile()
         val transport = FixtureTransport().apply { reply = manifest(raw) }
@@ -41,6 +41,22 @@ class KnowledgeCacheTest {
             assertTrue(cache.evaluate(observation(wall, "foreign-source"), "en").isEmpty())
             wall = 1; mono += 60000
             assertTrue(cache.evaluate(observation(1500), "en").isEmpty())
+        } finally { cache.close(); directory.deleteRecursively() }
+    }
+    @Test fun invalidSourceCannotRestorePreviousAdviceWithoutNewEpoch() {
+        val directory = Files.createTempDirectory("knowledge-source-fence-").toFile()
+        val transport = FixtureTransport().apply { reply = manifest(raw) }
+        val cache = KnowledgeCache(directory, "fixture-origin", transport, { 1500L }, { 10L })
+        try {
+            cache.refresh(binding())
+            assertEquals(1, cache.evaluate(observation(), "en").size)
+            assertTrue(cache.evaluate(observation(source = "foreign-source"), "en").isEmpty())
+            assertTrue(cache.evaluate(observation(), "en").isEmpty())
+            cache.refresh(binding())
+            assertTrue(cache.evaluate(observation(), "en").isEmpty())
+            cache.clear()
+            cache.refresh(binding())
+            assertEquals(1, cache.evaluate(observation(), "en").size)
         } finally { cache.close(); directory.deleteRecursively() }
     }
     @Test fun restartRevalidatesDigestAndRequiresNewAuthenticatedLease() {

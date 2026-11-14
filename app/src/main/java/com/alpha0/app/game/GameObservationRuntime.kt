@@ -21,6 +21,9 @@ object GameObservationRuntime {
         com.alpha0.app.knowledge.AndroidKnowledgeRuntime.start()
         calibration.clear()
         session.start(id, now)
+        // Only a real new capture generation can unlock an explicit Stop reset.
+        // This is not source attestation, input authority or an automatic reset.
+        GameAutomationStopRuntime.latch.onCaptureStarted(id)
         mutableState.value = GameObservationViewState(session.snapshot, install)
     }
 
@@ -29,6 +32,8 @@ object GameObservationRuntime {
     }
 
     internal fun stop(reason: String) {
+        // Revoke any action authority before the capture generation is cleared.
+        GameAutomationStopRuntime.latch.stop(session.snapshot.captureId)
         com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
         session.stop(reason)
         calibration.clear()

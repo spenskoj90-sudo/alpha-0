@@ -1,5 +1,6 @@
 'use strict';
 
+const { performance } = require('node:perf_hooks');
 const MAX_TEXT_CHARS = 2000;
 const MAX_PROVENANCE_ITEMS = 20;
 const MAX_PROVENANCE_CHARS = 256;
@@ -30,7 +31,7 @@ function sanitizePresentation(value) {
 }
 
 class OverlayPresentationStore {
-  constructor({ maxItems = 4, ttlMs = 15000, now = () => Date.now() } = {}) {
+  constructor({ maxItems = 4, ttlMs = 15000, now = () => performance.now() } = {}) {
     if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > 16) throw new Error('OVERLAY_STORE_LIMIT_INVALID');
     if (!Number.isInteger(ttlMs) || ttlMs < 1000 || ttlMs > 120000) throw new Error('OVERLAY_STORE_TTL_INVALID');
     this.maxItems = maxItems;
@@ -42,6 +43,7 @@ class OverlayPresentationStore {
     const presentation = sanitizePresentation(value);
     if (!presentation) return false;
     const receivedAt = this.now();
+    if (!Number.isFinite(receivedAt) || receivedAt < 0) return false;
     this.items = this.items.filter(item => item.presentation.presentationId !== presentation.presentationId);
     this.items.push({ presentation, receivedAt });
     if (this.items.length > this.maxItems) this.items = this.items.slice(-this.maxItems);
@@ -55,8 +57,14 @@ class OverlayPresentationStore {
   }
   clear() { this.items = []; }
   snapshot() {
-    const cutoff = this.now() - this.ttlMs;
-    this.items = this.items.filter(item => item.receivedAt >= cutoff);
+    const current = this.now();
+    if (!Number.isFinite(current) || current < 0) {
+      this.clear();
+      return [];
+    }
+    // Never extend old advice on a clock rollback or invalid time source.
+    this.items = this.items.filter(item => current >= item.receivedAt &&
+      current - item.receivedAt <= this.ttlMs);
     return this.items.map(item => item.presentation);
   }
   latestRecommendationId() {
@@ -68,4 +76,12 @@ class OverlayPresentationStore {
   }
 }
 
-module.exports = { OverlayPresentationStore, sanitizePresentation };
+// Any transport downgrade immediately revokes cached advice; TTL is only a
+// secondary bound and must not keep an old recommendation on reconnect.
+function clearOverlayOnInactiveCompanion(status, store) {
+  const inactive = status?.state !== 'ACTIVE';
+  if (inactive) store.clear();
+  return inactive;
+}
+
+module.exports = { OverlayPresentationStore, sanitizePresentation, clearOverlayOnInactiveCompanion };

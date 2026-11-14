@@ -8,6 +8,7 @@ class KnowledgeUiStatusTest {
     @Test fun `loading and unverified target are visibly pending`() {
         assertEquals(SentinelStatus.PENDING, knowledgeUiStatus("LOADING"))
         assertEquals(SentinelStatus.PENDING, knowledgeUiStatus("WAITING_FOR_VERIFIED_PROFILE"))
+        assertEquals(SentinelStatus.PENDING, knowledgeUiStatus("WAITING_FOR_VERIFIED_OBSERVATION"))
     }
 
     @Test fun `verified knowledge is available but access denial is not pending`() {

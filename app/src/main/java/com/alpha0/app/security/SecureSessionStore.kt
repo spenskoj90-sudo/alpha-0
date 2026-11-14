@@ -21,7 +21,9 @@ class SecureSessionStore {
         private const val REFRESH_TOKEN = "refresh_token"
         private const val DEVICE_ID = "device_id"
         private val writer = Any()
-        private var epoch = 0L
+        @Volatile private var epoch = 0L
+        // Writers synchronize mutations; the service reads without waiting for Keystore I/O.
+        fun currentEpoch(): Long = epoch
 
         data class Session(val accessToken: String, val refreshToken: String, val deviceId: String? = null, val epoch: Long = 0)
     }

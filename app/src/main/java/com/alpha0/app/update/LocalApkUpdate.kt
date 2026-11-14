@@ -10,6 +10,8 @@ import android.os.Build
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -65,6 +67,11 @@ internal object LocalApkUpdate {
         } ?: emptyList()
     }
 
+    /** Local, observed installed signer: never a claimed publisher or release lineage. */
+    internal fun installedSignerSha256(context: Context): String? = runCatching {
+        signers(installedInfo(context)).singleOrNull()
+    }.getOrNull()
+
     private fun policyCheck(context: Context, file: File): ApkUpdatePolicy.BlockReason? {
         val candidate = candidateInfo(context, file) ?: throw IllegalArgumentException("INVALID_APK")
         val installed = installedInfo(context)
@@ -88,33 +95,29 @@ internal object LocalApkUpdate {
             temporary = temp
             val candidateFile = File(folder, temp.name.removeSuffix(".tmp") + ".apk")
             staged = candidateFile
-            val digest = MessageDigest.getInstance("SHA-256")
-            var size = 0L
+            val cancellation = currentCoroutineContext()
             val input = context.contentResolver.openInputStream(uri)
                 ?: throw IllegalArgumentException("APK_UNREADABLE")
-            input.use { source ->
+            val fingerprint = input.use { source ->
                 FileOutputStream(temp).use { output ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        val count = source.read(buffer)
-                        if (count < 0) break
-                        if (count == 0) continue
-                        size += count.toLong()
-                        if (size > MAX_APK_BYTES) throw IllegalArgumentException("APK_TOO_LARGE")
-                        output.write(buffer, 0, count)
-                        digest.update(buffer, 0, count)
-                    }
+                    val value = ApkByteStream.consume(
+                        input = source,
+                        maxBytes = MAX_APK_BYTES,
+                        write = { bytes, count -> output.write(bytes, 0, count) },
+                        checkCancellation = { cancellation.ensureActive() },
+                    )
                     output.fd.sync()
+                    value
                 }
             }
-            if (size == 0L || !temp.renameTo(candidateFile)) throw IllegalArgumentException("INVALID_APK")
+            if (!temp.renameTo(candidateFile)) throw IllegalArgumentException("INVALID_APK")
             val reason = policyCheck(context, candidateFile)
             if (reason != null) {
                 candidateFile.delete()
                 Result.Blocked(reason)
             } else {
                 val candidate = candidateInfo(context, candidateFile) ?: throw IllegalArgumentException("INVALID_APK")
-                val sha = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                val sha = fingerprint.sha256.joinToString("") { "%02x".format(it.toInt() and 0xff) }
                 if (!candidateFile.setReadOnly()) throw IllegalArgumentException("STAGING_NOT_READ_ONLY")
                 Result.Ready(candidateFile, candidate.longVersionCode, sha)
             }
@@ -137,23 +140,15 @@ internal object LocalApkUpdate {
             file.length() in 1..MAX_APK_BYTES
     }
 
-    private fun digestMatches(file: File, expected: String): Boolean {
+    private fun digestMatches(
+        file: File, expected: String, checkCancellation: () -> Unit,
+    ): Boolean {
         if (!Regex("[0-9a-f]{64}").matches(expected)) return false
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(64 * 1024)
-            var read = 0L
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                if (count == 0) continue
-                read += count.toLong()
-                if (read > MAX_APK_BYTES) return false
-                digest.update(buffer, 0, count)
-            }
+        val actual = file.inputStream().use { input ->
+            ApkByteStream.consume(input, MAX_APK_BYTES, checkCancellation = checkCancellation).sha256
         }
         val expectedBytes = expected.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        return MessageDigest.isEqual(expectedBytes, digest.digest())
+        return MessageDigest.isEqual(expectedBytes, actual)
     }
 
     /**
@@ -162,14 +157,19 @@ internal object LocalApkUpdate {
      */
     suspend fun install(context: Context, ready: Result.Ready): InstallOutcome {
         val valid = withContext(Dispatchers.IO) {
+            val cancellation = currentCoroutineContext()
             try {
-                if (!trustedStagedFile(context, ready.file) || !digestMatches(ready.file, ready.sha256)) {
+                if (!trustedStagedFile(context, ready.file) ||
+                    !digestMatches(ready.file, ready.sha256) { cancellation.ensureActive() }
+                ) {
                     return@withContext false
                 }
                 val candidate = candidateInfo(context, ready.file)
                     ?: return@withContext false
                 candidate.longVersionCode == ready.versionCode &&
                     policyCheck(context, ready.file) == null
+            } catch (cancel: CancellationException) {
+                throw cancel
             } catch (_: Exception) {
                 false
             }

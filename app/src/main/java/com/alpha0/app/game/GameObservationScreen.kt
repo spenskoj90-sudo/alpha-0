@@ -397,7 +397,7 @@ internal fun GameObservationPanel(
         installed = installed != null,
         supported = supported,
         status = observation.status,
-        hasSampleableFrame = CalibrationSamplingGate.canSample(observation, state.installed, installed),
+        hasSampleableFrame = CalibrationSamplingGate.canSave(observation, state.installed, installed, now),
         consent = consent,
         pending = pending,
         sampleCount = sampleCount,
@@ -655,9 +655,10 @@ internal fun GameObservationPanel(
                     // A previously rendered frame or a paused historical candidate is not proof of a current observation.
                     val live = GameObservationRuntime.state.value
                     val currentInstall = ShatteredGameProfile.installed(context)
+                    val savedAt = SystemClock.elapsedRealtime()
                     val frameId = CalibrationSamplingGate.frameId(live.observation)
-                    val sample = if (frameId != null && CalibrationSamplingGate.canSample(live.observation, live.installed, currentInstall))
-                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), SystemClock.elapsedRealtime(), frameId, live.observation.lastCompletedFrameAt) { sample ->
+                    val sample = if (frameId != null && CalibrationSamplingGate.canSave(live.observation, live.installed, currentInstall, savedAt))
+                        campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), savedAt, frameId, live.observation.lastCompletedFrameAt) { sample ->
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
                             "calibration_campaign" to campaignId, "sample_sequence" to sample.sequence,
@@ -683,7 +684,7 @@ internal fun GameObservationPanel(
                         sampleCount = campaign.count
                         calibrationMessage = "game_calibration_saved"
                     }
-                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSample(observation, state.installed, installed) && sampleCount < 32)
+                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSave(observation, state.installed, installed, now) && sampleCount < 32)
                 Text(strings.text("game_calibration_count", sampleCount))
                 if (sampleCount > 0) {
                     val review = campaign.comparisonSummary()

@@ -164,6 +164,49 @@ class CalibrationSamplingGateTest {
         assertNull(CalibrationSamplingGate.timing(session.snapshot, 7300))
     }
 
+    @Test fun `incomplete or inconsistent OCR provenance blocks calibration`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        assertTrue(session.frame("capture", 110))
+        assertTrue(session.recognized("capture", 1, 110, 125, HealthCandidate(4, 20, 0)))
+        val valid = session.snapshot
+        assertTrue(CalibrationSamplingGate.canSave(valid, game, game, 130))
+        assertEquals(HealthCandidate(4, 20, 0), CalibrationSamplingGate.current(valid)?.candidate)
+        val invalid = listOf(
+            valid.copy(lastCompletedFrameSequence = 0),
+            valid.copy(lastCompletedFrameAt = 111),
+            valid.copy(lastFrameAt = null),
+            valid.copy(lastCompletedOcrAt = null),
+            valid.copy(lastCompletedOcrAt = 109),
+            valid.copy(lastCompletedOcrAt = 126),
+            valid.copy(lastOcrLatencyMs = null),
+            valid.copy(lastOcrLatencyMs = 0),
+            valid.copy(lastOcrLatencyMs = 5001),
+        )
+        invalid.forEach { snapshot ->
+            assertNull(CalibrationSamplingGate.frameId(snapshot))
+            assertFalse(CalibrationSamplingGate.canSample(snapshot, game, game))
+            assertFalse(CalibrationSamplingGate.canSave(snapshot, game, game, 130))
+            assertNull(CalibrationSamplingGate.current(snapshot))
+        }
+    }
+
+    @Test fun `Save rejects future OCR and expired retrospective evidence`() {
+        val session = ObservationSession()
+        session.start("capture", 100)
+        session.visibility("capture", true, 101)
+        assertTrue(session.frame("capture", 110))
+        assertTrue(session.recognized("capture", 1, 110, 150, null))
+        session.visibility("capture", false, 151)
+        val snapshot = session.snapshot
+        assertTrue(CalibrationSamplingGate.canSample(snapshot, game, game))
+        assertFalse(CalibrationSamplingGate.canSave(snapshot, game, game, 149))
+        assertTrue(CalibrationSamplingGate.canSave(snapshot, game, game, 151))
+        assertFalse(CalibrationSamplingGate.canSave(snapshot, game, game, 300111))
+        assertFalse(CalibrationSamplingGate.canSave(snapshot, game, repack, 151))
+    }
+
     @Test fun `timing readout rejects inconsistent and missing frame provenance`() {
         val session = ObservationSession()
         session.start("capture", 100)

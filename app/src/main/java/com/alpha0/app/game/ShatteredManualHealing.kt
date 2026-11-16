@@ -12,7 +12,7 @@ internal object ShatteredManualHealing {
         versionName: String?, versionCode: Long?,
         lowHealth: Answer, pharmacophobia: Answer, knownPotion: Answer,
     ): Outcome = when {
-        versionName != "4.0.2" || versionCode != 922L -> Outcome.UNSUPPORTED_VERSION
+        !ShatteredRuleProvenance.supports(versionName, versionCode) -> Outcome.UNSUPPORTED_VERSION
         pharmacophobia == Answer.YES -> Outcome.POISON_WARNING
         lowHealth == Answer.UNKNOWN || pharmacophobia == Answer.UNKNOWN || knownPotion == Answer.UNKNOWN ->
             Outcome.NEEDS_CONTEXT

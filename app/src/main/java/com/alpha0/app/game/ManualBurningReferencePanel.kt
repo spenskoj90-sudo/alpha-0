@@ -27,7 +27,7 @@ internal fun ManualBurningReferencePanel(
     captureActive: Boolean,
 ) {
     val strings = LocalAppStrings.current
-    val supported = installed?.versionName == "4.0.2" && installed.versionCode == 922L
+    val supported = ShatteredRuleProvenance.supports(installed?.versionName, installed?.versionCode)
     var expanded by remember(installed, captureId, captureActive) { mutableStateOf(false) }
     var burning by remember(installed, captureId, captureActive) {
         mutableStateOf(ShatteredManualHealing.Answer.UNKNOWN)
@@ -46,6 +46,8 @@ internal fun ManualBurningReferencePanel(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(strings.text("game_manual_burn_title"), style = MaterialTheme.typography.titleMedium)
             Text(strings.text("game_manual_burn_disclosure"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.text("game_manual_burn_source", ShatteredRuleProvenance.VERSION_NAME),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
                 !supported -> Text(strings.text("game_manual_burn_unsupported"),

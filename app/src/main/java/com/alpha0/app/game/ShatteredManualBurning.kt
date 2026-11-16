@@ -18,7 +18,7 @@ internal object ShatteredManualBurning {
         inWater: ShatteredManualHealing.Answer,
         safeReachableWater: ShatteredManualHealing.Answer,
     ): Outcome = when {
-        versionName != "4.0.2" || versionCode != 922L -> Outcome.UNSUPPORTED_VERSION
+        !ShatteredRuleProvenance.supports(versionName, versionCode) -> Outcome.UNSUPPORTED_VERSION
         burning == ShatteredManualHealing.Answer.UNKNOWN -> Outcome.NEEDS_CONTEXT
         burning == ShatteredManualHealing.Answer.NO -> Outcome.NO_BURNING
         flying == ShatteredManualHealing.Answer.UNKNOWN -> Outcome.NEEDS_CONTEXT

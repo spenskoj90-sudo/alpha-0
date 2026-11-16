@@ -641,7 +641,7 @@ internal fun GameObservationPanel(
                     // A fresh UNVERIFIED OCR hypothesis may prompt visual confirmation,
                     // never a Potion-of-Healing action or health/source attestation.
                     if (HudReadOnlyHint.possibleLowHealth(last.candidate, hudEvidence,
-                            installed?.versionName == "4.0.2" && installed.versionCode == 922L)) {
+                            ShatteredRuleProvenance.supports(installed?.versionName, installed?.versionCode))) {
                         Text(strings.text("game_capture_low_health_unverified"),
                             Modifier.testTag("game-hud-low-health-hint").politeStatusSemantics(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant)

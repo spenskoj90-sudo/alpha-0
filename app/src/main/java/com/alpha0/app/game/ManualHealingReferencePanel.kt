@@ -44,12 +44,14 @@ internal fun ManualHealingReferencePanel(
     var knownPotion by remember(installed, captureId, captureActive) {
         mutableStateOf(ShatteredManualHealing.Answer.UNKNOWN)
     }
-    val supported = installed?.versionName == "4.0.2" && installed.versionCode == 922L
+    val supported = ShatteredRuleProvenance.supports(installed?.versionName, installed?.versionCode)
 
     SentinelCard(kind = SentinelCardKind.CONTENT) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(strings.text("game_manual_title"), style = MaterialTheme.typography.titleMedium)
             Text(strings.text("game_manual_disclosure"),
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(strings.text("game_manual_source", ShatteredRuleProvenance.VERSION_NAME),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
                 !supported -> Text(strings.text("game_manual_unsupported"),

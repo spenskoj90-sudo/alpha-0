@@ -402,6 +402,14 @@ internal fun GameObservationPanel(
         pending = pending,
         sampleCount = sampleCount,
     )
+    // The displayed reason and the enabled state share one gate.
+    val calibrationSaveBlockKey = when {
+        !supported -> "game_calibration_block_unsupported"
+        sampleCount >= 32 -> "game_calibration_block_limit"
+        else -> CalibrationSamplingGate.saveBlockReason(
+            observation, state.installed, installed, now,
+        )?.stringKey
+    }
     val active = observation.status in setOf(ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED)
     // Stop remains reachable independently of scrolling through calibration and diagnostics.
     // The foreground notification/system capture controls remain additional Stop routes.
@@ -657,7 +665,10 @@ internal fun GameObservationPanel(
                     val currentInstall = ShatteredGameProfile.installed(context)
                     val savedAt = SystemClock.elapsedRealtime()
                     val frameId = CalibrationSamplingGate.frameId(live.observation)
-                    val sample = if (frameId != null && CalibrationSamplingGate.canSave(live.observation, live.installed, currentInstall, savedAt))
+                    val liveBlocker = CalibrationSamplingGate.saveBlockReason(
+                        live.observation, live.installed, currentInstall, savedAt,
+                    )
+                    val sample = if (frameId != null && liveBlocker == null)
                         campaign.record(expectedCurrent, expectedMaximum, CalibrationSamplingGate.current(live.observation), savedAt, frameId, live.observation.lastCompletedFrameAt) { sample ->
                         val sampleInstall = live.installed
                         val saved = DiagnosticLogger.get(context).info("GAME", "CALIBRATION_NUMERIC_SAMPLE", "OBSERVED", details = mapOf(
@@ -679,12 +690,22 @@ internal fun GameObservationPanel(
                         writeFailed = !saved
                         saved
                     } else null
-                    if (sample == null) calibrationMessage = if (writeFailed) "game_calibration_write_failed" else "game_calibration_invalid"
+                    if (sample == null) calibrationMessage = when {
+                        writeFailed -> "game_calibration_write_failed"
+                        liveBlocker != null -> liveBlocker.stringKey
+                        else -> "game_calibration_invalid"
+                    }
                     else {
                         sampleCount = campaign.count
                         calibrationMessage = "game_calibration_saved"
                     }
-                }, Modifier.fillMaxWidth(), enabled = supported && CalibrationSamplingGate.canSave(observation, state.installed, installed, now) && sampleCount < 32)
+                }, Modifier.fillMaxWidth().testTag("game-calibration-save"),
+                    enabled = calibrationSaveBlockKey == null)
+                calibrationSaveBlockKey?.let { reason ->
+                    Text(strings.text(reason),
+                        modifier = Modifier.politeStatusSemantics().testTag("game-calibration-blocker"),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text(strings.text("game_calibration_count", sampleCount))
                 if (sampleCount > 0) {
                     val review = campaign.comparisonSummary()

@@ -148,6 +148,38 @@ class GameObservationScreenInstrumentedTest {
         GameObservationRuntime.calibration.clear()
     }
 
+    @Test fun calibrationExplainsDisabledSaveAndUpdatesWhenCompletedFrameExpires() {
+        val install = StockGameInstall("fixture", 1)
+        val id = "calibration-blocker-ui"
+        val session = ObservationSession()
+        session.start(id, 100)
+        session.visibility(id, true, 101)
+        assertTrue(session.frame(id, 110))
+        val observed = mutableStateOf(GameObservationViewState(session.snapshot, install))
+        val clock = mutableStateOf(120L)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install, observed.value, true, false, false, clock.value,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-calibration-blocker").performScrollTo()
+            .assertTextContains("No fully processed OCR frame", substring = true)
+        compose.onNodeWithTag("game-calibration-save").assertIsNotEnabled()
+        assertTrue(session.recognized(id, 1, 110, 125, null))
+        session.visibility(id, false, 130)
+        compose.runOnIdle {
+            observed.value = GameObservationViewState(session.snapshot, install)
+            clock.value = 131L
+        }
+        compose.onNodeWithTag("game-calibration-save").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("game-calibration-blocker").assertDoesNotExist()
+        compose.runOnIdle { clock.value = 300111L }
+        compose.onNodeWithTag("game-calibration-blocker").performScrollTo()
+            .assertTextContains("more than five minutes old", substring = true)
+        compose.onNodeWithTag("game-calibration-save").assertIsNotEnabled()
+    }
+
     @Test fun missingGameCannotStartCaptureEvenWithConsent() {
         compose.setContent {
             SentinelTheme(AppThemeMode.LIGHT) {

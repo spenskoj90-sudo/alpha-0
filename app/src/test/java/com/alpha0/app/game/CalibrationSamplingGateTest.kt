@@ -238,5 +238,37 @@ class CalibrationSamplingGateTest {
         assertNull(CalibrationSamplingGate.timing(session.snapshot, 300111))
     }
 
+    @Test fun `Save blocker reasons match live and historical evidence authority`() {
+        val session = ObservationSession()
+        assertEquals(CalibrationSaveBlockReason.CAPTURE_INACTIVE,
+            CalibrationSamplingGate.saveBlockReason(session.snapshot, game, game, 100))
+        session.start("reasons", 100)
+        session.visibility("reasons", true, 101)
+        assertTrue(session.frame("reasons", 110))
+        assertEquals(CalibrationSaveBlockReason.FRAME_UNAVAILABLE,
+            CalibrationSamplingGate.saveBlockReason(session.snapshot, game, game, 120))
+        assertTrue(session.recognized("reasons", 1, 110, 125, null))
+        val live = session.snapshot
+        assertEquals(CalibrationSaveBlockReason.GAME_CHANGED,
+            CalibrationSamplingGate.saveBlockReason(live, game, repack, 130))
+        assertEquals(CalibrationSaveBlockReason.CLOCK_INVALID,
+            CalibrationSamplingGate.saveBlockReason(live, game, game, 124))
+        assertNull(CalibrationSamplingGate.saveBlockReason(live, game, game, 130))
+        assertTrue(CalibrationSamplingGate.canSave(live, game, game, 130))
+        session.visibility("reasons", false, 131)
+        val paused = session.snapshot
+        assertNull(CalibrationSamplingGate.saveBlockReason(paused, game, game, 300110))
+        assertTrue(CalibrationSamplingGate.canSave(paused, game, game, 300110))
+        assertEquals(CalibrationSaveBlockReason.FRAME_EXPIRED,
+            CalibrationSamplingGate.saveBlockReason(paused, game, game, 300111))
+        assertFalse(CalibrationSamplingGate.canSave(paused, game, game, 300111))
+        assertEquals(CalibrationSaveBlockReason.FRAME_UNAVAILABLE,
+            CalibrationSamplingGate.saveBlockReason(paused.copy(lastCompletedFrameSequence = 0),
+                game, game, 132))
+        session.stop("USER_STOP")
+        assertEquals(CalibrationSaveBlockReason.CAPTURE_INACTIVE,
+            CalibrationSamplingGate.saveBlockReason(session.snapshot, game, game, 132))
+    }
+
 }
 

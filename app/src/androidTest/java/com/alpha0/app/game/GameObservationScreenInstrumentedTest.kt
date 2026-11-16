@@ -364,6 +364,36 @@ class GameObservationScreenInstrumentedTest {
         compose.onNodeWithTag("game-calibration-current").assertTextContains("", substring = false)
     }
 
+    @Test fun unverifiedLowHealthHintAppearsOnlyWithRecentSupportedOcr() {
+        val health = HealthCandidate(5, 20, 0)
+        val current = ObservationSnapshot(
+            status = ObservationStatus.OBSERVING, captureId = "capture-hint",
+            frames = 1, lastFrameAt = 110L, health = health,
+            lastHealth = HealthObservation(health, 110L), lastRecognizedFrameAt = 110L,
+            lastCompletedFrameSequence = 1L, lastCompletedFrameAt = 110L,
+            lastCompletedOcrAt = 111L, lastOcrLatencyMs = 1L,
+        )
+        val supported = StockGameInstall("4.0.2", 922L)
+        val install = mutableStateOf(supported)
+        val view = mutableStateOf(GameObservationViewState(current, supported))
+        val now = mutableStateOf(111L)
+        compose.setContent {
+            SentinelTheme(AppThemeMode.LIGHT) {
+                GameObservationPanel(install.value, view.value, true, false, false, now.value,
+                    {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithTag("game-hud-low-health-hint").performScrollTo()
+            .assertTextContains("Verify the health bar in the game", substring = true)
+        compose.runOnIdle { now.value = 5111L }
+        compose.onNodeWithTag("game-hud-low-health-hint").assertDoesNotExist()
+        compose.runOnIdle { now.value = 111L; install.value = StockGameInstall("4.0.3", 923L) }
+        compose.onNodeWithTag("game-hud-low-health-hint").assertDoesNotExist()
+        compose.runOnIdle { view.value = GameObservationViewState(ObservationSnapshot(
+            status = ObservationStatus.STOPPED)) }
+        compose.onNodeWithTag("game-hud-low-health-hint").assertDoesNotExist()
+    }
+
     @Test fun recentOcrHypothesisDegradesToHistoryThenDisappearsOnStop() {
         val health = HealthCandidate(8, 20, 0)
         val snapshot = ObservationSnapshot(

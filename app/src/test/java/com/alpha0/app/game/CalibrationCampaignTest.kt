@@ -35,7 +35,7 @@ class CalibrationCampaignTest {
         assertNull(c.record("9", "20", sample, 110, frame(1), 100) { false })
         assertEquals(CalibrationComparisonSummary(0, 0, 0, 0, 0), c.comparisonSummary())
         assertNotNull(c.record("9", "20", sample, 111, frame(1), 100) { true })
-        assertEquals(CalibrationComparisonSummary(1, 1, 0, 0, 0), c.comparisonSummary())
+        assertEquals(CalibrationComparisonSummary(1, 1, 0, 0, 0, 1, 0, 0), c.comparisonSummary())
     }
 
     @Test fun `missing and stale samples remain in the denominator`() {

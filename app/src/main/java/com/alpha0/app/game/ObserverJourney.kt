@@ -44,6 +44,18 @@ internal fun observerNextStep(
  */
 internal enum class HudEvidenceState { UNKNOWN, RECENT_UNVERIFIED, HISTORICAL }
 
+/** Observation-only prompt for checking the game's own HUD; never an action decision.
+ * The one-quarter threshold is a conservative UI cue, not a game-rule claim.
+ */
+internal object HudReadOnlyHint {
+    fun possibleLowHealth(candidate: HealthCandidate?, state: HudEvidenceState, supported: Boolean): Boolean {
+        if (!supported || state != HudEvidenceState.RECENT_UNVERIFIED || candidate == null) return false
+        if (candidate.maximum !in 1..999999 || candidate.current !in 0..candidate.maximum ||
+            candidate.shield !in 0..999999) return false
+        return candidate.current.toLong() * 4L <= candidate.maximum.toLong()
+    }
+}
+
 internal fun hudEvidenceState(snapshot: ObservationSnapshot, now: Long): HudEvidenceState {
     if (snapshot.status !in setOf(ObservationStatus.OBSERVING, ObservationStatus.PAUSED) ||
         snapshot.captureId.isNullOrBlank() || now < 0) return HudEvidenceState.UNKNOWN

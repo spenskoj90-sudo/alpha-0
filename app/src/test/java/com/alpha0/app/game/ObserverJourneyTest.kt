@@ -4,6 +4,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ObserverJourneyTest {
+    @Test fun `unverified low health hint requires fresh bounded candidate and exact supported build`() {
+        val current = HealthCandidate(5, 20, 0)
+        assertEquals(true, HudReadOnlyHint.possibleLowHealth(current,
+            HudEvidenceState.RECENT_UNVERIFIED, true))
+        assertEquals(false, HudReadOnlyHint.possibleLowHealth(HealthCandidate(6, 20, 0),
+            HudEvidenceState.RECENT_UNVERIFIED, true))
+        assertEquals(false, HudReadOnlyHint.possibleLowHealth(current,
+            HudEvidenceState.HISTORICAL, true))
+        assertEquals(false, HudReadOnlyHint.possibleLowHealth(current,
+            HudEvidenceState.UNKNOWN, true))
+        assertEquals(false, HudReadOnlyHint.possibleLowHealth(current,
+            HudEvidenceState.RECENT_UNVERIFIED, false))
+        listOf(HealthCandidate(1, 0, 0), HealthCandidate(30, 20, 0),
+            HealthCandidate(-1, 20, 0), HealthCandidate(1, 20, -1),
+        ).forEach { candidate ->
+            assertEquals(false, HudReadOnlyHint.possibleLowHealth(candidate,
+                HudEvidenceState.RECENT_UNVERIFIED, true))
+        }
+    }
+
     private fun step(installed: Boolean = true, supported: Boolean = true,
                      status: ObservationStatus = ObservationStatus.STOPPED,
                      hasFrame: Boolean = false, consent: Boolean = false,

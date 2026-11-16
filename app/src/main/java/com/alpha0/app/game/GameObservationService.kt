@@ -74,6 +74,12 @@ class GameObservationService : Service() {
         override fun onCapturedContentVisibilityChanged(isVisible: Boolean) {
             val id = sessionId ?: return
             if (!isVisible) com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
+            // Source loss after actual observations revokes potential action authority.
+            // A later visible callback in this capture cannot clear the Stop latch.
+            GameAutomationCaptureGuard.onVisibilityChanged(
+                GameObservationRuntime.session.snapshot, id, isVisible,
+                GameAutomationStopRuntime.latch,
+            )
             GameObservationRuntime.session.visibility(id, isVisible, now())
             GameObservationRuntime.publish()
         }
@@ -81,7 +87,16 @@ class GameObservationService : Service() {
         override fun onCapturedContentResize(width: Int, height: Int) {
             if (stopping) return
             com.alpha0.app.knowledge.AndroidKnowledgeRuntime.stop()
-            sessionId?.let { GameObservationRuntime.session.invalidate(it); GameObservationRuntime.publish() }
+            // Ignore initial sizing before any frame; revoke active source binding on
+            // geometry changes after observation has started.
+            sessionId?.let { id ->
+                GameAutomationCaptureGuard.onGeometryChanged(
+                    GameObservationRuntime.session.snapshot, id,
+                    GameAutomationStopRuntime.latch,
+                )
+                GameObservationRuntime.session.invalidate(id)
+                GameObservationRuntime.publish()
+            }
             val size = CaptureSize.fit(width, height) ?: return finish("INVALID_CAPTURE_SIZE")
             try {
                 // Android 14 permits one virtual display per consent; resize that same display.

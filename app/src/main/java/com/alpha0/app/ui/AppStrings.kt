@@ -34,6 +34,7 @@ fun rememberAppStrings(selected: AppLanguage): AppStrings {
 internal val ENGLISH = mapOf(
     "game_calibration_review_counts" to "Post-hoc numeric comparisons: matching %d · different %d · OCR missing %d",
     "game_calibration_review_delay" to "Saved over 5 seconds after frame: %d / %d",
+    "game_calibration_review_timely" to "Saved within 5 seconds: matching %d · different %d · OCR missing %d",
     "game_calibration_review_scope" to "These user-entered comparisons are NOT frame-time ground truth or validated recognition accuracy. Capture app remains UNVERIFIED; no game recommendations or actions are authorized.",
     "game_install_package" to "Installed game package: %s",
     "game_install_signer_observed" to "Installed APK signer detected locally; publisher identity and selected capture app remain UNVERIFIED.",
@@ -552,6 +553,7 @@ internal val ENGLISH = mapOf(
 internal val RUSSIAN = mapOf(
     "game_calibration_review_counts" to "Сравнения после кадра: совпали %d · различаются %d · OCR не распознал %d",
     "game_calibration_review_delay" to "Сохранено позднее 5 сек. после кадра: %d / %d",
+    "game_calibration_review_timely" to "Сохранено за 5 сек.: совпали %d · различаются %d · OCR пропущен %d",
     "game_calibration_review_scope" to "Ручные сравнения НЕ доказывают точность OCR в момент кадра. Приложение-источник НЕ ПОДТВЕРЖДЕНО; рекомендации и действия в игре недоступны.",
     "game_install_package" to "Пакет установленной игры: %s",
     "game_install_signer_observed" to "Подпись установленного APK обнаружена локально; издатель и выбранное для захвата приложение НЕ ПОДТВЕРЖДЕНЫ.",

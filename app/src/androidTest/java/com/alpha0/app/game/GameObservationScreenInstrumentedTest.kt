@@ -144,6 +144,8 @@ class GameObservationScreenInstrumentedTest {
         }
         compose.onNodeWithTag("game-calibration-review-counts").performScrollTo()
             .assertTextContains("matching 1 · different 0 · OCR missing 1", substring = true)
+        compose.onNodeWithTag("game-calibration-review-timely").performScrollTo()
+            .assertTextContains("matching 1 · different 0 · OCR missing 1", substring = true)
         compose.onNodeWithText("Waiting for a verified target profile").performScrollTo().assertIsDisplayed()
         GameObservationRuntime.calibration.clear()
     }

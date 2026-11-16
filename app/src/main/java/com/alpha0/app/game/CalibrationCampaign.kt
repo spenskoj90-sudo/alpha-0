@@ -23,6 +23,10 @@ internal data class CalibrationComparisonSummary(
     val differentPairs: Int,
     val missingOcr: Int,
     val delayedAtSave: Int,
+    /** Saved close to capture, not verified frame-time ground truth. */
+    val timelyExactPairs: Int = 0,
+    val timelyDifferentPairs: Int = 0,
+    val timelyMissingOcr: Int = 0,
 )
 
 class CalibrationCampaign {
@@ -31,9 +35,13 @@ class CalibrationCampaign {
     private var differentPairs = 0
     private var missingOcr = 0
     private var delayedAtSave = 0
+    private var timelyExactPairs = 0
+    private var timelyDifferentPairs = 0
+    private var timelyMissingOcr = 0
 
     internal fun comparisonSummary() = CalibrationComparisonSummary(
         count, exactPairs, differentPairs, missingOcr, delayedAtSave,
+        timelyExactPairs, timelyDifferentPairs, timelyMissingOcr,
     )
     private val savedFrames = mutableSetOf<CalibrationFrameId>()
     private var boundCaptureId: String? = null
@@ -81,7 +89,16 @@ class CalibrationCampaign {
             sample.observed.current == sample.current && sample.observed.maximum == sample.maximum -> exactPairs++
             else -> differentPairs++
         }
-        if (sample.ageMs > 5_000L) delayedAtSave++
+        if (sample.ageMs > 5_000L) {
+            delayedAtSave++
+        } else {
+            when {
+                sample.observed == null -> timelyMissingOcr++
+                sample.observed.current == sample.current &&
+                    sample.observed.maximum == sample.maximum -> timelyExactPairs++
+                else -> timelyDifferentPairs++
+            }
+        }
         return sample
     }
 }

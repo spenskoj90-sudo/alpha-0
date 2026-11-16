@@ -713,6 +713,9 @@ internal fun GameObservationPanel(
                         review.exactPairs, review.differentPairs, review.missingOcr),
                         modifier = Modifier.testTag("game-calibration-review-counts"))
                     Text(strings.text("game_calibration_review_delay", review.delayedAtSave, review.saved))
+                    Text(strings.text("game_calibration_review_timely",
+                        review.timelyExactPairs, review.timelyDifferentPairs, review.timelyMissingOcr),
+                        modifier = Modifier.testTag("game-calibration-review-timely"))
                     Text(strings.text("game_calibration_review_scope"),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

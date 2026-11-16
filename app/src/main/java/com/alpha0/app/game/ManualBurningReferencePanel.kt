@@ -47,7 +47,9 @@ internal fun ManualBurningReferencePanel(
             Text(strings.text("game_manual_burn_title"), style = MaterialTheme.typography.titleMedium)
             Text(strings.text("game_manual_burn_disclosure"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(strings.text("game_manual_burn_source", ShatteredRuleProvenance.VERSION_NAME),
+            Text(strings.text("game_manual_burn_source", ShatteredRuleProvenance.VERSION_NAME,
+                ShatteredRuleProvenance.SOURCE_SHORT_REVISION),
+                modifier = Modifier.testTag("game-manual-burn-source"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
                 !supported -> Text(strings.text("game_manual_burn_unsupported"),

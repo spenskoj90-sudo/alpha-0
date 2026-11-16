@@ -27,6 +27,8 @@ class ManualBurningReferenceInstrumentedTest {
                 }
             }
         }
+        compose.onNodeWithTag("game-manual-burn-source").performScrollTo()
+            .assertTextContains("commit 57a4e06a4caf", substring = true)
         compose.onNodeWithTag("game-manual-burn-toggle").performScrollTo().performClick()
         compose.onNodeWithTag("game-manual-burn-result").performScrollTo()
             .assertTextContains("Unknown", substring = true)

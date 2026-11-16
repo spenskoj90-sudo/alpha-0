@@ -11,8 +11,10 @@ class ShatteredRuleProvenanceTest {
         assertFalse(ShatteredRuleProvenance.supports("4.0.2", 921L))
         assertFalse(ShatteredRuleProvenance.supports("4.0.3", 923L))
         assertFalse(ShatteredRuleProvenance.supports(null, null))
-        assertTrue(ShatteredRuleProvenance.HEALING_SOURCE.contains("/v4.0.2/"))
-        assertTrue(ShatteredRuleProvenance.BURNING_SOURCE.contains("/v4.0.2/"))
+        assertTrue(Regex("[0-9a-f]{40}").matches(ShatteredRuleProvenance.SOURCE_COMMIT))
+        assertTrue(ShatteredRuleProvenance.HEALING_SOURCE.contains("/blob/" + ShatteredRuleProvenance.SOURCE_COMMIT + "/"))
+        assertTrue(ShatteredRuleProvenance.BURNING_SOURCE.contains("/blob/" + ShatteredRuleProvenance.SOURCE_COMMIT + "/"))
+        assertFalse(ShatteredRuleProvenance.HEALING_SOURCE.contains("/blob/v4.0.2/"))
     }
 
     @Test fun `manual outcomes cannot be reused on unreviewed future version`() {

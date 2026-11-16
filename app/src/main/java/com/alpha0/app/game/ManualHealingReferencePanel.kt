@@ -51,7 +51,9 @@ internal fun ManualHealingReferencePanel(
             Text(strings.text("game_manual_title"), style = MaterialTheme.typography.titleMedium)
             Text(strings.text("game_manual_disclosure"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(strings.text("game_manual_source", ShatteredRuleProvenance.VERSION_NAME),
+            Text(strings.text("game_manual_source", ShatteredRuleProvenance.VERSION_NAME,
+                ShatteredRuleProvenance.SOURCE_SHORT_REVISION),
+                modifier = Modifier.testTag("game-manual-source"),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
                 !supported -> Text(strings.text("game_manual_unsupported"),

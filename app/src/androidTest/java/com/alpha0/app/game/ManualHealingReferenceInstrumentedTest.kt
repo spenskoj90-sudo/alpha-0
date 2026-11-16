@@ -26,6 +26,8 @@ class ManualHealingReferenceInstrumentedTest {
                 }
             }
         }
+        compose.onNodeWithTag("game-manual-source").performScrollTo()
+            .assertTextContains("commit 57a4e06a4caf", substring = true)
         compose.onNodeWithTag("game-manual-result").performScrollTo().assertTextContains("Unknown", substring = true)
         compose.onNodeWithTag("game-manual-reset").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("game-manual-low-yes").performScrollTo().performClick()

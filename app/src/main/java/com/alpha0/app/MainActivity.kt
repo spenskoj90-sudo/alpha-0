@@ -3,6 +3,7 @@ package com.alpha0.app
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -49,6 +50,7 @@ import com.alpha0.app.auth.AuthApi
 import com.alpha0.app.auth.FederatedAuthCoordinator
 import com.alpha0.app.auth.LoginScreen
 import com.alpha0.app.auth.SessionManager
+import com.alpha0.app.auth.StrictInboundBrowserCallback
 import com.alpha0.app.dashboard.ActivityScreen
 import com.alpha0.app.dashboard.DashboardApi
 import com.alpha0.app.dashboard.DashboardScreen
@@ -65,7 +67,9 @@ import com.alpha0.app.device.DeviceSetupScreen
 import com.alpha0.app.diagnostics.DiagnosticLogger
 import com.alpha0.app.help.AboutScreen
 import com.alpha0.app.game.GameObservationScreen
+import com.alpha0.app.game.GameReferenceScreen
 import com.alpha0.app.game.GameObservationService
+import com.alpha0.app.game.ObservationCapturePolicy
 import com.alpha0.app.help.HelpScreen
 import com.alpha0.app.net.DnsFailoverHttpTransport
 import com.alpha0.app.net.SessionCredentials
@@ -190,6 +194,9 @@ class MainActivity : ComponentActivity() {
             api = authApi,
             callbackScheme = BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME,
             vkRedirectUri = BuildConfig.SENTINEL_VK_REDIRECT_URI,
+            googleClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_GOOGLE_CLIENT_ID else null,
+            telegramClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_TELEGRAM_CLIENT_ID else null,
+            vkClientIdPin = if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "signed_feed") BuildConfig.SENTINEL_VK_CLIENT_ID else null,
         )
         val sessionManager = SessionManager(authApi, sessionStore)
         val deviceApi = DeviceApi(BuildConfig.SENTINEL_API_BASE_URL, httpTransport).also { it.attachDiagnostics(this) }
@@ -242,14 +249,12 @@ class MainActivity : ComponentActivity() {
 
     private fun validatedFederatedCallback(intent: Intent?): Uri? {
         val uri = intent?.data ?: return null
-        val generic = uri.scheme == BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME &&
-            uri.host == "callback"
-        val expectedVk = runCatching { Uri.parse(BuildConfig.SENTINEL_VK_REDIRECT_URI) }.getOrNull()
-        val vk = expectedVk != null &&
-            uri.scheme == expectedVk.scheme &&
-            uri.host == expectedVk.host &&
-            uri.path == expectedVk.path
-        return uri.takeIf { generic || vk }
+        val parsed = StrictInboundBrowserCallback.parseAny(
+            uri.toString(),
+            "${BuildConfig.SENTINEL_AUTH_CALLBACK_SCHEME}://callback",
+            BuildConfig.SENTINEL_VK_REDIRECT_URI,
+        )
+        return uri.takeIf { parsed != null }
     }
 }
 
@@ -273,7 +278,9 @@ private fun SentinelApplicationUi(
     deviceIdentity: DeviceIdentity,
     diagnostics: DiagnosticLogger,
 ) {
-    val activity = androidx.compose.ui.platform.LocalContext.current as ComponentActivity
+    val activity = checkNotNull(androidx.activity.compose.LocalActivity.current as? ComponentActivity) {
+        "SENTINEL application requires a ComponentActivity host"
+    }
     val strings = LocalAppStrings.current
     val navController = rememberNavController()
     val rotationScope = rememberCoroutineScope()
@@ -658,8 +665,17 @@ private fun SentinelApplicationUi(
                         GamesScreen(
                             current.accessToken,
                             dashboardApi,
-                            onLocalGameClick = if (BuildConfig.DEBUG) ({ navController.navigate("game-observer") }) else null,
+                            onLocalReferenceClick = { navController.navigate("game-reference") },
+                            onLocalGameClick = if (ObservationCapturePolicy.supports(
+                                BuildConfig.DEBUG, BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL,
+                                Build.VERSION.SDK_INT,
+                            )) ({ navController.navigate("game-observer") }) else null,
                         ) { navController.navigate("game-details/$it") }
+                    }
+                }
+                composable("game-reference") {
+                    AuthenticatedRoute(activeSession, sessionStore, activity, navController) {
+                        GameReferenceScreen()
                     }
                 }
                 composable("game-observer") {

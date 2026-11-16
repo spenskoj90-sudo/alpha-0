@@ -162,6 +162,29 @@ test('CompanionProcessManager ignores stale worker events and async refresh afte
   assert.deepEqual(manager.status, { state: 'ACTIVE', reason: 'HANDSHAKE_ACCEPTED' });
 });
 
+test('CompanionProcessManager reaps a self-stopped worker and permits a fresh start', () => {
+  const first = new FakeChild();
+  const second = new FakeChild();
+  const children = [first, second];
+  const manager = new CompanionProcessManager({ forkImpl: () => children.shift() });
+  manager.start({ coreUrl: 'http://127.0.0.1:8080', sessionToken: 'access-first-0123456789' });
+  first.emit('message', { type: 'status', status: {
+    state: 'STOPPED', reason: 'COMPANION_ENTITLEMENT_REVOKED', sessionToken: 'must-not-leak',
+  } });
+  assert.equal(first.killed, true);
+  assert.equal(manager.child, null);
+  assert.deepEqual(manager.status, { state: 'STOPPED', reason: 'COMPANION_ENTITLEMENT_REVOKED' });
+
+  manager.start({ coreUrl: 'http://127.0.0.1:8080', sessionToken: 'access-second-0123456789' });
+  first.emit('message', { type: 'status', status: { state: 'ACTIVE', reason: 'STALE' } });
+  first.emit('exit', 1, null);
+  assert.equal(manager.child, second);
+  assert.deepEqual(manager.status, { state: 'CONNECTING', reason: 'WORKER_STARTED' });
+  second.emit('message', { type: 'status', status: { state: 'ACTIVE', reason: 'HANDSHAKE_ACCEPTED' } });
+  assert.deepEqual(manager.status, { state: 'ACTIVE', reason: 'HANDSHAKE_ACCEPTED' });
+  manager.stop('TEST_DONE');
+});
+
 test('sanitizeStatus allowlists fields and drops unexpected data', () => {
   assert.deepEqual(
     sanitizeStatus({ state: 'DEGRADED', reason: 'RECONNECT_SCHEDULED', retryInMs: 1000, token: 'secret' }),

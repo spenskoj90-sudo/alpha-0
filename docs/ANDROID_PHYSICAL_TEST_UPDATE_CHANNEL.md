@@ -270,3 +270,23 @@ change IDs, production signing, secrets or Play distribution.
 
 There must be no additional owner-installable ephemeral/debug APK,
 regardless of whether it is called a test, staging, candidate or release.
+
+
+## Fail-closed APK staging stream (Android source/CI contract)
+
+Diagnostic document-provider staging and the final private-file integrity recheck
+share a bounded 64-KiB SHA-256 reader. A document provider returning a zero-byte
+read without EOF now fails instead of spinning indefinitely; empty files and
+data beyond the existing 256-MiB limit also fail. The copy writes only chunks
+inside the size limit, checks coroutine cancellation per read, syncs output
+before private staging rename, and never hands failed bytes to the installer.
+The pre-install digest recheck uses the same reader and propagates cancellation
+rather than converting it to a candidate failure. Existing package/version/
+same-certificate checks and Android's system installer confirmation are unchanged.
+
+Pure JVM tests cover multi-chunk byte equality and SHA-256, zero-progress,
+empty/excess input, exact-size acceptance, cancellation and writer failure.
+A stalled blocking `InputStream.read` is a distinct platform-provider timeout
+case and is **not** claimed solved by zero-progress handling. Real content-provider
+fault injection, release signer and physical upgrade-over-install still require
+their independent runtime/owner evidence.

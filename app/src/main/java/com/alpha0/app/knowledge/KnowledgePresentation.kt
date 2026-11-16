@@ -11,7 +11,7 @@ data class KnowledgeViewState(val state: String, val items: List<KnowledgeRecomm
 /** The adapter closures are service-owned. No renderer/OCR assertion is a trust
  * input. One actor owns cache creation/refresh; Stop never waits for that actor. */
 internal class KnowledgePresentation(private val getBinding: () -> TrustedKnowledgeBinding?,
-    private val getObservation: () -> TrustedKnowledgeObservation?, private val cacheFactory: (String) -> KnowledgeCache,
+    private val getObservation: () -> KnowledgeObservationInput, private val cacheFactory: (String) -> KnowledgeCache,
     private val locale: () -> String = { "en" }, private val onChange: (KnowledgeViewState) -> Unit = {},
     private val clock: () -> Long = { System.nanoTime() / 1000000 }) : AutoCloseable {
     private val lifecycle = Any()
@@ -24,11 +24,23 @@ internal class KnowledgePresentation(private val getBinding: () -> TrustedKnowle
     @Volatile private var cacheAuthority: String? = null
     @Volatile private var binding: TrustedKnowledgeBinding? = null
     @Volatile private var last = KnowledgeViewState("STOPPED")
+    @Volatile private var sourceFailureLatched = false
     private var timer: ScheduledFuture<*>? = null
     @Volatile private var lastRefresh = Long.MIN_VALUE
 
-    fun state(): KnowledgeViewState {
-        if (!running.get()) return KnowledgeViewState("STOPPED")
+    fun state(): KnowledgeViewState = try {
+        when {
+            !running.get() -> KnowledgeViewState("STOPPED")
+            sourceFailureLatched -> KnowledgeViewState("UNAVAILABLE")
+            else -> evaluateState()
+        }
+    } catch (_: Exception) {
+        // Service callback failure must never strand previously published advice.
+        sourceFailureLatched = true
+        cache?.clear()
+        KnowledgeViewState("UNAVAILABLE")
+    }
+    private fun evaluateState(): KnowledgeViewState {
         val current = getBinding()
         if (current == null || current != binding) {
             cache?.clear()
@@ -37,22 +49,48 @@ internal class KnowledgePresentation(private val getBinding: () -> TrustedKnowle
         val stored = cache ?: return last
         val status = stored.status()
         if (status.state != "READY") return if (last.state in setOf("DENIED", "UNAVAILABLE", "LOADING")) last else KnowledgeViewState("UNAVAILABLE")
-        val observation = getObservation()
-        val items = if (observation?.binding == current && observation.sourceId == current.sourceId) stored.evaluate(observation, locale()) else emptyList()
-        return if (running.get() && getBinding() == current) KnowledgeViewState("READY", items) else KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE")
+        val input = getObservation()
+        val result = when (input) {
+            KnowledgeObservationInput.AwaitingFirstFrame -> {
+                stored.observationAwaitingFirstFrame()
+                KnowledgeViewState("WAITING_FOR_VERIFIED_OBSERVATION")
+            }
+            is KnowledgeObservationInput.Processing ->
+                if (stored.observationProcessing(input.sequence, input.capturedMonotonicMs))
+                    KnowledgeViewState("WAITING_FOR_VERIFIED_OBSERVATION") else KnowledgeViewState("UNAVAILABLE")
+            KnowledgeObservationInput.Unavailable -> {
+                stored.observationUnavailable()
+                KnowledgeViewState("UNAVAILABLE")
+            }
+            is KnowledgeObservationInput.Frame -> KnowledgeViewState("READY", stored.evaluate(input.value, locale()))
+        }
+        if (!running.get() || getBinding() != current) return KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE")
+        return if (stored.observationBlocked()) KnowledgeViewState("UNAVAILABLE") else result
     }
     fun start() = synchronized(lifecycle) {
         if (closed.get()) return@synchronized
         if (running.getAndSet(true)) return@synchronized
-        epoch.incrementAndGet(); lastRefresh = Long.MIN_VALUE
-        last = KnowledgeViewState(if (getBinding() == null) "WAITING_FOR_VERIFIED_PROFILE" else "LOADING")
+        epoch.incrementAndGet(); lastRefresh = Long.MIN_VALUE; sourceFailureLatched = false
+        val initial = try { getBinding() } catch (_: Exception) { sourceFailureLatched = true; null }
+        last = KnowledgeViewState(when {
+            sourceFailureLatched -> "UNAVAILABLE"
+            initial == null -> "WAITING_FOR_VERIFIED_PROFILE"
+            else -> "LOADING"
+        })
         onChange(last)
         timer = worker.scheduleAtFixedRate({
             val operation = epoch.get()
             if (running.get()) {
-                val now = clock()
-                if (lastRefresh == Long.MIN_VALUE || now < lastRefresh || now - lastRefresh >= 30000) refresh(operation)
-                publish(operation, state())
+                val value = try {
+                    val now = clock()
+                    if (lastRefresh == Long.MIN_VALUE || now < lastRefresh || now - lastRefresh >= 30000) refresh(operation)
+                    state()
+                } catch (_: Exception) {
+                    sourceFailureLatched = true
+                    cache?.clear()
+                    KnowledgeViewState("UNAVAILABLE")
+                }
+                publish(operation, value)
             }
         }, 0, 1, TimeUnit.SECONDS)
     }
@@ -60,7 +98,7 @@ internal class KnowledgePresentation(private val getBinding: () -> TrustedKnowle
         if (running.get() && operation == epoch.get()) { last = value; onChange(value) }
     }
     private fun refresh(operation: Long) {
-        if (!refreshing.compareAndSet(false, true)) return
+        if (sourceFailureLatched || !refreshing.compareAndSet(false, true)) return
         try {
             lastRefresh = clock()
             val trusted = getBinding() ?: run { cache?.clear(); binding = null; publish(operation, KnowledgeViewState("WAITING_FOR_VERIFIED_PROFILE")); return }

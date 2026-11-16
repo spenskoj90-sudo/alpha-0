@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "shattered-healing-4.0.2-reviewed-source",
+  "version": "1",
+  "status": "validated",
+  "revoked": false,
+  "game": "shattered-pixel-dungeon",
+  "platform": "android",
+  "patch": "4.0.2",
+  "environment": "local-offline-single-player",
+  "profile": "health-potion-source-pilot-v922",
+  "provenance": [
+    "https://github.com/00-Evan/shattered-pixel-dungeon/blob/57a4e06a4caf162446d1c28caa7983f0493fecf0/build.gradle"
+  ],
+  "valid_until_ms": 1893456000000,
+  "max_state_age_ms": 1000,
+  "coverage": [
+    "SOURCE_REVIEW_ONLY; synthetic offline replay, not live game acceptance",
+    "health <=25% is conservative reviewer policy, not optimal strategy"
+  ],
+  "rules": [
+    {
+      "id": "pharmacophobia-poison",
+      "priority": 90,
+      "requires": [
+        {
+          "signal": "health",
+          "op": "gt",
+          "value": 0
+        },
+        {
+          "signal": "health",
+          "op": "lte",
+          "value": 0.25
+        },
+        {
+          "signal": "no_healing",
+          "op": "eq",
+          "value": true
+        }
+      ],
+      "text": {
+        "en": "Pharmacophobia: Potion of Healing poisons the hero. Do not use it as healing.",
+        "ru": "Фармакофобия: зелье лечения отравляет героя. Не используйте его для лечения."
+      },
+      "reason": {
+        "en": "NO_HEALING selects pharmacophobiaProc instead of Healing.",
+        "ru": "Проверенное правило точной версии; состояние забега должно быть подтверждено отдельно."
+      },
+      "provenance": [
+        "https://github.com/00-Evan/shattered-pixel-dungeon/blob/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/potions/PotionOfHealing.java",
+        "https://github.com/00-Evan/shattered-pixel-dungeon/blob/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/Challenges.java"
+      ],
+      "confidence": null
+    },
+    {
+      "id": "known-healing-option",
+      "priority": 90,
+      "requires": [
+        {
+          "signal": "health",
+          "op": "gt",
+          "value": 0
+        },
+        {
+          "signal": "health",
+          "op": "lte",
+          "value": 0.25
+        },
+        {
+          "signal": "no_healing",
+          "op": "eq",
+          "value": false
+        },
+        {
+          "signal": "known_healing_potions",
+          "op": "gte",
+          "value": 1
+        }
+      ],
+      "text": {
+        "en": "A known Potion of Healing is an option; review threats before choosing.",
+        "ru": "Известное зелье лечения — возможный вариант; сначала оцените угрозы."
+      },
+      "reason": {
+        "en": "Known inventory and NO_HEALING=false are both required. Healing is over time; safety/outcome are not guaranteed.",
+        "ru": "Проверенное правило точной версии; состояние забега должно быть подтверждено отдельно."
+      },
+      "provenance": [
+        "https://github.com/00-Evan/shattered-pixel-dungeon/blob/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/items/potions/PotionOfHealing.java",
+        "https://github.com/00-Evan/shattered-pixel-dungeon/blob/57a4e06a4caf162446d1c28caa7983f0493fecf0/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/Challenges.java"
+      ],
+      "confidence": null
+    }
+  ]
+}

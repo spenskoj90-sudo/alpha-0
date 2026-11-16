@@ -116,6 +116,8 @@ The Android manifest accepts only the build's compiled scheme plus host `callbac
 
 The PKCE verifier, provider and state survive the browser round trip only inside AES-GCM ciphertext protected by an Android Keystore key. The entry expires after ten minutes and is consumed before provider completion. The callback state is compared in constant time. Core independently enforces its own five-minute one-time challenge.
 
+The inbound browser callback is now parsed by one shared strict boundary in both MainActivity and FederatedAuthCoordinator **before** consuming the encrypted pending PKCE state: exact compiled scheme/authority/path, no fragment/userinfo/port, unique bounded state/code or provider-error parameters, and no conflicting success/error. Legitimate provider cancellation remains a distinct failure path. Pending provider/operation and constant-time state verification still follow, and only Core can exchange a code. Malformed callbacks do not consume an otherwise valid pending login. A well-formed callback with a wrong state, provider or operation also leaves the encrypted pending flow intact; the shared in-process lock serializes save/cancel/consume and a matching callback removes the record with synchronous preference persistence before exchanging its code, preserving single-use semantics and constant-time state comparison. Kotlin/JVM negative tests cover replayed/duplicate and malformed URLs; live provider-specific redirects, Android deep-link delivery and physical login remain external acceptance gates.
+
 ## 6. Disabled/default behavior
 
 All federated providers are disabled by default. Missing or partial provider configuration never falls back to accepting unverified client claims.

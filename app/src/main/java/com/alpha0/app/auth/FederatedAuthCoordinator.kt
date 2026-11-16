@@ -8,13 +8,15 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import java.security.MessageDigest
 
 class FederatedAuthCoordinator(
     private val context: Context,
     private val api: AuthApi,
     private val callbackScheme: String,
     private val vkRedirectUri: String,
+    private val googleClientIdPin: String? = null,
+    private val telegramClientIdPin: String? = null,
+    private val vkClientIdPin: String? = null,
     private val stateStore: FederatedAuthStateStore = FederatedAuthStateStore(),
     private val credentialManager: CredentialManager = CredentialManager.create(context),
 ) {
@@ -45,10 +47,11 @@ class FederatedAuthCoordinator(
     }
 
     fun isProviderCompatible(status: AuthApi.ProviderStatus): Boolean = when (status.provider) {
-        "google", "telegram" -> true
+        "google" -> googleClientIdAllowed(googleClientIdPin, status.clientId)
+        "telegram" -> browserClientIdAllowed(telegramClientIdPin, status.clientId)
         "vk" -> {
             val clientId = status.clientId
-            clientId != null && vkRedirectUri == "vk$clientId://vk.ru/blank.html"
+            clientId != null && browserClientIdAllowed(vkClientIdPin, clientId) && vkRedirectUri == "vk$clientId://vk.ru/blank.html"
         }
         else -> false
     }
@@ -75,6 +78,9 @@ class FederatedAuthCoordinator(
         val challenge = when (val result = api.googleChallenge()) {
             is AuthApi.GoogleChallengeResult.Success -> result.value
             is AuthApi.GoogleChallengeResult.Failure -> return GoogleCredentialResult.Failure(result.message)
+        }
+        if (!googleClientIdAllowed(googleClientIdPin, challenge.clientId)) {
+            return GoogleCredentialResult.Failure("AUTH_PROVIDER_NOT_CONFIGURED")
         }
         val option = GetGoogleIdOption.Builder()
             .setServerClientId(challenge.clientId)
@@ -115,6 +121,10 @@ class FederatedAuthCoordinator(
         if (normalized !in setOf("telegram", "vk")) {
             return BrowserLaunchResult.Failure("AUTH_PROVIDER_UNSUPPORTED")
         }
+        val browserPin = if (normalized == "telegram") telegramClientIdPin else vkClientIdPin
+        if (browserPin != null && !browserClientIdAllowed(browserPin, browserPin)) {
+            return BrowserLaunchResult.Failure("AUTH_PROVIDER_NOT_CONFIGURED")
+        }
         if (operation !in setOf("login", "link")) {
             return BrowserLaunchResult.Failure("AUTH_OPERATION_INVALID")
         }
@@ -133,6 +143,10 @@ class FederatedAuthCoordinator(
                 if (uri.scheme != "https" || uri.host != expectedHost) {
                     return BrowserLaunchResult.Failure("AUTH_PROVIDER_ENDPOINT_INVALID")
                 }
+                val redirect = if (normalized == "vk") vkRedirectUri else "$callbackScheme://callback"
+                if (browserPin != null && !trustedBrowserAuthorization(
+                        start.authorizationUrl, normalized, browserPin, redirect, start.state, start.codeVerifier
+                    )) return BrowserLaunchResult.Failure("AUTH_PROVIDER_ENDPOINT_INVALID")
                 stateStore.save(
                     context,
                     FederatedAuthStateStore.Pending(
@@ -179,60 +193,43 @@ class FederatedAuthCoordinator(
     }
 
     private fun consumeCallback(uri: Uri, expectedOperation: String): CallbackResult {
-        val genericCallback = uri.scheme == callbackScheme && uri.host == "callback"
-        val expectedVk = runCatching { Uri.parse(vkRedirectUri) }.getOrNull()
-        val vkCallback = expectedVk != null &&
-            uri.scheme == expectedVk.scheme &&
-            uri.host == expectedVk.host &&
-            uri.path == expectedVk.path
-        if (!genericCallback && !vkCallback) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
+        // Canonicalize before consuming the single-use Keystore PKCE pending state.
+        // An invalid deep link must not invalidate a legitimate in-progress login.
+        val parsed = StrictInboundBrowserCallback.parseAny(
+            uri.toString(), "$callbackScheme://callback", vkRedirectUri,
+        ) ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
+        val pending = when (val matched = stateStore.consumeMatching(
+            context, parsed.provider, expectedOperation, parsed.state,
+        )) {
+            is FederatedAuthStateStore.ConsumeResult.Matched -> matched.pending
+            FederatedAuthStateStore.ConsumeResult.Expired ->
+                return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
+            FederatedAuthStateStore.ConsumeResult.OperationMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
+            FederatedAuthStateStore.ConsumeResult.ProviderMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
+            FederatedAuthStateStore.ConsumeResult.StateMismatch ->
+                return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
         }
-        val pending = stateStore.consume(context)
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_EXPIRED")
-        if (pending.operation != expectedOperation) {
-            return CallbackResult.Failure("AUTH_CALLBACK_OPERATION_MISMATCH")
+        return when (parsed) {
+            is StrictInboundBrowserCallback.Parsed.ProviderError ->
+                CallbackResult.Failure("AUTH_PROVIDER_CANCELLED")
+            is StrictInboundBrowserCallback.Parsed.Code ->
+                CallbackResult.Success(
+                    BrowserCallback(
+                        provider = pending.provider,
+                        operation = pending.operation,
+                        code = parsed.code,
+                        state = parsed.state,
+                        codeVerifier = pending.codeVerifier,
+                        deviceId = parsed.deviceId,
+                    ),
+                )
         }
-        if (pending.provider == "vk" && !vkCallback) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        if (pending.provider == "telegram" && !genericCallback) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        val callbackState = uri.getQueryParameter("state")
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        if (!constantTimeEquals(callbackState, pending.state)) {
-            return CallbackResult.Failure("AUTH_CALLBACK_STATE_MISMATCH")
-        }
-        val providerError = uri.getQueryParameter("error")
-        if (!providerError.isNullOrBlank()) {
-            return CallbackResult.Failure("AUTH_PROVIDER_CANCELLED")
-        }
-        val code = uri.getQueryParameter("code")
-            ?: return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        if (code.isBlank() || code.length > 4096) {
-            return CallbackResult.Failure("AUTH_CALLBACK_INVALID")
-        }
-        val deviceId = uri.getQueryParameter("device_id")?.takeIf { it.isNotBlank() && it.length <= 512 }
-        return CallbackResult.Success(
-            BrowserCallback(
-                provider = pending.provider,
-                operation = pending.operation,
-                code = code,
-                state = callbackState,
-                codeVerifier = pending.codeVerifier,
-                deviceId = deviceId,
-            )
-        )
     }
 
     fun cancelPendingBrowserFlow() {
         stateStore.clear(context)
     }
 
-    private fun constantTimeEquals(left: String, right: String): Boolean =
-        MessageDigest.isEqual(
-            left.toByteArray(Charsets.UTF_8),
-            right.toByteArray(Charsets.UTF_8),
-        )
 }

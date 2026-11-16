@@ -27,6 +27,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.alpha0.app.BuildConfig
 import com.alpha0.app.ui.DataText
@@ -41,26 +44,35 @@ import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 
-private enum class UpdateState { IDLE, CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, PLAY_REQUIRED, FAILED }
+private enum class UpdateState { IDLE, CHECKING, CURRENT, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, STORE_UPDATE, PLAY_REQUIRED, FAILED }
 
 @Composable
 fun UpdateScreen() {
     val strings = LocalAppStrings.current
     val context = LocalContext.current
     val activity = context.findActivity()
-    val manager = remember(context) { AppUpdateManagerFactory.create(context) }
     var state by remember { mutableStateOf(UpdateState.IDLE) }
-    val diagnostic = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic"
+    val channel = BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
+    val diagnostic = UpdateChannelPolicy.allowsLocalApkSelection(channel)
+    val usesSignedFeed = UpdateChannelPolicy.allowsSignedFeed(channel)
+    val manager = remember(context, channel) {
+        if (UpdateChannelPolicy.usesPlayManager(channel)) AppUpdateManagerFactory.create(context)
+        else null
+    }
     val scope = rememberCoroutineScope()
     var localChecking by remember { mutableStateOf(false) }
     var localInstalling by remember { mutableStateOf(false) }
     var localResult by remember { mutableStateOf<LocalApkUpdate.Result?>(null) }
     var installOutcome by remember { mutableStateOf<LocalApkUpdate.InstallOutcome?>(null) }
+    var feedChecking by remember { mutableStateOf(false) }
+    var feedDownloading by remember { mutableStateOf(false) }
+    var feedResult by remember { mutableStateOf<FeedUpdateClient.Check?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null && !localChecking) {
             localChecking = true
             localResult = null
             installOutcome = null
+            feedResult = null
             scope.launch {
                 try {
                     localResult = LocalApkUpdate.stage(context, selected)
@@ -73,6 +85,7 @@ fun UpdateScreen() {
     val channelLabel = when (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL) {
         "play" -> strings.text("channel_play")
         "diagnostic" -> strings.text("channel_diagnostic")
+        "signed_feed" -> strings.text("channel_signed_feed")
         "development" -> strings.text("channel_development")
         else -> BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL
     }
@@ -91,13 +104,17 @@ fun UpdateScreen() {
         }
     }
     DisposableEffect(manager, installListener) {
-        manager.registerListener(installListener)
-        onDispose { manager.unregisterListener(installListener) }
+        manager?.registerListener(installListener)
+        onDispose { manager?.unregisterListener(installListener) }
     }
 
     fun check() {
+        val playManager = manager ?: run {
+            state = UpdateState.PLAY_REQUIRED
+            return
+        }
         state = UpdateState.CHECKING
-        manager.appUpdateInfo
+        playManager.appUpdateInfo
             .addOnSuccessListener { info ->
                 if (info.installStatus() == InstallStatus.DOWNLOADED) {
                     state = UpdateState.READY_TO_INSTALL
@@ -106,14 +123,23 @@ fun UpdateScreen() {
                 ) {
                     state = UpdateState.AVAILABLE
                     if (activity != null) {
-                        manager.startUpdateFlowForResult(
+                        playManager.startUpdateFlowForResult(
                             info,
                             launcher,
                             AppUpdateOptions.newBuilder(AppUpdateType.FLEXIBLE).build(),
                         )
                     }
                 } else {
-                    state = if (context.installedFromPlay()) UpdateState.CURRENT else UpdateState.PLAY_REQUIRED
+                    // Only an explicit not-available result proves CURRENT. A
+                    // disallowed flexible update or an interrupted Play flow
+                    // must not be presented as "latest version".
+                    state = when (info.updateAvailability()) {
+                        UpdateAvailability.UPDATE_AVAILABLE,
+                        UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> UpdateState.STORE_UPDATE
+                        UpdateAvailability.UPDATE_NOT_AVAILABLE ->
+                            if (context.installedFromPlay()) UpdateState.CURRENT else UpdateState.PLAY_REQUIRED
+                        else -> UpdateState.FAILED
+                    }
                 }
             }
             .addOnFailureListener {
@@ -135,7 +161,92 @@ fun UpdateScreen() {
                 }
             }
         }
-        if (diagnostic) {
+        if (usesSignedFeed) {
+            item {
+                SentinelCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(strings.text("update_feed_intro"), style = MaterialTheme.typography.titleMedium)
+                        val feedConfigured =
+                            BuildConfig.SENTINEL_UPDATE_FEED_URL.isNotBlank() &&
+                                BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY.isNotBlank()
+                        PrimaryButton(
+                                text = strings.text("check_updates"),
+                                onClick = {
+                                    if (!feedChecking && !feedDownloading) {
+                                        feedChecking = true
+                                        feedResult = null
+                                        localResult = null
+                                        installOutcome = null
+                                        scope.launch {
+                                            try {
+                                                feedResult = FeedUpdateClient.check(context,
+                                                    BuildConfig.SENTINEL_UPDATE_FEED_URL,
+                                                    BuildConfig.SENTINEL_UPDATE_FEED_VERIFYING_KEY)
+                                            } finally {
+                                                feedChecking = false
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = feedConfigured && !feedChecking && !feedDownloading &&
+                                    !localInstalling && !localChecking,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        if (!feedConfigured) {
+                            Text(strings.text(if (diagnostic) "update_feed_unconfigured" else "update_feed_unconfigured_release"),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (feedChecking) {
+                            CircularProgressIndicator()
+                            Text(strings.text("update_feed_checking"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
+                        when (val checked = feedResult) {
+                            is FeedUpdateClient.Check.Current -> Text(
+                                strings.text("update_feed_current", checked.versionCode),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                            )
+                            is FeedUpdateClient.Check.Available -> {
+                                Text(strings.text("update_feed_available", checked.release.versionCode),
+                                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                                Text(strings.text("update_feed_whats_new"),
+                                    style = MaterialTheme.typography.titleSmall)
+                                Text(checked.release.whatsNew)
+                                PrimaryButton(
+                                    text = strings.text("update_feed_download"),
+                                    onClick = {
+                                        if (!feedDownloading && !localInstalling) {
+                                            feedDownloading = true
+                                            localResult = null
+                                            scope.launch {
+                                                try {
+                                                    localResult = FeedUpdateClient.download(context, checked)
+                                                } finally {
+                                                    feedDownloading = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    enabled = !feedChecking && !feedDownloading && !localChecking &&
+                                        !localInstalling && localResult !is LocalApkUpdate.Result.Ready,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            FeedUpdateClient.Check.NotConfigured -> Text(strings.text(if (diagnostic) "update_feed_unconfigured" else "update_feed_unconfigured_release"))
+                            FeedUpdateClient.Check.Unavailable -> Text(strings.text("update_feed_unavailable"),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                            null -> Unit
+                        }
+                        if (feedDownloading) {
+                            CircularProgressIndicator()
+                            Text(strings.text("update_feed_downloading"),
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                        }
+                    }
+                }
+            }
+            if (diagnostic) {
             item {
                 Text(strings.text("update_local_intro"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -143,12 +254,16 @@ fun UpdateScreen() {
                 PrimaryButton(
                     text = strings.text("update_local_choose"),
                     onClick = { picker.launch(arrayOf("*/*")) },
-                    enabled = !localChecking && !localInstalling,
+                    enabled = !localChecking && !localInstalling && !feedChecking && !feedDownloading,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            }
+            // A verified feed download must expose the same stage/permission/system-installer
+            // flow as a user-selected diagnostic APK; only the file picker is diagnostic.
+            if (UpdateChannelPolicy.showsStagedInstall(channel)) {
             item {
-                if (localChecking) {
+                if (diagnostic && localChecking) {
                     CircularProgressIndicator()
                     Text(strings.text("update_local_checking"))
                 }
@@ -220,12 +335,13 @@ fun UpdateScreen() {
                     null -> Unit
                 }
             }
+            }
         } else {
         item {
             val readyToInstall = state == UpdateState.READY_TO_INSTALL
             PrimaryButton(
                 text = strings.text(if (readyToInstall) "install_update" else "check_updates"),
-                onClick = { if (readyToInstall) manager.completeUpdate() else check() },
+                onClick = { if (readyToInstall) manager?.completeUpdate() else check() },
                 enabled = state != UpdateState.CHECKING,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -238,12 +354,13 @@ fun UpdateScreen() {
         }
         item {
             val message = when (state) {
-                UpdateState.IDLE -> if (BuildConfig.SENTINEL_DISTRIBUTION_CHANNEL == "diagnostic") "update_sideload_notice" else "up_to_date"
+                UpdateState.IDLE -> "update_not_checked"
                 UpdateState.CHECKING -> "checking_updates"
                 UpdateState.CURRENT -> "up_to_date"
                 UpdateState.AVAILABLE -> "update_available"
                 UpdateState.DOWNLOADING -> "update_downloading"
                 UpdateState.READY_TO_INSTALL -> "update_ready"
+                UpdateState.STORE_UPDATE -> "update_open_play_required"
                 UpdateState.PLAY_REQUIRED -> "update_play_required"
                 UpdateState.FAILED -> "server_unreachable"
             }

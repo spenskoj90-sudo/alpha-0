@@ -40,6 +40,7 @@ app.whenReady().then(() => {
     knowledge.stop();
     require('./exact-environment-evidence');
     require('./runtime-health');
+    require('./renderer-boundary');
     require('./voice-runtime');
     require('./wow-savedvariables');
 
@@ -55,6 +56,7 @@ app.whenReady().then(() => {
         'knowledge-presentation',
         'exact-environment-evidence',
         'runtime-health',
+        'renderer-boundary',
         'voice-runtime',
         'wow-savedvariables',
       ],

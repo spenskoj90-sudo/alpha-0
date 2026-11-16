@@ -45,6 +45,8 @@ jobs:
           python scripts/test_release_evidence.py
           python scripts/test_release_evidence_supply_chain.py
           python scripts/test_artifact_attestations.py
+          python scripts/test_signed_feed_candidate.py
+          python scripts/test_signed_update_feed_release.py
 
       - name: Record PR contract-only scope
         if: github.event_name == 'pull_request'

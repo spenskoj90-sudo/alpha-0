@@ -138,7 +138,15 @@ class CompanionProcessManager {
   async #onMessage(source, message) {
     if (source !== this.child || !message || typeof message !== 'object') return;
     if (message.type === 'status' && message.status) {
-      this.#publish(message.status);
+      const status = sanitizeStatus(message.status);
+      if (status.state === 'STOPPED') {
+        // A terminal server rejection or exhausted retry budget stops the
+        // worker itself. Reap it now, or the parent cannot start again.
+        this.child = null;
+        this.expectedStop = true;
+        if (!source.killed) source.kill('SIGTERM');
+      }
+      this.#publish(status);
       return;
     }
     if (message.type === 'handshake-evidence') {

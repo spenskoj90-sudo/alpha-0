@@ -6,6 +6,10 @@ const { URL } = require('node:url');
 const KNOWLEDGE_MAX_BYTES = 262144;
 const KNOWLEDGE_MAX_JSON_BYTES = 4 * Math.ceil(KNOWLEDGE_MAX_BYTES / 3) + 4096;
 const KNOWLEDGE_TIMEOUT_MS = 10000;
+const CORE_REQUEST_TIMEOUT_MS = 15000;
+const CORE_REQUEST_MAX_TIMEOUT_MS = 30000;
+// Base64 for up to 2,000,000 bytes of TTS audio plus bounded JSON envelope.
+const CORE_JSON_MAX_BYTES = 3 * 1024 * 1024;
 const KNOWLEDGE_PROFILE_KEYS = ['game', 'platform', 'patch', 'environment', 'profile'];
 const DIGEST = /^[0-9a-f]{64}$/;
 
@@ -74,43 +78,56 @@ async function abortable(operation, signal) {
   finally { signal.removeEventListener('abort', aborted); }
 }
 
-async function readBounded(response, limit, signal) {
+async function readBounded(response, limit, signal, errorKind = 'KNOWLEDGE') {
   const declared = response.headers?.get?.('content-length');
   if (declared !== null && declared !== undefined) {
     if (!/^(0|[1-9][0-9]*)$/.test(declared) || Number(declared) > limit) {
-      throw new Error('KNOWLEDGE_SIZE_INVALID');
+      throw new Error(`${errorKind}_SIZE_INVALID`);
     }
   }
   if (!response.body?.getReader) {
-    throw new Error('KNOWLEDGE_RESPONSE_INVALID');
+    throw new Error(`${errorKind}_RESPONSE_INVALID`);
   }
   const chunks = [];
   let length = 0;
+  let reads = 0;
+  let emptyReads = 0;
+  let complete = false;
   const reader = response.body.getReader();
   try {
-  while (true) {
-    const { done, value } = await abortable(() => reader.read(), signal);
-    if (done) break;
-    length += value.byteLength;
-    if (length > limit) {
-      void reader.cancel().catch(() => {});
-      throw new Error('KNOWLEDGE_SIZE_INVALID');
+    while (true) {
+      // A malicious stream can resolve read() indefinitely without yielding
+      // the event loop to the wall-clock timeout. Bound *read operations* as
+      // well as bytes and reject repeated zero-progress chunks.
+      if (++reads > 32768) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+      const { done, value } = await abortable(() => reader.read(), signal);
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+      if (value.byteLength === 0) {
+        if (++emptyReads > 32) throw new Error(`${errorKind}_RESPONSE_INVALID`);
+        continue;
+      }
+      length += value.byteLength;
+      if (length > limit) throw new Error(`${errorKind}_SIZE_INVALID`);
+      chunks.push(Buffer.from(value));
     }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, length);
+    complete = true;
+    return Buffer.concat(chunks, length);
   } finally {
-    if (signal?.aborted) void reader.cancel().catch(() => {});
+    // Every failed / incomplete response releases its reader and transport.
+    // A completed body needs no additional network cancellation.
+    if (!complete || signal?.aborted) void reader.cancel().catch(() => {});
     reader.releaseLock();
   }
 }
 
-async function readBoundedJson(response, signal) {
-  const raw = await readBounded(response, KNOWLEDGE_MAX_JSON_BYTES, signal);
+async function readBoundedJson(response, signal, limit = KNOWLEDGE_MAX_JSON_BYTES,
+  errorKind = 'KNOWLEDGE') {
+  const raw = await readBounded(response, limit, signal, errorKind);
   try {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(raw));
   } catch {
-    throw new Error('KNOWLEDGE_RESPONSE_INVALID');
+    throw new Error(`${errorKind}_RESPONSE_INVALID`);
   }
 }
 
@@ -121,15 +138,25 @@ class CoreSessionManager {
   #mfaChallenge = null;
   #mfaExpiresAt = null;
   #sessionEpoch = 0;
+  // Invalidates async login/MFA replies that arrive after Logout or a newer attempt.
+  #authGeneration = 0;
   #knowledgeControllers = new Set();
+  #authorizedControllers = new Set();
+  #authControllers = new Set();
   #refreshFlight = null;
   #knowledgeTimeoutMs;
+  #coreTimeoutMs;
 
-  constructor({ fetchImpl = globalThis.fetch, knowledgeTimeoutMs = KNOWLEDGE_TIMEOUT_MS } = {}) {
+  constructor({ fetchImpl = globalThis.fetch, knowledgeTimeoutMs = KNOWLEDGE_TIMEOUT_MS,
+    coreTimeoutMs = CORE_REQUEST_TIMEOUT_MS } = {}) {
     if (typeof fetchImpl !== 'function') throw new Error('FETCH_UNAVAILABLE');
     if (!Number.isInteger(knowledgeTimeoutMs) || knowledgeTimeoutMs < 1 || knowledgeTimeoutMs > KNOWLEDGE_TIMEOUT_MS) {
       throw new Error('KNOWLEDGE_TIMEOUT_INVALID');
     }
+    if (!Number.isInteger(coreTimeoutMs) || coreTimeoutMs < 1 || coreTimeoutMs > CORE_REQUEST_MAX_TIMEOUT_MS) {
+      throw new Error('CORE_TIMEOUT_INVALID');
+    }
+    this.#coreTimeoutMs = coreTimeoutMs;
     this.#knowledgeTimeoutMs = knowledgeTimeoutMs;
     this.#fetch = fetchImpl;
   }
@@ -153,13 +180,24 @@ class CoreSessionManager {
     if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
       throw new Error('CREDENTIALS_REQUIRED');
     }
+    const attempt = ++this.#authGeneration;
+    // A fresh login revokes any older MFA challenge immediately, even if the
+    // new server response is delayed or fails.
+    this.#mfaChallenge = null;
+    this.#mfaExpiresAt = null;
     const rid = requestId();
-    const response = await this.#fetch(`${normalized}/v1/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
-      body: JSON.stringify({ email: email.trim(), password }),
-    });
-    const payload = await readJson(response);
+    let response, payload;
+    try {
+      ({ response, payload } = await this.#boundedAuthJson(`${normalized}/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
+        body: JSON.stringify({ email: email.trim(), password }),
+      }));
+    } catch (error) {
+      if (attempt !== this.#authGeneration) throw new Error('SESSION_CHANGED');
+      throw error;
+    }
+    if (attempt !== this.#authGeneration) throw new Error('SESSION_CHANGED');
     if (!response.ok) throw new Error(errorCode(payload, 'LOGIN_FAILED'));
     if (payload?.mfa_required === true) {
       if (typeof payload.challenge_token !== 'string' || payload.challenge_token.length < 32) {
@@ -179,18 +217,26 @@ class CoreSessionManager {
     if (!this.#coreUrl || !this.#mfaChallenge) throw new Error('MFA_CHALLENGE_REQUIRED');
     const normalizedCode = typeof code === 'string' ? code.trim() : '';
     if (normalizedCode.length < 6 || normalizedCode.length > 64) throw new Error('MFA_CODE_INVALID');
+    const origin = this.#coreUrl;
+    const challenge = this.#mfaChallenge;
+    const attempt = ++this.#authGeneration;
     const rid = requestId();
-    const response = await this.#fetch(`${this.#coreUrl}/v1/auth/mfa/complete`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
-      body: JSON.stringify({
-        challenge_token: this.#mfaChallenge,
-        code: normalizedCode,
-      }),
-    });
-    const payload = await readJson(response);
+    let response, payload;
+    try {
+      ({ response, payload } = await this.#boundedAuthJson(`${origin}/v1/auth/mfa/complete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'X-Request-ID': rid },
+        body: JSON.stringify({ challenge_token: challenge, code: normalizedCode }),
+      }));
+    } catch (error) {
+      if (attempt !== this.#authGeneration || this.#coreUrl !== origin ||
+          this.#mfaChallenge !== challenge) throw new Error('SESSION_CHANGED');
+      throw error;
+    }
+    if (attempt !== this.#authGeneration || this.#coreUrl !== origin ||
+        this.#mfaChallenge !== challenge) throw new Error('SESSION_CHANGED');
     if (!response.ok) throw new Error(errorCode(payload, 'MFA_VERIFICATION_FAILED'));
-    this.#setSession(this.#coreUrl, payload);
+    this.#setSession(origin, payload);
     return this.status;
   }
 
@@ -306,12 +352,47 @@ class CoreSessionManager {
   }
 
   clear() {
+    this.#authGeneration += 1;
     this.#sessionEpoch += 1;
     this.cancelKnowledge();
+    // An abandoned login/MFA may never return a server response.
+    for (const controller of this.#authControllers) controller.abort(new Error('SESSION_CHANGED'));
+    this.#authControllers.clear();
+    // Logout/account replacement cancels outstanding feature/voice requests too.
+    for (const controller of this.#authorizedControllers) controller.abort(new Error('SESSION_CHANGED'));
+    this.#authorizedControllers.clear();
     this.#session = null;
     this.#coreUrl = null;
     this.#mfaChallenge = null;
     this.#mfaExpiresAt = null;
+  }
+
+  async #boundedAuthJson(url, init) {
+    const controller = new AbortController();
+    const signal = controller.signal;
+    this.#authControllers.add(controller);
+    const timer = setTimeout(() => controller.abort(
+      new DOMException('Authentication request deadline', 'TimeoutError'),
+    ), this.#coreTimeoutMs);
+    try {
+      const response = await abortable(() => this.#fetch(url, {
+        ...init, signal, redirect: 'error', cache: 'no-store',
+      }), signal);
+      const payload = response.body?.getReader
+        ? await readBoundedJson(response, signal, CORE_JSON_MAX_BYTES, 'CORE')
+        : await abortable(() => readJson(response), signal);
+      signal.throwIfAborted();
+      return { response, payload };
+    } catch (error) {
+      if (signal.aborted && signal.reason?.name === 'TimeoutError') {
+        throw new Error('CORE_REQUEST_TIMEOUT');
+      }
+      if (signal.aborted) throw new Error('SESSION_CHANGED');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      this.#authControllers.delete(controller);
+    }
   }
 
   async #authorizedJson(path, { method = 'GET', body = null } = {}, fallback = 'CORE_REQUEST_FAILED') {
@@ -319,29 +400,64 @@ class CoreSessionManager {
     const rid = requestId();
     const epoch = this.#sessionEpoch;
     const origin = this.#coreUrl;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    this.#authorizedControllers.add(controller);
+    // One total deadline covers the initial request, one-use token rotation,
+    // retry and JSON decoding. The network can never keep Voice/Account busy
+    // forever, even if an injected transport ignores AbortSignal.
+    const timer = setTimeout(() => controller.abort(
+      new DOMException('Core request deadline', 'TimeoutError'),
+    ), this.#coreTimeoutMs);
+    const ensureCurrent = () => {
+      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl || !this.accessToken) {
+        throw new Error('SESSION_CHANGED');
+      }
+      signal.throwIfAborted();
+    };
     const send = () => {
-      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
+      ensureCurrent();
       const headers = { Authorization: `Bearer ${this.accessToken}`, 'X-Request-ID': rid };
-      const init = { method, headers };
+      const init = { method, headers, redirect: 'error', cache: 'no-store', signal };
       if (body !== null) {
         headers['content-type'] = 'application/json';
         init.body = JSON.stringify(body);
       }
-      return this.#fetch(`${this.#coreUrl}${path}`, init);
+      return abortable(() => this.#fetch(`${origin}${path}`, init), signal);
     };
 
-    const attemptedAccess = this.accessToken;
-    let response = await send();
-    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
-    if (response.status === 401 && this.refreshToken) {
-      // Another caller may already have rotated the same one-use token.
-      if (this.accessToken === attemptedAccess) await this.refresh(rid);
-      response = await send();
+    try {
+      const attemptedAccess = this.accessToken;
+      let response = await send();
+      ensureCurrent();
+      if (response.status === 401 && this.refreshToken) {
+        // Release the failed response stream before the refresh/retry; do not
+        // retain a socket body that the caller will never consume.
+        void response.body?.cancel().catch(() => {});
+        // A concurrent caller may have already rotated this one-use token.
+        if (this.accessToken === attemptedAccess) await this.refresh(rid, { signal });
+        ensureCurrent();
+        response = await send();
+      }
+      // Real transport responses are streamed and bounded, including Base64 TTS.
+      // Legacy in-memory mock transports may expose only json().
+      const payload = response.body?.getReader
+        ? await readBoundedJson(response, signal, CORE_JSON_MAX_BYTES, 'CORE')
+        : await abortable(() => readJson(response), signal);
+      ensureCurrent();
+      if (!response.ok) throw new Error(errorCode(payload, fallback));
+      return payload;
+    } catch (error) {
+      if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
+      if (signal.aborted && signal.reason?.name === 'TimeoutError') {
+        throw new Error('CORE_REQUEST_TIMEOUT');
+      }
+      if (signal.aborted) throw new Error('SESSION_CHANGED');
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      this.#authorizedControllers.delete(controller);
     }
-    const payload = await readJson(response);
-    if (epoch !== this.#sessionEpoch || origin !== this.#coreUrl) throw new Error('SESSION_CHANGED');
-    if (!response.ok) throw new Error(errorCode(payload, fallback));
-    return payload;
   }
 
   #requireKnowledgeOrigin() {

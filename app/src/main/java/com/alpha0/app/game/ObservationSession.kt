@@ -88,16 +88,22 @@ class ObservationSession {
             snapshot = snapshot.copy(ocrLateCallbacks = snapshot.ocrLateCallbacks + 1)
             return false
         }
+        // Future recognition adapters must not bypass the OCR reader's numeric bounds.
+        // This is still a completed callback, but malformed values count as a miss.
+        val safeHealth = health?.takeIf {
+            it.maximum in 1..999999 && it.current in 0..it.maximum &&
+                it.shield in 0..999999
+        }
         snapshot = snapshot.copy(
-            health = health,
-            lastHealth = health?.let { HealthObservation(it, frameAt) } ?: snapshot.lastHealth,
-            lastRecognizedFrameAt = if (health == null) null else frameAt,
+            health = safeHealth,
+            lastHealth = safeHealth?.let { HealthObservation(it, frameAt) } ?: snapshot.lastHealth,
+            lastRecognizedFrameAt = if (safeHealth == null) null else frameAt,
             lastCompletedFrameSequence = sequence,
             lastCompletedFrameAt = frameAt,
             lastCompletedOcrAt = now,
             lastOcrLatencyMs = latencyMs,
             ocrCompletedFrames = snapshot.ocrCompletedFrames + 1,
-            ocrMissFrames = snapshot.ocrMissFrames + if (health == null) 1L else 0L,
+            ocrMissFrames = snapshot.ocrMissFrames + if (safeHealth == null) 1L else 0L,
             maxOcrLatencyMs = maxOf(snapshot.maxOcrLatencyMs ?: 0L, latencyMs),
         )
         return true

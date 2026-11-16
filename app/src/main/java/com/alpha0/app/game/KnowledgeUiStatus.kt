@@ -10,6 +10,6 @@ internal fun knowledgeUiStatus(state: String): SentinelStatus = when (state) {
     "READY" -> SentinelStatus.ACTIVE
     "DENIED" -> SentinelStatus.DENIED
     "STOPPED" -> SentinelStatus.STOPPED
-    "WAITING_FOR_VERIFIED_PROFILE", "LOADING" -> SentinelStatus.PENDING
+    "WAITING_FOR_VERIFIED_PROFILE", "WAITING_FOR_VERIFIED_OBSERVATION", "LOADING" -> SentinelStatus.PENDING
     else -> SentinelStatus.UNAVAILABLE
 }

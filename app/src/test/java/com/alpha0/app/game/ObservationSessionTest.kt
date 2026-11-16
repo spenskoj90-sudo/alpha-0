@@ -4,6 +4,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ObservationSessionTest {
+    @Test fun `impossible OCR numeric results are counted only as misses`() {
+        val session = visibleSession()
+        val invalid = listOf(
+            HealthCandidate(1, 0, 0), HealthCandidate(11, 10, 0),
+            HealthCandidate(-1, 10, 0), HealthCandidate(1, 10, -1),
+            HealthCandidate(1, 1_000_000, 0), HealthCandidate(1, 10, 1_000_000),
+        )
+        invalid.forEachIndexed { index, candidate ->
+            val frameAt = 110L + 10L * index
+            assertTrue(session.frame("a", frameAt))
+            assertTrue(session.recognized("a", index + 1L, frameAt, frameAt + 1, candidate))
+            assertNull(session.snapshot.health)
+            assertNull(session.snapshot.lastHealth)
+        }
+        assertEquals(invalid.size.toLong(), session.snapshot.ocrMissFrames)
+        assertEquals(invalid.size.toLong(), session.snapshot.ocrCompletedFrames)
+    }
+
     @Test fun `frames require an active visible session`() {
         val session = ObservationSession()
         assertFalse(session.frame("a", 10))

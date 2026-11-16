@@ -21,7 +21,9 @@ test('microphone permission requires short-lived main-process capture lease', ()
   const permissions = functionBody(main, 'configureVoicePermissions()', "ipcMain.handle('catalog'");
   assert.match(main, /VOICE_CAPTURE_PERMISSION_LEASE_MS\s*=\s*5000/);
   assert.match(main, /function voiceCapturePermissionArmed\(\)/);
-  assert.match(main, /voiceCapturePermissionExpiresAt\s*>\s*Date\.now\(\)/);
+  assert.match(main, /voiceCapturePermissionExpiresAt\s*>\s*performance\.now\(\)/);
+  assert.match(main, /voiceCapturePermissionExpiresAt\s*=\s*performance\.now\(\) \+ VOICE_CAPTURE_PERMISSION_LEASE_MS/);
+  assert.doesNotMatch(main, /voiceCapturePermissionExpiresAt\s*>\s*Date\.now\(\)/);
   assert.match(permissions, /consentGranted:\s*voiceCapturePermissionArmed\(\)/);
   assert.doesNotMatch(permissions, /consentGranted:\s*voiceConsentGranted[,\n]/);
   assert.match(permissions, /setDisplayMediaRequestHandler\(\(_request, callback\) => callback\(null\)\)/);
@@ -43,4 +45,26 @@ test('renderer arms only for explicit getUserMedia and immediately disarms after
   const disarmIndex = renderer.indexOf('await window.sentinel.disarmVoiceCapture()');
   assert.ok(armIndex >= 0 && mediaIndex > armIndex && disarmIndex > mediaIndex);
   assert.match(renderer, /video:\s*false/);
+});
+
+test('voice readiness requires active Companion transport, not just cached STT availability', () => {
+  const body = functionBody(main, 'voiceSnapshot()', 'function publishVoiceSnapshot()');
+  assert.match(body, /companion\.status\.state !== 'ACTIVE'/);
+  assert.match(body, /state = 'COMPANION_UNAVAILABLE'/);
+  assert.match(body, /state === 'COMPANION_UNAVAILABLE' \? 'COMPANION_NOT_ACTIVE'/);
+  assert.ok(body.indexOf("companion.status.state !== 'ACTIVE'") < body.indexOf("voiceProviderStatus?.sttAvailable) state = 'READY'"));
+});
+
+test('voice UI and IPC never arm or retain microphone capture during degraded transport', () => {
+  const arm = main.slice(main.indexOf("ipcMain.handle('voice:capture:arm'"), main.indexOf("ipcMain.handle('voice:capture:disarm'"));
+  const submit = main.slice(main.indexOf("ipcMain.handle('voice:submit'"), main.indexOf("\n\napp.whenReady()"));
+  for (const handler of [arm, submit]) {
+    assert.match(handler, /companion\.status\.state !== 'ACTIVE'/);
+    assert.doesNotMatch(handler, /\['ACTIVE', 'DEGRADED'\]\.includes\(companion\.status\.state\)/);
+  }
+  assert.match(renderer, /const companionReady = companionState === 'ACTIVE'/);
+  assert.match(renderer, /const voiceReady = [^\n]*currentVoice\.state === 'READY'/);
+  assert.match(renderer, /COMPANION_UNAVAILABLE: \['Companion connection required'/);
+  assert.match(renderer, /if \(companionState !== 'ACTIVE' &&[\s\S]*?cancelVoiceCapture\(\)/);
+  assert.match(renderer, /function voiceCaptureStillAuthorized[\s\S]*?companionState === 'ACTIVE'/);
 });

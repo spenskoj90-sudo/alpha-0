@@ -16,6 +16,13 @@ internal object GameInstallFence {
             current.versionName == versionName &&
             current.versionCode == versionCode &&
             current.signerSha256 == signerSha256
+
+    /** A resumed SENTINEL route must immediately revoke a still-running capture
+     * when installed game metadata changes. Not proof of the captured window. */
+    fun activeCaptureRequiresStop(runtime: GameObservationViewState, installedNow: StockGameInstall?): Boolean =
+        runtime.observation.status in setOf(
+            ObservationStatus.WAITING, ObservationStatus.OBSERVING, ObservationStatus.PAUSED,
+        ) && (runtime.installed == null || runtime.installed != installedNow)
 }
 
 object ShatteredGameProfile {

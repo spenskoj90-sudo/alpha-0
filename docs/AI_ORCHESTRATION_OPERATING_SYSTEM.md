@@ -1,4 +1,4 @@
-# SENTINEL — GPT-Controlled Engineering Orchestration OS
+# SENTINEL — Engineering Orchestration OS
 
 **Status:** ACTIVE
 **Effective:** 2026-09-29
@@ -27,11 +27,11 @@ Owner-only gates:
 
 No agent or service may bypass these gates.
 
-## 2. GPT/ChatGPT role
+## 2. Owner-facing assistant role
 
 The Owner-facing assistant coordinates work and technical integration in the selected environment; this does not override the Owner integration decision or other applicable gates.
 
-GPT owns:
+The Owner-facing assistant owns:
 - task decomposition and routing;
 - choice of tools, agents, and services;
 - repository/runtime reconciliation;
@@ -57,13 +57,13 @@ Allowed examples:
 - external model families for bounded research, adversarial review, UX critique, architecture challenge, or isolated implementation when the expected value exceeds context/cost overhead.
 
 Rules:
-- GPT defines scope and acceptance criteria.
+- The Owner-facing assistant defines scope and acceptance criteria.
 - One writer per logical change set.
 - Mutable work is isolated by branch/worktree/project.
 - Parallel lanes must be independent.
 - Integration is serialized.
 - Secondary systems never merge protected `main`.
-- Secondary output is input evidence, not truth; GPT validates it against source, tests, runtime, and project invariants.
+- Secondary output is input evidence, not truth; the Owner-facing assistant validates it against source, tests, runtime, and project invariants.
 - Never expose production secrets, signing material, protected admin credentials, or unnecessary personal data to secondary systems.
 
 For the design laboratory specifically, `spenskoj90-sudo/sentinel-aware-companion` may read production context when safe, but writes remain in the design repository. Production imports occur only after a stable finished design SHA is validated. Unfinished Lovable iterations must not be imported.
@@ -84,7 +84,7 @@ Parallelize only when:
 - expected wall-clock or quality benefit is material;
 - coordination cost is lower than the benefit.
 
-If multi-agent orchestration creates more rework, token/credit cost, conflicts, or CI reruns than direct execution, return that task class to a single GPT-led pass.
+If multi-agent orchestration creates more rework, token/credit cost, conflicts, or CI reruns than direct execution, return that task class to a single coordinated pass.
 
 ## 5. Context and token discipline
 
@@ -155,7 +155,7 @@ Before asking the Owner to act:
 - do not ask for secrets in chat;
 - do not ask repetitive confirmation questions.
 
-When a prompt/task must be sent to Work, Lovable, Replit, Figma, or another service, provide it as one self-contained copy-ready block unless GPT can send it directly through the connected service.
+When a prompt/task must be sent to Work, Lovable, Replit, Figma, or another service, provide it as one self-contained copy-ready block unless the assistant can send it directly through the connected service.
 
 Physical testing is batched and exact-candidate based. Prefer emulator, browser, synthetic, staging, and provider-side checks first; request physical testing only when the intended device/host itself is required for evidence.
 
@@ -173,4 +173,4 @@ For implementation facts, live repository/runtime/provider evidence outranks pro
 
 ## 11. Amendment rule
 
-Only the Human Owner may fundamentally change this operating model. GPT may autonomously reconcile subordinate docs, tests, and repository instructions to an explicit Owner decision.
+Only the Human Owner may fundamentally change this operating model. The assistant may autonomously reconcile subordinate docs, tests, and repository instructions to an explicit Owner decision.

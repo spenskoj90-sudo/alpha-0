@@ -14,7 +14,7 @@ Read this file first. Do not load the entire repository documentation set by def
 ## Core rules
 
 - Git `main` at an exact SHA is implementation truth.
-- GPT/ChatGPT is the sole Owner-facing orchestrator and final technical integrator.
+- The Owner-facing orchestrator selects Chat, Codex, or Work according to task suitability and available tools; preserve the applicable integration decision and documented handoff.
 - Secondary agents/services are bounded workers only; GPT controls routing, review, and integration.
 - One writer per change set; parallel lanes must be independent; integration is serialized.
 - Secondary agents never merge protected `main`.
@@ -55,7 +55,7 @@ Report exact SHA, PR/check evidence, runtime/visual evidence when applicable, un
 
 ## Controlled integration review
 
-One daily integration PR; request one Codex review on a practically final HEAD.
+Group related changes into coherent integration PRs. Use a separate PR when it reduces risk or helps delivery; do not impose a daily quota. Choose review proportionate to risk and final scope; preserve independent substantive review and the Owner integration decision where required by the shared regulation.
 Prioritize actionable correctness/security regressions: privilege/auth bypass, RLS/ownership,
 credential leakage, unsafe game-action authority, replay/idempotency/concurrency,
 stale-state execution, provenance drift, release/signing boundaries and destructive data behavior.

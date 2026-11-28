@@ -15,10 +15,10 @@ Read this file first. Do not load the entire repository documentation set by def
 
 - Git `main` at an exact SHA is implementation truth.
 - The Owner-facing orchestrator selects Chat, Codex, or Work according to task suitability and available tools; preserve the applicable integration decision and documented handoff.
-- Secondary agents/services are bounded workers only; GPT controls routing, review, and integration.
+- Secondary agents/services are bounded workers only; the Owner-facing assistant controls routing, review, and integration.
 - One writer per change set; parallel lanes must be independent; integration is serialized.
 - Secondary agents never merge protected `main`.
-- Exact-SHA required-check verification is mandatory before GPT merges.
+- Exact-SHA required-check verification and any applicable Owner integration decision are mandatory before integration.
 - Routine CI failures are fixed autonomously.
 - Never weaken security, fabricate evidence, or expose secrets.
 - Owner-only: production/live deployment, release publication, production credentials, signing material, branch-protection/required-check changes, repository permissions, irreversible destructive operations, fundamental product-direction changes, legal/commercial gates.
@@ -64,6 +64,6 @@ Missing physical/environment evidence is an explicit gate; never infer acceptanc
 
 ## Production design ownership
 
-GPT owns production design in alpha-0 under Design System v3. The companion design laboratory
+The project owns production design in alpha-0 under Design System v3. The companion design laboratory
 is reference/history only. No automatic imports or lab parity requirement. Owner visual acceptance
 is separate from implementation and automated contracts.

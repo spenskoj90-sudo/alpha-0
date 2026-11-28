@@ -7,7 +7,7 @@
 
 This is the canonical engineering-governance contract for SENTINEL.
 
-The former strict GPT-only participation restriction is retired. The current model is **GPT-controlled orchestration**: the Human Owner works through GPT/ChatGPT; GPT/ChatGPT remains the sole Owner-facing engineering orchestrator and final technical integrator; bounded secondary agents, model families, studios, and connected services may contribute only under GPT supervision and only when their use improves verified delivery.
+The former strict GPT-only participation restriction is retired. The Owner-facing assistant selects Chat, Codex, or Work according to task suitability and actual capabilities. Bounded secondary agents, model families, studios, and connected services may contribute when authorized and useful. Preserve one writer per branch, explicit handoff, applicable review and the Owner integration decision required by the shared regulation.
 
 ## 1. Authority
 
@@ -29,7 +29,7 @@ No agent or service may bypass these gates.
 
 ## 2. GPT/ChatGPT role
 
-GPT/ChatGPT is the sole Owner-facing orchestrator and final integrator.
+The Owner-facing assistant coordinates work and technical integration in the selected environment; this does not override the Owner integration decision or other applicable gates.
 
 GPT owns:
 - task decomposition and routing;
@@ -128,7 +128,7 @@ Routine build/test/lint/security/workflow failures are ordinary engineering work
 
 Never weaken security or meaningful tests to obtain green CI.
 
-GPT may merge a PR into `main` only when:
+After the required Owner integration decision, the responsible assistant may merge a PR into `main` only when:
 1. base is `main`;
 2. exact PR HEAD SHA is known;
 3. required checks are identified;

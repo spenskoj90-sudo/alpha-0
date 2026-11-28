@@ -14,11 +14,11 @@ Read this file first. Do not load the entire repository documentation set by def
 ## Core rules
 
 - Git `main` at an exact SHA is implementation truth.
-- GPT/ChatGPT is the sole Owner-facing orchestrator and final technical integrator.
-- Secondary agents/services are bounded workers only; GPT controls routing, review, and integration.
+- The Owner-facing orchestrator selects Chat, Codex, or Work according to task suitability and available tools; preserve the applicable integration decision and documented handoff.
+- Secondary agents/services are bounded workers only; the Owner-facing assistant controls routing, review, and integration.
 - One writer per change set; parallel lanes must be independent; integration is serialized.
 - Secondary agents never merge protected `main`.
-- Exact-SHA required-check verification is mandatory before GPT merges.
+- Exact-SHA required-check verification and any applicable Owner integration decision are mandatory before integration.
 - Routine CI failures are fixed autonomously.
 - Never weaken security, fabricate evidence, or expose secrets.
 - Owner-only: production/live deployment, release publication, production credentials, signing material, branch-protection/required-check changes, repository permissions, irreversible destructive operations, fundamental product-direction changes, legal/commercial gates.
@@ -55,7 +55,7 @@ Report exact SHA, PR/check evidence, runtime/visual evidence when applicable, un
 
 ## Controlled integration review
 
-One daily integration PR; request one Codex review on a practically final HEAD.
+Group related changes into coherent integration PRs. Use a separate PR when it reduces risk or helps delivery; do not impose a daily quota. Choose review proportionate to risk and final scope; preserve independent substantive review and the Owner integration decision where required by the shared regulation.
 Prioritize actionable correctness/security regressions: privilege/auth bypass, RLS/ownership,
 credential leakage, unsafe game-action authority, replay/idempotency/concurrency,
 stale-state execution, provenance drift, release/signing boundaries and destructive data behavior.
@@ -64,6 +64,6 @@ Missing physical/environment evidence is an explicit gate; never infer acceptanc
 
 ## Production design ownership
 
-GPT owns production design in alpha-0 under Design System v3. The companion design laboratory
+The project owns production design in alpha-0 under Design System v3. The companion design laboratory
 is reference/history only. No automatic imports or lab parity requirement. Owner visual acceptance
 is separate from implementation and automated contracts.
